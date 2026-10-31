@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="fi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Laulun miekka</title>
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div id="vignette"></div>
+    <div id="flash"></div>
+
+    <div id="hud">
+      <div class="bars">
+        <div class="bar-wrap">
+          <div class="label">Sinä</div>
+          <div class="bar"><div id="php" class="fill hp"></div></div>
+          <div class="label small">Laulun voima <span id="songReady"></span></div>
+          <div class="bar thin"><div id="psong" class="fill song"></div></div>
+        </div>
+        <div class="bar-wrap right">
+          <div class="label" id="ename">Pohjolan soturi</div>
+          <div class="bar"><div id="ehp" class="fill hp enemy"></div></div>
+          <div class="label small" id="wave">Aalto 1</div>
+        </div>
+      </div>
+      <div id="msg"></div>
+      <div id="sub"></div>
+      <div id="corner"><span id="ver"></span> · <span id="fps"></span> FPS</div>
+    </div>
+
+    <div id="song" class="hidden">
+      <div id="verse"></div>
+      <div id="track"><div id="marker"></div></div>
+      <div id="songHint">Paina välilyöntiä (tai napauta), kun riimu osuu merkkiin</div>
+    </div>
+
+    <div id="touch" class="hidden">
+      <button data-act="dodge">Väistä</button>
+      <button data-act="song">Laula</button>
+      <button data-act="block">Torju</button>
+      <button data-act="attack" class="big">Isku</button>
+    </div>
+
+    <div id="pause" class="overlay hidden">
+      <div class="panel">
+        <h1>Tauko</h1>
+        <p class="tag">Hiiri vapautui tai ikkuna menetti fokuksen.</p>
+        <button id="resumeBtn">Jatka</button>
+      </div>
+    </div>
+
+    <div id="start" class="overlay">
+      <div class="panel">
+        <h1>Laulun miekka</h1>
+        <p class="tag">Kalevala-taisteluprototyyppi</p>
+        <ul>
+          <li><b>WASD</b>: liiku ja kierrä vastustajaa</li>
+          <li><b>Hiiren vasen</b> tai <b>J</b>: isku</li>
+          <li><b>Hiiren oikea</b> tai <b>K</b> pohjassa: torjunta. Torju juuri ennen osumaa, niin vastustaja horjuu.</li>
+          <li><b>Shift</b>: väistö</li>
+          <li><b>Q</b>: kun laulun voima on täynnä, aika hidastuu ja laulat. Paina <b>välilyöntiä</b> tahdissa.</li>
+          <li><b>Esc</b>: vapauta hiiri ja pidä tauko</li>
+        </ul>
+        <p class="small">Vastustajan terä hehkuu, kun isku on tulossa. Laulun voima kasvaa osumista ja täydellisistä torjunnoista.</p>
+        <button id="startBtn">Aloita</button>
+      </div>
+    </div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
