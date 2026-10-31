@@ -7,7 +7,7 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-10-31
 
-- **Versio v00.01.00**, taisteluprototyyppi "Laulun miekka". Branch
+- **Versio v00.01.01**, taisteluprototyyppi "Laulun miekka". Branch
   `claude/combat-prototype`, haarautettu `claude/agent-docs`-branchista.
   Tarkista kummankin merge-tila `git merge-base --is-ancestor` -komennolla.
 - **Koodi valmis:** Three.js + TypeScript + Vite + Bun. Metsäaukio (kuusikko,
@@ -29,6 +29,10 @@ Päivitetty: 2026-10-31
 - **Komennot:** `bun run test` (12 testiä ok), `bunx tsc --noEmit` ok,
   `bun run build` ok, `bun audit` puhdas, `bun outdated` tyhjä.
 - **Riippuvuustarkistus:** 2026-10-31, ei mitään odottamassa.
+- v00.01.01: hiiren lukitus ja tauko. Todennettu Playwrightilla (lukitus
+  päälle, Esc/blur → tauko, Jatka → lukitus takaisin).
+- Repo on yksityinen, joten GitHub Pages vaatii joko julkisen repon tai
+  maksullisen GitHub-tilin. Vaihtoehto: Cloudflare Pages / Netlify.
 - Savutestien apuna `window.__game` (tila, tapahtumaloki, `fillSong()`,
   `nextBeatIn`, `enemyStrikeIn`).
 

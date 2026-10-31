@@ -121,6 +121,7 @@ window.addEventListener("keyup", (e) => {
   if (e.code === "KeyK") blockHeld = false;
 });
 canvas.addEventListener("mousedown", (e) => {
+  if (running && !document.pointerLockElement) lockPointer();
   if (e.button === 0) { attackQueued = true; beatQueued = true; }
   if (e.button === 2) blockHeld = true;
 });
@@ -627,6 +628,7 @@ function restart() {
   song = 0;
   gameOver = false;
   spawnEnemy();
+  lockPointer();
 }
 
 // ---------- Pääsilmukka ----------
@@ -646,7 +648,8 @@ function frame(now: number) {
   let dt = realDt * timeScale;
   if (hitstop > 0) { hitstop -= realDt; dt = 0; }
 
-  if (running) {
+  if (paused) dt = 0;
+  if (running && !paused) {
     gameTime += dt;
     updateSong();
     updatePlayer(dt);
@@ -707,11 +710,58 @@ function frame(now: number) {
   requestAnimationFrame(frame);
 }
 
+// ---------- Hiiren lukitus ja tauko ----------
+// Hiiri lukitaan pelin ajaksi, jotta kursori ei karkaa pelialueelta ja vie
+// klikkauksia muualle. Jos lukitus ei ole saatavilla (esim. upotettu näkymä),
+// peli pysähtyy, kun hiiri tai fokus lähtee ikkunasta.
+let paused = false;
+let pointerLockWorked = false;
+
+function clearInputs() {
+  keys.clear();
+  blockHeld = false;
+  attackQueued = dodgeQueued = songQueued = beatQueued = false;
+}
+
+function lockPointer() {
+  if (isTouch) return;
+  try {
+    const r = canvas.requestPointerLock() as unknown as Promise<void> | undefined;
+    if (r && typeof r.catch === "function") r.catch(() => {});
+  } catch {
+    /* lukitus ei ole sallittu: tauko hoitaa tilanteen */
+  }
+}
+
+function pause() {
+  if (!running || paused || gameOver) return;
+  paused = true;
+  clearInputs();
+  $("pause").classList.remove("hidden");
+}
+
+function resume() {
+  paused = false;
+  $("pause").classList.add("hidden");
+  last = performance.now();
+  lockPointer();
+}
+
+document.addEventListener("pointerlockchange", () => {
+  if (document.pointerLockElement === canvas) pointerLockWorked = true;
+  else if (pointerLockWorked) pause();
+});
+window.addEventListener("blur", () => { clearInputs(); pause(); });
+document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
+document.addEventListener("mouseleave", () => { if (!pointerLockWorked && !isTouch) pause(); });
+$("resumeBtn").addEventListener("click", resume);
+
 $("startBtn").addEventListener("click", () => {
   $("start").classList.add("hidden");
   sfx.start();
   running = true;
   spawnEnemy();
+  lockPointer();
 });
 
 // Kehityskäyttöön ja savutesteihin: tila näkyy konsolista.

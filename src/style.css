@@ -8,7 +8,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; color: var(--ink);
   font-family: Georgia, "Palatino Linotype", serif; user-select: none; -webkit-user-select: none; touch-action: none; }
-#c { display: block; width: 100vw; height: 100vh; transition: filter 0.4s; }
+#c { display: block; cursor: crosshair; width: 100vw; height: 100vh; transition: filter 0.4s; }
 #c.singing { filter: saturate(0.3) sepia(0.25) contrast(1.1) brightness(0.92); }
 #vignette { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.4s;
   background: radial-gradient(ellipse at center, transparent 45%, rgba(30, 20, 5, 0.75) 100%); }
