@@ -1,0 +1,28 @@
+# Riippuvuudet ja buildit
+node_modules
+dist
+*.local
+
+# Lokit
+logs
+*.log
+
+# Editorit ja käyttöjärjestelmä
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+
+# Blenderin varmuuskopiot
+*.blend1
+*.blend2
+
+# Paikalliset agenttityötilat ja koneenkohtaiset asetukset
+.worktrees/
+.claude/settings.local.json
+.claude/worktrees/
+
+# Salaisuudet
+.env
+.env.*
