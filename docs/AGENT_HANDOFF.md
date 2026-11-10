@@ -7,61 +7,71 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-10 (Claude, kotikone, Windows)
 
-- **Versio v00.01.01**, taisteluprototyyppi "Laulun miekka". Sen branchit
-  (`claude/agent-docs`, `claude/combat-prototype`) on mergetty mainiin.
-- **Viimeisin branch:** `claude/deps-update` (vite 8.3.7, vitest 5.1.0,
-  `.claude/launch.json`, tämä handoff). Ei pelikoodimuutosta, ei
-  versionnostoa. Tarkista merge-tila `git merge-base --is-ancestor`.
-- **Koodi valmis:** Three.js + TypeScript + Vite + Bun. Metsäaukio (kuusikko,
-  koivut, kivet, kota, nuotio), primitiiveistä koottu hahmo, proseduraaliset
-  asennot, lyönti/torjunta/täydellinen torjunta/väistö, vastustajan
-  tekoäly aalloittain, laululoitsu (rytmipeli, aika hidastuu 0,12x:ään,
-  onnistunut laulu laulaa vastustajan suohon).
-- **Deployattu:** GitHub Pagesissa https://immontim.github.io/3D_Kalevala_demo/
-  (repo julkinen; ensimmäinen onnistunut ajo 2026-11-10, käsin käynnistetty).
-  Jokainen push mainiin julkaisee uudelleen `.github/workflows/pages.yml`:n
-  kautta. Vanha Claude-artifact-esikatselu (yksityinen):
-  https://claude.ai/artifact/ThGhwtEyDkif1jTjBucwQg
-- **Käsin testattu:** pilvessä Playwright + headless Chromium (taistelu,
-  täydellinen torjunta, laulu → suo, hiiren lukitus ja tauko).
-  2026-11-10 kotikoneella Clauden in-app browserissa: dev- ja
-  preview-build renderöityvät, taistelu käynnistyy, ei konsolivirheitä.
-- **Ensimmäinen oikea FPS:** 60 FPS (vsync-katto, hitain ruutu 17 ms)
-  taistelun aikana, RTX 4080 Super, ikkuna 800×600. Koko näytön
-  tarkkuutta ja keskitason konetta ei ole mitattu. Huom: jos selainpaneeli
-  on piilossa, selain kuristaa ruudut ~1 FPS:ään — mittaa vain näkyvänä.
-- **Komennot 2026-11-10 (`claude/deps-update`):** `bun ci`, `bun audit`
-  (puhdas), `bun run test` (12/12), `bunx tsc --noEmit`, `bun run lint`,
-  `bun run build` — kaikki ok. Buildi varoittaa ~600 kt:n chunkista.
-- **Riippuvuustarkistus:** 2026-11-10, rajojen sisäiset päivitykset
-  otettu, `bun outdated` tyhjä, audit puhdas.
-- `.claude/launch.json`: konfiguraatiot `dev` (5173) ja `preview` (4173)
-  in-app browserin `preview_start`ia varten.
-- Savutestien apuna `window.__game` (tila, tapahtumaloki, `fillSong()`,
-  `nextBeatIn`, `enemyStrikeIn`).
+- **Versio v00.02.00**, branch `claude/forest-clearing` (tarkista merge-tila
+  `git merge-base --is-ancestor`). Edelliset branchit on mergetty mainiin.
+- **Koodi valmis:** taisteluprototyyppi (lyönti, torjunta, väistö, aallot,
+  laululoitsu) ja uusi metsäaukio Blender-putkella. `src/world.ts` lataa
+  `assets/forest.glb`:n (30 prototyyppimallia, 5 Mt) ja sijoittelee ne
+  instansseina: 423 puuta (mänty, kuusi, koivu), varvikko, heinät, saniaiset,
+  kivet, kelot, kota, nuotio. Maasto sekoittaa kolmea skannattua pintaa
+  shaderissa. Nuotio: shader-liekki, kipinät, savu, lepattava valo.
+  Jälkikäsittely `main.ts`:ssä (hehku, sävytys, vinjetti, MSAA säilyy).
+- **Blender-putki:** skriptit `assets-src/blender/`; koko ajo
+  `build_all.py` → `run()` (atlas → puut → propit → vienti). Lähdeassetit
+  haetaan `tools/fetch-polyhaven.ps1`:llä (140 Mt, ei Gitissä).
+  `forest_clearing.blend` (83 Mt) ei ole Gitissä: uudella koneella aja
+  haku, tuo glTF:t SRC-kokoelmaan (ks. Blender MCP -historia / `props.py`:n
+  odottamat objektinimet) ja aja `build_all.py`. **Tuontivaihetta ei ole
+  skriptattu** — se on aukko, jos .blend katoaa.
+- **Deployattu:** GitHub Pages https://immontim.github.io/3D_Kalevala_demo/
+  julkaisee mainin. v00.02.00 ei ole vielä mainissa.
+- **Käsin testattu 2026-11-10** (Clauden in-app browser, dev-serveri):
+  renderöinti, taistelun käynnistys, ei konsolivirheitä. **60 FPS, hitain
+  ruutu 17 ms, 1280×720, noin 2,0 milj. kolmiota, RTX 4080 Super.**
+  Koko näytön tarkkuutta, keskitason konetta ja mobiilia ei ole mitattu.
+  Huom: piilotettu selainpaneeli kuristaa ruudut ~1 FPS:ään.
+- **Komennot 2026-11-10:** `bun run test` (12/12), `bun run lint`,
+  `bun run build` ok. Bundle 709 kt + assetit 7,8 Mt.
+- **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
+- **Arviointi (ali-agentti, kuvakaappauksista):** kierros 1 noin 30–35 %
+  Chivalry 2 -tasosta, kierros 2 noin 50 %; arvioijan mukaan selaimen katto
+  on noin 65–70 %. Kolmatta korjausta (nuotion hehku, utu, varvikon
+  kirkkaus, kiven sävy) ei ole arvioitu uudelleen.
+- Savutestien apuna `window.__game` (tila, `fillSong()`,
+  `setCamera([x,y,z],[x,y,z])` vapaa kamera, `setCamera(null)` takaisin)
+  ja `window.__world` (puiden ja kolmioiden määrä).
 
 ## Tunnetut rajoitteet ja riskit
 
-- Osumat ratkaistaan etäisyyden ja kulman perusteella iskun lauetessa, ei
-  terän todellisesta liikeradasta. Chivalry-tyyppinen terän jäljitys on
-  myöhempää työtä.
+- **Suorituskyky on mitattu vain tehokoneella.** 2 milj. kolmiota, 4096²
+  varjokartta ja jälkikäsittely voivat olla liikaa integroidulle
+  näytönohjaimelle. LOD-malleja ja laatuasetusta ei ole.
+- Hahmot ovat yhä primitiivejä ja näyttävät vierailta uudessa metsässä.
+- Avoimet grafiikkaviat (arvioijan lista): kodassa ei näkyvää oviaukkoa
+  aukiolle päin ja reuna on liian siisti; uhrikivi on ruskea eikä harmaa
+  graniitti; latvukset näyttävät vastavalossa paperisilta; varvikon
+  alfa-reunat voivat väreillä liikkeessä (ei varmistettu); nuotion valo ei
+  näy päivänvalossa ympäristössä; ei tuulta (kasvit eivät liiku).
+- Puiden runkoihin ja kiviin ei voi törmätä; aukion raja on yhä ympyrä.
+- Blender-skriptien polut on kovakoodattu (`C:DataD Kalevala`).
+- Osumat ratkaistaan etäisyyden ja kulman perusteella, ei terän liikeradasta.
 - Vihollinen ei tee täydellisiä torjuntoja eikä harhautuksia.
 - Kosketusnapit ovat alkeelliset, eikä liikkumista ole kosketuksella.
-- Pelin aika etenee enintään 0,05 s / ruutu, joten hyvin hitaalla
-  koneella koko peli hidastuu (myös laulun rytmi).
-- Bundle on noin 600 kt (Three.js mukana). Ei haittaa vielä.
+- Pelin aika etenee enintään 0,05 s / ruutu: hitaalla koneella peli hidastuu.
 
 ## Seuraava tehtävä
 
-Omistaja pelaa esikatselua ja kertoo tuntumasta (ajoitukset, kamera,
-laulun vaikeus). Sen jälkeen joko taistelun syventäminen (iskusuunnat,
-terän jäljitys) tai Blender MCP -asennusharjoitus.
+Omistaja pelaa uuden metsäaukion (mieluiten koko näytöllä ja myös
+läppärillä) ja kertoo tuntuman ja FPS:n. Sen perusteella joko grafiikan
+seuraava kierros (avoimet viat yllä, tuuli, LOD/laatuasetus) tai hahmojen
+mallinnus Blenderissä.
 
 ## Ei vielä aloiteta
 
 - Karttanäkymä ja siirtymät karttaan/3D-paikkoihin.
-- Oikeat 3D-mallit ja Git LFS (vasta kun Blender-putki on testattu).
-- Gauntlet-loop ali-agenteilla (vasta kun suunta on lyöty lukkoon).
+- Git LFS (omistajan päätös 2026-11-10: ei vielä; GLB:t pidetään pieninä ja
+  .blend poissa Gitistä).
+- Isojen skannattujen puiden (Poly Haven, 0,5 Gt/kpl) lataus ja kevennys.
 
 ## Pysyvät päätökset
 
@@ -71,6 +81,9 @@ terän jäljitys) tai Blender MCP -asennusharjoitus.
   GitHub-synkkauksen kautta, mutta koodia ei kirjoiteta Lovablen tekoälyllä
   (kaksi tekoälyä samassa koodissa sotkisi).
 - Tyyli: pronssikautinen / varhaisen rautakauden Fennoskandia.
+- Ulkopuoliset assetit vain CC0 (Poly Haven); lähteet `assets/CREDITS.md`.
+  Puut tehdään itse oksakorteista, koska skannatut puut ovat selaimelle
+  liian raskaita (17 milj. polygonia).
 - `bun.lock` on muotoa `lockfileVersion: 2`, joten vaaditaan Bun 1.4 tai
   uudempi (1.3 ei osaa lukea sitä). Kotikoneella Bun 1.4.4.
 - Laulun säkeet otetaan Kalevalasta (1849, vapaa käyttää).

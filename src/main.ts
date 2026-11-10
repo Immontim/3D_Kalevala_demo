@@ -8,6 +8,11 @@ import { ARENA_RADIUS, buildWorld, groundHeight } from "./world";
 import { Sfx } from "./audio";
 import { BeatJudgement, GOOD_WINDOW, SONG_VERSES, judgeBeat, songOutcome } from "./songLogic";
 import { VERSION } from "./version";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 
 // ---------- Perusasetukset ----------
 const canvas = document.getElementById("c") as HTMLCanvasElement;
@@ -20,11 +25,34 @@ renderer.toneMappingExposure = 1.05;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 300);
-const world = buildWorld(scene);
+const world = buildWorld(scene, renderer);
 const sfx = new Sfx();
+
+// Jälkikäsittely: hehku (nuotio, vastavalo), sävytys ja vinjetti. MSAA säilyy renderöintikohteessa.
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.14, 0.5, 1.0));
+composer.addPass(new OutputPass());
+composer.addPass(new ShaderPass({
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+  fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
+    void main(){
+      vec3 c = texture2D(tDiffuse, vUv).rgb;
+      float l = dot(c, vec3(0.299, 0.587, 0.114));
+      c = mix(vec3(l), c, 0.92);                                   // hieman hillitympi värikylläisyys
+      c *= mix(vec3(0.93, 0.98, 1.06), vec3(1.05, 1.0, 0.93), smoothstep(0.1, 0.8, l));   // viileät varjot, lämpimät valot
+      c = (c - 0.5) * 1.06 + 0.5;
+      vec2 d = vUv - 0.5;
+      c *= 1.0 - dot(d, d) * 0.55;                                 // vinjetti
+      gl_FragColor = vec4(c, 1.0);
+    }`,
+}));
 
 function resize() {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
+  composer.setPixelRatio(renderer.getPixelRatio());
+  composer.setSize(window.innerWidth, window.innerHeight);
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
 }
@@ -585,7 +613,14 @@ function syncVisual(a: Actor, dt: number) {
 // ---------- Kamera ----------
 const camPos = new THREE.Vector3(0, 4, -9);
 const camLook = new THREE.Vector3();
+// Savutestien ja kuvakaappausten vapaa kamera: { pos: [x,y,z], look: [x,y,z] } tai null.
+let camOverride: { pos: number[]; look: number[] } | null = null;
 function updateCamera(dt: number) {
+  if (camOverride) {
+    camera.position.fromArray(camOverride.pos);
+    camera.lookAt(camOverride.look[0], camOverride.look[1], camOverride.look[2]);
+    return;
+  }
   const target = enemy && enemy.state !== "dead" ? enemy.pos : player.pos.clone().add(new THREE.Vector3(Math.sin(player.yaw), 0, Math.cos(player.yaw)).multiplyScalar(3));
   const dir = target.clone().sub(player.pos).setY(0);
   if (dir.lengthSq() < 0.01) dir.set(0, 0, 1);
@@ -694,7 +729,7 @@ function frame(now: number) {
   }
   ringGeo.attributes.position.needsUpdate = true;
 
-  world.update(realTime, dt);
+  world.update(realTime, dt, camera);
   updateSparks(dt);
   shake = Math.max(0, shake - realDt * 1.2);
   updateCamera(realDt);
@@ -706,7 +741,7 @@ function frame(now: number) {
   }
   attackQueued = dodgeQueued = songQueued = beatQueued = false;
 
-  renderer.render(scene, camera);
+  composer.render();
   requestAnimationFrame(frame);
 }
 
@@ -772,6 +807,8 @@ $("startBtn").addEventListener("click", () => {
   get events() { return [...events]; },
   get song() { return songState ? { results: [...songState.results], done: songState.done, realTime, beats: songState.beats } : null; },
   fillSong() { song = SONG_MAX; },
+  /** Vapaa kamera kuvakaappauksia varten; null palauttaa pelikameran. */
+  setCamera(pos: number[] | null, look: number[] = [0, 1, 0]) { camOverride = pos ? { pos, look } : null; },
   /** Sekunteja (reaaliaikaa) seuraavaan laulun tahtiin, tai null. */
   get nextBeatIn() {
     if (!songState) return null;
