@@ -26,3 +26,11 @@ Thumbs.db
 # Salaisuudet
 .env
 .env.*
+
+# Poly Havenista haetut lähdeassetit (tools/fetch-polyhaven.ps1 hakee uudelleen)
+assets-src/_downloads/
+
+# Blender-lähdetiedosto ja välitulokset: yli 50 Mt, rakennetaan uudelleen skripteillä (assets-src/blender/)
+assets-src/*.blend
+assets-src/cards/
+assets-src/textures/
