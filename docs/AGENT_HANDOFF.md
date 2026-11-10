@@ -17,10 +17,10 @@ Päivitetty: 2026-11-10 (Claude, kotikone, Windows)
   asennot, lyönti/torjunta/täydellinen torjunta/väistö, vastustajan
   tekoäly aalloittain, laululoitsu (rytmipeli, aika hidastuu 0,12x:ään,
   onnistunut laulu laulaa vastustajan suohon).
-- **Deployattu:** ei GitHub Pagesiin vielä. Työnkulku
-  `.github/workflows/pages.yml` on valmis, mutta omistajan pitää kytkeä
-  Pages päälle (Settings → Pages → Source: GitHub Actions). Pelattava
-  esikatselu on julkaistu Claude-artifactina (yksityinen):
+- **Deployattu:** GitHub Pagesissa https://immontim.github.io/3D_Kalevala_demo/
+  (repo julkinen; ensimmäinen onnistunut ajo 2026-11-10, käsin käynnistetty).
+  Jokainen push mainiin julkaisee uudelleen `.github/workflows/pages.yml`:n
+  kautta. Vanha Claude-artifact-esikatselu (yksityinen):
   https://claude.ai/artifact/ThGhwtEyDkif1jTjBucwQg
 - **Käsin testattu:** pilvessä Playwright + headless Chromium (taistelu,
   täydellinen torjunta, laulu → suo, hiiren lukitus ja tauko).
@@ -37,8 +37,6 @@ Päivitetty: 2026-11-10 (Claude, kotikone, Windows)
   otettu, `bun outdated` tyhjä, audit puhdas.
 - `.claude/launch.json`: konfiguraatiot `dev` (5173) ja `preview` (4173)
   in-app browserin `preview_start`ia varten.
-- Repo on yksityinen, joten GitHub Pages vaatii joko julkisen repon tai
-  maksullisen GitHub-tilin. Vaihtoehto: Cloudflare Pages / Netlify.
 - Savutestien apuna `window.__game` (tila, tapahtumaloki, `fillSong()`,
   `nextBeatIn`, `enemyStrikeIn`).
 
