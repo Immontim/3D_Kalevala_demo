@@ -24,6 +24,25 @@ Itse tehty Blenderissä (skriptit `assets-src/blender/`): puiden rungot ja
 oksistojen geometria, koivun tuohi ja lehdet, mustikka-, puolukka- ja
 kanervakortit, kota ja nuotion asettelu.
 
+## `characters.glb`
+
+| Osa | Lähde | Käyttö |
+| --- | --- | --- |
+| Vartalo, pää, kädet, silmät | [Blender Studio Human Base Meshes](https://www.blender.org/download/demo-files/) v1.4.1, `GEO-body_male_realistic` (CC0) | Sormet koukistettu nyrkkiin; vaatteet johdettu vartalon pinnasta |
+| Nahka (vyö, kengät, tuppi, kilven reunus) | Poly Haven `brown_leather` | |
+| Villatunika, myssy | Poly Haven `hessian_230` | |
+| Sininen alustunika ja housut | Poly Haven `rough_linen` | |
+| Tumma villatunika | Poly Haven `poly_wool_herringbone` | |
+| Housut, säärikääreet | Poly Haven `cotton_jersey` | Sävytetty verteksiväreillä |
+| Kilpien lankut, keihään varsi | Poly Haven `medieval_wood` | Kilpien maalaus tehty itse |
+
+Itse tehty (skriptit `assets-src/blender/char_*.py`): luuranko ja painot,
+rengaspanssarin ja koristenauhojen tekstuurit, kypärät, hiukset ja parrat,
+säärisuojat, olkaviitta, miekka, keihäs ja kilvet. Hahmojen ulkoasu perustuu
+omistajan referenssikuviin (kansio `Reference Pictures/`, ei Gitissä).
+
+Haku: `tools/fetch-characters.ps1`. Ladattu mutta ei käytössä: `metal_plate_02`.
+
 ## `ground/`
 
 | Tiedosto | Lähde |

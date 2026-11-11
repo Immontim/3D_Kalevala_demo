@@ -1,7 +1,10 @@
 import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
+import charactersUrl from "../assets/characters.glb?url";
 
-// Primitiiveistä koottu hahmo ja proseduraalinen animaatio (ei luurankoanimaatioita).
-// Asennot (Pose) ovat nivelkulmia, joita kohti hahmo pehmeästi liukuu.
+// Blenderissä mallinnettu luurankohahmo, jota ohjataan koodilla: asennot (Pose) ovat
+// nivelkulmia, joita kohti hahmo pehmeästi liukuu. Valmiita animaatioleikkeitä ei ole.
 
 export interface Pose {
   spineYaw: number;
@@ -54,192 +57,264 @@ export const POSES: Record<string, Pose> = {
   },
 };
 
+export type CharacterId = "hero" | "urho" | "pohja";
+export type Loadout = "sword" | "sword_shield" | "spear";
+
 export interface FighterLook {
-  tunic: number;
-  trim: number;
-  skin: number;
-  hair: number;
-  blade: number;
-  cap?: number;
+  character: CharacterId;
+  loadout: Loadout;
+}
+
+// ---------- Blender-hahmot (assets/characters.glb) ----------
+// Tiedostossa on yksi luuranko (RIG, 17 luuta), kolme hahmoa (char_hero, char_urho,
+// char_pohja) ja varusteet (sword, spear, shield_*). Jokainen taistelija saa oman
+// kloonin, josta jätetään näkyviin vain oma hahmo ja varusteet.
+const BONE_NAMES = [
+  "hips", "spine", "chest", "neck", "head",
+  "upper_arm_L", "forearm_L", "hand_L", "upper_arm_R", "forearm_R", "hand_R",
+  "thigh_L", "shin_L", "foot_L", "thigh_R", "shin_R", "foot_R",
+] as const;
+type BoneName = (typeof BONE_NAMES)[number];
+const ARM_BONES = new Set<BoneName>(["upper_arm_L", "forearm_L", "hand_L", "upper_arm_R", "forearm_R", "hand_R"]);
+
+const characterAssets = new GLTFLoader().loadAsync(charactersUrl);
+/** Valmistuu, kun hahmomallit on ladattu. */
+export const charactersReady: Promise<void> = characterAssets.then(() => undefined);
+charactersReady.catch((e) => console.error("Hahmomallien lataus epäonnistui", e));
+
+let envMap: THREE.Texture | null = null;
+const envTargets = new Set<THREE.MeshStandardMaterial>();
+/** Ympäristökartta metallipinnoille (kypärä, rengaspanssari, terä); ilman sitä metalli näkyy mustana. */
+export function setCharacterEnv(tex: THREE.Texture) {
+  envMap = tex;
+  for (const m of envTargets) { m.envMap = tex; m.needsUpdate = true; }
+}
+
+const DOWN = new THREE.Vector3(0, -1, 0);
+const qA = new THREE.Quaternion(), qB = new THREE.Quaternion(), qC = new THREE.Quaternion();
+const eul = new THREE.Euler();
+const vTmp = new THREE.Vector3();
+const IDENT = new THREE.Quaternion();
+
+interface BoneInfo {
+  bone: THREE.Bone;
+  parent: BoneName | null;
+  /** Luun asento hahmon koordinaatistossa, kun virtuaalinen ranka on nolla-asennossa (kädet suorina alas). */
+  canon: THREE.Quaternion;
+  world: THREE.Quaternion;
 }
 
 export class Fighter {
   readonly root = new THREE.Group();
   readonly body = new THREE.Group(); // kaatuu kuollessa
-  private hips = new THREE.Group();
-  private spine = new THREE.Group();
-  private head = new THREE.Group();
-  private rSh = new THREE.Group();
-  private rEl = new THREE.Group();
-  private rHand = new THREE.Group();
-  private lSh = new THREE.Group();
-  private lEl = new THREE.Group();
-  private lThigh = new THREE.Group();
-  private rThigh = new THREE.Group();
-  private lKnee = new THREE.Group();
-  private rKnee = new THREE.Group();
-  readonly bladeMat: THREE.MeshStandardMaterial;
   readonly bladeTip = new THREE.Object3D();
   readonly bladeBase = new THREE.Object3D();
+  private weapon = new THREE.Group();
+  private rig: THREE.Object3D | null = null;
+  private bones = new Map<BoneName, BoneInfo>();
+  private hipsRest = new THREE.Vector3();
+  private footRestY = 0;
+  private bladeMats: THREE.MeshStandardMaterial[] = [];
   private pose: Pose = { ...POSES.guard };
   private walkPhase = 0;
+  private disposed = false;
   sink = 0; // suohon vajoaminen metreinä
   fall = 0; // 0..1 kaatuminen
 
-  constructor(look: FighterLook) {
-    const mat = (color: number, rough = 0.9, metal = 0) =>
-      new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal });
-    const tunic = mat(look.tunic), trim = mat(look.trim), skin = mat(look.skin, 0.7), hair = mat(look.hair);
-    const leg = mat(0x4a3b2c);
-    this.bladeMat = new THREE.MeshStandardMaterial({
-      color: look.blade, roughness: 0.35, metalness: 0.85, emissive: 0x000000,
-    });
-    const shadowy = (m: THREE.Mesh) => {
+  constructor(readonly look: FighterLook) {
+    this.root.add(this.body);
+    // Terän pisteet ovat olemassa heti, vaikka malli latautuu vasta hetken päästä.
+    this.weapon.position.set(-0.3, 1.0, 0.2);
+    this.body.add(this.weapon);
+    const spear = look.loadout === "spear";
+    this.bladeBase.position.z = spear ? 1.08 : 0.12;
+    this.bladeTip.position.z = spear ? 1.36 : 0.8;
+    this.weapon.add(this.bladeBase, this.bladeTip);
+    characterAssets.then((gltf) => { if (!this.disposed) this.build(gltf.scene); });
+  }
+
+  dispose() { this.disposed = true; }
+
+  private build(source: THREE.Object3D) {
+    const clone = SkeletonUtils.clone(source);
+    const rig = clone.getObjectByName("RIG") ?? clone;
+    const keep = new Set<string>([`char_${this.look.character}`]);
+    const equip: Record<string, THREE.Object3D> = {};
+    for (const child of [...clone.children, ...rig.children]) {
+      const n = child.name;
+      if (n.startsWith("char_") && !keep.has(n)) child.removeFromParent();
+      if (/^(sword|spear|shield_)/.test(n)) { equip[n] = child; child.removeFromParent(); }
+    }
+    clone.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
       m.castShadow = true;
       m.receiveShadow = true;
-      return m;
-    };
-    const capsule = (r: number, len: number, m: THREE.Material) =>
-      shadowy(new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 4, 8), m));
+      m.frustumCulled = false;
+      const mat = m.material as THREE.MeshStandardMaterial;
+      if (mat.metalness > 0.5) { envTargets.add(mat); mat.envMapIntensity = 0.45; if (envMap) mat.envMap = envMap; }
+    });
+    this.body.add(clone);
+    this.rig = rig;
+    clone.updateMatrixWorld(true);
 
-    this.root.add(this.body);
-    this.body.add(this.hips);
-    this.hips.position.y = 0.95;
-
-    // Jalat
-    for (const [thigh, knee, x] of [
-      [this.lThigh, this.lKnee, 0.12],
-      [this.rThigh, this.rKnee, -0.12],
-    ] as const) {
-      thigh.position.set(x, 0, 0);
-      const t = capsule(0.085, 0.36, leg);
-      t.position.y = -0.24;
-      thigh.add(t);
-      knee.position.y = -0.47;
-      const s = capsule(0.07, 0.34, leg);
-      s.position.y = -0.22;
-      knee.add(s);
-      const foot = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.08, 0.24), trim));
-      foot.position.set(0, -0.44, 0.05);
-      knee.add(foot);
-      thigh.add(knee);
-      this.hips.add(thigh);
+    // Lepoasennot hahmon omassa koordinaatistossa (klooni on vielä origossa).
+    const inv = qC.copy(this.body.getWorldQuaternion(new THREE.Quaternion())).invert();
+    for (const name of BONE_NAMES) {
+      const bone = rig.getObjectByName(name) as THREE.Bone;
+      const rest = bone.getWorldQuaternion(new THREE.Quaternion()).premultiply(inv);
+      const canon = rest.clone();
+      if (ARM_BONES.has(name)) {
+        // A-asennosta kädet suoriksi alas: sama nolla-asento kuin vanhassa primitiivihahmossa.
+        const dir = vTmp.set(0, 1, 0).applyQuaternion(rest).clone();
+        canon.premultiply(new THREE.Quaternion().setFromUnitVectors(dir, DOWN));
+      }
+      const p = bone.parent && (BONE_NAMES as readonly string[]).includes(bone.parent.name) ? (bone.parent.name as BoneName) : null;
+      this.bones.set(name, { bone, parent: p, canon, world: new THREE.Quaternion() });
     }
+    const hips = this.bones.get("hips")!.bone;
+    this.hipsRest.copy(hips.position);
+    this.footRestY = Math.min(this.boneY("foot_L"), this.boneY("foot_R"));
 
-    // Vartalo: tunika levenee helmaksi.
-    this.hips.add(this.spine);
-    const torso = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.58, 10), tunic));
-    torso.position.y = 0.3;
-    this.spine.add(torso);
-    const skirt = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.33, 0.32, 10), tunic));
-    skirt.position.y = -0.1;
-    this.hips.add(skirt);
-    const belt = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.255, 0.255, 0.07, 12), trim));
-    belt.position.y = 0.04;
-    this.spine.add(belt);
-    const chest = shadowy(new THREE.Mesh(new THREE.SphereGeometry(0.23, 10, 8), tunic));
-    chest.scale.set(1.15, 0.7, 0.85);
-    chest.position.y = 0.55;
-    this.spine.add(chest);
-
-    // Pää
-    this.head.position.y = 0.78;
-    this.spine.add(this.head);
-    const neck = capsule(0.06, 0.08, skin);
-    neck.position.y = -0.05;
-    this.head.add(neck);
-    const skull = shadowy(new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), skin));
-    skull.position.y = 0.12;
-    this.head.add(skull);
-    const hairMesh = shadowy(new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 8, 0, Math.PI * 2, 0, Math.PI / 1.8), hair));
-    hairMesh.position.set(0, 0.13, -0.015);
-    this.head.add(hairMesh);
-    const beard = shadowy(new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.2, 8), hair));
-    beard.rotation.x = Math.PI;
-    beard.position.set(0, 0.0, 0.07);
-    this.head.add(beard);
-    if (look.cap !== undefined) {
-      const cap = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.12, 12), mat(look.cap)));
-      cap.position.y = 0.22;
-      this.head.add(cap);
+    // Ase oikeaan käteen: pidikkeen asento = virtuaalinen käsikehys (terä +z).
+    const hand = this.bones.get("hand_R")!;
+    this.weapon.removeFromParent();
+    hand.bone.add(this.weapon);
+    const cInv = hand.canon.clone().invert();
+    this.weapon.quaternion.copy(cInv).multiply(qA.setFromEuler(eul.set(0, HAND_TWIST, 0)));
+    this.weapon.position.copy(vTmp.set(GRIP.x, GRIP.y, GRIP.z).applyQuaternion(cInv));
+    const weaponModel = equip[this.look.loadout === "spear" ? "spear" : "sword"];
+    if (weaponModel) {
+      weaponModel.position.set(0, 0, 0);
+      weaponModel.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh) return;
+        const mat = m.material as THREE.MeshStandardMaterial;
+        if (mat.metalness > 0.5) {
+          // Oma kopio, jotta vihollisen terän hehku ei sytytä muiden teriä.
+          const own = mat.clone();
+          if (envMap) own.envMap = envMap;
+          envTargets.add(own);
+          m.material = own;
+          this.bladeMats.push(own);
+        }
+      });
+      this.weapon.add(weaponModel);
     }
+    if (this.look.loadout === "sword_shield") {
+      const shield = equip[`shield_${this.look.character}`];
+      const arm = this.bones.get("forearm_L")!;
+      if (shield) {
+        const aInv = arm.canon.clone().invert();
+        const holder = new THREE.Group();
+        // Keskikahvakilpi: pinta osoittaa kyynärvarren suuntaan (rystyset edellä), joten
+        // koukistetulla kädellä kilpi on pystyssä vartalon edessä.
+        holder.quaternion.copy(aInv).multiply(qA.setFromEuler(eul.set(Math.PI / 2, 0, 0)));
+        holder.position.copy(vTmp.set(0.0, -0.36, 0.0).applyQuaternion(aInv));
+        shield.position.set(0, 0, 0);
+        holder.add(shield);
+        arm.bone.add(holder);
+      }
+    }
+    this.apply(0);
+  }
 
-    // Kädet
-    const arm = (sh: THREE.Group, el: THREE.Group, x: number) => {
-      sh.position.set(x, 0.62, 0);
-      const ua = capsule(0.065, 0.24, tunic);
-      ua.position.y = -0.15;
-      sh.add(ua);
-      el.position.y = -0.3;
-      const fa = capsule(0.055, 0.22, skin);
-      fa.position.y = -0.14;
-      el.add(fa);
-      sh.add(el);
-      this.spine.add(sh);
+  private boneY(name: BoneName) {
+    return this.bones.get(name)!.bone.getWorldPosition(vTmp).y - this.body.getWorldPosition(new THREE.Vector3()).y;
+  }
+
+  /** Asettaa luun hahmokoordinaatiston kierron v (virtuaalinen nivelkehys) mukaan. */
+  private setBone(name: BoneName, v: THREE.Quaternion) {
+    const b = this.bones.get(name)!;
+    b.world.copy(v).multiply(b.canon);
+    const pw = b.parent ? this.bones.get(b.parent)!.world : IDENT;
+    b.bone.quaternion.copy(qC.copy(pw).invert()).multiply(b.world);
+  }
+
+  private apply(moveAmp: number) {
+    if (!this.rig) return;
+    const p = this.pose;
+    const S = new THREE.Quaternion().setFromEuler(eul.set(p.spinePitch, p.spineYaw, 0));
+    const H = new THREE.Quaternion().setFromEuler(eul.set(p.headPitch, -p.spineYaw * 0.5, 0));
+    const half = new THREE.Quaternion().slerpQuaternions(IDENT, S, 0.5);
+    this.setBone("hips", IDENT);
+    this.setBone("spine", half);
+    this.setBone("chest", S);
+    this.setBone("neck", qA.copy(S).multiply(qB.slerpQuaternions(IDENT, H, 0.5)));
+    this.setBone("head", qA.copy(S).multiply(H));
+
+    const arm = (side: "L" | "R", shX: number, shZ: number, el: number, hand: THREE.Quaternion | null) => {
+      const sh = new THREE.Quaternion().copy(S).multiply(qA.setFromEuler(eul.set(shX, 0, shZ)));
+      this.setBone(`upper_arm_${side}`, sh);
+      const fo = sh.clone().multiply(qA.setFromEuler(eul.set(el, 0, 0)));
+      this.setBone(`forearm_${side}`, fo);
+      this.setBone(`hand_${side}`, hand ? fo.multiply(hand) : fo);
     };
-    arm(this.rSh, this.rEl, -0.3);
-    arm(this.lSh, this.lEl, 0.3);
+    arm("R", p.rShX, p.rShZ, p.rEl, qB.setFromEuler(eul.set(p.rHandX, p.rHandY, 0, "YXZ")).clone());
+    arm("L", p.lShX, p.lShZ, p.lEl, null);
+    eul.order = "XYZ";
 
-    // Pronssimiekka (lehtimäinen terä) oikeassa kädessä. Terä osoittaa käden +z-suuntaan.
-    this.rHand.position.y = -0.29;
-    this.rEl.add(this.rHand);
-    const grip = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.14, 6), trim));
-    grip.rotation.x = Math.PI / 2;
-    this.rHand.add(grip);
-    const guard = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.03, 0.04), this.bladeMat));
-    guard.position.z = 0.08;
-    this.rHand.add(guard);
-    const shape = new THREE.Shape();
-    shape.moveTo(-0.025, 0);
-    shape.quadraticCurveTo(-0.05, 0.42, -0.018, 0.68);
-    shape.lineTo(0, 0.76);
-    shape.lineTo(0.018, 0.68);
-    shape.quadraticCurveTo(0.05, 0.42, 0.025, 0);
-    shape.lineTo(-0.025, 0);
-    const bladeGeo = new THREE.ExtrudeGeometry(shape, { depth: 0.012, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 1 });
-    bladeGeo.translate(0, 0, -0.006);
-    const blade = shadowy(new THREE.Mesh(bladeGeo, this.bladeMat));
-    blade.rotation.x = Math.PI / 2;
-    blade.position.z = 0.09;
-    this.rHand.add(blade);
-    this.bladeBase.position.z = 0.15;
-    this.bladeTip.position.z = 0.84;
-    this.rHand.add(this.bladeBase, this.bladeTip);
+    // Kävely: reidet heiluvat vastakkain, polvet koukistuvat.
+    const s = Math.sin(this.walkPhase);
+    const leg = (side: "L" | "R", thighRot: number, kneeRot: number) => {
+      const th = new THREE.Quaternion().setFromEuler(eul.set(thighRot, 0, 0));
+      this.setBone(`thigh_${side}`, th);
+      const sh = th.clone().multiply(qA.setFromEuler(eul.set(kneeRot, 0, 0)));
+      this.setBone(`shin_${side}`, sh);
+      this.setBone(`foot_${side}`, qA.slerpQuaternions(sh, IDENT, 0.7));
+    };
+    leg("L", -s * moveAmp - p.crouch * 1.2, Math.max(0, s) * moveAmp * 1.4 + p.crouch * 2);
+    leg("R", s * moveAmp - p.crouch * 1.2, Math.max(0, -s) * moveAmp * 1.4 + p.crouch * 2);
+
+    // Lantio seuraa jalkoja: alempi jalka pysyy maassa kyykyssä ja askeleessa.
+    const hips = this.bones.get("hips")!.bone;
+    hips.position.copy(this.hipsRest);
+    this.rig.position.y = 0;
+    this.rig.updateMatrixWorld(true);
+    const low = Math.min(this.boneY("foot_L"), this.boneY("foot_R"));
+    this.rig.position.y = this.footRestY - low - this.sink;
   }
 
   /** Liu'uttaa asentoa kohti kohdeasentoa. rate = kuinka nopeasti (1/s). */
   animate(target: Pose, rate: number, dt: number, moveSpeed: number) {
     const k = 1 - Math.exp(-rate * dt);
-    for (const key of KEYS) this.pose[key] += (target[key] - this.pose[key]) * k;
-    const p = this.pose;
-
-    this.spine.rotation.set(p.spinePitch, p.spineYaw, 0);
-    this.head.rotation.set(p.headPitch, -p.spineYaw * 0.5, 0);
-    this.rSh.rotation.set(p.rShX, 0, p.rShZ);
-    this.rEl.rotation.set(p.rEl, 0, 0);
-    this.rHand.rotation.set(p.rHandX, p.rHandY, 0, "YXZ");
-    this.lSh.rotation.set(p.lShX, 0, p.lShZ);
-    this.lEl.rotation.set(p.lEl, 0, 0);
-
-    // Kävely: reidet heiluvat vastakkain, polvet koukistuvat.
+    // Kilpikäsi: kilpi pysyy vartalon edessä ja nousee torjunnassa eteen, ei pään päälle.
+    const over = this.look.loadout === "sword_shield"
+      ? (target === POSES.block ? SHIELD_BLOCK : SHIELD_ARM.has(target) ? SHIELD_GUARD : null)
+      : this.look.loadout === "spear" ? SPEAR.get(target) ?? null : null;
+    for (const key of KEYS) {
+      const goal = over && key in over ? over[key as keyof typeof over]! : target[key];
+      this.pose[key] += (goal - this.pose[key]) * k;
+    }
     this.walkPhase += dt * moveSpeed * 3.2;
-    const amp = Math.min(1, moveSpeed / 3) * 0.6;
-    const s = Math.sin(this.walkPhase);
-    this.lThigh.rotation.x = -s * amp - p.crouch * 1.2;
-    this.rThigh.rotation.x = s * amp - p.crouch * 1.2;
-    this.lKnee.rotation.x = Math.max(0, s) * amp * 1.4 + p.crouch * 2;
-    this.rKnee.rotation.x = Math.max(0, -s) * amp * 1.4 + p.crouch * 2;
-    this.hips.position.y = 0.95 - p.crouch * 0.5 + Math.abs(Math.cos(this.walkPhase)) * amp * 0.05 - this.sink;
-
     // Kaatuminen selälleen.
     this.body.rotation.x = -this.fall * (Math.PI / 2) * 0.95;
     this.body.position.y = this.fall * 0.15;
+    this.apply(Math.min(1, moveSpeed / 3) * 0.6);
   }
 
   setGlow(amount: number) {
-    this.bladeMat.emissive.setRGB(amount * 1.0, amount * 0.6, amount * 0.15);
+    for (const m of this.bladeMats) m.emissive.setRGB(amount * 1.0, amount * 0.6, amount * 0.15);
   }
 }
+
+// Kilpikäden asennot (vasen käsi): kyynärvarsi vaakasuoraan eteen, jolloin kilpi on pystyssä.
+const SHIELD_GUARD: Partial<Pose> = { lShX: -0.35, lShZ: 0.42, lEl: -1.2 };
+const SHIELD_BLOCK: Partial<Pose> = { lShX: -0.95, lShZ: 0.18, lEl: -0.75, rShX: -0.5, rShZ: -0.35, rEl: -1.2, rHandX: 0.9, rHandY: 0 };
+const SHIELD_ARM = new Set<Pose>([POSES.guard, POSES.windup, POSES.strike]);
+
+// Keihäs: kärki eteen vaakatasossa (olkapään, kyynärpään ja ranteen kulmien summa noin nolla),
+// takakäsi lantion vieressä ja etukäsi varrella. Isku on pisto, ei lyönti.
+const SPEAR = new Map<Pose, Partial<Pose>>([
+  [POSES.guard, { spineYaw: -0.45, rShX: 0.35, rShZ: -0.15, rEl: -1.3, rHandX: 0.95, rHandY: 0, lShX: -0.85, lShZ: -0.3, lEl: -0.55 }],
+  [POSES.windup, { spineYaw: -0.8, rShX: 0.85, rShZ: -0.2, rEl: -1.7, rHandX: 0.85, rHandY: 0, lShX: -0.6, lShZ: -0.35, lEl: -0.9 }],
+  [POSES.strike, { spineYaw: 0.35, spinePitch: 0.3, rShX: -1.15, rShZ: 0.1, rEl: -0.2, rHandX: 1.35, rHandY: 0, lShX: -1.2, lShZ: -0.2, lEl: -0.25 }],
+  [POSES.block, { spineYaw: -0.2, rShX: -0.3, rShZ: -0.3, rEl: -1.5, rHandX: 0.6, rHandY: 1.2, lShX: -1.3, lShZ: 0.2, lEl: -0.9 }],
+]);
+
+// Aseen paikka kädessä virtuaalisessa käsikehyksessä (käsi suorana alas: y alas rannetta pitkin).
+const GRIP = { x: 0, y: -0.085, z: 0.0 };
+const HAND_TWIST = 0;
 
 /** Miekan jälkivana: nauha terän tyven ja kärjen viimeisistä sijainneista. */
 export class SwordTrail {
