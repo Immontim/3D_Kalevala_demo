@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import charactersUrl from "../assets/characters.glb?url";
+import type { Loadout } from "./combat";
 
 // Blenderissä mallinnettu luurankohahmo, jota ohjataan koodilla: asennot (Pose) ovat
 // nivelkulmia, joita kohti hahmo pehmeästi liukuu. Valmiita animaatioleikkeitä ei ole.
@@ -19,46 +20,94 @@ export interface Pose {
   lEl: number;
   crouch: number;
   headPitch: number;
+  /** Haara-asento: vasen jalka eteen, oikea taakse (rad). Negatiivinen = oikea jalka edessä. */
+  stride: number;
 }
 
 const KEYS = Object.keys({
   spineYaw: 0, spinePitch: 0, rShX: 0, rShZ: 0, rEl: 0, rHandX: 0, rHandY: 0,
-  lShX: 0, lShZ: 0, lEl: 0, crouch: 0, headPitch: 0,
+  lShX: 0, lShZ: 0, lEl: 0, crouch: 0, headPitch: 0, stride: 0,
 } satisfies Pose) as (keyof Pose)[];
 
 export const POSES: Record<string, Pose> = {
   guard: {
     spineYaw: -0.15, spinePitch: 0.08, rShX: -0.55, rShZ: -0.15, rEl: -1.15, rHandX: 0.95, rHandY: 0,
-    lShX: -0.5, lShZ: 0.25, lEl: -1.3, crouch: 0.06, headPitch: 0,
+    lShX: -0.5, lShZ: 0.25, lEl: -1.3, crouch: 0.06, headPitch: 0, stride: 0.22,
   },
   windup: {
     spineYaw: -0.75, spinePitch: -0.05, rShX: -2.7, rShZ: -0.55, rEl: -1.0, rHandX: -0.3, rHandY: 0,
-    lShX: -0.9, lShZ: 0.4, lEl: -0.6, crouch: 0.12, headPitch: 0,
+    lShX: -0.9, lShZ: 0.4, lEl: -0.6, crouch: 0.12, headPitch: 0, stride: 0.1,
   },
   strike: {
     spineYaw: 0.7, spinePitch: 0.35, rShX: -0.9, rShZ: 0.55, rEl: -0.15, rHandX: 0.35, rHandY: 0,
-    lShX: -0.2, lShZ: 0.6, lEl: -0.4, crouch: 0.18, headPitch: 0.1,
+    lShX: -0.2, lShZ: 0.6, lEl: -0.4, crouch: 0.18, headPitch: 0.1, stride: 0.42,
   },
   block: {
     spineYaw: 0.05, spinePitch: 0.02, rShX: -1.5, rShZ: -0.35, rEl: -1.25, rHandX: 0.2, rHandY: 1.55,
-    lShX: -1.4, lShZ: 0.5, lEl: -1.4, crouch: 0.1, headPitch: 0.05,
+    lShX: -1.4, lShZ: 0.5, lEl: -1.4, crouch: 0.1, headPitch: 0.05, stride: 0.2,
   },
   stagger: {
     spineYaw: -0.4, spinePitch: -0.45, rShX: -0.6, rShZ: -0.9, rEl: -0.3, rHandX: 0.5, rHandY: 0,
-    lShX: -0.5, lShZ: 0.9, lEl: -0.3, crouch: 0.15, headPitch: -0.4,
+    lShX: -0.5, lShZ: 0.9, lEl: -0.3, crouch: 0.15, headPitch: -0.4, stride: -0.12,
   },
   rooted: {
     spineYaw: 0.2, spinePitch: 0.2, rShX: -2.4, rShZ: -0.8, rEl: -0.5, rHandX: 0.4, rHandY: 0,
-    lShX: -2.5, lShZ: 0.8, lEl: -0.5, crouch: 0, headPitch: -0.3,
+    lShX: -2.5, lShZ: 0.8, lEl: -0.5, crouch: 0, headPitch: -0.3, stride: 0,
+  },
+  // Raskas isku: miekka pään yli ja alas.
+  heavyWindup: {
+    spineYaw: -0.25, spinePitch: -0.22, rShX: -2.95, rShZ: -0.2, rEl: -1.35, rHandX: -0.55, rHandY: 0,
+    lShX: -0.9, lShZ: 0.35, lEl: -0.8, crouch: 0.08, headPitch: -0.1, stride: 0.12,
+  },
+  heavyStrike: {
+    spineYaw: 0.35, spinePitch: 0.55, rShX: -0.8, rShZ: 0.2, rEl: -0.1, rHandX: 0.55, rHandY: 0,
+    lShX: -0.1, lShZ: 0.55, lEl: -0.5, crouch: 0.26, headPitch: 0.15, stride: 0.5,
+  },
+  // Kilpityöntö: kilpi vedetään rintaa vasten ja työnnetään eteen.
+  bashWindup: {
+    spineYaw: 0.4, spinePitch: 0.1, rShX: -0.3, rShZ: -0.35, rEl: -1.1, rHandX: 0.9, rHandY: 0,
+    lShX: -0.3, lShZ: 0.35, lEl: -1.7, crouch: 0.16, headPitch: 0, stride: 0.15,
+  },
+  bashStrike: {
+    spineYaw: -0.55, spinePitch: 0.3, rShX: 0.1, rShZ: -0.45, rEl: -0.9, rHandX: 0.9, rHandY: 0,
+    lShX: -1.35, lShZ: 0.1, lEl: -0.3, crouch: 0.2, headPitch: 0.05, stride: 0.5,
+  },
+  // Sivallus: miekka viedään oikealle sivulle ja vedetään vaakaan vartalon poikki.
+  slashWindup: {
+    spineYaw: -0.85, spinePitch: 0.05, rShX: 0, rShZ: -1.3, rEl: -0.3, rHandX: 2.2, rHandY: 0,
+    lShX: -0.8, lShZ: 0.3, lEl: -0.9, crouch: 0.12, headPitch: 0, stride: 0.12,
+  },
+  slashStrike: {
+    spineYaw: 0.85, spinePitch: 0.2, rShX: -1.25, rShZ: 0.75, rEl: -0.25, rHandX: 1.3, rHandY: 0.5,
+    lShX: -0.3, lShZ: 0.6, lEl: -0.5, crouch: 0.16, headPitch: 0.05, stride: 0.4,
+  },
+  // Pisto: kahva vedetään kylkeen terä edellä ja työnnetään suoraan eteen.
+  thrustWindup: {
+    spineYaw: -0.7, spinePitch: 0.1, rShX: 0.55, rShZ: -0.25, rEl: -2.0, rHandX: 1.45, rHandY: 0,
+    lShX: -1.0, lShZ: 0.2, lEl: -0.6, crouch: 0.14, headPitch: 0, stride: 0.15,
+  },
+  thrustStrike: {
+    spineYaw: 0.55, spinePitch: 0.3, rShX: -1.35, rShZ: 0.1, rEl: -0.1, rHandX: 1.45, rHandY: 0,
+    lShX: 0.2, lShZ: 0.5, lEl: -0.6, crouch: 0.22, headPitch: 0.05, stride: 0.55,
+  },
+  // Torjunnat aseella: block = ylätorjunta (terä vaakasuoraan pään yllä),
+  // blockSide = sivutorjunta (terä pystyssä kyljellä), blockThrust = piston ohjaus sivuun (terä alaviistoon).
+  blockSide: {
+    spineYaw: -0.25, spinePitch: 0.02, rShX: -0.9, rShZ: -0.55, rEl: -1.2, rHandX: 0.5, rHandY: 0.3,
+    lShX: -0.6, lShZ: 0.3, lEl: -1.2, crouch: 0.1, headPitch: 0, stride: 0.2,
+  },
+  blockThrust: {
+    spineYaw: 0.25, spinePitch: 0.05, rShX: -1.1, rShZ: 0.2, rEl: -0.9, rHandX: 2.7, rHandY: 0.5,
+    lShX: -0.5, lShZ: 0.4, lEl: -1.0, crouch: 0.12, headPitch: 0.05, stride: 0.2,
   },
   sing: {
     spineYaw: 0, spinePitch: -0.12, rShX: -0.25, rShZ: -0.35, rEl: -0.4, rHandX: 0.9, rHandY: 0,
-    lShX: -1.2, lShZ: 0.9, lEl: -0.6, crouch: 0.02, headPitch: -0.35,
+    lShX: -1.2, lShZ: 0.9, lEl: -0.6, crouch: 0.02, headPitch: -0.35, stride: 0.05,
   },
 };
 
 export type CharacterId = "hero" | "urho" | "pohja";
-export type Loadout = "sword" | "sword_shield" | "spear";
+export type { Loadout };
 
 export interface FighterLook {
   character: CharacterId;
@@ -115,6 +164,15 @@ export class Fighter {
   private hipsRest = new THREE.Vector3();
   private footRestY = 0;
   private bladeMats: THREE.MeshStandardMaterial[] = [];
+  private shieldHolder: THREE.Group | null = null;
+  private shieldModel: THREE.Object3D | null = null;
+  private shieldUniforms: ShieldUniforms[] = [];
+  private shieldMats: THREE.MeshStandardMaterial[] = [];
+  private shieldBasis = { center: new THREE.Vector3(), u: new THREE.Vector3(1, 0, 0), v: new THREE.Vector3(0, 1, 0), radius: 0.4 };
+  private shieldNotched = false;
+  private armLen: [number, number] = [0.28, 0.26];
+  /** Onko kilpi kädessä. Hajonnut kilpi poistuu, ja hahmo taistelee kuin ilman kilpeä. */
+  hasShield: boolean;
   private pose: Pose = { ...POSES.guard };
   private walkPhase = 0;
   private disposed = false;
@@ -122,6 +180,7 @@ export class Fighter {
   fall = 0; // 0..1 kaatuminen
 
   constructor(readonly look: FighterLook) {
+    this.hasShield = look.loadout === "sword_shield";
     this.root.add(this.body);
     // Terän pisteet ovat olemassa heti, vaikka malli latautuu vasta hetken päästä.
     this.weapon.position.set(-0.3, 1.0, 0.2);
@@ -133,7 +192,17 @@ export class Fighter {
     characterAssets.then((gltf) => { if (!this.disposed) this.build(gltf.scene); });
   }
 
-  dispose() { this.disposed = true; }
+  /** Vapauttaa taistelijan omat materiaalikopiot ja luurangon tekstuurin. Kutsutaan, kun hahmo poistetaan. */
+  dispose() {
+    this.disposed = true;
+    for (const m of [...this.bladeMats, ...this.shieldMats]) { envTargets.delete(m); m.dispose(); }
+    this.bladeMats = [];
+    this.shieldMats = [];
+    this.body.traverse((o) => {
+      const sk = o as THREE.SkinnedMesh;
+      if (sk.isSkinnedMesh) sk.skeleton.dispose();
+    });
+  }
 
   private build(source: THREE.Object3D) {
     const clone = SkeletonUtils.clone(source);
@@ -174,6 +243,10 @@ export class Fighter {
     }
     const hips = this.bones.get("hips")!.bone;
     this.hipsRest.copy(hips.position);
+    const pUp = this.bones.get("upper_arm_L")!.bone.getWorldPosition(new THREE.Vector3());
+    const pFo = this.bones.get("forearm_L")!.bone.getWorldPosition(new THREE.Vector3());
+    const pHa = this.bones.get("hand_L")!.bone.getWorldPosition(new THREE.Vector3());
+    this.armLen = [pUp.distanceTo(pFo), pFo.distanceTo(pHa)];
     this.footRestY = Math.min(this.boneY("foot_L"), this.boneY("foot_R"));
 
     // Ase oikeaan käteen: pidikkeen asento = virtuaalinen käsikehys (terä +z).
@@ -214,9 +287,89 @@ export class Fighter {
         shield.position.set(0, 0, 0);
         holder.add(shield);
         arm.bone.add(holder);
+        this.shieldHolder = holder;
+        this.shieldModel = shield;
+        this.prepareShield(shield);
+        holder.visible = this.hasShield;
+        this.setShieldNotch(this.shieldNotched);
       }
     }
     this.apply(0);
+  }
+
+  /** Kilven materiaalit omiksi kopioiksi, joihin voi leikata loven ja joista saa sirpaleet. */
+  private prepareShield(shield: THREE.Object3D) {
+    const box = new THREE.Box3();
+    shield.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      m.geometry.computeBoundingBox();
+      box.union(m.geometry.boundingBox!);
+    });
+    const size = box.getSize(new THREE.Vector3());
+    const axes = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)];
+    const dims = [size.x, size.y, size.z];
+    const thin = dims.indexOf(Math.min(...dims));
+    const [u, v] = axes.filter((_, i) => i !== thin);
+    box.getCenter(this.shieldBasis.center);
+    this.shieldBasis.u.copy(u);
+    this.shieldBasis.v.copy(v);
+    this.shieldBasis.radius = Math.max(...dims) / 2;
+    this.shieldUniforms = patchShield(shield, this.shieldBasis);
+    shield.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) this.shieldMats.push(m.material as THREE.MeshStandardMaterial);
+    });
+  }
+
+  /** Lovi näkyviin, kun kilven kestosta on jäljellä enää puolet. */
+  setShieldNotch(on: boolean) {
+    this.shieldNotched = on;
+    for (const u of this.shieldUniforms) u.uNotch.value = on ? 1 : 0;
+  }
+
+  /** Kilpi hajoaa: se poistuu kädestä ja palaset lentävät maahan. Palauttaa sirpaleet päivitettäviksi. */
+  breakShield(): ShieldDebris | null {
+    if (!this.hasShield) return null;
+    this.hasShield = false;
+    if (!this.shieldHolder || !this.shieldModel) return null;
+    this.shieldHolder.updateWorldMatrix(true, true);
+    const debris = new ShieldDebris(this.shieldModel, this.shieldBasis);
+    this.shieldHolder.visible = false;
+    return debris;
+  }
+
+  /** Uusi ehjä kilpi käteen. */
+  restoreShield() {
+    if (this.look.loadout !== "sword_shield") return;
+    this.hasShield = true;
+    this.setShieldNotch(false);
+    if (this.shieldHolder) this.shieldHolder.visible = true;
+  }
+
+  /** Keihään etukäsi: vasen käsi viedään varrelle kahden luun käänteiskinematiikalla. */
+  private reachShaft() {
+    this.body.updateMatrixWorld(true);
+    const S = this.body.worldToLocal(this.bones.get("upper_arm_L")!.bone.getWorldPosition(new THREE.Vector3()));
+    const T = this.body.worldToLocal(this.weapon.localToWorld(new THREE.Vector3(0, 0, SPEAR_FRONT_GRIP)));
+    T.y += 0.04;
+    const [l1, l2] = this.armLen;
+    const to = T.clone().sub(S);
+    const d = Math.min(Math.max(to.length(), 0.05), l1 + l2 - 0.005);
+    to.normalize();
+    const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d);
+    const h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+    // Kyynärpää osoittaa alas ja ulos vasemmalle.
+    const pole = new THREE.Vector3(0.55, -1, -0.15);
+    pole.addScaledVector(to, -pole.dot(to)).normalize();
+    const elbow = to.clone().multiplyScalar(a).addScaledVector(pole, h);
+    const wrist = to.clone().multiplyScalar(d);
+    const d1 = elbow.clone().normalize();
+    const d2 = wrist.sub(elbow).normalize();
+    this.setBone("upper_arm_L", new THREE.Quaternion().setFromUnitVectors(DOWN, d1));
+    const fo = new THREE.Quaternion().setFromUnitVectors(DOWN, d2);
+    this.setBone("forearm_L", fo);
+    this.setBone("hand_L", fo);
   }
 
   private boneY(name: BoneName) {
@@ -253,6 +406,7 @@ export class Fighter {
     arm("R", p.rShX, p.rShZ, p.rEl, qB.setFromEuler(eul.set(p.rHandX, p.rHandY, 0, "YXZ")).clone());
     arm("L", p.lShX, p.lShZ, p.lEl, null);
     eul.order = "XYZ";
+    if (this.look.loadout === "spear" && this.fall < 0.05) this.reachShaft();
 
     // Kävely: reidet heiluvat vastakkain, polvet koukistuvat.
     const s = Math.sin(this.walkPhase);
@@ -263,8 +417,11 @@ export class Fighter {
       this.setBone(`shin_${side}`, sh);
       this.setBone(`foot_${side}`, qA.slerpQuaternions(sh, IDENT, 0.7));
     };
-    leg("L", -s * moveAmp - p.crouch * 1.2, Math.max(0, s) * moveAmp * 1.4 + p.crouch * 2);
-    leg("R", s * moveAmp - p.crouch * 1.2, Math.max(0, -s) * moveAmp * 1.4 + p.crouch * 2);
+    // Haara-asento sulautuu pois kävellessä, jotta askel ei jää toispuoleiseksi.
+    const st = p.stride * (1 - moveAmp * 0.6);
+    const sf = Math.max(0, st), sb = Math.max(0, -st);
+    leg("L", -s * moveAmp - p.crouch * 1.2 - st, Math.max(0, s) * moveAmp * 1.4 + p.crouch * 2 + sf * 0.35 + sb * 0.6);
+    leg("R", s * moveAmp - p.crouch * 1.2 + st, Math.max(0, -s) * moveAmp * 1.4 + p.crouch * 2 + sb * 0.35 + sf * 0.6);
 
     // Lantio seuraa jalkoja: alempi jalka pysyy maassa kyykyssä ja askeleessa.
     const hips = this.bones.get("hips")!.bone;
@@ -279,8 +436,8 @@ export class Fighter {
   animate(target: Pose, rate: number, dt: number, moveSpeed: number) {
     const k = 1 - Math.exp(-rate * dt);
     // Kilpikäsi: kilpi pysyy vartalon edessä ja nousee torjunnassa eteen, ei pään päälle.
-    const over = this.look.loadout === "sword_shield"
-      ? (target === POSES.block ? SHIELD_BLOCK : SHIELD_ARM.has(target) ? SHIELD_GUARD : null)
+    const over = this.hasShield
+      ? (BLOCK_POSES.has(target) ? SHIELD_BLOCK : SHIELD_ARM.has(target) ? SHIELD_GUARD : null)
       : this.look.loadout === "spear" ? SPEAR.get(target) ?? null : null;
     for (const key of KEYS) {
       const goal = over && key in over ? over[key as keyof typeof over]! : target[key];
@@ -298,23 +455,160 @@ export class Fighter {
   }
 }
 
-// Kilpikäden asennot (vasen käsi): kyynärvarsi vaakasuoraan eteen, jolloin kilpi on pystyssä.
-const SHIELD_GUARD: Partial<Pose> = { lShX: -0.35, lShZ: 0.42, lEl: -1.2 };
-const SHIELD_BLOCK: Partial<Pose> = { lShX: -0.95, lShZ: 0.18, lEl: -0.75, rShX: -0.5, rShZ: -0.35, rEl: -1.2, rHandX: 0.9, rHandY: 0 };
-const SHIELD_ARM = new Set<Pose>([POSES.guard, POSES.windup, POSES.strike]);
+// Kilpikäden asennot (vasen käsi). Levossa kilpi roikkuu vasemmalla kyljellä pinta sivulle;
+// torjunnassa se nostetaan keskelle vartalon eteen, jolloin liike näkyy selvästi.
+const SHIELD_GUARD: Partial<Pose> = { lShX: 0.15, lShZ: 0.5, lEl: -0.55 };
+const SHIELD_BLOCK: Partial<Pose> = {
+  lShX: -1.1, lShZ: -0.1, lEl: -0.8, spineYaw: -0.3, crouch: 0.14,
+  rShX: -0.5, rShZ: -0.35, rEl: -1.2, rHandX: 0.9, rHandY: 0,
+};
+const BLOCK_POSES = new Set<Pose>([POSES.block, POSES.blockSide, POSES.blockThrust]);
+const SHIELD_ARM = new Set<Pose>([
+  POSES.guard, POSES.windup, POSES.strike, POSES.heavyWindup, POSES.heavyStrike,
+  POSES.slashWindup, POSES.slashStrike, POSES.thrustWindup, POSES.thrustStrike,
+]);
 
 // Keihäs: kärki eteen vaakatasossa (olkapään, kyynärpään ja ranteen kulmien summa noin nolla),
-// takakäsi lantion vieressä ja etukäsi varrella. Isku on pisto, ei lyönti.
+// takakäsi lantion vieressä. Etukäden vie varrelle reachShaft(). Keihäällä vain pistetään.
+const SPEAR_BLOCK: Partial<Pose> = { spineYaw: -0.2, rShX: -0.3, rShZ: -0.3, rEl: -1.5, rHandX: 0.6, rHandY: 1.2, lShX: -1.3, lShZ: 0.2, lEl: -0.9 };
 const SPEAR = new Map<Pose, Partial<Pose>>([
   [POSES.guard, { spineYaw: -0.45, rShX: 0.35, rShZ: -0.15, rEl: -1.3, rHandX: 0.95, rHandY: 0, lShX: -0.85, lShZ: -0.3, lEl: -0.55 }],
-  [POSES.windup, { spineYaw: -0.8, rShX: 0.85, rShZ: -0.2, rEl: -1.7, rHandX: 0.85, rHandY: 0, lShX: -0.6, lShZ: -0.35, lEl: -0.9 }],
-  [POSES.strike, { spineYaw: 0.35, spinePitch: 0.3, rShX: -1.15, rShZ: 0.1, rEl: -0.2, rHandX: 1.35, rHandY: 0, lShX: -1.2, lShZ: -0.2, lEl: -0.25 }],
-  [POSES.block, { spineYaw: -0.2, rShX: -0.3, rShZ: -0.3, rEl: -1.5, rHandX: 0.6, rHandY: 1.2, lShX: -1.3, lShZ: 0.2, lEl: -0.9 }],
+  [POSES.thrustWindup, { spineYaw: -0.8, rShX: 0.85, rShZ: -0.2, rEl: -1.7, rHandX: 0.85, rHandY: 0, lShX: -0.6, lShZ: -0.35, lEl: -0.9 }],
+  [POSES.thrustStrike, { stride: 0.55, crouch: 0.22, spineYaw: 0.35, spinePitch: 0.3, rShX: -1.15, rShZ: 0.1, rEl: -0.2, rHandX: 1.35, rHandY: 0, lShX: -1.2, lShZ: -0.2, lEl: -0.25 }],
+  [POSES.block, SPEAR_BLOCK], [POSES.blockSide, SPEAR_BLOCK], [POSES.blockThrust, SPEAR_BLOCK],
 ]);
+/** Etukäden paikka keihään varrella metreinä takakädestä kärkeen päin. */
+const SPEAR_FRONT_GRIP = 0.46;
 
 // Aseen paikka kädessä virtuaalisessa käsikehyksessä (käsi suorana alas: y alas rannetta pitkin).
 const GRIP = { x: 0, y: -0.085, z: 0.0 };
 const HAND_TWIST = 0;
+
+interface ShieldUniforms {
+  uNotch: { value: number };
+  uSector: { value: THREE.Vector2 };
+}
+interface ShieldBasis { center: THREE.Vector3; u: THREE.Vector3; v: THREE.Vector3; radius: number }
+
+/**
+ * Antaa kilven materiaaleille omat kopiot, joiden shader osaa leikata pois loven (uNotch)
+ * ja rajata näkyviin yhden sektorin (uSector, sirpaleita varten).
+ */
+function patchShield(shield: THREE.Object3D, basis: ShieldBasis): ShieldUniforms[] {
+  const out: ShieldUniforms[] = [];
+  shield.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    const mat = (m.material as THREE.MeshStandardMaterial).clone();
+    const uniforms = {
+      uNotch: { value: 0 },
+      uSector: { value: new THREE.Vector2(0, 0) },
+      uShC: { value: basis.center },
+      uShU: { value: basis.u },
+      uShV: { value: basis.v },
+      uShR: { value: basis.radius },
+    };
+    mat.side = THREE.DoubleSide;
+    if (mat.metalness > 0.5) { mat.envMapIntensity = 0.45; if (envMap) mat.envMap = envMap; envTargets.add(mat); }
+    mat.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, uniforms);
+      sh.vertexShader = sh.vertexShader
+        .replace("#include <common>", "#include <common>\nvarying vec3 vShP;")
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvShP = position;");
+      sh.fragmentShader = sh.fragmentShader
+        .replace("#include <common>", `#include <common>
+          varying vec3 vShP;
+          uniform float uNotch; uniform vec2 uSector; uniform vec3 uShC; uniform vec3 uShU; uniform vec3 uShV; uniform float uShR;
+          float shAngDiff(float a, float b){ float d = a - b; return abs(atan(sin(d), cos(d))); }`)
+        .replace("#include <color_fragment>", `#include <color_fragment>
+          {
+            vec3 q = vShP - uShC;
+            vec2 uv = vec2(dot(q, uShU), dot(q, uShV)) / uShR;
+            float r = length(uv);
+            float ang = atan(uv.y, uv.x) + 0.07 * sin(r * 21.0);
+            ang = atan(sin(ang), cos(ang)); // takaisin välille -PI..PI, ettei sauman kohdalle jää rakoa
+            if (uSector.y > uSector.x && (ang < uSector.x || ang > uSector.y)) discard;
+            if (uNotch > 0.5) {
+              // Iso lovi reunasta kohti keskustaa ja pienempi lohkeama toisella laidalla.
+              float d1 = shAngDiff(ang, 2.2), w1 = 0.34 * smoothstep(0.25, 1.0, r);
+              float d2 = shAngDiff(ang, -0.6), w2 = 0.2 * smoothstep(0.55, 1.0, r);
+              if ((r > 0.25 && d1 < w1) || (r > 0.55 && d2 < w2)) discard;
+              // Tummat halkeamat loven reunoilla ja sen jatkeena.
+              float crack = min(smoothstep(0.0, 0.035, d1 - w1), smoothstep(0.0, 0.03, d2 - w2));
+              crack = min(crack, mix(1.0, smoothstep(0.0, 0.02, d1), step(0.08, r) * step(r, 0.27)));
+              diffuseColor.rgb *= mix(0.25, 1.0, crack);
+            }
+          }`);
+    };
+    mat.customProgramCacheKey = () => "shield-damage";
+    m.material = mat;
+    out.push(uniforms);
+  });
+  return out;
+}
+
+const PIECES = 6;
+/** Hajonneen kilven palaset: kuusi sektoria, jotka lentävät erilleen ja jäävät maahan. */
+export class ShieldDebris {
+  readonly group = new THREE.Group();
+  private pieces: { obj: THREE.Object3D; vel: THREE.Vector3; spin: THREE.Vector3; landed: boolean; flat: THREE.Quaternion; normal: THREE.Vector3 }[] = [];
+  private age = 0;
+
+  constructor(shield: THREE.Object3D, basis: ShieldBasis) {
+    const pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3();
+    shield.matrixWorld.decompose(pos, quat, scl);
+    const normal = new THREE.Vector3().crossVectors(basis.u, basis.v);
+    for (let i = 0; i < PIECES; i++) {
+      const a0 = -Math.PI + (i / PIECES) * Math.PI * 2, a1 = a0 + (Math.PI * 2) / PIECES;
+      const obj = shield.clone(true);
+      for (const u of patchShield(obj, basis)) u.uSector.value.set(a0, a1);
+      obj.position.copy(pos);
+      obj.quaternion.copy(quat);
+      obj.scale.copy(scl);
+      const mid = (a0 + a1) / 2;
+      const out = basis.u.clone().multiplyScalar(Math.cos(mid)).addScaledVector(basis.v, Math.sin(mid)).applyQuaternion(quat);
+      const vel = out.multiplyScalar(1.2 + Math.random() * 1.3).add(new THREE.Vector3(0, 1.2 + Math.random() * 1.5, 0));
+      const spin = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(9);
+      this.pieces.push({ obj, vel, spin, landed: false, flat: new THREE.Quaternion(), normal: normal.clone() });
+      this.group.add(obj);
+    }
+  }
+
+  /** Palauttaa false, kun palaset on aika poistaa. */
+  update(dt: number, groundAt: (x: number, z: number) => number): boolean {
+    this.age += dt;
+    for (const p of this.pieces) {
+      if (p.landed) {
+        p.obj.quaternion.slerp(p.flat, 1 - Math.exp(-10 * dt));
+        continue;
+      }
+      p.vel.y -= 9.8 * dt;
+      p.obj.position.addScaledVector(p.vel, dt);
+      qA.setFromEuler(eul.set(p.spin.x * dt, p.spin.y * dt, p.spin.z * dt));
+      p.obj.quaternion.premultiply(qA);
+      const g = groundAt(p.obj.position.x, p.obj.position.z) + 0.03;
+      if (p.obj.position.y <= g && p.vel.y < 0) {
+        p.obj.position.y = g;
+        p.landed = true;
+        // Lappeelleen maahan: kilven pinnan normaali ylös tai alas sen mukaan, kumpi on lähempänä.
+        const n = p.normal.clone().applyQuaternion(p.obj.quaternion);
+        const up = new THREE.Vector3(0, n.y >= 0 ? 1 : -1, 0);
+        p.flat.setFromUnitVectors(n, up).multiply(p.obj.quaternion);
+      }
+    }
+    return this.age < 20;
+  }
+
+  dispose() {
+    this.group.removeFromParent();
+    this.group.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      envTargets.delete(m.material as THREE.MeshStandardMaterial);
+      (m.material as THREE.Material).dispose();
+    });
+  }
+}
 
 /** Miekan jälkivana: nauha terän tyven ja kärjen viimeisistä sijainneista. */
 export class SwordTrail {

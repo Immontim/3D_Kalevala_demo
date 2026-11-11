@@ -16,15 +16,20 @@
         <div class="bar-wrap">
           <div class="label">Sinä</div>
           <div class="bar"><div id="php" class="fill hp"></div></div>
+          <div class="bar thin shieldbar"><div id="pshield" class="fill shield"></div></div>
           <div class="label small">Laulun voima <span id="songReady"></span></div>
           <div class="bar thin"><div id="psong" class="fill song"></div></div>
+          <div class="label small" id="pstance"></div>
         </div>
         <div class="bar-wrap right">
           <div class="label" id="ename">Pohjolan soturi</div>
           <div class="bar"><div id="ehp" class="fill hp enemy"></div></div>
+          <div class="bar thin shieldbar"><div id="eshield" class="fill shield"></div></div>
           <div class="label small" id="wave">Aalto 1</div>
+          <div class="label cue" id="cue"></div>
         </div>
       </div>
+      <div id="charge"><div id="chargeLabel"></div><div class="bar"><div id="chargeFill" class="fill charge"></div></div></div>
       <div id="msg"></div>
       <div id="sub"></div>
       <div id="corner"><span id="ver"></span> · <span id="fps"></span> FPS</div>
@@ -57,13 +62,17 @@
         <p class="tag">Kalevala-taisteluprototyyppi</p>
         <ul>
           <li><b>WASD</b>: liiku ja kierrä vastustajaa</li>
-          <li><b>Hiiren vasen</b> tai <b>J</b>: isku</li>
+          <li><b>Hiiren vasen</b> tai <b>J</b>: sivallus sivulta</li>
+          <li><b>F</b> tai <b>I</b>: ylälyönti · <b>E</b> tai <b>L</b>: pisto</li>
+          <li>Pidä iskunappia <b>pohjassa</b>, kunnes mittari on täysi: raskas isku. Vapauta, niin isku laukeaa.</li>
           <li><b>Hiiren oikea</b> tai <b>K</b> pohjassa: torjunta. Torju juuri ennen osumaa, niin vastustaja horjuu.</li>
+          <li><b>Kilpi</b> torjuu kaikki iskut, mutta kuluu ja lopulta hajoaa. Iskunappi torjunnan aikana: kilpityöntö.</li>
+          <li><b>Ilman kilpeä</b> torjunnan pitää vastata iskua: torjunnan aikana iskunappi valitsee sivu-, ylä- tai pistotorjunnan.</li>
           <li><b>Shift</b>: väistö</li>
           <li><b>Q</b>: kun laulun voima on täynnä, aika hidastuu ja laulat. Paina <b>välilyöntiä</b> tahdissa.</li>
           <li><b>Esc</b>: vapauta hiiri ja pidä tauko</li>
         </ul>
-        <p class="small">Vastustajan terä hehkuu, kun isku on tulossa. Laulun voima kasvaa osumista ja täydellisistä torjunnoista.</p>
+        <p class="small">Vastustajan terä hehkuu, kun isku on tulossa, ja iskun suunta näkyy hänen nimensä alla. Laulun voima kasvaa osumista ja täydellisistä torjunnoista.</p>
         <button id="startBtn">Aloita</button>
       </div>
     </div>

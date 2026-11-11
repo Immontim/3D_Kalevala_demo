@@ -1,9 +1,11 @@
 import * as THREE from "three";
 import {
-  ActionState, AttackTiming, BLOCK_RECOIL, DODGE_COOLDOWN, DODGE_TIME, PLAYER_ATTACK, SONG_GAIN_HIT,
-  SONG_GAIN_PARRY, SONG_MAX, STAGGER_TIME, angleBetween, attackPhase, damageFor, enemyTiming, resolveHit,
+  ActionState, AttackDef, AttackTiming, BASH, BLOCK_RECOIL, CHARGE_HOLD_MAX, DODGE_COOLDOWN, DODGE_TIME,
+  GUARDBREAK_ADVANTAGE, GUARDBREAK_STAGGER, Loadout, SHIELDS, SONG_GAIN_HIT, SONG_GAIN_PARRY, SONG_MAX,
+  STAGGER_TIME, STYLES, ShieldDef, StrikeStyle, StrikeWeight, WeaponDef, angleBetween, attackPhase, chargeLevel,
+  enemyAttackTiming, makeAttack, resolveHit, shieldWear, strikeDamage, styleFor, weaponOf,
 } from "./combat";
-import { Fighter, FighterLook, POSES, SwordTrail, setCharacterEnv } from "./fighter";
+import { Fighter, FighterLook, POSES, ShieldDebris, SwordTrail, setCharacterEnv } from "./fighter";
 import { ARENA_RADIUS, buildWorld, groundHeight } from "./world";
 import { Sfx } from "./audio";
 import { BeatJudgement, GOOD_WINDOW, SONG_VERSES, judgeBeat, songOutcome } from "./songLogic";
@@ -72,6 +74,19 @@ interface Actor {
   state: ActionState;
   stateTime: number;
   timing: AttackTiming;
+  /** Käynnissä oleva tai viimeisin isku. */
+  attack: AttackDef;
+  loadout: Loadout;
+  weapon: WeaponDef;
+  /** Ehjä kilpi, tai null jos kilpeä ei ole tai se on hajonnut. */
+  shield: ShieldDef | null;
+  shieldHp: number;
+  /** Aseella torjuttaessa: mitä iskusuuntaa vastaan torjunta on. */
+  stance: StrikeStyle;
+  /** Pelaaja pitää iskunappia pohjassa: isku virittyy eikä vielä laukea. */
+  charging: boolean;
+  /** Lyöjän voima: vahingon perusarvo ennen aseen ja iskun kertoimia. */
+  power: number;
   struck: boolean;
   hp: number;
   maxHp: number;
@@ -83,16 +98,22 @@ interface Actor {
   extraRecovery: number;
 }
 
-function makeActor(look: FighterLook, pos: THREE.Vector3, timing: AttackTiming, hp: number, trailColor: number): Actor {
+function makeActor(look: FighterLook, pos: THREE.Vector3, hp: number, trailColor: number, power: number): Actor {
   const fighter = new Fighter(look);
   const trail = new SwordTrail(trailColor);
   scene.add(fighter.root, trail.mesh);
+  const weapon = weaponOf(look.loadout);
+  const shield = look.loadout === "sword_shield" ? SHIELDS.round : null;
   return {
-    fighter, trail, pos: pos.clone(), yaw: 0, state: "idle", stateTime: 0, timing, struck: false, hp, maxHp: hp,
+    weapon, shield, shieldHp: shield ? shield.durability : 0, stance: "slash", charging: false, power,
+    fighter, trail, pos: pos.clone(), yaw: 0, state: "idle", stateTime: 0, timing: { windup: 0.3, release: 0.1, recovery: 0.3 },
+    attack: makeAttack(weapon, styleFor(weapon, "slash"), "light"), loadout: look.loadout, struck: false, hp, maxHp: hp,
     blockStart: -99, rootTime: 0, dodgeDir: new THREE.Vector3(), dodgeCd: 0, moveSpeed: 0, extraRecovery: 0,
   };
 }
 
+const PLAYER_POWER = 20;
+const debris: ShieldDebris[] = [];
 const PLAYER_LOOK: FighterLook = { character: "hero", loadout: "sword_shield" };
 // Vastustajat kiertävät: kaksi hahmoa, kummallakin miekka, miekka ja kilpi sekä keihäs.
 const ENEMIES: { name: string; look: FighterLook }[] = [
@@ -104,7 +125,7 @@ const ENEMIES: { name: string; look: FighterLook }[] = [
   { name: "Pohjan soturi, keihäs", look: { character: "pohja", loadout: "spear" } },
 ];
 
-let player = makeActor(PLAYER_LOOK, new THREE.Vector3(0, 0, -3), PLAYER_ATTACK, 100, 0xffd27a);
+let player = makeActor(PLAYER_LOOK, new THREE.Vector3(0, 0, -3), 100, 0xffd27a, PLAYER_POWER);
 let enemy: Actor | null = null;
 let wave = 0;
 let song = 0;
@@ -115,6 +136,23 @@ let nextWaveAt = -1;
 const corpses: { actor: Actor; removeAt: number }[] = [];
 const events: string[] = [];
 
+/** Poistaa taistelijan näkymästä ja vapauttaa sen omat materiaalit. */
+function removeActor(a: Actor) {
+  scene.remove(a.fighter.root, a.trail.mesh);
+  a.fighter.dispose();
+  a.trail.mesh.geometry.dispose();
+  (a.trail.mesh.material as THREE.Material).dispose();
+}
+
+/** Uusi ehjä kilpi pelaajalle jokaiseen aaltoon. */
+function renewPlayerShield() {
+  if (PLAYER_LOOK.loadout !== "sword_shield") return;
+  player.shield = SHIELDS.round;
+  player.shieldHp = player.shield.durability;
+  player.loadout = "sword_shield";
+  player.fighter.restoreShield();
+}
+
 function spawnEnemy() {
   wave++;
   const def = ENEMIES[(wave - 1) % ENEMIES.length];
@@ -124,7 +162,7 @@ function spawnEnemy() {
   const r = Math.hypot(pos.x, pos.z);
   if (r > ARENA_RADIUS - 1) pos.multiplyScalar((ARENA_RADIUS - 1) / r);
   const hp = 80 + wave * 20;
-  enemy = makeActor(def.look, pos, enemyTiming(wave), hp, 0xff6a3a);
+  enemy = makeActor(def.look, pos, hp, 0xff6a3a, 14 + wave);
   ai = newAi();
   $("ename").textContent = def.name;
   $("wave").textContent = `Aalto ${wave}`;
@@ -133,7 +171,14 @@ function spawnEnemy() {
 
 // ---------- Syöte ----------
 const keys = new Set<string>();
-let attackQueued = false;
+// Kolme iskunappia, yksi kullekin iskusuunnalle. Pohjassa pidetty nappi virittää raskaan iskun.
+let strikeQueued: StrikeStyle | null = null;
+const strikeHeld: Record<StrikeStyle, boolean> = { overhead: false, slash: false, thrust: false };
+const STRIKE_KEYS: Record<string, StrikeStyle> = {
+  KeyJ: "slash", KeyI: "overhead", KeyF: "overhead", KeyL: "thrust", KeyE: "thrust",
+};
+function pressStrike(style: StrikeStyle) { strikeQueued = style; strikeHeld[style] = true; }
+function releaseStrikes() { for (const st of STYLES) strikeHeld[st] = false; }
 let blockHeld = false;
 let dodgeQueued = false;
 let songQueued = false;
@@ -142,7 +187,7 @@ let beatQueued = false;
 window.addEventListener("keydown", (e) => {
   if (e.repeat) return;
   keys.add(e.code);
-  if (e.code === "KeyJ") attackQueued = true;
+  if (STRIKE_KEYS[e.code]) pressStrike(STRIKE_KEYS[e.code]);
   if (e.code === "KeyK") blockHeld = true;
   if (e.code === "ShiftLeft" || e.code === "ShiftRight") dodgeQueued = true;
   if (e.code === "KeyQ") songQueued = true;
@@ -152,13 +197,17 @@ window.addEventListener("keydown", (e) => {
 window.addEventListener("keyup", (e) => {
   keys.delete(e.code);
   if (e.code === "KeyK") blockHeld = false;
+  if (STRIKE_KEYS[e.code]) strikeHeld[STRIKE_KEYS[e.code]] = false;
 });
 canvas.addEventListener("mousedown", (e) => {
   if (running && !document.pointerLockElement) lockPointer();
-  if (e.button === 0) { attackQueued = true; beatQueued = true; }
+  if (e.button === 0) { pressStrike("slash"); beatQueued = true; }
   if (e.button === 2) blockHeld = true;
 });
-window.addEventListener("mouseup", (e) => { if (e.button === 2) blockHeld = false; });
+window.addEventListener("mouseup", (e) => {
+  if (e.button === 0) strikeHeld.slash = false;
+  if (e.button === 2) blockHeld = false;
+});
 window.addEventListener("contextmenu", (e) => e.preventDefault());
 
 // Kosketusnapit
@@ -168,13 +217,17 @@ document.querySelectorAll<HTMLButtonElement>("#touch button").forEach((b) => {
   const act = b.dataset.act;
   b.addEventListener("pointerdown", (e) => {
     e.preventDefault();
-    if (act === "attack") { attackQueued = true; beatQueued = true; }
+    if (act === "attack") { pressStrike("slash"); beatQueued = true; }
     if (act === "block") blockHeld = true;
     if (act === "dodge") dodgeQueued = true;
     if (act === "song") { songQueued = true; beatQueued = true; }
   });
-  b.addEventListener("pointerup", () => { if (act === "block") blockHeld = false; });
-  b.addEventListener("pointerleave", () => { if (act === "block") blockHeld = false; });
+  const release = () => {
+    if (act === "block") blockHeld = false;
+    if (act === "attack") strikeHeld.slash = false;
+  };
+  b.addEventListener("pointerup", release);
+  b.addEventListener("pointerleave", release);
 });
 $("song").addEventListener("pointerdown", () => (beatQueued = true));
 canvas.addEventListener("touchstart", () => (beatQueued = true), { passive: true });
@@ -205,7 +258,37 @@ function updateHud() {
   s.style.width = `${(song / SONG_MAX) * 100}%`;
   s.classList.toggle("full", song >= SONG_MAX);
   $("songReady").textContent = song >= SONG_MAX ? "· paina Q" : "";
+
+  // Kilpien kesto.
+  const shieldBar = (id: string, a: Actor | null) => {
+    const wrap = $(id).parentElement!;
+    wrap.style.visibility = a && a.fighter.look.loadout === "sword_shield" ? "visible" : "hidden";
+    $(id).style.width = a && a.shield ? `${(a.shieldHp / a.shield.durability) * 100}%` : "0%";
+    $(id).classList.toggle("worn", !!a && !!a.shield && a.shieldHp <= a.shield.durability * a.shield.notchAt);
+  };
+  shieldBar("pshield", player);
+  shieldBar("eshield", enemy);
+
+  // Viritysmittari: täyttyy, kun iskunappi on pohjassa. Täysi = raskas isku viritetty.
+  const p = player;
+  let charge = 0;
+  if (p.state === "windup" && p.attack.kind !== "bash") {
+    charge = p.charging ? chargeLevel(p.stateTime, heavyOf(p)) : p.attack.weight === "heavy" ? 1 : 0;
+  } else if (p.state === "release" && p.attack.weight === "heavy") charge = 1;
+  $("charge").classList.toggle("on", charge > 0.12);
+  $("charge").classList.toggle("full", charge >= 1);
+  $("chargeFill").style.width = `${charge * 100}%`;
+  $("chargeLabel").textContent = charge >= 1 ? `${STYLE_NAME[p.attack.kind]} · raskas` : charge > 0 ? STYLE_NAME[p.attack.kind] : "";
+
+  // Vastustajan tuleva isku ja oma torjunta-asento tekstinä.
+  const e = enemy;
+  $("cue").textContent = e && e.state === "windup" ? `${STYLE_ICON[e.attack.kind]} ${STYLE_NAME[e.attack.kind]}${e.attack.weight === "heavy" ? " (raskas)" : ""}` : "";
+  $("pstance").textContent = p.state === "block" && !p.shield ? `Torjunta: ${BLOCK_NAME[p.stance]}` : "";
 }
+const STYLE_NAME: Record<AttackDef["kind"], string> = { overhead: "Ylälyönti", slash: "Sivallus", thrust: "Pisto", bash: "Kilpityöntö" };
+const STYLE_ICON: Record<AttackDef["kind"], string> = { overhead: "↓", slash: "→", thrust: "•", bash: "◐" };
+const BLOCK_NAME: Record<StrikeStyle, string> = { overhead: "ylä", slash: "sivu", thrust: "pisto" };
+function heavyOf(a: Actor) { return makeAttack(a.weapon, a.attack.kind === "bash" ? "slash" : a.attack.kind, "heavy"); }
 
 // ---------- Efektit ----------
 const dotTex = (() => {
@@ -375,7 +458,30 @@ let ai: Ai = newAi();
 function newAi(): Ai { return { decide: 1.2, strafeDir: Math.random() < 0.5 ? 1 : -1, reactedTo: -1, counter: false }; }
 let playerAttackId = 0;
 
-function blockChance() { return Math.min(0.7, 0.3 + 0.1 * wave); }
+/** Kilpi torjuu useammin, keihäsmies harvemmin. */
+function blockChance(e: Actor) {
+  const bonus = e.shield ? 0.2 : e.loadout === "spear" ? -0.1 : 0;
+  return Math.min(0.7, 0.3 + 0.1 * wave) + bonus;
+}
+/** Kuinka usein aseella torjuva vihollinen lukee iskun suunnan oikein. */
+function readChance() { return Math.min(0.9, 0.5 + 0.06 * wave); }
+
+/** Pelaaja on seissyt torjunnassa niin pitkään, että suoja kannattaa murtaa. */
+function playerTurtles() { return player.state === "block" && gameTime - player.blockStart > 0.7; }
+
+/** Minkä iskun vihollinen tältä etäisyydeltä aloittaisi, tai null jos mikään ei ylety. */
+function pickEnemyAttack(e: Actor, dist: number, quick = false): { kind: StrikeStyle | "bash"; weight: StrikeWeight } | null {
+  // Kilpityöntö murtaa aseella torjuvan pelaajan suojan; kilpeä vastaan se ei auta.
+  if (e.shield && !player.shield && playerTurtles() && dist < BASH.range - 0.1) return { kind: "bash", weight: "light" };
+  const kind = styleFor(e.weapon, STYLES[Math.floor(Math.random() * STYLES.length)]);
+  // Pelkällä miekalla taisteleva lyö usein raskaasti, kilpimies harvoin.
+  // Kilven takana seisovaa pelaajaa vastaan kaikki lyövät raskaasti: kilpi kuluu nopeammin.
+  let heavy = e.loadout === "sword" ? 0.35 : e.loadout === "spear" ? 0.25 : 0.15;
+  if (playerTurtles() && player.shield) heavy = 0.7;
+  const weight: StrikeWeight = !quick && Math.random() < heavy ? "heavy" : "light";
+  const a = makeAttack(e.weapon, kind, weight);
+  return dist < a.range + 0.2 && dist > a.minRange + 0.1 ? { kind, weight } : null;
+}
 
 function updateAi(e: Actor, dt: number) {
   const toPlayer = player.pos.clone().sub(e.pos);
@@ -386,30 +492,38 @@ function updateAi(e: Actor, dt: number) {
     // Reagoi pelaajan nostoon: torju joskus.
     if (player.state === "windup" && ai.reactedTo !== playerAttackId && dist < 3.2) {
       ai.reactedTo = playerAttackId;
-      if (Math.random() < blockChance()) {
+      if (Math.random() < blockChance(e)) {
         setState(e, "block");
+        // Aseella torjuva arvaa iskun suunnan: myöhemmillä aalloilla useammin oikein.
+        const real = player.attack.kind === "bash" ? "slash" : player.attack.kind;
+        const wrong = STYLES.filter((st) => st !== real);
+        e.stance = Math.random() < readChance() ? real : wrong[Math.floor(Math.random() * wrong.length)];
         e.blockStart = -99; // vihollinen ei tee täydellisiä torjuntoja
         return;
       }
     }
     // Liiku sopivalle etäisyydelle ja kierrä.
-    const want = 1.9;
+    // Keihäsmies pitää välimatkaa, kilpimies tulee iholle murtamaan pitkän torjunnan.
+    const spear = e.loadout === "spear";
+    const want = spear ? 2.7 : e.shield && !player.shield && playerTurtles() ? 1.35 : 1.9;
     const dir = toPlayer.clone().normalize();
     const side = new THREE.Vector3(dir.z, 0, -dir.x).multiplyScalar(ai.strafeDir);
     const move = new THREE.Vector3();
     if (dist > want + 0.3) move.add(dir);
     else if (dist < want - 0.4) move.sub(dir);
     move.addScaledVector(side, 0.45);
-    moveActor(e, move, dist > 4 ? 3.4 : 2.4, dt);
+    moveActor(e, move, dist > 4 ? 3.4 : spear && dist < want - 0.4 ? 3.0 : 2.4, dt);
 
     ai.decide -= dt;
-    if (ai.counter && dist < 2.4) {
+    const counter = ai.counter ? pickEnemyAttack(e, dist, true) : null;
+    if (counter) {
       ai.counter = false;
-      startAttack(e);
+      startAttack(e, counter.kind, counter.weight);
     } else if (ai.decide <= 0) {
       ai.decide = 0.5 + Math.random() * 1.0;
       if (Math.random() < 0.25) ai.strafeDir *= -1;
-      if (dist < 2.5 && player.state !== "dead" && Math.random() < 0.65) startAttack(e);
+      const pick = pickEnemyAttack(e, dist);
+      if (pick && player.state !== "dead" && Math.random() < (pick.kind === "bash" ? 0.9 : 0.65)) startAttack(e, pick.kind, pick.weight);
     }
   } else {
     e.moveSpeed = 0;
@@ -429,11 +543,30 @@ function setState(a: Actor, s: ActionState) {
   a.state = s;
   a.stateTime = 0;
   a.struck = false;
+  a.charging = false;
 }
-function startAttack(a: Actor) {
+function startAttack(a: Actor, kind: StrikeStyle | "bash", weight: StrikeWeight = "light", charging = false) {
   setState(a, "windup");
+  a.attack = kind === "bash" ? BASH : makeAttack(a.weapon, styleFor(a.weapon, kind), weight);
+  a.timing = { ...(a === player ? a.attack.timing : enemyAttackTiming(a.attack, wave)) };
+  a.charging = charging;
   a.extraRecovery = 0;
   if (a === player) playerAttackId++;
+}
+
+/** Kilpi hajoaa: palaset putoavat maahan, ja kantaja taistelee tästä eteenpäin ilman kilpeä. */
+function breakShield(a: Actor) {
+  a.shield = null;
+  a.shieldHp = 0;
+  if (a.loadout === "sword_shield") a.loadout = "sword";
+  const d = a.fighter.breakShield();
+  if (d) { scene.add(d.group); debris.push(d); }
+  sfx.clang(false);
+  sfx.hit();
+  shake = Math.max(shake, 0.25);
+  hitstop = Math.max(hitstop, 0.1);
+  if (a === player) { showMsg("Kilpesi hajosi!", "Torju nyt miekalla oikeaan suuntaan", 1.6); flash("#b33a2e", 0.25); }
+  else showMsg("Kilpi hajosi!", "", 1.1);
 }
 
 function lerpAngle(a: number, b: number, t: number) { return a + angleBetween(a, b) * t; }
@@ -449,30 +582,63 @@ function resolveStrike(att: Actor, def: Actor) {
   const dist = toDef.length();
   const angleToDefender = angleBetween(att.yaw, Math.atan2(toDef.x, toDef.z));
   const angleToAttacker = angleBetween(def.yaw, Math.atan2(-toDef.x, -toDef.z));
-  const res = resolveHit({ distance: dist, angleToDefender }, { state: def.state, blockStart: def.blockStart, angleToAttacker }, gameTime);
+  const atk = att.attack;
+  const defState = def.state;
+  const defender = {
+    state: defState, blockStart: def.blockStart, angleToAttacker,
+    shield: def.shield, stance: def.stance, blockArc: def.weapon.blockArc,
+  };
+  const res = resolveHit({ distance: dist, angleToDefender }, defender, gameTime, atk);
   const contact = att.pos.clone().lerp(def.pos, 0.55).setY(groundHeight(def.pos.x, def.pos.z) + 1.3);
   const isPlayer = att === player;
-  events.push(`${isPlayer ? "pelaaja" : "vihollinen"}:${res}`);
+  events.push(`${isPlayer ? "pelaaja" : "vihollinen"}:${atk.kind}/${atk.weight}:${res}`);
   if (events.length > 30) events.shift();
 
+  const heavy = atk.weight === "heavy";
+  def.hp -= strikeDamage(att.power, atk, res, defState);
+  // Kilpi kuluu torjutuista iskuista: puolivälissä siihen tulee lovi, lopussa se hajoaa.
+  const wear = shieldWear(atk, res, defender);
+  if (wear > 0 && def.shield) {
+    def.shieldHp -= wear;
+    if (def.shieldHp <= 0) breakShield(def);
+    else if (def.shieldHp <= def.shield.durability * def.shield.notchAt) def.fighter.setShieldNotch(true);
+  }
+  const died = def.hp <= 0;
+  if (died) {
+    setState(def, "dead");
+    if (def === player) onPlayerDeath();
+    else onEnemyDeath();
+  }
+
   if (res === "hit") {
-    const base = isPlayer ? 20 : 14 + wave;
-    const dmg = damageFor(base, def.state);
-    def.hp -= dmg;
     sfx.hit();
-    hitstop = 0.07;
-    shake = isPlayer ? 0.12 : 0.22;
-    emitSparks(contact, 10, 2);
+    hitstop = heavy ? 0.11 : 0.07;
+    shake = (isPlayer ? 0.12 : 0.22) * (heavy ? 1.5 : atk.kind === "bash" ? 0.7 : 1);
+    emitSparks(contact, heavy ? 18 : 10, 2);
     if (isPlayer) song = Math.min(SONG_MAX, song + SONG_GAIN_HIT);
-    else flash("#b33a2e", 0.35);
-    if (def.hp <= 0) {
-      setState(def, "dead");
-      if (def === player) onPlayerDeath();
-      else onEnemyDeath();
-    } else if (def.state === "windup" || def.state === "idle" || def.state === "block") {
+    else flash("#b33a2e", heavy ? 0.45 : atk.kind === "bash" ? 0.15 : 0.35);
+    if (!isPlayer && defState === "block" && !died) showMsg("Väärä torjunta", `${STYLE_NAME[atk.kind]} meni läpi`, 0.9);
+    // Lyhyt horjahdus keskeyttää noston. Kilpityöntö ei riitä pysäyttämään jo alkanutta iskua.
+    const interrupts = defState === "idle" || defState === "block" || (defState === "windup" && atk.kind !== "bash");
+    if (!died && interrupts) {
       setState(def, "stagger");
-      def.stateTime = STAGGER_TIME * 0.55; // lyhyt horjahdus keskeyttää noston
+      def.stateTime = STAGGER_TIME * 0.55;
     }
+  } else if (res === "guardbreak") {
+    sfx.clang(false);
+    sfx.hit();
+    emitSparks(contact, 26, 5);
+    hitstop = 0.08;
+    shake = 0.18;
+    if (!died) {
+      setState(def, "stagger");
+      def.stateTime = STAGGER_TIME - GUARDBREAK_STAGGER;
+    }
+    // Murtaja toipuu nopeasti ja ehtii iskeä ennen kuin puolustaja saa suojan takaisin.
+    att.extraRecovery = -GUARDBREAK_ADVANTAGE;
+    if (!isPlayer) ai.counter = true;
+    if (isPlayer) showMsg("Suoja murtui!", "Iske nyt", 0.9);
+    else { showMsg("Suojasi murtui", "", 0.8); flash("#b33a2e", 0.2); }
   } else if (res === "blocked") {
     sfx.clang(false);
     emitSparks(contact, 18, 4);
@@ -501,10 +667,16 @@ function updateCombatant(a: Actor, other: Actor | null, dt: number) {
   const t = a.timing;
 
   if (a.state === "windup" || a.state === "release" || a.state === "recovery") {
-    const phase = attackPhase(a.stateTime, { ...t, recovery: t.recovery + a.extraRecovery });
+    const phase = a.charging ? "windup" : attackPhase(a.stateTime, { ...t, recovery: t.recovery + a.extraRecovery });
     if (phase === "release" && a.state !== "release") {
       a.state = "release";
       sfx.swing();
+    }
+    if (phase === "release") {
+      // Askel iskun mukana: paino siirtyy eteen.
+      const step = (a.attack.lunge / t.release) * dt;
+      a.pos.x += Math.sin(a.yaw) * step;
+      a.pos.z += Math.cos(a.yaw) * step;
     }
     if (phase === "release" && !a.struck && other) {
       a.struck = true;
@@ -542,6 +714,23 @@ function updatePlayer(dt: number) {
 
   if (songState) { p.moveSpeed = 0; return; }
 
+  // Viritys: niin kauan kuin iskunappi on pohjassa, isku ei laukea. Kun viritysaika täyttyy,
+  // isku muuttuu raskaaksi. Napin vapautus laukaisee iskun.
+  if (p.state === "windup" && p.charging && p.attack.kind !== "bash") {
+    const style = p.attack.kind;
+    const heavy = makeAttack(p.weapon, style, "heavy");
+    const full = p.stateTime >= heavy.timing.windup;
+    if (full && p.attack.weight === "light") { p.attack = heavy; sfx.tick(); }
+    // Nappi lasketaan pohjassa olevaksi myös, jos ase muunsi painetun suunnan toiseksi (keihäs).
+    const held = STYLES.some((st) => strikeHeld[st] && styleFor(p.weapon, st) === style);
+    if (!held || p.stateTime >= heavy.timing.windup + CHARGE_HOLD_MAX) {
+      p.charging = false;
+      // Kevyt isku laukeaa aikaisintaan oman nostonsa jälkeen, viritetty raskas heti.
+      const lightWindup = makeAttack(p.weapon, style, "light").timing.windup;
+      p.timing = { ...p.attack.timing, windup: full ? p.stateTime : Math.max(p.stateTime, lightWindup) };
+    }
+  }
+
   if (p.state === "idle" || p.state === "block") {
     if (songQueued && song >= SONG_MAX && enemy && enemy.state !== "dead") {
       startSong();
@@ -553,7 +742,13 @@ function updatePlayer(dt: number) {
       p.dodgeDir.copy(move.lengthSq() > 0 ? move.normalize() : right.clone().negate());
       return;
     }
-    if (attackQueued && p.state === "idle") { startAttack(p); return; }
+    if (strikeQueued) {
+      if (p.state === "idle") { startAttack(p, strikeQueued, "light", true); return; }
+      // Torjunnan aikana: kilven kanssa kilpityöntö, pelkällä aseella torjunta-asennon vaihto.
+      if (p.shield) { startAttack(p, "bash"); return; }
+      // Asennon vaihto aloittaa torjunnan alusta, joten oikeaan aikaan vaihdettu asento on täydellinen torjunta.
+      if (strikeQueued !== p.stance) { p.stance = strikeQueued; p.blockStart = gameTime; }
+    }
     if (blockHeld && p.state === "idle") { setState(p, "block"); p.blockStart = gameTime; }
     if (!blockHeld && p.state === "block") setState(p, "idle");
   }
@@ -580,11 +775,18 @@ function keepApartAndInside(a: Actor, b: Actor | null) {
 }
 
 function targetPose(a: Actor) {
+  const k = a.attack.kind, hv = a.attack.weight === "heavy";
   switch (a.state) {
-    case "windup": return { pose: POSES.windup, rate: 7 / a.timing.windup };
-    case "release": return { pose: POSES.strike, rate: 40 };
+    case "windup": {
+      const pose = k === "bash" ? POSES.bashWindup : k === "slash" ? POSES.slashWindup : k === "thrust" ? POSES.thrustWindup : hv ? POSES.heavyWindup : POSES.windup;
+      return { pose, rate: 7 / a.timing.windup };
+    }
+    case "release": {
+      const pose = k === "bash" ? POSES.bashStrike : k === "slash" ? POSES.slashStrike : k === "thrust" ? POSES.thrustStrike : hv ? POSES.heavyStrike : POSES.strike;
+      return { pose, rate: 40 };
+    }
     case "recovery": return { pose: POSES.guard, rate: 5 };
-    case "block": return { pose: POSES.block, rate: 22 };
+    case "block": return { pose: a.stance === "slash" ? POSES.blockSide : a.stance === "thrust" ? POSES.blockThrust : POSES.block, rate: 22 };
     case "stagger": return { pose: POSES.stagger, rate: 14 };
     case "rooted": return { pose: POSES.rooted, rate: 6 };
     case "dead": return { pose: POSES.stagger, rate: 6 };
@@ -608,11 +810,11 @@ function syncVisual(a: Actor, dt: number) {
   f.animate(pose, rate, dt, a.moveSpeed);
   // Vihollisen terä hehkuu noston aikana: ajoitusvihje.
   const glow = a !== player && a.state === "windup" ? Math.min(1, a.stateTime / a.timing.windup) : 0;
-  f.setGlow(glow * 0.9);
+  f.setGlow(glow * (a.attack.weight === "heavy" ? 1.5 : 0.9));
   f.root.updateMatrixWorld(true);
   f.bladeBase.getWorldPosition(tmpA);
   f.bladeTip.getWorldPosition(tmpB);
-  a.trail.update(tmpA, tmpB, a.state === "release" || (a.state === "recovery" && a.stateTime < a.timing.windup + a.timing.release + 0.05));
+  a.trail.update(tmpA, tmpB, a.attack.kind !== "bash" && (a.state === "release" || (a.state === "recovery" && a.stateTime < a.timing.windup + a.timing.release + 0.05)));
 }
 
 // ---------- Kamera ----------
@@ -651,7 +853,7 @@ function updateCamera(dt: number) {
 // ---------- Hahmorivi (kehityskäyttöön) ----------
 // Kaikki hahmot ja varustukset rivissä eri asennoissa kuvakaappauksia ja arviointia varten.
 const showcase: { fighter: Fighter; pose: keyof typeof POSES }[] = [];
-function setShowcase(on: boolean) {
+function setShowcase(on: boolean, allPose?: string) {
   for (const s of showcase) { scene.remove(s.fighter.root); s.fighter.dispose(); }
   showcase.length = 0;
   if (!on) return;
@@ -670,7 +872,7 @@ function setShowcase(on: boolean) {
     fighter.root.position.set(x, groundHeight(x, 1), 1);
     fighter.root.rotation.y = Math.PI;
     scene.add(fighter.root);
-    showcase.push({ fighter, pose });
+    showcase.push({ fighter, pose: allPose && allPose in POSES ? allPose : pose });
   });
 }
 
@@ -685,10 +887,12 @@ function onPlayerDeath() {
 }
 function restart() {
   for (const a of [player, enemy, ...corpses.map((c) => c.actor)]) {
-    if (a) scene.remove(a.fighter.root, a.trail.mesh);
+    if (a) removeActor(a);
   }
   corpses.length = 0;
-  player = makeActor(PLAYER_LOOK, new THREE.Vector3(0, 0, -3), PLAYER_ATTACK, 100, 0xffd27a);
+  for (const d of debris) d.dispose();
+  debris.length = 0;
+  player = makeActor(PLAYER_LOOK, new THREE.Vector3(0, 0, -3), 100, 0xffd27a, PLAYER_POWER);
   enemy = null;
   wave = 0;
   song = 0;
@@ -703,6 +907,13 @@ let fpsAcc = 0, fpsFrames = 0;
 function frame(now: number) {
   const realDt = Math.min(0.05, (now - last) / 1000);
   last = now;
+  simulate(realDt);
+  composer.render();
+  requestAnimationFrame(frame);
+}
+
+/** Yksi pelin askel ilman piirtoa. Erillään, jotta savutesti voi ajaa peliä tasaisin askelin. */
+function simulate(realDt: number) {
   realTime += realDt;
   fpsAcc += realDt; fpsFrames++;
   if (fpsAcc > 0.5) { $("fps").textContent = String(Math.round(fpsFrames / fpsAcc)); fpsAcc = 0; fpsFrames = 0; }
@@ -729,11 +940,12 @@ function frame(now: number) {
       nextWaveAt = -1;
       if (enemy) corpses.push({ actor: enemy, removeAt: gameTime + 6 });
       player.hp = Math.min(player.maxHp, player.hp + 35);
+      renewPlayerShield();
       spawnEnemy();
     }
     for (let i = corpses.length - 1; i >= 0; i--) {
       if (gameTime > corpses[i].removeAt) {
-        scene.remove(corpses[i].actor.fighter.root, corpses[i].actor.trail.mesh);
+        removeActor(corpses[i].actor);
         corpses.splice(i, 1);
       }
     }
@@ -743,6 +955,9 @@ function frame(now: number) {
   if (enemy) syncVisual(enemy, dt);
   for (const c of corpses) syncVisual(c.actor, dt);
   for (const s of showcase) s.fighter.animate(POSES[s.pose], 8, realDt, 0);
+  for (let i = debris.length - 1; i >= 0; i--) {
+    if (!debris[i].update(dt, groundHeight)) { debris[i].dispose(); debris.splice(i, 1); }
+  }
 
   // Suo
   const swampTarget = enemy && enemy.state === "rooted" ? 1.4 : 0;
@@ -771,10 +986,8 @@ function frame(now: number) {
     msgTimer -= realDt;
     if (msgTimer <= 0) { $("msg").style.opacity = "0"; $("sub").style.opacity = "0"; }
   }
-  attackQueued = dodgeQueued = songQueued = beatQueued = false;
-
-  composer.render();
-  requestAnimationFrame(frame);
+  strikeQueued = null;
+  dodgeQueued = songQueued = beatQueued = false;
 }
 
 // ---------- Hiiren lukitus ja tauko ----------
@@ -787,7 +1000,11 @@ let pointerLockWorked = false;
 function clearInputs() {
   keys.clear();
   blockHeld = false;
-  attackQueued = dodgeQueued = songQueued = beatQueued = false;
+  // Kesken jäänyt viritys perutaan, jottei isku laukea itsestään tauon jälkeen.
+  if (player.state === "windup" && player.charging) setState(player, "idle");
+  releaseStrikes();
+  strikeQueued = null;
+  dodgeQueued = songQueued = beatQueued = false;
 }
 
 function lockPointer() {
@@ -834,13 +1051,26 @@ $("startBtn").addEventListener("click", () => {
 // Kehityskäyttöön ja savutesteihin: tila näkyy konsolista.
 (window as unknown as { __game: unknown }).__game = {
   get state() {
-    return { dist: enemy ? +enemy.pos.distanceTo(player.pos).toFixed(2) : null, ai: { ...ai }, player: player.state, playerHp: player.hp, enemy: enemy?.state, enemyHp: enemy?.hp, song, wave, timeScale };
+    return { pos: player.pos.toArray().map((v) => +v.toFixed(2)), yaw: +player.yaw.toFixed(2), dist: enemy ? +enemy.pos.distanceTo(player.pos).toFixed(2) : null, ai: { ...ai }, player: player.state, playerAttack: `${player.attack.kind}/${player.attack.weight}`, playerHp: player.hp, playerShield: player.shieldHp, stance: player.stance, enemy: enemy?.state, enemyAttack: enemy ? `${enemy.attack.kind}/${enemy.attack.weight}` : null, enemyShield: enemy?.shieldHp, enemyHp: enemy?.hp, song, wave, timeScale };
   },
   get events() { return [...events]; },
   get song() { return songState ? { results: [...songState.results], done: songState.done, realTime, beats: songState.beats } : null; },
   fillSong() { song = SONG_MAX; },
+  /** Ajaa peliä n askelta eteenpäin ruudunpäivityksestä riippumatta (savutestit). */
+  tick(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) simulate(dt); },
+  /** Asennot muokattavina: hahmorivin kanssa asentoja voi säätää lennossa konsolista. */
+  poses: POSES,
+  /** Vaihtaa vastustajan suoraan annetun aallon vastustajaan (1 = urho ja miekka, 3 = keihäs, 4 = kilpi). */
+  skipTo(n: number) {
+    if (enemy) removeActor(enemy);
+    enemy = null;
+    wave = Math.max(0, n - 1);
+    nextWaveAt = -1;
+    renewPlayerShield();
+    spawnEnemy();
+  },
   /** Hahmorivi: kaikki hahmot ja varustukset näkyviin aukion keskelle. */
-  showcase(on = true) { setShowcase(on); },
+  showcase(on = true, pose?: string) { setShowcase(on, pose); },
   /** Vapaa kamera kuvakaappauksia varten; null palauttaa pelikameran. */
   setCamera(pos: number[] | null, look: number[] = [0, 1, 0]) { camOverride = pos ? { pos, look } : null; },
   /** Sekunteja (reaaliaikaa) seuraavaan laulun tahtiin, tai null. */
