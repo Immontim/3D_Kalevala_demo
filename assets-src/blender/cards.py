@@ -31,7 +31,7 @@ def _setup_scene(w, h):
     return sc
 
 
-def render_card(obj_names, name, view="side", w=1024, h=1024, margin=0.03, yaw=0.0):
+def render_card(obj_names, name, view="side", w=1024, h=1024, margin=0.03, yaw=0.0, extra_visible=()):
     """Renderöi objektit ortokameralla. view: 'side' (katsotaan -Y suuntaan,
     kuvan alareuna = objektin tyvi) tai 'top'."""
     sc = _setup_scene(w, h)
@@ -39,7 +39,7 @@ def render_card(obj_names, name, view="side", w=1024, h=1024, margin=0.03, yaw=0
     hidden = {}
     for o in bpy.data.objects:
         hidden[o.name] = o.hide_render
-        o.hide_render = o not in targets
+        o.hide_render = o not in targets and o.name not in extra_visible
     pts = [o.matrix_world @ Vector(c) for o in targets for c in o.bound_box]
     mn = Vector((min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)))
     mx = Vector((max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))

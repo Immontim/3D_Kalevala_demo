@@ -54,6 +54,8 @@ function moisture(x: number, z: number) {
 
 export interface World {
   campfireLight: THREE.PointLight;
+  /** Taivaasta laskettu ympäristökartta hahmojen metallipinnoille. */
+  envMap: THREE.Texture;
   /** Valmistuu, kun Blender-mallit on ladattu ja sijoiteltu. */
   ready: Promise<void>;
   update(t: number, dt: number, camera: THREE.Camera): void;
@@ -156,6 +158,7 @@ function buildSky(scene: THREE.Scene, sunDir: THREE.Vector3) {
   );
   sky.renderOrder = -10;
   scene.add(sky);
+  return sky;
 }
 
 // ---------- Nuotion liekki ----------
@@ -457,7 +460,12 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   const sunPos = new THREE.Vector3(-22, 24, -15);
   scene.background = new THREE.Color(0xc8cfc9);
   scene.fog = new THREE.FogExp2(0x93a6ad, 0.0105);
-  buildSky(scene, sunPos.clone().normalize());
+  const sky = buildSky(scene, sunPos.clone().normalize());
+  const envScene = new THREE.Scene();
+  envScene.add(sky.clone());
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const envMap = pmrem.fromScene(envScene, 0, 1, 400).texture;
+  pmrem.dispose();
 
   scene.add(new THREE.HemisphereLight(0xc6d2e2, 0x6e6a52, 2.0));
   const sun = new THREE.DirectionalLight(0xffcf9a, 3.6);
@@ -491,6 +499,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
 
   return {
     campfireLight: fire.light,
+    envMap,
     ready,
     update(_t, dt, camera) {
       fire.update(dt, camera);

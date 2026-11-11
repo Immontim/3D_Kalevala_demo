@@ -3,7 +3,7 @@ import {
   ActionState, AttackTiming, BLOCK_RECOIL, DODGE_COOLDOWN, DODGE_TIME, PLAYER_ATTACK, SONG_GAIN_HIT,
   SONG_GAIN_PARRY, SONG_MAX, STAGGER_TIME, angleBetween, attackPhase, damageFor, enemyTiming, resolveHit,
 } from "./combat";
-import { Fighter, FighterLook, POSES, SwordTrail } from "./fighter";
+import { Fighter, FighterLook, POSES, SwordTrail, setCharacterEnv } from "./fighter";
 import { ARENA_RADIUS, buildWorld, groundHeight } from "./world";
 import { Sfx } from "./audio";
 import { BeatJudgement, GOOD_WINDOW, SONG_VERSES, judgeBeat, songOutcome } from "./songLogic";
@@ -27,6 +27,7 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 300);
 const world = buildWorld(scene, renderer);
 const sfx = new Sfx();
+setCharacterEnv(world.envMap);
 
 // Jälkikäsittely: hehku (nuotio, vastavalo), sävytys ja vinjetti. MSAA säilyy renderöintikohteessa.
 const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
@@ -92,11 +93,15 @@ function makeActor(look: FighterLook, pos: THREE.Vector3, timing: AttackTiming, 
   };
 }
 
-const PLAYER_LOOK: FighterLook = { tunic: 0xb7a27c, trim: 0x5a3d22, skin: 0xe0b896, hair: 0xb08a4a, blade: 0xc9913f };
+const PLAYER_LOOK: FighterLook = { character: "hero", loadout: "sword_shield" };
+// Vastustajat kiertävät: kaksi hahmoa, kummallakin miekka, miekka ja kilpi sekä keihäs.
 const ENEMIES: { name: string; look: FighterLook }[] = [
-  { name: "Pohjolan soturi", look: { tunic: 0x3b3431, trim: 0x8a2a1f, skin: 0xd4a888, hair: 0x2a221c, blade: 0x9c7a3c, cap: 0x5b4636 } },
-  { name: "Louhen vartija", look: { tunic: 0x2d3540, trim: 0x9b8a5a, skin: 0xd8b090, hair: 0x6b6058, blade: 0xa88445, cap: 0x2b2b2b } },
-  { name: "Tuonelan karhunkaataja", look: { tunic: 0x4a3524, trim: 0x2a2a2a, skin: 0xc79c7c, hair: 0x1c1712, blade: 0xb08b4c, cap: 0x3c2c1e } },
+  { name: "Nuori urho", look: { character: "urho", loadout: "sword" } },
+  { name: "Pohjan soturi", look: { character: "pohja", loadout: "sword" } },
+  { name: "Nuori urho, keihäs", look: { character: "urho", loadout: "spear" } },
+  { name: "Pohjan soturi, kilpi", look: { character: "pohja", loadout: "sword_shield" } },
+  { name: "Nuori urho, kilpi", look: { character: "urho", loadout: "sword_shield" } },
+  { name: "Pohjan soturi, keihäs", look: { character: "pohja", loadout: "spear" } },
 ];
 
 let player = makeActor(PLAYER_LOOK, new THREE.Vector3(0, 0, -3), PLAYER_ATTACK, 100, 0xffd27a);
@@ -643,6 +648,32 @@ function updateCamera(dt: number) {
   camera.updateProjectionMatrix();
 }
 
+// ---------- Hahmorivi (kehityskäyttöön) ----------
+// Kaikki hahmot ja varustukset rivissä eri asennoissa kuvakaappauksia ja arviointia varten.
+const showcase: { fighter: Fighter; pose: keyof typeof POSES }[] = [];
+function setShowcase(on: boolean) {
+  for (const s of showcase) { scene.remove(s.fighter.root); s.fighter.dispose(); }
+  showcase.length = 0;
+  if (!on) return;
+  const row: [FighterLook, keyof typeof POSES][] = [
+    [{ character: "hero", loadout: "sword_shield" }, "guard"],
+    [{ character: "urho", loadout: "sword" }, "guard"],
+    [{ character: "urho", loadout: "sword_shield" }, "block"],
+    [{ character: "urho", loadout: "spear" }, "windup"],
+    [{ character: "pohja", loadout: "sword" }, "strike"],
+    [{ character: "pohja", loadout: "sword_shield" }, "guard"],
+    [{ character: "pohja", loadout: "spear" }, "guard"],
+  ];
+  row.forEach(([look, pose], i) => {
+    const fighter = new Fighter(look);
+    const x = (i - (row.length - 1) / 2) * 1.5;
+    fighter.root.position.set(x, groundHeight(x, 1), 1);
+    fighter.root.rotation.y = Math.PI;
+    scene.add(fighter.root);
+    showcase.push({ fighter, pose });
+  });
+}
+
 // ---------- Kierrokset ----------
 function onEnemyDeath() {
   showMsg("Vastustaja kaatui", "Seuraava saapuu metsästä…", 2.4);
@@ -711,6 +742,7 @@ function frame(now: number) {
   syncVisual(player, dt);
   if (enemy) syncVisual(enemy, dt);
   for (const c of corpses) syncVisual(c.actor, dt);
+  for (const s of showcase) s.fighter.animate(POSES[s.pose], 8, realDt, 0);
 
   // Suo
   const swampTarget = enemy && enemy.state === "rooted" ? 1.4 : 0;
@@ -807,6 +839,8 @@ $("startBtn").addEventListener("click", () => {
   get events() { return [...events]; },
   get song() { return songState ? { results: [...songState.results], done: songState.done, realTime, beats: songState.beats } : null; },
   fillSong() { song = SONG_MAX; },
+  /** Hahmorivi: kaikki hahmot ja varustukset näkyviin aukion keskelle. */
+  showcase(on = true) { setShowcase(on); },
   /** Vapaa kamera kuvakaappauksia varten; null palauttaa pelikameran. */
   setCamera(pos: number[] | null, look: number[] = [0, 1, 0]) { camOverride = pos ? { pos, look } : null; },
   /** Sekunteja (reaaliaikaa) seuraavaan laulun tahtiin, tai null. */
