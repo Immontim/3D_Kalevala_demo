@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import charactersUrl from "../assets/characters.glb?url";
+import type { Loadout } from "./combat";
 
 // Blenderissä mallinnettu luurankohahmo, jota ohjataan koodilla: asennot (Pose) ovat
 // nivelkulmia, joita kohti hahmo pehmeästi liukuu. Valmiita animaatioleikkeitä ei ole.
@@ -19,46 +20,66 @@ export interface Pose {
   lEl: number;
   crouch: number;
   headPitch: number;
+  /** Haara-asento: vasen jalka eteen, oikea taakse (rad). Negatiivinen = oikea jalka edessä. */
+  stride: number;
 }
 
 const KEYS = Object.keys({
   spineYaw: 0, spinePitch: 0, rShX: 0, rShZ: 0, rEl: 0, rHandX: 0, rHandY: 0,
-  lShX: 0, lShZ: 0, lEl: 0, crouch: 0, headPitch: 0,
+  lShX: 0, lShZ: 0, lEl: 0, crouch: 0, headPitch: 0, stride: 0,
 } satisfies Pose) as (keyof Pose)[];
 
 export const POSES: Record<string, Pose> = {
   guard: {
     spineYaw: -0.15, spinePitch: 0.08, rShX: -0.55, rShZ: -0.15, rEl: -1.15, rHandX: 0.95, rHandY: 0,
-    lShX: -0.5, lShZ: 0.25, lEl: -1.3, crouch: 0.06, headPitch: 0,
+    lShX: -0.5, lShZ: 0.25, lEl: -1.3, crouch: 0.06, headPitch: 0, stride: 0.22,
   },
   windup: {
     spineYaw: -0.75, spinePitch: -0.05, rShX: -2.7, rShZ: -0.55, rEl: -1.0, rHandX: -0.3, rHandY: 0,
-    lShX: -0.9, lShZ: 0.4, lEl: -0.6, crouch: 0.12, headPitch: 0,
+    lShX: -0.9, lShZ: 0.4, lEl: -0.6, crouch: 0.12, headPitch: 0, stride: 0.1,
   },
   strike: {
     spineYaw: 0.7, spinePitch: 0.35, rShX: -0.9, rShZ: 0.55, rEl: -0.15, rHandX: 0.35, rHandY: 0,
-    lShX: -0.2, lShZ: 0.6, lEl: -0.4, crouch: 0.18, headPitch: 0.1,
+    lShX: -0.2, lShZ: 0.6, lEl: -0.4, crouch: 0.18, headPitch: 0.1, stride: 0.42,
   },
   block: {
     spineYaw: 0.05, spinePitch: 0.02, rShX: -1.5, rShZ: -0.35, rEl: -1.25, rHandX: 0.2, rHandY: 1.55,
-    lShX: -1.4, lShZ: 0.5, lEl: -1.4, crouch: 0.1, headPitch: 0.05,
+    lShX: -1.4, lShZ: 0.5, lEl: -1.4, crouch: 0.1, headPitch: 0.05, stride: 0.2,
   },
   stagger: {
     spineYaw: -0.4, spinePitch: -0.45, rShX: -0.6, rShZ: -0.9, rEl: -0.3, rHandX: 0.5, rHandY: 0,
-    lShX: -0.5, lShZ: 0.9, lEl: -0.3, crouch: 0.15, headPitch: -0.4,
+    lShX: -0.5, lShZ: 0.9, lEl: -0.3, crouch: 0.15, headPitch: -0.4, stride: -0.12,
   },
   rooted: {
     spineYaw: 0.2, spinePitch: 0.2, rShX: -2.4, rShZ: -0.8, rEl: -0.5, rHandX: 0.4, rHandY: 0,
-    lShX: -2.5, lShZ: 0.8, lEl: -0.5, crouch: 0, headPitch: -0.3,
+    lShX: -2.5, lShZ: 0.8, lEl: -0.5, crouch: 0, headPitch: -0.3, stride: 0,
+  },
+  // Raskas isku: miekka pään yli ja alas.
+  heavyWindup: {
+    spineYaw: -0.25, spinePitch: -0.22, rShX: -2.95, rShZ: -0.2, rEl: -1.35, rHandX: -0.55, rHandY: 0,
+    lShX: -0.9, lShZ: 0.35, lEl: -0.8, crouch: 0.08, headPitch: -0.1, stride: 0.12,
+  },
+  heavyStrike: {
+    spineYaw: 0.35, spinePitch: 0.55, rShX: -0.8, rShZ: 0.2, rEl: -0.1, rHandX: 0.55, rHandY: 0,
+    lShX: -0.1, lShZ: 0.55, lEl: -0.5, crouch: 0.26, headPitch: 0.15, stride: 0.5,
+  },
+  // Kilpityöntö: kilpi vedetään rintaa vasten ja työnnetään eteen.
+  bashWindup: {
+    spineYaw: 0.4, spinePitch: 0.1, rShX: -0.3, rShZ: -0.35, rEl: -1.1, rHandX: 0.9, rHandY: 0,
+    lShX: -0.3, lShZ: 0.35, lEl: -1.7, crouch: 0.16, headPitch: 0, stride: 0.15,
+  },
+  bashStrike: {
+    spineYaw: -0.55, spinePitch: 0.3, rShX: 0.1, rShZ: -0.45, rEl: -0.9, rHandX: 0.9, rHandY: 0,
+    lShX: -1.35, lShZ: 0.1, lEl: -0.3, crouch: 0.2, headPitch: 0.05, stride: 0.5,
   },
   sing: {
     spineYaw: 0, spinePitch: -0.12, rShX: -0.25, rShZ: -0.35, rEl: -0.4, rHandX: 0.9, rHandY: 0,
-    lShX: -1.2, lShZ: 0.9, lEl: -0.6, crouch: 0.02, headPitch: -0.35,
+    lShX: -1.2, lShZ: 0.9, lEl: -0.6, crouch: 0.02, headPitch: -0.35, stride: 0.05,
   },
 };
 
 export type CharacterId = "hero" | "urho" | "pohja";
-export type Loadout = "sword" | "sword_shield" | "spear";
+export type { Loadout };
 
 export interface FighterLook {
   character: CharacterId;
@@ -263,8 +284,11 @@ export class Fighter {
       this.setBone(`shin_${side}`, sh);
       this.setBone(`foot_${side}`, qA.slerpQuaternions(sh, IDENT, 0.7));
     };
-    leg("L", -s * moveAmp - p.crouch * 1.2, Math.max(0, s) * moveAmp * 1.4 + p.crouch * 2);
-    leg("R", s * moveAmp - p.crouch * 1.2, Math.max(0, -s) * moveAmp * 1.4 + p.crouch * 2);
+    // Haara-asento sulautuu pois kävellessä, jotta askel ei jää toispuoleiseksi.
+    const st = p.stride * (1 - moveAmp * 0.6);
+    const sf = Math.max(0, st), sb = Math.max(0, -st);
+    leg("L", -s * moveAmp - p.crouch * 1.2 - st, Math.max(0, s) * moveAmp * 1.4 + p.crouch * 2 + sf * 0.35 + sb * 0.6);
+    leg("R", s * moveAmp - p.crouch * 1.2 + st, Math.max(0, -s) * moveAmp * 1.4 + p.crouch * 2 + sb * 0.35 + sf * 0.6);
 
     // Lantio seuraa jalkoja: alempi jalka pysyy maassa kyykyssä ja askeleessa.
     const hips = this.bones.get("hips")!.bone;
@@ -301,14 +325,14 @@ export class Fighter {
 // Kilpikäden asennot (vasen käsi): kyynärvarsi vaakasuoraan eteen, jolloin kilpi on pystyssä.
 const SHIELD_GUARD: Partial<Pose> = { lShX: -0.35, lShZ: 0.42, lEl: -1.2 };
 const SHIELD_BLOCK: Partial<Pose> = { lShX: -0.95, lShZ: 0.18, lEl: -0.75, rShX: -0.5, rShZ: -0.35, rEl: -1.2, rHandX: 0.9, rHandY: 0 };
-const SHIELD_ARM = new Set<Pose>([POSES.guard, POSES.windup, POSES.strike]);
+const SHIELD_ARM = new Set<Pose>([POSES.guard, POSES.windup, POSES.strike, POSES.heavyWindup, POSES.heavyStrike]);
 
 // Keihäs: kärki eteen vaakatasossa (olkapään, kyynärpään ja ranteen kulmien summa noin nolla),
 // takakäsi lantion vieressä ja etukäsi varrella. Isku on pisto, ei lyönti.
 const SPEAR = new Map<Pose, Partial<Pose>>([
   [POSES.guard, { spineYaw: -0.45, rShX: 0.35, rShZ: -0.15, rEl: -1.3, rHandX: 0.95, rHandY: 0, lShX: -0.85, lShZ: -0.3, lEl: -0.55 }],
   [POSES.windup, { spineYaw: -0.8, rShX: 0.85, rShZ: -0.2, rEl: -1.7, rHandX: 0.85, rHandY: 0, lShX: -0.6, lShZ: -0.35, lEl: -0.9 }],
-  [POSES.strike, { spineYaw: 0.35, spinePitch: 0.3, rShX: -1.15, rShZ: 0.1, rEl: -0.2, rHandX: 1.35, rHandY: 0, lShX: -1.2, lShZ: -0.2, lEl: -0.25 }],
+  [POSES.strike, { stride: 0.55, crouch: 0.22, spineYaw: 0.35, spinePitch: 0.3, rShX: -1.15, rShZ: 0.1, rEl: -0.2, rHandX: 1.35, rHandY: 0, lShX: -1.2, lShZ: -0.2, lEl: -0.25 }],
   [POSES.block, { spineYaw: -0.2, rShX: -0.3, rShZ: -0.3, rEl: -1.5, rHandX: 0.6, rHandY: 1.2, lShX: -1.3, lShZ: 0.2, lEl: -0.9 }],
 ]);
 

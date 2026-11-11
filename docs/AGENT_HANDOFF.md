@@ -7,58 +7,70 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-11 (Claude, kotikone, Windows)
 
-- **Versio v00.03.00**, branch `claude/characters` (tarkista merge-tila
-  `git merge-base --is-ancestor`). Metsäaukio (v00.02.00) on mainissa.
-- **Koodi valmis:** taisteluprototyyppi, Blender-metsäaukio ja nyt
-  Blender-hahmot. `assets/characters.glb` (5 Mt): yksi luuranko `RIG`
-  (17 luuta), kolme hahmoa (`char_hero`, `char_urho`, `char_pohja`, noin
-  28 000 kolmiota / hahmo) ja varusteet (`sword`, `spear`, `shield_*`).
-  `src/fighter.ts` kloonaa mallin taistelijalle, jättää näkyviin oman hahmon,
-  kiinnittää aseen oikeaan käteen ja kilven vasempaan kyynärvarteen.
-- **Animaatio on yhä kokonaan koodia:** samat `Pose`-nivelkulmat kuin
-  ennen. `Fighter.apply()` muuntaa ne luiden kierroiksi "virtuaalisen
-  rangan" kautta (kädet suorina alas = nolla-asento), joten vanhat asennot
-  toimivat A-asennossa mallinnetulla luurangolla. Lantio korjataan niin, että
-  alempi jalka pysyy maassa. Kilvelle ja keihäälle on omat asentolisät
-  (`SHIELD_*`, `SPEAR`).
-- **Varustukset ovat vasta ulkoasua:** pelaaja on sankari (miekka ja kilpi),
-  vastustajat kiertävät urho/pohja × miekka, miekka+kilpi, keihäs.
-  Osumalogiikka, kantama ja torjunta ovat kaikilla samat kuin miekalla.
+- **Versio v00.04.00**, branch `claude/loadout-combat` (tarkista merge-tila
+  `git merge-base --is-ancestor`). Metsäaukio (v00.02.00) ja Blender-hahmot
+  (v00.03.00) ovat mainissa.
+- **Koodi valmis: varustuskohtainen taistelu.** Säännöt ovat puhtaana
+  logiikkana tiedostossa `src/combat.ts` (taulukko `ATTACKS`, `resolveHit`,
+  `strikeDamage`, `attackFor`, `enemyAttackTiming`), testit vieressä.
+  - **Sivallus** (`slash`): perusisku, kantama 2,3 m.
+  - **Raskas isku** (`heavy`): iskunappi pohjassa yli 0,24 s. Hidas nosto,
+    vahinko 1,8×, murtaa miekalla tai keihäällä tehdyn torjunnan (puolet
+    vahingosta läpi ja horjahdus). Kilpi kestää sen.
+  - **Pisto** (`thrust`): keihään ainoa isku. Kantama 3,3 m, kapea kaari
+    (sivuaskel väistää), ei osu alle 1,3 m:n päähän.
+  - **Kilpityöntö** (`bash`): isku torjunnan aikana, vain kilven kanssa.
+    Nopea ja lyhyt, vahinko 0,25×, murtaa minkä tahansa torjunnan, ei
+    keskeytä jo alkanutta iskua.
+  - Kilpi torjuu leveämmältä (120° puolikulma) kuin ase (82°). Täydellinen
+    torjunta pysäyttää kaikki iskut. Suojan murtanut toipuu 0,25 s nopeammin,
+    murrettu horjuu 0,9 s.
+- **Tekoäly varustuksen mukaan** (`pickEnemyAttack` tiedostossa
+  `src/main.ts`): keihäsmies pitää 2,7 m välimatkaa ja perääntyy, kilpimies
+  torjuu useammin ja työntää kilvellä, jos pelaaja seisoo torjunnassa yli
+  0,7 s, pelkkä miekkamies lyö raskaasti 35 % iskuista.
+- **Animaatio on yhä kokonaan koodia** (`src/fighter.ts`): `Pose`-nivelkulmat
+  muunnetaan luiden kierroiksi "virtuaalisen rangan" kautta. Uutta:
+  `stride` (haara-asento, vasen jalka edessä), asennot `heavyWindup`,
+  `heavyStrike`, `bashWindup`, `bashStrike`, ja isku siirtää hahmoa askeleen
+  eteen (`AttackDef.lunge`).
+- Pelaaja on sankari (miekka ja kilpi). Vastustajat kiertävät urho/pohja ×
+  miekka, miekka+kilpi, keihäs.
 - **Blender-putket:** metsä `assets-src/blender/build_all.py`, hahmot
-  `char_all.py` → `run_chars()` (`char_rig.py` luuranko ja nyrkit,
-  `char_build.py` vaatteet ja varusteet, `char_export.py`). Lähteet:
-  `tools/fetch-polyhaven.ps1` ja `tools/fetch-characters.ps1` (ei Gitissä).
-  `.blend`-tiedostot eivät ole Gitissä, eikä lähdemallien tuontia
-  SRC-kokoelmaan ole skriptattu (hahmoilla: `GEO-body_male_realistic` ja
-  sen silmät Human Base Meshes -paketista).
-- **Deployattu:** GitHub Pages julkaisee mainin; v00.03.00 ei ole mainissa.
-- **Käsin testattu 2026-11-11** (Clauden in-app browser, dev-serveri):
-  hahmot renderöityvät, ase ja kilpi istuvat käteen, taistelu käynnistyy,
-  lyönti- ja torjunta-asennot toimivat, ei konsolivirheitä.
-  **FPS:ää ei mitattu hahmojen kanssa**, koska selainpaneeli oli piilossa
-  (kuristaa ~1 FPS:ään). Edellinen mittaus ilman hahmoja: 60 FPS /
-  1280×720 / RTX 4080 Super.
-- **Komennot 2026-11-11:** `bun run test` (12/12), `bun run lint`,
+  `char_all.py` → `run_chars()`. Lähteet: `tools/fetch-polyhaven.ps1` ja
+  `tools/fetch-characters.ps1` (ei Gitissä). `.blend`-tiedostot eivät ole
+  Gitissä, eikä lähdemallien tuontia SRC-kokoelmaan ole skriptattu.
+- **Deployattu:** GitHub Pages julkaisee mainin; v00.04.00 ei ole mainissa.
+- **Käsin testattu 2026-11-11** (Clauden in-app browser, dev-serveri,
+  näppäinsyöte skriptillä): sivallus, raskas isku ja kilpityöntö lähtevät
+  oikeista syötteistä; keihäsmies pistää 2,7 m päästä; kilpimies murtaa
+  pelaajan pitkän torjunnan ja lyö perään; ei konsolivirheitä.
+  **60 FPS** / 800×710 / RTX 4080 Super hahmojen kanssa.
+  **Ei testattu:** ihmisen pelaamana (tuntuma, tasapaino), kosketusnäyttö,
+  buildattu versio selaimessa.
+- **Komennot 2026-11-11:** `bun run test` (21/21), `bun run lint`,
   `bun run build` ok.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
-- **Arviointi (ali-agentti, kuvakaappauksista):** hahmot 4–5/10
-  referensseihin nähden ensimmäisellä kierroksella. Korjauskierros tehty
-  (housut, rengaspanssari, nahka, kypärät, kilvet, viitta, kengät), sitä ei
-  ole arvioitu uudelleen.
-- Savutestien apuna `window.__game`: `showcase()` asettaa kaikki hahmot ja
-  varustukset riviin aukiolle, `setCamera([x,y,z],[x,y,z])` vapaa kamera.
+- Savutestien apuna `window.__game`: `skipTo(n)` vaihtaa vastustajan aallon
+  n vastustajaan (3 = keihäs, 4 = kilpi), `showcase(true, "heavyStrike")`
+  asettaa hahmorivin annettuun asentoon, `setCamera(pos, look)` vapaa
+  kamera, `events` listaa iskut muodossa `kuka:isku:tulos`.
 
 ## Tunnetut rajoitteet ja riskit
 
-- **Hahmojen avoimet viat:** kasvot ovat ilman tekstuuria (verteksivärit) ja
-  näyttävät lähikuvassa nukkemaisilta; rengaspanssari on varjossa lähes
-  musta; vartalo on tukeva verrattuna referenssien hoikkiin hahmoihin;
-  hiukset ovat sileä "verho"; peukalo ei kierry kahvan ympäri; keihästä
-  pidetään kahdella kädellä vain likimäärin (ei IK:ta), joten etukäsi ei
-  osu varteen; helma voi venyä tai leikata jalkaa isoissa askelissa.
-- **Asennot ovat jäykkiä:** jalat rinnakkain, ei painonsiirtoa eikä
-  askelluksen ja iskun yhteyttä. Tämä on seuraavan kierroksen työ yhdessä
-  uusien iskujen kanssa.
+- **Tasapainoa ei ole pelitestattu.** Luvut (kantamat, ajoitukset, vahingot)
+  ovat ensimmäinen arvaus. Epäilyt: keihäsmies on avuton, jos pelaaja pysyy
+  iholla; kilpivastustaja voi olla sitkeä, koska pelaajan raskas isku ei
+  murra kilpeä (keinot: kilpityöntö, sivusta kiertäminen, täydellinen
+  torjunta, laulu).
+- **Raskas isku tulee nappia pitämällä**, joten nopea näpäytys on sivallus.
+  Jos se tuntuu epätarkalta, vaihtoehto on oma nappi.
+- Vihollisen isku ei näytä tyyppiään muuten kuin asennolla ja noston
+  pituudella; terän hehku on kaikissa sama.
+- **Hahmojen avoimet viat:** kasvot ilman tekstuuria, rengaspanssari varjossa
+  lähes musta, tukeva vartalo, hiukset sileä "verho", peukalo ei kierry
+  kahvan ympäri, keihään etukäsi ei osu varteen (ei IK:ta), helma voi venyä
+  haara-asennossa.
 - Suorituskyky on mitattu vain tehokoneella; LOD-malleja tai
   laatuasetusta ei ole. Metsässä 2 milj. kolmiota, hahmoissa 28 000 / kpl.
 - Metsän avoimet viat: kodan oviaukko, ruskea uhrikivi, paperiset
@@ -69,10 +81,9 @@ Päivitetty: 2026-11-11 (Claude, kotikone, Windows)
 
 ## Seuraava tehtävä
 
-Pelimoottoriin muutakin kuin peruslyönti ja miekkatorjunta: varustuskohtainen
-taistelu (kilpitorjunta, keihään pisto ja kantama, iskusuunnat) ja sen
-vaatimat asennot. Omistaja pelaa ensin hahmot ja kertoo, mikä ulkoasussa
-pitää korjata ennen sitä.
+Omistaja pelaa v00.04.00:n ja kertoo tuntuman. Sen perusteella säädetään
+iskujen luvut (`ATTACKS` ja tekoälyn todennäköisyydet) ja päätetään, hiotaanko
+seuraavaksi hahmojen ulkoasua vai lisätäänkö taisteluun iskusuunnat.
 
 ## Ei vielä aloiteta
 
@@ -80,6 +91,8 @@ pitää korjata ennen sitä.
 - Git LFS (omistajan päätös 2026-11-10: ei vielä).
 - Muut referenssihahmot (tietäjä, emäntä, Louhi, jousineito, isäntä).
 - Isojen skannattujen puiden lataus ja kevennys.
+- Suuntatorjunta ja iskusuunnat (vasen/oikea/ylä) ennen kuin nykyiset neljä
+  iskua on pelitestattu.
 
 ## Pysyvät päätökset
 
