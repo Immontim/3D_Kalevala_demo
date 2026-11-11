@@ -59,3 +59,19 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; col
 #touch.hidden { display: none; }
 #touch button { opacity: 0.85; padding: 14px 18px; font-size: 16px; margin: 0; }
 #touch button.big { padding: 20px 24px; }
+
+/* Kilven kesto, viritysmittari ja iskuvihje */
+.bar.shieldbar { margin-top: 3px; height: 6px; border-color: rgba(150, 170, 190, 0.5); }
+.bar-wrap.right .bar.shieldbar .fill { margin-left: auto; }
+.fill.shield { background: linear-gradient(#b9c6d2, #7d8c9a); height: 100%; transition: width 0.15s; }
+.fill.shield.worn { background: linear-gradient(#d9a441, #9a5a22); }
+.label.cue { min-height: 1.4em; font-size: 18px; color: #ffd27a; text-shadow: 0 1px 4px #000; }
+#pstance { min-height: 1.2em; color: #cfd8e0; }
+#charge { position: absolute; left: 50%; bottom: 14%; width: min(260px, 50vw); transform: translateX(-50%); opacity: 0; transition: opacity 0.12s; text-align: center; }
+#charge.on { opacity: 1; }
+#charge .bar { height: 10px; }
+#chargeLabel { font-size: 13px; letter-spacing: 0.08em; color: #e8dcc0; text-shadow: 0 1px 3px #000; min-height: 1.3em; }
+.fill.charge { height: 100%; background: linear-gradient(#e8dcc0, #b9a26a); }
+#charge.full .fill.charge { background: linear-gradient(#ffd27a, #e0672a); box-shadow: 0 0 10px #ffb24a; }
+#charge.full .bar { border-color: #ffd27a; }
+.fill.charge { transition: none; }
