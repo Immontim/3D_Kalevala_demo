@@ -75,3 +75,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; col
 #charge.full .fill.charge { background: linear-gradient(#ffd27a, #e0672a); box-shadow: 0 0 10px #ffb24a; }
 #charge.full .bar { border-color: #ffd27a; }
 .fill.charge { transition: none; }
+
+/* Asetusikkuna: näppäinsidonnat */
+.panel h2 { margin: 6px 0 8px; font-size: 20px; font-weight: normal; color: var(--bronze); letter-spacing: 0.04em; }
+.bindrow { display: grid; grid-template-columns: 1fr 150px 150px; gap: 8px; align-items: center; margin: 4px 0; }
+.panel button.bind { margin: 0; padding: 6px 8px; font-size: 15px; background: rgba(217, 164, 65, 0.18); color: #e8dcc0; border: 1px solid rgba(217, 164, 65, 0.45); }
+.panel button.bind.empty { color: var(--muted); }
+.panel button.bind.listening { background: var(--bronze); color: #1a1209; }
+.panel button.secondary { background: transparent; color: var(--bronze); border: 1px solid rgba(217, 164, 65, 0.6); margin-left: 8px; font-size: 15px; }
+#bindNote { min-height: 1.3em; }
+@media (max-width: 520px) { .bindrow { grid-template-columns: 1fr 96px 96px; } }

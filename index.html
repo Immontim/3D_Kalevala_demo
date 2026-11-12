@@ -51,8 +51,13 @@
     <div id="pause" class="overlay hidden">
       <div class="panel">
         <h1>Tauko</h1>
-        <p class="tag">Hiiri vapautui tai ikkuna menetti fokuksen.</p>
+        <p class="tag">Peli on pysähdyksissä. Näppäimet voi vaihtaa tästä.</p>
+        <h2>Näppäimet</h2>
+        <div id="binds"></div>
+        <p class="small" id="bindNote"></p>
+        <p class="small">Liike (WASD), laulun tahti (välilyönti), uusi peli (R) ja tauko (Esc) ovat kiinteitä. Asetus tallentuu tähän selaimeen.</p>
         <button id="resumeBtn">Jatka</button>
+        <button id="resetBinds" class="secondary">Palauta oletukset</button>
       </div>
     </div>
 
@@ -70,7 +75,7 @@
           <li><b>Ilman kilpeä</b> torjunnan pitää vastata iskua: torjunnan aikana iskunappi valitsee sivu-, ylä- tai pistotorjunnan.</li>
           <li><b>Shift</b>: väistö</li>
           <li><b>Q</b>: kun laulun voima on täynnä, aika hidastuu ja laulat. Paina <b>välilyöntiä</b> tahdissa.</li>
-          <li><b>Esc</b>: vapauta hiiri ja pidä tauko</li>
+          <li><b>Esc</b>: tauko. Taukoikkunassa voit vaihtaa iskujen, torjunnan, väistön ja laulun näppäimet, myös hiiren lisänapeille.</li>
         </ul>
         <p class="small">Vastustajan terä hehkuu, kun isku on tulossa, ja iskun suunta näkyy hänen nimensä alla. Laulun voima kasvaa osumista ja täydellisistä torjunnoista.</p>
         <button id="startBtn">Aloita</button>

@@ -5,7 +5,11 @@ import {
   STAGGER_TIME, STYLES, ShieldDef, StrikeStyle, StrikeWeight, WeaponDef, angleBetween, attackPhase, chargeLevel,
   enemyAttackTiming, makeAttack, resolveHit, shieldWear, strikeDamage, styleFor, weaponOf,
 } from "./combat";
-import { Fighter, FighterLook, POSES, ShieldDebris, SwordTrail, setCharacterEnv } from "./fighter";
+import { Debris, Fighter, FighterLook, POSES, SwordTrail, setCharacterEnv } from "./fighter";
+import {
+  ACTIONS, Action, Bindings, DEFAULT_BINDINGS, RESERVED, SLOTS, actionFor, assign, clearSlot, cloneBindings, codeLabel,
+  mouseCode, parseBindings,
+} from "./bindings";
 import { ARENA_RADIUS, buildWorld, groundHeight } from "./world";
 import { Sfx } from "./audio";
 import { BeatJudgement, GOOD_WINDOW, SONG_VERSES, judgeBeat, songOutcome } from "./songLogic";
@@ -113,7 +117,7 @@ function makeActor(look: FighterLook, pos: THREE.Vector3, hp: number, trailColor
 }
 
 const PLAYER_POWER = 20;
-const debris: ShieldDebris[] = [];
+const debris: Debris[] = [];
 const PLAYER_LOOK: FighterLook = { character: "hero", loadout: "sword_shield" };
 // Vastustajat kiertävät: kaksi hahmoa, kummallakin miekka, miekka ja kilpi sekä keihäs.
 const ENEMIES: { name: string; look: FighterLook }[] = [
@@ -174,9 +178,6 @@ const keys = new Set<string>();
 // Kolme iskunappia, yksi kullekin iskusuunnalle. Pohjassa pidetty nappi virittää raskaan iskun.
 let strikeQueued: StrikeStyle | null = null;
 const strikeHeld: Record<StrikeStyle, boolean> = { overhead: false, slash: false, thrust: false };
-const STRIKE_KEYS: Record<string, StrikeStyle> = {
-  KeyJ: "slash", KeyI: "overhead", KeyF: "overhead", KeyL: "thrust", KeyE: "thrust",
-};
 function pressStrike(style: StrikeStyle) { strikeQueued = style; strikeHeld[style] = true; }
 function releaseStrikes() { for (const st of STYLES) strikeHeld[st] = false; }
 let blockHeld = false;
@@ -184,31 +185,114 @@ let dodgeQueued = false;
 let songQueued = false;
 let beatQueued = false;
 
+// Näppäinsidonnat: vaihdettavissa taukoikkunassa ja tallessa selaimen muistissa.
+const BIND_STORE = "laulun-miekka.bindings.v1";
+let bindings: Bindings = (() => {
+  try { return parseBindings(JSON.parse(localStorage.getItem(BIND_STORE) ?? "null")); }
+  catch { return cloneBindings(DEFAULT_BINDINGS); }
+})();
+function saveBindings() {
+  try { localStorage.setItem(BIND_STORE, JSON.stringify(bindings)); } catch { /* muisti ei käytössä: sidonnat ovat voimassa tämän istunnon */ }
+}
+/** Sidontaa odottava paikka asetusikkunassa, tai null. */
+let capture: { action: Action; slot: number } | null = null;
+
+/** Näppäin tai hiiren nappi painettiin. Palauttaa true, jos se oli sidottu johonkin. */
+function pressCode(code: string): boolean {
+  const a = actionFor(bindings, code);
+  if (!a) return false;
+  if (a === "block") blockHeld = true;
+  else if (a === "dodge") dodgeQueued = true;
+  else if (a === "song") songQueued = true;
+  else pressStrike(a);
+  return true;
+}
+function releaseCode(code: string) {
+  const a = actionFor(bindings, code);
+  if (a === "block") blockHeld = false;
+  else if (a === "slash" || a === "overhead" || a === "thrust") strikeHeld[a] = false;
+}
+
 window.addEventListener("keydown", (e) => {
-  if (e.repeat) return;
+  if (capture || e.repeat) return;
+  if (e.code === "Escape") { pause(); return; }
   keys.add(e.code);
-  if (STRIKE_KEYS[e.code]) pressStrike(STRIKE_KEYS[e.code]);
-  if (e.code === "KeyK") blockHeld = true;
-  if (e.code === "ShiftLeft" || e.code === "ShiftRight") dodgeQueued = true;
-  if (e.code === "KeyQ") songQueued = true;
+  if (pressCode(e.code)) e.preventDefault();
   if (e.code === "Space") { beatQueued = true; e.preventDefault(); }
   if (e.code === "KeyR" && gameOver) restart();
 });
 window.addEventListener("keyup", (e) => {
   keys.delete(e.code);
-  if (e.code === "KeyK") blockHeld = false;
-  if (STRIKE_KEYS[e.code]) strikeHeld[STRIKE_KEYS[e.code]] = false;
+  releaseCode(e.code);
 });
 canvas.addEventListener("mousedown", (e) => {
+  if (capture) return;
   if (running && !document.pointerLockElement) lockPointer();
-  if (e.button === 0) { pressStrike("slash"); beatQueued = true; }
-  if (e.button === 2) blockHeld = true;
+  if (e.button === 0) beatQueued = true;
+  pressCode(mouseCode(e.button));
 });
-window.addEventListener("mouseup", (e) => {
-  if (e.button === 0) strikeHeld.slash = false;
-  if (e.button === 2) blockHeld = false;
-});
+window.addEventListener("mouseup", (e) => releaseCode(mouseCode(e.button)));
+// Hiiren lisänapit (4 ja 5) eivät saa selata sivuhistoriaa kesken pelin.
+for (const type of ["mousedown", "mouseup", "auxclick"] as const) {
+  window.addEventListener(type, (e) => { if (e.button >= 3) e.preventDefault(); });
+}
 window.addEventListener("contextmenu", (e) => e.preventDefault());
+
+// ---------- Asetusikkuna: näppäinten vaihto ----------
+let captureEndedAt = 0;
+function renderBinds(note = "") {
+  const rootEl = $("binds");
+  rootEl.textContent = "";
+  for (const { id, label } of ACTIONS) {
+    const row = document.createElement("div");
+    row.className = "bindrow";
+    const name = document.createElement("span");
+    name.textContent = label;
+    row.appendChild(name);
+    for (let slot = 0; slot < SLOTS; slot++) {
+      const b = document.createElement("button");
+      const listening = capture?.action === id && capture.slot === slot;
+      b.className = "bind" + (listening ? " listening" : "") + (bindings[id][slot] ? "" : " empty");
+      b.textContent = listening ? "Paina nappia…" : codeLabel(bindings[id][slot]);
+      b.addEventListener("click", () => {
+        // Sama klikkaus, jolla hiiren nappi juuri sidottiin, ei avaa kuuntelua uudelleen.
+        if (performance.now() - captureEndedAt < 350) return;
+        capture = { action: id, slot };
+        renderBinds();
+      });
+      row.appendChild(b);
+    }
+    rootEl.appendChild(row);
+  }
+  $("bindNote").textContent = note || (capture ? "Paina näppäintä tai hiiren nappia. Esc peruu, Delete tyhjentää." : "Napsauta paikkaa ja paina uutta näppäintä tai hiiren nappia.");
+}
+function endCapture(next: Bindings | null, note = "") {
+  if (next) { bindings = next; saveBindings(); }
+  capture = null;
+  captureEndedAt = performance.now();
+  renderBinds(note);
+}
+// Kuuntelu sieppaa seuraavan painalluksen ennen pelin omia käsittelijöitä.
+window.addEventListener("keydown", (e) => {
+  if (!capture) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  if (e.code === "Escape") endCapture(null);
+  else if (e.code === "Delete" || e.code === "Backspace") endCapture(clearSlot(bindings, capture.action, capture.slot));
+  else if (RESERVED.includes(e.code)) endCapture(null, `${codeLabel(e.code)} on varattu (liike, laulun tahti, uusi peli).`);
+  else endCapture(assign(bindings, capture.action, capture.slot, e.code));
+}, true);
+window.addEventListener("mousedown", (e) => {
+  if (!capture) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  endCapture(assign(bindings, capture.action, capture.slot, mouseCode(e.button)));
+}, true);
+$("resetBinds").addEventListener("click", () => {
+  if (performance.now() - captureEndedAt < 350) return;
+  endCapture(cloneBindings(DEFAULT_BINDINGS), "Oletusnäppäimet palautettu.");
+});
+renderBinds();
 
 // Kosketusnapit
 const isTouch = matchMedia("(pointer: coarse)").matches;
@@ -617,6 +701,16 @@ function resolveStrike(att: Actor, def: Actor) {
     emitSparks(contact, heavy ? 18 : 10, 2);
     if (isPlayer) song = Math.min(SONG_MAX, song + SONG_GAIN_HIT);
     else flash("#b33a2e", heavy ? 0.45 : atk.kind === "bash" ? 0.15 : 0.35);
+    // Tehoste: sivallus tai ylälyönti voi lennättää vastustajan kypärän päästä. Ei vaikuta peliin.
+    if (isPlayer && def.fighter.hasHelmet && (atk.kind === "slash" || atk.kind === "overhead")
+      && Math.random() < (died ? 1 : heavy ? 0.6 : 0.25)) {
+      const away = toDef.clone().setY(0).normalize();
+      const side = new THREE.Vector3(away.z, 0, -away.x);
+      // Sivallus vie kypärän sivulle, ylälyönti taakse.
+      const dir = atk.kind === "slash" ? side.multiplyScalar(-1).addScaledVector(away, 0.4) : away.addScaledVector(side, Math.random() - 0.5);
+      const prop = def.fighter.knockHelmet(dir);
+      if (prop) { scene.add(prop.group); debris.push(prop); sfx.clang(false); }
+    }
     if (!isPlayer && defState === "block" && !died) showMsg("Väärä torjunta", `${STYLE_NAME[atk.kind]} meni läpi`, 0.9);
     // Lyhyt horjahdus keskeyttää noston. Kilpityöntö ei riitä pysäyttämään jo alkanutta iskua.
     const interrupts = defState === "idle" || defState === "block" || (defState === "windup" && atk.kind !== "bash");
@@ -1021,10 +1115,13 @@ function pause() {
   if (!running || paused || gameOver) return;
   paused = true;
   clearInputs();
+  renderBinds();
   $("pause").classList.remove("hidden");
 }
 
 function resume() {
+  if (performance.now() - captureEndedAt < 350) return; // klikkaus, jolla juuri sidottiin hiiren nappi
+  capture = null;
   paused = false;
   $("pause").classList.add("hidden");
   last = performance.now();
@@ -1056,6 +1153,14 @@ $("startBtn").addEventListener("click", () => {
   get events() { return [...events]; },
   get song() { return songState ? { results: [...songState.results], done: songState.done, realTime, beats: songState.beats } : null; },
   fillSong() { song = SONG_MAX; },
+  /** Lennättää vastustajan kypärän päästä (tehosteen kokeiluun). */
+  knockHelmet() {
+    if (!enemy) return false;
+    const prop = enemy.fighter.knockHelmet(new THREE.Vector3(Math.sin(enemy.yaw + 2), 0, Math.cos(enemy.yaw + 2)));
+    if (prop) { scene.add(prop.group); debris.push(prop); }
+    return !!prop;
+  },
+  get bindings() { return cloneBindings(bindings); },
   /** Ajaa peliä n askelta eteenpäin ruudunpäivityksestä riippumatta (savutestit). */
   tick(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) simulate(dt); },
   /** Asennot muokattavina: hahmorivin kanssa asentoja voi säätää lennossa konsolista. */

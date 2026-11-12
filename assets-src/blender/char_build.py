@@ -511,15 +511,76 @@ def hair_parts(C, color, length=1.40, beard=0.014, beard_long=0.03, cap=True, mo
     return parts
 
 
-def helmet_parts(C, tall=0.20, col=(0.20, 0.205, 0.215)):
-    ctr = V((0, -0.043, 1.598))
+def helmet_parts(C, tall=0.15, col=(0.20, 0.205, 0.215)):
+    """Nenäsuojakypärä omana kappaleenaan: pyöreähkö suippo kupu, joka ulottuu otsalle ja
+    niskassa hieman alemmas, otsavanne, neljä kiskoa ja vanteeseen kiinnitetty nenäsuoja."""
+    ctr = V((0, -0.044, 1.585))
+    rx, ry, n = 0.106, 0.128, 24
     w = {"head": 1.0}
-    prof = [(0.105, 0.0), (0.104, 0.03), (0.096, 0.07), (0.078, 0.11), (0.05, tall - 0.045), (0.022, tall - 0.012), (0.004, tall)]
-    parts = [lathe(ctr, prof, 18, "metal", w, col, sx=0.90, sy=1.10)]
-    parts.append(lathe(ctr + V((0, 0, -0.012)), [(0.107, 0.0), (0.108, 0.02), (0.104, 0.024)], 18, "metal", w, tuple(x * 0.75 for x in col), sx=0.90, sy=1.10))
-    # nenäsuoja
-    parts.append(box_part(V((0, -0.166, 1.555)), (0.03, 0.008, 0.10), "metal", w, tuple(x * 0.85 for x in col), Matrix.Rotation(-0.08, 3, 'X')))
-    return parts
+    k = tall / 0.145
+    prof = [(1.0, 0.0), (1.0, 0.025), (0.975, 0.05), (0.91, 0.075), (0.78, 0.1), (0.58, 0.122), (0.33, 0.137), (0.12, 0.144)]
+    dark = tuple(x * 0.72 for x in col)
+
+    def pt(a, rf, h, off=0.0):
+        back = (math.cos(a) + 1) / 2                      # a = 0 on takana (+Y), pi edessä
+        drop = 0.03 * smoothstep(0.35, 0.9, back) * (1 - smoothstep(0.0, 0.06, max(h, 0.0)))
+        return ctr + V((math.sin(a) * (rx * rf + off), math.cos(a) * (ry * rf + off), h * k - drop))
+
+    def uv(a, h):
+        return (a / (2 * math.pi) * 9, h / 0.05)
+
+    def quad(p, a0, a1, r0, h0, o0, r1, h1, o1, c):
+        p.f([p.v(pt(a0, r0, h0, o0), dict(w)), p.v(pt(a1, r0, h0, o0), dict(w)), p.v(pt(a1, r1, h1, o1), dict(w)), p.v(pt(a0, r1, h1, o1), dict(w))],
+            "metal", [uv(a0, h0), uv(a1, h0), uv(a1, h1), uv(a0, h1)], c)
+
+    # kupu
+    dome = Part()
+    rings = [[dome.v(pt(2 * math.pi * i / n, rf, h), dict(w)) for i in range(n)] for rf, h in prof]
+    for j in range(len(prof) - 1):
+        for i in range(n):
+            i2 = (i + 1) % n
+            a0, a1 = 2 * math.pi * i / n, 2 * math.pi * (i + 1) / n
+            dome.f([rings[j][i], rings[j][i2], rings[j + 1][i2], rings[j + 1][i]], "metal",
+                   [uv(a0, prof[j][1]), uv(a1, prof[j][1]), uv(a1, prof[j + 1][1]), uv(a0, prof[j + 1][1])], col)
+    apex = dome.v(ctr + V((0, 0, 0.1475 * k)), dict(w))
+    for i in range(n):
+        dome.f([rings[-1][i], rings[-1][(i + 1) % n], apex], "metal", [(0, 0.95), (0.1, 0.95), (0.05, 1.0)], col)
+    # sisäpinta, jotta päästä lentänyt kypärä ei näytä ontolta kuorelta
+    inner = (0.05, 0.05, 0.055)
+    for j in range(len(prof) - 1):
+        for i in range(n):
+            a0, a1 = 2 * math.pi * i / n, 2 * math.pi * (i + 1) / n
+            (r0, h0), (r1, h1) = prof[j], prof[j + 1]
+            quad(dome, a1, a0, r0, h0, -0.004, r1, h1, -0.004, inner)
+
+    # otsavanne ja kiskot
+    trim = Part()
+    band = [(-0.004, 0.0), (-0.004, 0.006), (0.024, 0.006), (0.028, 0.0)]
+    for i in range(n):
+        a0, a1 = 2 * math.pi * i / n, 2 * math.pi * (i + 1) / n
+        for (h0, o0), (h1, o1) in zip(band, band[1:]):
+            quad(trim, a0, a1, 1.0, h0, o0, 1.0, h1, o1, dark)
+    for a in (0.0, math.pi / 2, math.pi, 3 * math.pi / 2):
+        for (r0, h0), (r1, h1) in zip(prof, prof[1:]):
+            da0, da1 = 0.1 / max(r0, 0.3), 0.1 / max(r1, 0.3)
+            trim.f([trim.v(pt(a - da0, r0, h0, 0.004), dict(w)), trim.v(pt(a + da0, r0, h0, 0.004), dict(w)),
+                    trim.v(pt(a + da1, r1, h1, 0.004), dict(w)), trim.v(pt(a - da1, r1, h1, 0.004), dict(w))], "metal", None, dark)
+    knob = lathe(ctr + V((0, 0, 0.140 * k)), [(0.016, 0.0), (0.014, 0.01), (0.006, 0.02), (0.001, 0.024)], 8, "metal", w, dark)
+
+    # nenäsuoja: vanteen etureunasta nenänpäähän, hieman kapeneva
+    nasal = Part()
+    y0 = ctr.y - ry - 0.006
+    secs = [(1.612, 0.017, 0.0), (1.578, 0.015, 0.0), (1.548, 0.013, -0.002), (1.527, 0.010, -0.003)]
+    rows = []
+    for z, hw, dy in secs:
+        rows.append([nasal.v(V((-hw, y0 + dy - 0.004, z)), dict(w)), nasal.v(V((hw, y0 + dy - 0.004, z)), dict(w)),
+                     nasal.v(V((hw, y0 + dy + 0.004, z)), dict(w)), nasal.v(V((-hw, y0 + dy + 0.004, z)), dict(w))])
+    for a, b in zip(rows, rows[1:]):
+        for q in range(4):
+            q2 = (q + 1) % 4
+            nasal.f([a[q2], a[q], b[q], b[q2]], "metal", None, dark, False)
+    nasal.f([rows[-1][0], rows[-1][1], rows[-1][2], rows[-1][3]], "metal", None, dark, False)
+    return [dome, trim, knob, nasal]
 
 
 def cap_parts(C, col=(0.75, 0.68, 0.6)):
@@ -650,8 +711,7 @@ def build_characters():
 
     # --- Kalevalan sankari: rengaspanssari, sininen alustunika, kypärä, säärisuojat
     P = skin_parts(C, 0.62, blond)
-    P += hair_parts(C, blond, length=1.39, cap=True, cap_max_z=1.615)
-    P += helmet_parts(C, 0.20)
+    P += hair_parts(C, blond, length=1.39, cap=True)
     P += torso_parts(C, "mail", (1, 1, 1), 0.47, inflate=0.03, tile=0.11, smooth=9, collar=(0.9, 0.35, 0.3))
     P += [skirt(C, 1.0, 0.57, 0.034, (0.27, 0.215), "mail", tile=0.11)]
     P += torso_parts(C, "linen", (0.26, 0.31, 0.52), 0.78, inflate=0.013, sleeve_from=0.36, torso=False)
@@ -660,6 +720,8 @@ def build_characters():
     P += legs_parts(C, "linen", (0.22, 0.27, 0.46), (0.9, 0.86, 0.75), greaves=True)
     P += belt_parts(C, off=0.04, scabbard=True)
     _, stats["char_hero"] = assemble("char_hero", P)
+    # Kypärät ovat omia kappaleitaan (ei luurankoa): peli kiinnittää ne pääluuhun ja voi irrottaa.
+    _, stats["helmet_hero"] = assemble("helmet_hero", helmet_parts(C, 0.152), rig=False)
 
     # --- Nuori urho: villatunika, myssy, puukko
     P = skin_parts(C, 0.9, straw)
@@ -674,8 +736,7 @@ def build_characters():
 
     # --- Pohjan soturi: rengaspanssari tumman villatunikan päällä, olkaviitta
     P = skin_parts(C, 0.9, ginger)
-    P += hair_parts(C, ginger, length=1.46, beard=0.012, beard_long=0.02, cap=True, cap_max_z=1.615)
-    P += helmet_parts(C, 0.18, (0.19, 0.195, 0.205))
+    P += hair_parts(C, ginger, length=1.46, beard=0.012, beard_long=0.02, cap=True)
     P += torso_parts(C, "mail", (0.85, 0.85, 0.9), 0.44, inflate=0.03, tile=0.11, smooth=9, collar=(0.8, 0.3, 0.25))
     P += [skirt(C, 1.0, 0.63, 0.034, (0.265, 0.21), "mail", tile=0.11, col=(0.85, 0.85, 0.9))]
     P += torso_parts(C, "wool", (0.5, 0.5, 0.52), 0.97, inflate=0.014, sleeve_from=0.34, torso=False)
@@ -685,6 +746,7 @@ def build_characters():
     P += belt_parts(C, off=0.04, scabbard=True)
     P += cloak_parts(C)
     _, stats["char_pohja"] = assemble("char_pohja", P)
+    _, stats["helmet_pohja"] = assemble("helmet_pohja", helmet_parts(C, 0.142, (0.19, 0.195, 0.205)), rig=False)
     return stats
 
 
