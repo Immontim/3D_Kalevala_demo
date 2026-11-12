@@ -164,6 +164,7 @@ export class Fighter {
   private hipsRest = new THREE.Vector3();
   private footRestY = 0;
   private bladeMats: THREE.MeshStandardMaterial[] = [];
+  private helmet: THREE.Object3D | null = null;
   private shieldHolder: THREE.Group | null = null;
   private shieldModel: THREE.Object3D | null = null;
   private shieldUniforms: ShieldUniforms[] = [];
@@ -213,6 +214,7 @@ export class Fighter {
       const n = child.name;
       if (n.startsWith("char_") && !keep.has(n)) child.removeFromParent();
       if (/^(sword|spear|shield_)/.test(n)) { equip[n] = child; child.removeFromParent(); }
+      if (n.startsWith("helmet_") && n !== `helmet_${this.look.character}`) child.removeFromParent();
     }
     clone.traverse((o) => {
       const m = o as THREE.Mesh;
@@ -294,7 +296,26 @@ export class Fighter {
         this.setShieldNotch(this.shieldNotched);
       }
     }
+    // Kypärä on oma kappaleensa: se kiinnitetään pääluuhun lepoasennossa, jolloin se istuu
+    // kuten Blenderissä ja voidaan myöhemmin irrottaa lentämään.
+    const helmet = clone.getObjectByName(`helmet_${this.look.character}`);
+    if (helmet) {
+      this.root.updateMatrixWorld(true);
+      this.bones.get("head")!.bone.attach(helmet);
+      this.helmet = helmet;
+    }
     this.apply(0);
+  }
+
+  get hasHelmet() { return this.helmet !== null; }
+
+  /** Kypärä lentää päästä suuntaan dir (maailmankoordinaateissa). Pelkkä tehoste. */
+  knockHelmet(dir: THREE.Vector3): FlyingProp | null {
+    const h = this.helmet;
+    if (!h) return null;
+    this.helmet = null;
+    this.root.updateMatrixWorld(true);
+    return new FlyingProp(h, dir);
   }
 
   /** Kilven materiaalit omiksi kopioiksi, joihin voi leikata loven ja joista saa sirpaleet. */
@@ -547,9 +568,63 @@ function patchShield(shield: THREE.Object3D, basis: ShieldBasis): ShieldUniforms
   return out;
 }
 
+/** Maahan putoava irtokappale (kilven sirpaleet, päästä lentänyt kypärä). */
+export interface Debris {
+  readonly group: THREE.Group;
+  /** Palauttaa false, kun kappale on aika poistaa. */
+  update(dt: number, groundAt: (x: number, z: number) => number): boolean;
+  dispose(): void;
+}
+
+/** Yksi jäykkä kappale, joka irtoaa hahmosta, lentää kaaressa, pomppaa kerran ja jää maahan. */
+export class FlyingProp implements Debris {
+  readonly group = new THREE.Group();
+  private vel: THREE.Vector3;
+  private spin: THREE.Vector3;
+  private bounces = 0;
+  private rest = false;
+  private age = 0;
+
+  constructor(obj: THREE.Object3D, dir: THREE.Vector3) {
+    const pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3();
+    obj.matrixWorld.decompose(pos, quat, scl);
+    obj.removeFromParent();
+    // Kääntöpiste kappaleen keskelle, jotta se pyörii luontevasti eikä kierrä hahmon jalkoja.
+    const center = new THREE.Box3().setFromObject(obj).getCenter(new THREE.Vector3());
+    obj.position.copy(pos).sub(center);
+    obj.quaternion.copy(quat);
+    obj.scale.copy(scl);
+    this.group.position.copy(center);
+    this.group.add(obj);
+    this.vel = dir.clone().setY(0).normalize().multiplyScalar(2.2 + Math.random() * 1.2).add(new THREE.Vector3(0, 2.6 + Math.random(), 0));
+    this.spin = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(12);
+  }
+
+  update(dt: number, groundAt: (x: number, z: number) => number): boolean {
+    this.age += dt;
+    if (this.rest) return this.age < 25;
+    const g = this.group;
+    this.vel.y -= 9.8 * dt;
+    g.position.addScaledVector(this.vel, dt);
+    qA.setFromEuler(eul.set(this.spin.x * dt, this.spin.y * dt, this.spin.z * dt));
+    g.quaternion.premultiply(qA);
+    const floor = groundAt(g.position.x, g.position.z) + 0.09;
+    if (g.position.y <= floor && this.vel.y < 0) {
+      g.position.y = floor;
+      if (this.bounces++ < 1) {
+        this.vel.set(this.vel.x * 0.45, -this.vel.y * 0.35, this.vel.z * 0.45);
+        this.spin.multiplyScalar(0.5);
+      } else this.rest = true;
+    }
+    return true;
+  }
+
+  dispose() { this.group.removeFromParent(); }
+}
+
 const PIECES = 6;
 /** Hajonneen kilven palaset: kuusi sektoria, jotka lentävät erilleen ja jäävät maahan. */
-export class ShieldDebris {
+export class ShieldDebris implements Debris {
   readonly group = new THREE.Group();
   private pieces: { obj: THREE.Object3D; vel: THREE.Vector3; spin: THREE.Vector3; landed: boolean; flat: THREE.Quaternion; normal: THREE.Vector3 }[] = [];
   private age = 0;

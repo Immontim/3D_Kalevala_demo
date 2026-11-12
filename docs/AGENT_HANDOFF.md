@@ -5,12 +5,23 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-11 (Claude, kotikone, Windows)
+Päivitetty: 2026-11-12 (Claude, kotikone, Windows)
 
-- **Versio v00.05.00**, branch `claude/loadout-combat` (tarkista merge-tila
-  `git merge-base --is-ancestor`). Branchissa on kaksi committia: v00.04.00
-  (varustuskohtainen taistelu) ja v00.05.00 (iskusuunnat ja kilven kesto).
-  Metsäaukio (v00.02.00) ja Blender-hahmot (v00.03.00) ovat mainissa.
+- **Versio v00.06.00**, branch `claude/helmets-keybinds` (tarkista merge-tila
+  `git merge-base --is-ancestor`). Mainissa on v00.05.00 (metsä, hahmot,
+  iskusuunnat, kilven kesto).
+- **Kypärät** (`helmet_hero`, `helmet_pohja`) ovat `characters.glb`:ssä omia
+  kappaleitaan ilman luurankoa. `Fighter.build()` kiinnittää kypärän
+  pääluuhun lepoasennossa. `knockHelmet(dir)` irrottaa sen lentämään
+  (`FlyingProp`). Pelaajan sivallus tai ylälyönti lennättää vastustajan
+  kypärän: kevyt 25 %, raskas 60 %, kaatava isku aina. Ei pelivaikutusta.
+  Hiukset ovat nyt kokonaiset myös kypärän alla. Urholla on myssy, ei kypärää.
+- **Näppäinsidonnat** (`src/bindings.ts`, testit vieressä): toiminnot
+  sivallus, ylälyönti, pisto, torjunta, väistö ja laulu, kullakin kaksi
+  paikkaa. Koodit ovat `KeyboardEvent.code`-arvoja tai `Mouse0`…`MouseN`.
+  Asetusikkuna on taukoikkunassa (Esc); tallennus `localStorage`-avaimeen
+  `laulun-miekka.bindings.v1`. WASD, välilyönti, R ja Esc ovat kiinteitä.
+  Hiiren nappien 4 ja 5 oletustoiminto (selaimen takaisin/eteenpäin) on estetty.
 - **Taistelusäännöt ovat parametritaulukoita** tiedostossa `src/combat.ts`
   (puhdasta logiikkaa, testit vieressä):
   - `STRIKES`: iskusuunta (`overhead`, `slash`, `thrust`) × paino (`light`,
@@ -47,19 +58,20 @@ Päivitetty: 2026-11-11 (Claude, kotikone, Windows)
   `char_all.py` → `run_chars()`. Lähteet: `tools/fetch-polyhaven.ps1` ja
   `tools/fetch-characters.ps1` (ei Gitissä). `.blend`-tiedostot eivät ole
   Gitissä, eikä lähdemallien tuontia SRC-kokoelmaan ole skriptattu.
-- **Deployattu:** GitHub Pages julkaisee mainin; v00.04.00 ja v00.05.00
-  eivät ole mainissa.
-- **Käsin testattu 2026-11-11** (Clauden in-app browser, dev-serveri,
-  näppäinsyöte skriptillä ja peli ajettu `__game.tick()`-askelin): näpäytys
-  on kevyt isku, pito täyttää mittarin ja tekee raskaan, täysi viritys
-  laukeaa itsestään; kilpi kuluu 10 → 0, lovi näkyy puolivälissä, sirpaleet
-  putoavat maahan; ilman kilpeä väärä torjunta-asento päästää iskun läpi;
-  keihäsmiehen molemmat kädet ovat varrella; ei konsolivirheitä.
-  **FPS:ää ei mitattu tällä kierroksella**, koska selainikkuna oli
-  taustalla (edellinen mittaus 60 FPS / RTX 4080 Super; kilven sirpaleet
-  lisäävät hetkeksi kuusi piirtokutsua).
-  **Ei testattu:** ihmisen pelaamana, kosketusnäyttö, buildattu versio.
-- **Komennot 2026-11-11:** `bun run test` (26/26), `bun run lint`,
+- **Deployattu:** GitHub Pages julkaisee mainin; v00.06.00 ei ole mainissa.
+  **Omistaja testaa julkaistusta osoitteesta**, ei dev-serveriltä.
+- **Käsin testattu 2026-11-12** (Clauden in-app browser, dev-serveri,
+  skriptattu syöte): uusi kypärä istuu päähän ja nenäsuoja on kiinni
+  vanteessa; kypärä lentää ja jää maahan, alta paljastuvat hiukset;
+  asetusikkunassa sidonta hiiren napille 4 ja näppäimelle F13 toimii,
+  varattu näppäin hylätään, sama nappi siirtyy pois vanhalta toiminnolta,
+  asetus tallentuu ja uusi nappi tekee iskun pelissä; ei konsolivirheitä.
+  **FPS:** lukema vaihteli 60:n ja 29:n välillä, koska selainpaneeli
+  kuristi ajoittain päivitystä; luotettava mittaus puuttuu. Muutos lisää
+  yhden piirtokutsun per kypärä.
+  **Ei testattu:** oikealla moninappihiirellä (vain keinotekoisilla
+  tapahtumilla), ihmisen pelaamana, kosketusnäyttö, buildattu versio.
+- **Komennot 2026-11-12:** `bun run test` (35/35), `bun run lint`,
   `bun run build` ok.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Savutestien apuna `window.__game`: `tick(n, dt)` ajaa peliä askelin
@@ -78,6 +90,11 @@ Päivitetty: 2026-11-11 (Claude, kotikone, Windows)
 - **Asennot on viritetty silmämääräisesti** kuvakaappauksista. Raskaalla
   sivalluksella ja pistolla ei ole omaa asentoa (sama kuin kevyellä).
   Keihäsmiehen torjunta näyttää samalta kaikissa kolmessa asennossa.
+- **Hiiren lisänapit:** jos hiiren ajuri on määrittänyt napin omaan
+  toimintoonsa (makro, DPI-vaihto), selain ei näe painallusta lainkaan.
+  Joissain selaimissa napit 4 ja 5 voivat silti selata historiaa.
+- **Kypärän tekstuuri** on sama metallilevy kuin muissa osissa, ja kupu on
+  melko sileä; lentävä kypärä voi pudota puun tai kiven läpi (ei törmäyksiä).
 - **Kilven lovi** leikkaa pinnan shaderilla, joten loven reunassa ei ole
   paksuutta, ja kilven varjo pysyy ehjänä.
 - **Hahmojen avoimet viat:** kasvot ilman tekstuuria, rengaspanssari varjossa
@@ -92,9 +109,9 @@ Päivitetty: 2026-11-11 (Claude, kotikone, Windows)
 
 ## Seuraava tehtävä
 
-Omistaja pelaa v00.05.00:n ja kertoo tuntuman. Sen perusteella säädetään
-taulukoiden luvut (`STRIKES`, `WEAPONS`, `SHIELDS`, tekoälyn todennäköisyydet)
-ja asennot.
+Omistaja pelaa v00.06.00:n julkaistusta osoitteesta mergen jälkeen ja kertoo
+tuntuman (kypärät, näppäinasetukset oikealla hiirellä, taistelun tasapaino).
+Sen perusteella säädetään taulukoiden luvut ja asennot.
 
 ## Ei vielä aloiteta
 
