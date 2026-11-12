@@ -42,7 +42,12 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; col
 #marker { position: absolute; left: 25%; top: 4px; bottom: 4px; width: 4px; margin-left: -2px; background: #f0c766; box-shadow: 0 0 12px #f0c766; }
 .rune { position: absolute; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; display: grid; place-items: center;
   font-size: 28px; color: #f0c766; text-shadow: 0 0 8px #f0c766; }
-.rune.perfect { color: #fff; text-shadow: 0 0 16px #fff4c0; }
+.rune.hit { color: #fff; text-shadow: 0 0 16px #fff4c0; }
+/* Osuma-alue riimun alla: välilyönnin pitää osua tähän, ei täsmälleen riimuun. */
+.zone { position: absolute; top: 5px; bottom: 5px; border-radius: 4px; background: rgba(96, 176, 190, 0.34);
+  border: 1px solid rgba(150, 220, 230, 0.75); box-shadow: inset 0 0 10px rgba(120, 210, 225, 0.35); }
+.zone.hit { background: rgba(240, 199, 102, 0.5); border-color: #ffe9a8; box-shadow: 0 0 14px rgba(240, 199, 102, 0.8); }
+.zone.miss { background: rgba(70, 60, 50, 0.35); border-color: rgba(120, 105, 85, 0.5); box-shadow: none; }
 .rune.miss { color: #6b5a40; text-shadow: none; }
 #songHint { margin-top: 8px; font-size: 13px; color: var(--muted); text-shadow: 0 1px 3px #000; }
 .overlay { position: fixed; inset: 0; display: flex; align-items: safe center; justify-content: center; overflow-y: auto; background: rgba(10, 8, 6, 0.55); padding: 16px; }

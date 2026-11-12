@@ -100,9 +100,10 @@ export const POSES: Record<string, Pose> = {
     spineYaw: 0.25, spinePitch: 0.05, rShX: -1.1, rShZ: 0.2, rEl: -0.9, rHandX: 2.7, rHandY: 0.5,
     lShX: -0.5, lShZ: 0.4, lEl: -1.0, crouch: 0.12, headPitch: 0.05, stride: 0.2,
   },
+  // Laulu: kädet levitettyinä sivuille, miekka käden jatkeena, kilpi sivulla, pää hieman takakenossa.
   sing: {
-    spineYaw: 0, spinePitch: -0.12, rShX: -0.25, rShZ: -0.35, rEl: -0.4, rHandX: 0.9, rHandY: 0,
-    lShX: -1.2, lShZ: 0.9, lEl: -0.6, crouch: 0.02, headPitch: -0.35, stride: 0.05,
+    spineYaw: 0, spinePitch: -0.12, rShX: 0, rShZ: -1.12, rEl: -0.2, rHandX: 1.57, rHandY: 0,
+    lShX: 0, lShZ: 1.12, lEl: -0.2, crouch: 0.02, headPitch: -0.32, stride: 0.05,
   },
 };
 

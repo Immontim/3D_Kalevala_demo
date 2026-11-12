@@ -58,11 +58,17 @@ export interface World {
   envMap: THREE.Texture;
   /** Valmistuu, kun Blender-mallit on ladattu ja sijoiteltu. */
   ready: Promise<void>;
+  /** Maaston laatoittuvat tekstuurit muiden maanpintojen (suo) käyttöön. */
+  groundTex: GroundTex;
+  /** Metsän malli nimellä (esim. "grass_d"); tyhjä, kunnes mallit on ladattu. */
+  proto(name: string): { geometry: THREE.BufferGeometry; material: THREE.Material }[];
   update(t: number, dt: number, camera: THREE.Camera): void;
 }
 
+export interface GroundTex { mossDiff: THREE.Texture; mossNor: THREE.Texture; dirtDiff: THREE.Texture; dirtNor: THREE.Texture; }
+
 // ---------- Maasto: kolmen skannatun pinnan sekoitus ----------
-function buildGround(scene: THREE.Scene, maxAniso: number) {
+function buildGround(scene: THREE.Scene, maxAniso: number): GroundTex {
   const size = 180, seg = 200;
   const geo = new THREE.PlaneGeometry(size, size, seg, seg);
   geo.rotateX(-Math.PI / 2);
@@ -135,6 +141,7 @@ function buildGround(scene: THREE.Scene, maxAniso: number) {
   const ground = new THREE.Mesh(geo, mat);
   ground.receiveShadow = true;
   scene.add(ground);
+  return { mossDiff: uniforms.tM.value, mossNor: uniforms.nM.value, dirtDiff: uniforms.tD.value, dirtNor: uniforms.nD.value };
 }
 
 // ---------- Taivas ----------
@@ -478,11 +485,11 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   sun.shadow.normalBias = 0.05;
   scene.add(sun);
 
-  buildGround(scene, maxAniso);
+  const groundTex = buildGround(scene, maxAniso);
+  const protos = new Map<string, Proto>();
   const fire = buildFire(scene);
 
   const ready = new GLTFLoader().loadAsync(forestUrl).then((gltf) => {
-    const protos = new Map<string, Proto>();
     for (const child of gltf.scene.children) {
       const parts: Proto = [];
       child.traverse((o) => {
@@ -501,6 +508,8 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     campfireLight: fire.light,
     envMap,
     ready,
+    groundTex,
+    proto: (name) => protos.get(name) ?? [],
     update(_t, dt, camera) {
       fire.update(dt, camera);
     },
