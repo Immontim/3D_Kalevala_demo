@@ -7,9 +7,27 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-12 (Claude, kotikone, Windows)
 
-- **Versio v00.06.00**, branch `claude/helmets-keybinds` (tarkista merge-tila
-  `git merge-base --is-ancestor`). Mainissa on v00.05.00 (metsä, hahmot,
-  iskusuunnat, kilven kesto).
+- **Versio v00.07.00**, branch `claude/song-sequence` (tarkista merge-tila
+  `git merge-base --is-ancestor`). Mainissa on v00.06.00 (kypärät,
+  näppäinasetukset).
+- **Laulu** (`src/songLogic.ts` puhdas logiikka ja kaikki luvut, kulku
+  `src/main.ts`): Q täydellä mittarilla → maailma hidastuu
+  (`SONG_SLOWMO` 1/20) → pelaaja ottaa asennon `POSES.sing` reaaliajassa
+  (`SONG_INTRO` 1,5 s, painallukset eivät vielä laske) → rytmipeli: neljä
+  riimua, kunkin alla osuma-alue (`ZONE_FIRST` ±0,24 s, jokainen seuraava
+  `ZONE_SHRINK` 0,8 × edellinen). Painallus arvioidaan aina seuraavaa
+  riimua vastaan, joten alueen ulkopuolelle osunut painallus on huti.
+  Loitsu laukeaa `SONG_MIN_HITS` 2 osumalla; kesto on osumat ×
+  `ROOT_TIME_PER_HIT` 1,5 s. Vastustajan osuma kesken laulun kutsuu
+  `interruptSong()`: loitsu raukeaa ja aika palaa heti. Voima nollataan
+  laulun alussa. Tauko pysäyttää myös riimut.
+- **Suo** (`src/bog.ts`, malli `assets/bog.glb`, skripti
+  `assets-src/blender/bog.py`): mutapinta, sammalreunus ja kuplan malli
+  tulevat Blenderistä ilman tekstuureja; pinnat tehdään maaston
+  tekstuureista (`World.groundTex`) ja heinätupsut metsän malleista
+  (`World.proto`). Mudan vellonta, kuplat ja puhkeamisrenkaat lasketaan
+  koodissa joka ruutu (529 verteksiä). Luvut taulukossa `BOG`. Suohon
+  juuttunutta vastustajaa ei voi enää työntää paikaltaan.
 - **Kypärät** (`helmet_hero`, `helmet_pohja`) ovat `characters.glb`:ssä omia
   kappaleitaan ilman luurankoa. `Fighter.build()` kiinnittää kypärän
   pääluuhun lepoasennossa. `knockHelmet(dir)` irrottaa sen lentämään
@@ -55,29 +73,34 @@ Päivitetty: 2026-11-12 (Claude, kotikone, Windows)
   ja aseella torjuessaan arvaa suunnan oikein sitä useammin, mitä pidemmällä
   aalloissa ollaan. Keihäällä voi vain pistää.
 - **Blender-putket:** metsä `assets-src/blender/build_all.py`, hahmot
-  `char_all.py` → `run_chars()`. Lähteet: `tools/fetch-polyhaven.ps1` ja
+  `char_all.py` → `run_chars()`, suo `bog.py` → `build_bog()` (tyhjässä
+  tiedostossa; vienti samassa kutsussa tiedoston avauksen kanssa kaatuu). Lähteet: `tools/fetch-polyhaven.ps1` ja
   `tools/fetch-characters.ps1` (ei Gitissä). `.blend`-tiedostot eivät ole
   Gitissä, eikä lähdemallien tuontia SRC-kokoelmaan ole skriptattu.
-- **Deployattu:** GitHub Pages julkaisee mainin; v00.06.00 ei ole mainissa.
+- **Deployattu:** GitHub Pages julkaisee mainin heti mergen jälkeen
+  (Actions-ajo "Julkaise GitHub Pagesiin"); v00.07.00 ei ole mainissa.
   **Omistaja testaa julkaistusta osoitteesta**, ei dev-serveriltä.
 - **Käsin testattu 2026-11-12** (Clauden in-app browser, dev-serveri,
-  skriptattu syöte): uusi kypärä istuu päähän ja nenäsuoja on kiinni
-  vanteessa; kypärä lentää ja jää maahan, alta paljastuvat hiukset;
-  asetusikkunassa sidonta hiiren napille 4 ja näppäimelle F13 toimii,
-  varattu näppäin hylätään, sama nappi siirtyy pois vanhalta toiminnolta,
-  asetus tallentuu ja uusi nappi tekee iskun pelissä; ei konsolivirheitä.
-  **FPS:** lukema vaihteli 60:n ja 29:n välillä, koska selainpaneeli
-  kuristi ajoittain päivitystä; luotettava mittaus puuttuu. Muutos lisää
-  yhden piirtokutsun per kypärä.
-  **Ei testattu:** oikealla moninappihiirellä (vain keinotekoisilla
-  tapahtumilla), ihmisen pelaamana, kosketusnäyttö, buildattu versio.
-- **Komennot 2026-11-12:** `bun run test` (35/35), `bun run lint`,
+  skriptattu syöte `__game.tick`-askelin): laulu 4, 3 ja 2 osumalla antaa
+  6, 4,5 ja 3 s suon, 1 ja 0 osumalla loitsu epäonnistuu; voima on nolla
+  joka tapauksessa; alkuanimaation aikainen painallus ei laske; hidastus
+  käy arvossa 0,05; vastustajan isku, josta oli 0,11 s jäljellä laulun
+  alkaessa, osui noin 0,9 s:n kuluttua ja katkaisi laulun, aika palasi
+  heti; suo, reunus ja kuplat näkyvät, vastustaja vajoaa siihen; ei
+  konsolivirheitä. **FPS** 52–60 suon ollessa näkyvissä (paneeli kuristaa
+  ajoittain, joten lukema on suuntaa antava).
+  **Ei testattu:** ihmisen pelaamana (osuma-alueiden vaikeus on arvaus),
+  kosketusnäyttö, buildattu versio selaimessa.
+- **Komennot 2026-11-12:** `bun run test` (38/38), `bun run lint`,
   `bun run build` ok.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Savutestien apuna `window.__game`: `tick(n, dt)` ajaa peliä askelin
   ruudunpäivityksestä riippumatta, `skipTo(n)`, `showcase(true, "asento")`,
   `poses` (asentojen säätö lennossa), `setCamera(pos, look)`, `state`,
-  `events` muodossa `kuka:isku/paino:tulos`.
+  `events` muodossa `kuka:isku/paino:tulos`, `fillSong()`, `beat()`
+  (välilyönti laululle), `nextBeatIn`, `bog([x,0,z])` (suo näkyviin).
+  Selainpaneeli pysäyttää pelin, kun se menettää fokuksen: napsauta
+  `#resumeBtn` jokaisen skriptin alussa.
 
 ## Tunnetut rajoitteet ja riskit
 
@@ -95,6 +118,12 @@ Päivitetty: 2026-11-12 (Claude, kotikone, Windows)
   Joissain selaimissa napit 4 ja 5 voivat silti selata historiaa.
 - **Kypärän tekstuuri** on sama metallilevy kuin muissa osissa, ja kupu on
   melko sileä; lentävä kypärä voi pudota puun tai kiven läpi (ei törmäyksiä).
+- **Laulun hidastus 1/20** tarkoittaa, että koko laulu (noin 5,7 s) on
+  vastustajalle noin 0,3 s. Vastustaja ehtii osua vain, jos sen isku oli
+  jo nostossa laulun alkaessa. Jos keskeytyksen halutaan olevan todellinen
+  uhka, `SONG_SLOWMO` pitää nostaa (esim. 1/8).
+- **Suon reunus** on erillinen kumpu maan päällä: sen ulkoreunan ja
+  tallatun maan raja näkyy läheltä. Muta ei heijasta hahmoja.
 - **Kilven lovi** leikkaa pinnan shaderilla, joten loven reunassa ei ole
   paksuutta, ja kilven varjo pysyy ehjänä.
 - **Hahmojen avoimet viat:** kasvot ilman tekstuuria, rengaspanssari varjossa
@@ -109,9 +138,9 @@ Päivitetty: 2026-11-12 (Claude, kotikone, Windows)
 
 ## Seuraava tehtävä
 
-Omistaja pelaa v00.06.00:n julkaistusta osoitteesta mergen jälkeen ja kertoo
-tuntuman (kypärät, näppäinasetukset oikealla hiirellä, taistelun tasapaino).
-Sen perusteella säädetään taulukoiden luvut ja asennot.
+Omistaja pelaa v00.07.00:n julkaistusta osoitteesta mergen jälkeen ja kertoo
+tuntuman (laulun kulku ja osuma-alueiden vaikeus, suon ulkoasu, taistelun
+tasapaino). Sen perusteella säädetään `songLogic.ts`:n ja taulukoiden luvut.
 
 ## Ei vielä aloiteta
 

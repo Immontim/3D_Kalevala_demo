@@ -12,7 +12,10 @@ import {
 } from "./bindings";
 import { ARENA_RADIUS, buildWorld, groundHeight } from "./world";
 import { Sfx } from "./audio";
-import { BeatJudgement, GOOD_WINDOW, SONG_VERSES, judgeBeat, songOutcome } from "./songLogic";
+import {
+  BEAT_GAP, SONG_INTRO, SONG_LEAD, SONG_OUTRO, SONG_SLOWMO, SONG_VERSES, inZone, songOutcome, zoneHalf,
+} from "./songLogic";
+import { Bog } from "./bog";
 import { VERSION } from "./version";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
@@ -420,16 +423,9 @@ function updateSparks(dt: number) {
   sparkGeo.attributes.position.needsUpdate = true;
 }
 
-// Suo, johon vihollinen lauletaan.
-const swamp = new THREE.Mesh(
-  new THREE.CircleGeometry(1, 40),
-  new THREE.MeshStandardMaterial({ color: 0x1e2414, roughness: 0.15, metalness: 0.2, transparent: true, opacity: 0.92 }),
-);
-swamp.rotation.x = -Math.PI / 2;
-swamp.scale.setScalar(0.001);
-swamp.receiveShadow = true;
-scene.add(swamp);
-let swampSize = 0;
+// Suo, johon vihollinen lauletaan (malli Blenderistä, liike koodista).
+const bog = new Bog(scene, world);
+let bogDemo: THREE.Vector3 | null = null;
 
 // Laulun kultainen rengas pelaajan ympärillä.
 const ringCount = 80;
@@ -444,26 +440,39 @@ ring.frustumCulled = false;
 scene.add(ring);
 
 // ---------- Laulu ----------
+// Kulku: 1) maailma hidastuu, 2) pelaaja ottaa lauluasennon normaalinopeudella,
+// 3) rytmipeli: välilyönti, kun merkki on riimun osuma-alueella, 4) loitsu laukeaa tai ei.
+// Jos hidastettu vastustaja ehtii osua, laulu katkeaa heti.
 interface SongState {
   start: number; // reaaliaika
+  /** Rytmipeli alkaa, kun lauluasento on otettu. */
+  playAt: number;
+  shown: boolean;
   beats: number[];
-  results: (BeatJudgement | null)[];
+  results: (boolean | null)[];
   runes: HTMLDivElement[];
-  done: boolean;
+  zones: HTMLDivElement[];
+  /** Kun kaikki riimut on arvioitu: hetki, jolloin loitsu laukeaa. */
+  endAt: number;
 }
 let songState: SongState | null = null;
 let timeScale = 1;
 let realTime = 0;
 const RUNES = ["ᚠ", "ᚹ", "ᛃ", "ᛟ"];
-const BEAT_GAP = 0.8;
-const LEAD = 1.4;
 
 function startSong() {
-  song = 0;
+  song = 0; // voima kuluu kokonaan, kävi laululle miten tahansa
   sfx.startDrone();
   const track = $("track");
-  track.querySelectorAll(".rune").forEach((r) => r.remove());
-  const beats = SONG_VERSES.map((_, i) => realTime + LEAD + i * BEAT_GAP);
+  track.querySelectorAll(".rune, .zone").forEach((r) => r.remove());
+  const playAt = realTime + SONG_INTRO;
+  const beats = SONG_VERSES.map((_, i) => playAt + SONG_LEAD + i * BEAT_GAP);
+  const zones = beats.map(() => {
+    const d = document.createElement("div");
+    d.className = "zone";
+    track.appendChild(d);
+    return d;
+  });
   const runes = beats.map((_, i) => {
     const d = document.createElement("div");
     d.className = "rune";
@@ -471,12 +480,11 @@ function startSong() {
     track.appendChild(d);
     return d;
   });
-  songState = { start: realTime, beats, results: beats.map(() => null), runes, done: false };
-  $("song").classList.remove("hidden");
+  songState = { start: realTime, playAt, shown: false, beats, results: beats.map(() => null), runes, zones, endAt: -1 };
   $("verse").textContent = "";
   canvas.classList.add("singing");
   $("vignette").classList.add("on");
-  player.state = "idle";
+  setState(player, "idle");
   showMsg("Laulu alkaa", "", 1);
 }
 
@@ -484,56 +492,75 @@ let lastTick = -1;
 function updateSong() {
   const s = songState;
   if (!s) return;
+  if (realTime < s.playAt) return; // lauluasento kesken: painallukset eivät vielä laske
+  if (!s.shown) { s.shown = true; $("song").classList.remove("hidden"); }
   const trackW = $("track").clientWidth;
   const markerX = trackW * 0.25;
   const pxPerSec = trackW * 0.45;
   s.beats.forEach((bt, i) => {
     const x = markerX + (bt - realTime) * pxPerSec;
+    const w = 2 * zoneHalf(i) * pxPerSec;
     s.runes[i].style.left = `${x}px`;
-    if (s.results[i] === null && realTime > bt + GOOD_WINDOW) judge(i, "miss");
+    s.zones[i].style.left = `${x - w / 2}px`;
+    s.zones[i].style.width = `${w}px`;
+    if (s.results[i] === null && realTime > bt + zoneHalf(i)) judge(i, false);
   });
-  // Tikitys ennen jokaista tahtia.
+  // Tikitys ennen jokaista riimua.
   const next = s.beats.findIndex((b, i) => s.results[i] === null && b > realTime);
   if (next >= 0) {
     const tick = Math.floor((s.beats[next] - realTime) / (BEAT_GAP / 2));
     if (tick !== lastTick && tick <= 1) { sfx.tick(); lastTick = tick; }
   }
+  // Painallus arvioidaan aina seuraavaa riimua vastaan: alueen ulkopuolelle osunut painallus on huti.
   if (beatQueued) {
     const i = s.results.findIndex((r) => r === null);
-    if (i >= 0) judge(i, judgeBeat(realTime - s.beats[i]));
+    if (i >= 0) judge(i, inZone(realTime - s.beats[i], i));
   }
-  if (!s.done && s.results.every((r) => r !== null)) {
-    s.done = true;
-    const out = songOutcome(s.results as BeatJudgement[]);
-    setTimeout(() => endSong(out.success, out.rootTime), 450);
+  if (s.endAt < 0 && s.results.every((r) => r !== null)) s.endAt = realTime + SONG_OUTRO;
+  if (s.endAt >= 0 && realTime >= s.endAt) {
+    const out = songOutcome(s.results as boolean[]);
+    endSong(out.success, out.rootTime, out.hits);
   }
 }
 
-function judge(i: number, j: BeatJudgement) {
+function judge(i: number, hit: boolean) {
   const s = songState!;
-  s.results[i] = j;
-  s.runes[i].classList.add(j);
-  sfx.pluck(i * 2 + (j === "perfect" ? 1 : 0), j !== "miss");
-  $("verse").textContent = j === "miss" ? "…" : SONG_VERSES[i];
-  if (j === "perfect") flash("#f0c766", 0.18);
+  s.results[i] = hit;
+  s.runes[i].classList.add(hit ? "hit" : "miss");
+  s.zones[i].classList.add(hit ? "hit" : "miss");
+  sfx.pluck(i * 2 + 1, hit);
+  $("verse").textContent = hit ? SONG_VERSES[i] : "…";
+  if (hit) flash("#f0c766", 0.14);
 }
 
-function endSong(success: boolean, rootTime: number) {
+/** Sulkee laulun näkymän ja palauttaa ajan kulun. */
+function closeSong(instant = false) {
   songState = null;
   sfx.stopDrone();
   $("song").classList.add("hidden");
   canvas.classList.remove("singing");
   $("vignette").classList.remove("on");
+  if (instant) timeScale = 1;
+}
+
+function endSong(success: boolean, rootTime: number, hits: number) {
+  closeSong();
   if (success && enemy && enemy.state !== "dead") {
     enemy.state = "rooted";
     enemy.stateTime = 0;
     enemy.rootTime = rootTime;
     sfx.swamp();
     shake = 0.25;
-    showMsg("Suohon suonivyötäisistä!", `Vastustaja on kiinni ${rootTime.toFixed(1)} s ja ottaa tuplavahingon`, 2.2);
+    showMsg("Suohon suonivyötäisistä!", `${hits}/${SONG_VERSES.length} osumaa: vastustaja on kiinni ${rootTime.toFixed(1)} s ja ottaa tuplavahingon`, 2.4);
   } else {
     showMsg("Laulu katkesi", "Tahti ei pitänyt", 1.6);
   }
+}
+
+/** Vastustajan isku osui kesken laulun: loitsu raukeaa ja aika palaa heti normaaliksi. */
+function interruptSong() {
+  closeSong(true);
+  showMsg("Laulu katkesi", "Isku osui kesken laulun", 1.6);
 }
 
 // ---------- Tekoäly ----------
@@ -688,6 +715,7 @@ function resolveStrike(att: Actor, def: Actor) {
     else if (def.shieldHp <= def.shield.durability * def.shield.notchAt) def.fighter.setShieldNotch(true);
   }
   const died = def.hp <= 0;
+  if (def === player && songState && (res === "hit" || res === "guardbreak")) interruptSong();
   if (died) {
     setState(def, "dead");
     if (def === player) onPlayerDeath();
@@ -861,9 +889,11 @@ function keepApartAndInside(a: Actor, b: Actor | null) {
     const d = b.pos.clone().sub(a.pos);
     const len = d.length();
     if (len < 1.0 && len > 0.0001) {
-      const push = d.multiplyScalar((1.0 - len) / len / 2);
+      // Suohon juuttunutta ei voi työntää: vain toinen osapuoli väistyy.
+      const stuck = b.state === "rooted";
+      const push = d.multiplyScalar((1.0 - len) / len / (stuck ? 1 : 2));
       a.pos.sub(push);
-      b.pos.add(push);
+      if (!stuck) b.pos.add(push);
     }
   }
 }
@@ -885,7 +915,7 @@ function targetPose(a: Actor) {
     case "rooted": return { pose: POSES.rooted, rate: 6 };
     case "dead": return { pose: POSES.stagger, rate: 6 };
     case "dodge": return { pose: POSES.guard, rate: 10 };
-    default: return { pose: a === player && songState ? POSES.sing : POSES.guard, rate: 8 };
+    default: return a === player && songState ? { pose: POSES.sing, rate: 4.5 } : { pose: POSES.guard, rate: 8 };
   }
 }
 
@@ -990,6 +1020,7 @@ function restart() {
   enemy = null;
   wave = 0;
   song = 0;
+  if (songState) closeSong(true);
   gameOver = false;
   spawnEnemy();
   lockPointer();
@@ -1008,14 +1039,15 @@ function frame(now: number) {
 
 /** Yksi pelin askel ilman piirtoa. Erillään, jotta savutesti voi ajaa peliä tasaisin askelin. */
 function simulate(realDt: number) {
-  realTime += realDt;
+  if (!paused) realTime += realDt; // tauko pysäyttää myös laulun riimut
   fpsAcc += realDt; fpsFrames++;
   if (fpsAcc > 0.5) { $("fps").textContent = String(Math.round(fpsFrames / fpsAcc)); fpsAcc = 0; fpsFrames = 0; }
 
   if (gameOver && isTouch && beatQueued) restart();
 
-  const targetScale = songState ? 0.12 : 1;
-  timeScale += (targetScale - timeScale) * (1 - Math.exp(-6 * realDt));
+  // Laulu hidastaa maailman nopeasti; paluu normaaliin on pehmeämpi.
+  const targetScale = songState ? SONG_SLOWMO : 1;
+  timeScale += (targetScale - timeScale) * (1 - Math.exp(-(songState ? 16 : 6) * realDt));
   let dt = realDt * timeScale;
   if (hitstop > 0) { hitstop -= realDt; dt = 0; }
 
@@ -1045,7 +1077,8 @@ function simulate(realDt: number) {
     }
   }
 
-  syncVisual(player, dt);
+  // Laulaja liikkuu omassa ajassaan, vaikka maailma on hidastettu.
+  syncVisual(player, songState && !paused ? realDt : dt);
   if (enemy) syncVisual(enemy, dt);
   for (const c of corpses) syncVisual(c.actor, dt);
   for (const s of showcase) s.fighter.animate(POSES[s.pose], 8, realDt, 0);
@@ -1054,10 +1087,7 @@ function simulate(realDt: number) {
   }
 
   // Suo
-  const swampTarget = enemy && enemy.state === "rooted" ? 1.4 : 0;
-  swampSize += (swampTarget - swampSize) * (1 - Math.exp(-3 * dt));
-  if (enemy) swamp.position.set(enemy.pos.x, enemy.pos.y + 0.03, enemy.pos.z);
-  swamp.scale.setScalar(Math.max(0.001, swampSize));
+  bog.update(bogDemo ? realDt : dt, bogDemo ?? (enemy && enemy.state === "rooted" ? enemy.pos : null));
 
   // Laulurengas (pyörii reaaliajassa, vaikka maailma on hidastettu).
   const ringMat = ring.material as THREE.PointsMaterial;
@@ -1151,7 +1181,7 @@ $("startBtn").addEventListener("click", () => {
     return { pos: player.pos.toArray().map((v) => +v.toFixed(2)), yaw: +player.yaw.toFixed(2), dist: enemy ? +enemy.pos.distanceTo(player.pos).toFixed(2) : null, ai: { ...ai }, player: player.state, playerAttack: `${player.attack.kind}/${player.attack.weight}`, playerHp: player.hp, playerShield: player.shieldHp, stance: player.stance, enemy: enemy?.state, enemyAttack: enemy ? `${enemy.attack.kind}/${enemy.attack.weight}` : null, enemyShield: enemy?.shieldHp, enemyHp: enemy?.hp, song, wave, timeScale };
   },
   get events() { return [...events]; },
-  get song() { return songState ? { results: [...songState.results], done: songState.done, realTime, beats: songState.beats } : null; },
+  get song() { return songState ? { results: [...songState.results], done: songState.endAt >= 0, realTime, playAt: songState.playAt, beats: songState.beats } : null; },
   fillSong() { song = SONG_MAX; },
   /** Lennättää vastustajan kypärän päästä (tehosteen kokeiluun). */
   knockHelmet() {
@@ -1184,6 +1214,10 @@ $("startBtn").addEventListener("click", () => {
     const i = songState.results.findIndex((r) => r === null);
     return i < 0 ? null : songState.beats[i] - realTime;
   },
+  /** Vie välilyönnin painalluksen laululle (savutestit). */
+  beat() { beatQueued = true; },
+  /** Suo näkyviin annettuun kohtaan tai pois (kuvakaappaukset). */
+  bog(pos: number[] | null) { bogDemo = pos ? new THREE.Vector3(pos[0], groundHeight(pos[0], pos[2]), pos[2]) : null; },
   /** Pelin sekunteja siihen, kun vihollisen isku laukeaa, tai null. */
   get enemyStrikeIn() {
     return enemy && enemy.state === "windup" ? enemy.timing.windup - enemy.stateTime : null;

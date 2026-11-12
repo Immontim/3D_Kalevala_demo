@@ -1,34 +1,52 @@
-// Laululoitsun rytmipelin puhdas logiikka.
+// Laululoitsun puhdas logiikka: hidastus, alkuanimaation kesto, osuma-alueet ja lopputulos.
+// Kaikki säädettävät luvut ovat tässä.
 
-export type BeatJudgement = "perfect" | "good" | "miss";
+/** Maailman nopeus laulun aikana (vastustaja liikkuu, mutta näin hitaasti). */
+export const SONG_SLOWMO = 1 / 20;
+/** Pelaajan lauluasennon kesto ennen kuin rytmipeli alkaa (sekunteja, reaaliaikaa). */
+export const SONG_INTRO = 1.5;
+/** Aika rytmipelin alusta ensimmäiseen riimuun. */
+export const SONG_LEAD = 1.3;
+/** Riimujen väli. */
+export const BEAT_GAP = 0.8;
+/** Aika viimeisestä riimusta loitsun laukeamiseen. */
+export const SONG_OUTRO = 0.45;
 
-export const PERFECT_WINDOW = 0.09;
-export const GOOD_WINDOW = 0.2;
+/** Ensimmäisen osuma-alueen puolikas: painallus saa osua näin paljon ohi riimun keskikohdan. */
+export const ZONE_FIRST = 0.24;
+/** Jokainen seuraava alue on tämän verran edellisestä (0.8 = viidenneksen lyhyempi). */
+export const ZONE_SHRINK = 0.8;
 
-/** offset = painalluksen aika miinus tahdin aika (sekunteja, reaaliaikaa). */
-export function judgeBeat(offset: number): BeatJudgement {
-  const a = Math.abs(offset);
-  if (a <= PERFECT_WINDOW) return "perfect";
-  if (a <= GOOD_WINDOW) return "good";
-  return "miss";
+/** Loitsu laukeaa, kun osumia on vähintään näin monta. */
+export const SONG_MIN_HITS = 2;
+/** Suohon laulamisen kesto jokaista osumaa kohti (pelin sekunteja). */
+export const ROOT_TIME_PER_HIT = 1.5;
+
+/** Osuma-alueen puolikas sekunteina riimulle i (0 = ensimmäinen). */
+export function zoneHalf(i: number): number {
+  return ZONE_FIRST * Math.pow(ZONE_SHRINK, i);
+}
+
+/** offset = painalluksen aika miinus riimun aika (sekunteja, reaaliaikaa). */
+export function inZone(offset: number, i: number): boolean {
+  return Math.abs(offset) <= zoneHalf(i);
 }
 
 export interface SongOutcome {
   success: boolean;
+  hits: number;
   /** Kuinka kauan vihollinen on suossa (pelin sekunteja). */
   rootTime: number;
-  score: number;
 }
 
-/** perfect = 2 pistettä, good = 1. Neljällä tahdilla maksimi on 8. */
-export function songOutcome(results: BeatJudgement[]): SongOutcome {
-  const score = results.reduce((s, r) => s + (r === "perfect" ? 2 : r === "good" ? 1 : 0), 0);
-  if (score >= 7) return { success: true, rootTime: 6, score };
-  if (score >= 4) return { success: true, rootTime: 3.5, score };
-  return { success: false, rootTime: 0, score };
+/** Kesto kasvaa osumien määrän mukaan; liian vähillä osumilla loitsu ei laukea lainkaan. */
+export function songOutcome(results: boolean[]): SongOutcome {
+  const hits = results.filter(Boolean).length;
+  const success = hits >= SONG_MIN_HITS;
+  return { success, hits, rootTime: success ? hits * ROOT_TIME_PER_HIT : 0 };
 }
 
-/** Kalevalan 3. runo (1849, vapaa käyttää). Yksi säe per tahti. */
+/** Kalevalan 3. runo (1849, vapaa käyttää). Yksi säe per riimu. */
 export const SONG_VERSES = [
   "Lauloi vanha Väinämöinen:",
   "järvet läikkyi, maa järisi,",

@@ -43,6 +43,12 @@ omistajan referenssikuviin (kansio `Reference Pictures/`, ei Gitissä).
 
 Haku: `tools/fetch-characters.ps1`. Ladattu mutta ei käytössä: `metal_plate_02`.
 
+## `bog.glb`
+
+Itse tehty Blenderissä (skripti `assets-src/blender/bog.py`): mutapinta,
+turvereunus ja kuplan malli. Tiedostossa ei ole tekstuureja: peli käyttää
+kansion `ground/` sammal- ja maatekstuureja sekä `forest.glb`:n heinämalleja.
+
 ## `ground/`
 
 | Tiedosto | Lähde |
