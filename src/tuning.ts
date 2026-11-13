@@ -95,6 +95,7 @@ export const FIELDS: readonly Field[] = [
   { group: "Laulu", label: "Laulunauhan nopeus", path: "song.speed", min: 0.25, max: 4, step: 0.05 },
   { group: "Laulu", label: "Vaaditut osumat", path: "song.minHits", min: 1, max: 8, step: 1 },
   { group: "Laulu", label: "Suon kesto / osuma, s", path: "song.rootTimePerHit", min: 0, max: 10, step: 0.05 },
+  { group: "Laulu", label: "Parannus / osuma, elämää", path: "song.healPerHit", min: 0, max: 100, step: 1 },
   { group: "Laulu", label: "Laulun voima osumasta", path: "combat.songGainHit", min: 0, max: 100, step: 1 },
   { group: "Laulu", label: "Laulun voima täydellisestä torjunnasta", path: "combat.songGainParry", min: 0, max: 100, step: 1 },
 ];

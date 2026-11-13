@@ -6,7 +6,10 @@
 // Moninappihiiren lisänapit tulevat selaimelle joko nappeina 3 ja 4 tai ajurin
 // lähettäminä näppäinpainalluksina; molemmat kelpaavat sellaisinaan.
 
-export type Action = "slash" | "overhead" | "thrust" | "block" | "dodge" | "song";
+export type SongSlotAction = "song1" | "song2" | "song3" | "song4" | "song5";
+export type Action = "slash" | "overhead" | "thrust" | "block" | "dodge" | "song" | SongSlotAction;
+/** Laulun pikavalinnat valintaringin paikoille vasemmalta oikealle. */
+export const SONG_SLOT_ACTIONS: readonly SongSlotAction[] = ["song1", "song2", "song3", "song4", "song5"];
 
 export const ACTIONS: { id: Action; label: string }[] = [
   { id: "slash", label: "Sivallus" },
@@ -15,6 +18,11 @@ export const ACTIONS: { id: Action; label: string }[] = [
   { id: "block", label: "Torjunta" },
   { id: "dodge", label: "Väistö" },
   { id: "song", label: "Laulu" },
+  { id: "song1", label: "Laulupaikka 1" },
+  { id: "song2", label: "Laulupaikka 2" },
+  { id: "song3", label: "Laulupaikka 3" },
+  { id: "song4", label: "Laulupaikka 4" },
+  { id: "song5", label: "Laulupaikka 5" },
 ];
 
 /** Jokaisella toiminnolla on kaksi paikkaa; tyhjä merkkijono on tyhjä paikka. */
@@ -28,6 +36,11 @@ export const DEFAULT_BINDINGS: Bindings = {
   block: ["Mouse2", "KeyK"],
   dodge: ["ShiftLeft", "ShiftRight"],
   song: ["KeyQ", ""],
+  song1: ["F1", ""],
+  song2: ["F2", ""],
+  song3: ["F3", ""],
+  song4: ["F4", ""],
+  song5: ["F5", ""],
 };
 
 /** Näppäimet, joilla on kiinteä tehtävä: liike, laulun tahti, uusi peli ja tauko. */

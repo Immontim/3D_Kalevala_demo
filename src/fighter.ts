@@ -261,6 +261,10 @@ export class Fighter {
   private bladeMats: THREE.MeshStandardMaterial[] = [];
   private helmet: THREE.Object3D | null = null;
   private shieldHolder: THREE.Group | null = null;
+  /** Kilven asento kyynärvarteen nähden torjunnassa (pinta kyynärvarren suuntaan). */
+  private shieldFront = new THREE.Quaternion();
+  /** 0 = kilpi edessä torjumassa, 1 = kilpi roikkuu kahvastaan kyljellä pinta ulospäin. */
+  private shieldHang = 1;
   private shieldModel: THREE.Object3D | null = null;
   private shieldUniforms: ShieldUniforms[] = [];
   private shieldMats: THREE.MeshStandardMaterial[] = [];
@@ -410,6 +414,7 @@ export class Fighter {
         // Keskikahvakilpi: pinta osoittaa kyynärvarren suuntaan (rystyset edellä), joten
         // koukistetulla kädellä kilpi on pystyssä vartalon edessä.
         holder.quaternion.copy(aInv).multiply(qA.setFromEuler(eul.set(Math.PI / 2, 0, 0)));
+        this.shieldFront.copy(holder.quaternion);
         holder.position.copy(vTmp.set(0.0, -0.36, 0.0).applyQuaternion(aInv));
         shield.position.set(0, 0, 0);
         holder.add(shield);
@@ -742,6 +747,14 @@ export class Fighter {
     arm("R", p.rShX, p.rShZ, p.rEl, qB.setFromEuler(eul.set(p.rHandX, p.rHandY, 0, "YXZ")).clone());
     arm("L", p.lShX, p.lShZ, p.lEl, null);
     eul.order = "XYZ";
+    if (this.shieldHolder) {
+      // Levossa ranne antaa periksi ja kilpi roikkuu kahvastaan pystyssä kyljellä, pinta ulospäin
+      // ja hieman eteen. Torjunnassa se kääntyy takaisin kyynärvarren eteen.
+      const hang = qA.setFromEuler(eul.set(0, this.leftX * SHIELD_HANG_YAW, 0));
+      qB.copy(this.bones.get("forearm_L")!.world).invert().multiply(hang);
+      const hw = this.shieldHang * this.shieldHang * (3 - 2 * this.shieldHang);
+      this.shieldHolder.quaternion.slerpQuaternions(this.shieldFront, qB, hw);
+    }
     if (this.look.loadout === "spear") this.spearArms();
 
     // Jalat: asennon mukainen jalan paikka lasketaan ensin (reisi ja polvi), siihen lisätään
@@ -820,6 +833,7 @@ export class Fighter {
     const over = this.hasShield
       ? (BLOCK_POSES.has(target) ? SHIELD_BLOCK : SHIELD_ARM.has(target) ? SHIELD_GUARD : null)
       : this.look.loadout === "spear" ? SPEAR.get(target) ?? null : null;
+    this.shieldHang += ((SHIELD_FRONT.has(target) ? 0 : 1) - this.shieldHang) * k;
     for (const key of KEYS) {
       const goal = over && key in over ? over[key as keyof typeof over]! : target[key];
       this.pose[key] += (goal - this.pose[key]) * k;
@@ -877,12 +891,16 @@ export class Fighter {
 
 // Kilpikäden asennot (vasen käsi). Levossa kilpi roikkuu vasemmalla kyljellä pinta sivulle;
 // torjunnassa se nostetaan keskelle vartalon eteen, jolloin liike näkyy selvästi.
-const SHIELD_GUARD: Partial<Pose> = { lShX: 0.15, lShZ: 0.5, lEl: -0.55 };
+const SHIELD_GUARD: Partial<Pose> = { lShX: 0.1, lShZ: 0.34, lEl: -0.3 };
+/** Roikkuvan kilven pinnan suunta: 90° = suoraan sivulle, pienempi = hieman eteen. */
+const SHIELD_HANG_YAW = 1.3;
 const SHIELD_BLOCK: Partial<Pose> = {
   lShX: -1.1, lShZ: -0.1, lEl: -0.8, spineYaw: -0.3, crouch: 0.14,
   rShX: -0.5, rShZ: -0.35, rEl: -1.2, rHandX: 0.9, rHandY: 0,
 };
 const BLOCK_POSES = new Set<Pose>([POSES.block, POSES.blockSide, POSES.blockThrust]);
+/** Asennot, joissa kilpi on edessä: torjunnat ja kilpi-isku. Muissa se roikkuu kyljellä. */
+const SHIELD_FRONT = new Set<Pose>([...BLOCK_POSES, POSES.bashWindup, POSES.bashStrike]);
 const SHIELD_ARM = new Set<Pose>([
   POSES.guard, POSES.windup, POSES.strike, POSES.heavyWindup, POSES.heavyStrike,
   POSES.slashWindup, POSES.slashStrike, POSES.thrustWindup, POSES.thrustStrike,
