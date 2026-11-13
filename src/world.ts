@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import forestUrl from "../assets/forest.glb?url";
+import homesteadUrl from "../assets/homestead.glb?url";
 import needlesDiffUrl from "../assets/ground/needles_diff.webp";
 import needlesNorUrl from "../assets/ground/needles_nor.webp";
 import mossDiffUrl from "../assets/ground/moss_diff.webp";
@@ -8,15 +9,117 @@ import mossNorUrl from "../assets/ground/moss_nor.webp";
 import dirtDiffUrl from "../assets/ground/dirt_diff.webp";
 import dirtNorUrl from "../assets/ground/dirt_nor.webp";
 
-// Metsäaukio kangasmetsässä: maasto, männyt, kuuset, koivut, varvut, kivet,
-// kota ja nuotio. Mallit tulevat Blenderistä (assets/forest.glb); tämä tiedosto
+// Taistelualueet kangasmetsässä: maasto, männyt, kuuset, koivut, varvut ja kivet
+// sekä alueen oma keskus (nuotioaukion kota tai pihapiirin rakennukset). Mallit
+// tulevat Blenderistä (assets/forest.glb, assets/homestead.glb); tämä tiedosto
 // sijoittelee ne instansseina ja hoitaa valon, maaston ja tulen.
 
+/** Taistelukehän säde; sama molemmilla alueilla. */
 export const ARENA_RADIUS = 11;
 
-const FIRE = { x: 4.5, z: 3 };
+export type ArenaId = "clearing" | "homestead";
+export const ARENAS: Record<ArenaId, { name: string; desc: string }> = {
+  clearing: { name: "Nuotioaukio", desc: "Metsäaukio mäntykankaalla: kota, nuotio ja uhrikivi." },
+  homestead: { name: "Pihapiiri", desc: "Rautakautinen talo ulkorakennuksineen punosaidan sisällä." },
+};
+const ARENA_STORE = "laulun-miekka.arena.v1";
+
+function savedArena(): ArenaId {
+  try {
+    const v = localStorage.getItem(ARENA_STORE);
+    if (v === "clearing" || v === "homestead") return v;
+  } catch { /* muisti ei käytössä */ }
+  return "clearing";
+}
+
+/** Tallentaa valinnan; se tulee voimaan, kun sivu ladataan uudelleen (maailma rakennetaan kerran). */
+export function saveArena(id: ArenaId): boolean {
+  try { localStorage.setItem(ARENA_STORE, id); return true; } catch { return false; }
+}
+
+/** Tällä latauksella käytössä oleva alue. */
+export const ARENA: ArenaId = savedArena();
+
+/** Rakennuksen pohja maassa: suorakaide, jonka etusivu (ovi) osoittaa suuntaan yaw. */
+interface Footprint { x: number; z: number; yaw: number; hx: number; front: number; back: number; }
+
+interface Site {
+  fire: { x: number; z: number };
+  /** Maaston tasainen alue: kumpuilu alkaa säteeltä flat0 ja on täysi säteellä flat1. */
+  flat0: number; flat1: number;
+  /** Tasaisen alueen jäljelle jäävä epätasaisuus (0..1). */
+  rough: number;
+  /** Lähimpien puiden etäisyys keskipisteestä. */
+  treeMin: number;
+  /** Varvikko alkaa säteeltä shrub0 ja on täysi säteellä shrub1. */
+  shrub0: number; shrub1: number;
+  /** Tallatun maan säde keskeltä. */
+  dirtR: number;
+  /** Kamera pidetään tämän säteen sisällä, ettei se mene rakennusten sisään. */
+  camMaxR: number;
+  footprints: Footprint[];
+  /** Pyöreät esteet (nuotio, kota, uhrikivi): x, z, säde. */
+  circles: { x: number; z: number; r: number }[];
+}
+
 const KOTA = { x: 8.6, z: -9.6 };
 const OFFERING = { x: -7.5, z: 5 };
+
+/** Paikka kehällä: kulma asteina (0 = +z, 90 = +x) ja etäisyys d; etusivu osoittaa keskipisteeseen. */
+function onRing(aDeg: number, d: number, hx: number, front: number, back: number): Footprint {
+  const a = (aDeg * Math.PI) / 180;
+  return { x: Math.sin(a) * d, z: Math.cos(a) * d, yaw: a + Math.PI, hx, front, back };
+}
+
+// Pihapiirin rakennukset kehällä taistelukehän ulkopuolella.
+const HOUSE = onRing(180, 16.2, 6.3, 3.6, 3.6);
+const PITHOUSE = onRing(72, 16.9, 2.5, 4.3, 2.8);
+const STOREHOUSE = onRing(-104, 15.6, 2.0, 3.0, 2.1);
+const SHED = onRing(-52, 14.6, 2.5, 1.9, 1.9);
+const RACK = onRing(126, 15.4, 2.0, 0.8, 0.8);
+const FENCE_R = 12.9;
+const GATE_HALF = 0.11;       // portin puolileveys radiaaneina (etelässä, +z)
+/** Kuoppatalon kulkukuilu, joka leikataan maastoon: puolileveys sekä alku ja loppu etusuuntaan
+ *  (homestead.py: dw + 0.34, L/2 - 0.25, L/2 + RAMP). */
+const PIT_HOLE = { half: 0.76, from: 2.05, to: 4.2 };
+
+const SITES: Record<ArenaId, Site> = {
+  clearing: {
+    fire: { x: 4.5, z: 3 }, flat0: ARENA_RADIUS - 2, flat1: ARENA_RADIUS + 10, rough: 0.12,
+    treeMin: ARENA_RADIUS + 2.2, shrub0: 5.5, shrub1: ARENA_RADIUS, dirtR: ARENA_RADIUS - 3, camMaxR: Infinity,
+    footprints: [],
+    circles: [{ x: 4.5, z: 3, r: 2.2 }, { x: KOTA.x, z: KOTA.z, r: 3.2 }, { x: OFFERING.x, z: OFFERING.z, r: 2.4 }],
+  },
+  homestead: {
+    fire: { x: 5.6, z: -6.4 }, flat0: 20, flat1: 34, rough: 0.03,
+    treeMin: 25, shrub0: 17, shrub1: 24, dirtR: 15, camMaxR: 12.2,
+    footprints: [HOUSE, PITHOUSE, STOREHOUSE, SHED, RACK],
+    circles: [{ x: 5.6, z: -6.4, r: 2.0 }],
+  },
+};
+const SITE = SITES[ARENA];
+const FIRE = SITE.fire;
+
+/** Pisteen paikka rakennuksen omassa koordinaatistossa: [sivulle, eteen]. */
+function toLocal(f: Footprint, x: number, z: number): [number, number] {
+  const dx = x - f.x, dz = z - f.z, s = Math.sin(f.yaw), c = Math.cos(f.yaw);
+  return [dx * c - dz * s, dx * s + dz * c];
+}
+/** Rakennuksen oman pisteen (sivulle, eteen) paikka maailmassa. */
+function fromLocal(f: Footprint, lx: number, lz: number): [number, number] {
+  const s = Math.sin(f.yaw), c = Math.cos(f.yaw);
+  return [f.x + lx * c + lz * s, f.z - lx * s + lz * c];
+}
+
+/** Onko piste rakennuksen, nuotion tai muun kiinteän kohteen alla (pad laajentaa aluetta). */
+function blocked(x: number, z: number, pad: number) {
+  for (const c of SITE.circles) if (Math.hypot(x - c.x, z - c.z) < c.r + pad) return true;
+  for (const f of SITE.footprints) {
+    const [lx, lz] = toLocal(f, x, z);
+    if (Math.abs(lx) < f.hx + pad && lz < f.front + pad && lz > -f.back - pad) return true;
+  }
+  return false;
+}
 
 function rand(seed: number) {
   let s = seed;
@@ -43,8 +146,8 @@ export function groundHeight(x: number, z: number): number {
   const r = Math.hypot(x, z);
   const n = noise2(x * 0.08, z * 0.08) * 2.2 + noise2(x * 0.3, z * 0.3) * 0.35;
   // Aukio on lähes tasainen, reunoilla maasto kumpuilee.
-  const t = THREE.MathUtils.smoothstep(r, ARENA_RADIUS - 2, ARENA_RADIUS + 10);
-  return n * (0.12 + 0.88 * t) + t * 1.5;
+  const t = THREE.MathUtils.smoothstep(r, SITE.flat0, SITE.flat1);
+  return n * (SITE.rough + (1 - SITE.rough) * t) + t * 1.5;
 }
 
 /** Kosteus 0..1: korkea arvo = sammalta, mustikkaa ja kuusia; matala = kuivaa kangasta. */
@@ -62,6 +165,8 @@ export interface World {
   groundTex: GroundTex;
   /** Metsän malli nimellä (esim. "grass_d"); tyhjä, kunnes mallit on ladattu. */
   proto(name: string): { geometry: THREE.BufferGeometry; material: THREE.Material }[];
+  /** Siirtää kameran paikan pois rakennusten sisältä (pihapiirissä kehän sisäpuolelle). */
+  clearCamera(pos: THREE.Vector3): void;
   update(t: number, dt: number, camera: THREE.Camera): void;
 }
 
@@ -80,11 +185,17 @@ function buildGround(scene: THREE.Scene, maxAniso: number): GroundTex {
     const r = Math.hypot(x, z);
     const fire = Math.hypot(x - FIRE.x, z - FIRE.z);
     // Tallattu maa aukion keskellä ja nuotion ympärillä.
-    let dirt = (1 - THREE.MathUtils.smoothstep(r, 1, ARENA_RADIUS - 3)) * 0.8 + noise2(x * 0.6, z * 0.6) * 0.25 - 0.1;
+    let dirt = (1 - THREE.MathUtils.smoothstep(r, 1, SITE.dirtR)) * 0.8 + noise2(x * 0.6, z * 0.6) * 0.25 - 0.1;
     dirt = Math.max(dirt, 1 - THREE.MathUtils.smoothstep(fire, 0.8, 2.6));
+    // Rakennusten edustat ja seinänvierustat ovat tallattua maata.
+    for (const f of SITE.footprints) {
+      const [lx, lz] = toLocal(f, x, z);
+      const out = Math.max(Math.abs(lx) - f.hx, lz - f.front, -lz - f.back);
+      dirt = Math.max(dirt, 1 - THREE.MathUtils.smoothstep(out + (noise2(x * 0.7, z * 0.7) - 0.5) * 1.2, 0.3, 2.2));
+    }
     dirt = THREE.MathUtils.clamp(dirt, 0, 1);
     const m = moisture(x, z) + (noise2(x * 0.9, z * 0.9) - 0.5) * 0.25;
-    const moss = THREE.MathUtils.smoothstep(m, 0.42, 0.62) * THREE.MathUtils.smoothstep(r, 5, ARENA_RADIUS) * (1 - dirt);
+    const moss = THREE.MathUtils.smoothstep(m, 0.42, 0.62) * THREE.MathUtils.smoothstep(r, SITE.shrub0 - 0.5, SITE.shrub1) * (1 - dirt);
     const needles = Math.max(0.05, 1 - moss - dirt);
     splat.set([needles, moss, dirt], i * 3);
   }
@@ -102,7 +213,15 @@ function buildGround(scene: THREE.Scene, maxAniso: number): GroundTex {
   const uniforms = {
     tN: { value: tex(needlesDiffUrl, true) }, tM: { value: tex(mossDiffUrl, true) }, tD: { value: tex(dirtDiffUrl, true) },
     nN: { value: tex(needlesNorUrl, false) }, nM: { value: tex(mossNorUrl, false) }, nD: { value: tex(dirtNorUrl, false) },
+    // Maastoon leikattava suorakaide (kuoppatalon kulkukuilu): keskipiste, etusuunta ja puolimitat (sivulle, eteen).
+    uHoleC: { value: new THREE.Vector2() }, uHoleDir: { value: new THREE.Vector2(0, 1) }, uHoleHalf: { value: new THREE.Vector2(0, 0) },
   };
+  if (ARENA === "homestead") {
+    const [cx, cz] = fromLocal(PITHOUSE, 0, (PIT_HOLE.from + PIT_HOLE.to) / 2);
+    uniforms.uHoleC.value.set(cx, cz);
+    uniforms.uHoleDir.value.set(Math.sin(PITHOUSE.yaw), Math.cos(PITHOUSE.yaw));
+    uniforms.uHoleHalf.value.set(PIT_HOLE.half, (PIT_HOLE.to - PIT_HOLE.from) / 2);
+  }
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.96, metalness: 0 });
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -114,6 +233,7 @@ function buildGround(scene: THREE.Scene, maxAniso: number): GroundTex {
         "#include <common>",
         `#include <common>
         uniform sampler2D tN, tM, tD, nN, nM, nD;
+        uniform vec2 uHoleC, uHoleDir, uHoleHalf;
         varying vec3 vSplat;
         varying vec2 vGuv;
         vec3 gW;
@@ -121,7 +241,9 @@ function buildGround(scene: THREE.Scene, maxAniso: number): GroundTex {
       )
       .replace(
         "#include <map_fragment>",
-        `gUvA = vGuv * 0.27;
+        `vec2 hd = vGuv - uHoleC;
+        if (abs(dot(hd, vec2(uHoleDir.y, -uHoleDir.x))) < uHoleHalf.x && abs(dot(hd, uHoleDir)) < uHoleHalf.y) discard;
+        gUvA = vGuv * 0.27;
         gUvB = vGuv * 0.061 + vec2(0.37, 0.11);   // toinen mittakaava häivyttää laatoituksen toiston
         vec3 cN = mix(texture2D(tN, gUvA).rgb, texture2D(tN, gUvB).rgb, 0.4);
         vec3 cM = mix(texture2D(tM, gUvA).rgb, texture2D(tM, gUvB).rgb, 0.4);
@@ -203,6 +325,37 @@ function softDot(inner: string, outer: string) {
   return new THREE.CanvasTexture(c);
 }
 
+/** Savupatsas: pehmeät harmaat pilvet, jotka nousevat, ajelehtivat tuulessa ja haihtuvat. */
+function makeSmoke(parent: THREE.Object3D, count: number, life: number, y0: number, size: number, alpha: number) {
+  const sPos = new Float32Array(count * 3);
+  const sCol = new Float32Array(count * 4);
+  const sLife = new Float32Array(count);
+  for (let i = 0; i < count; i++) sLife[i] = (i / count) * life;
+  const sGeo = new THREE.BufferGeometry();
+  sGeo.setAttribute("position", new THREE.BufferAttribute(sPos, 3));
+  sGeo.setAttribute("color", new THREE.BufferAttribute(sCol, 4));
+  const smoke = new THREE.Points(
+    sGeo,
+    new THREE.PointsMaterial({ map: softDot("rgba(255,255,255,0.55)", "rgba(255,255,255,0)"), size, transparent: true, depthWrite: false, vertexColors: true }),
+  );
+  smoke.frustumCulled = false;
+  parent.add(smoke);
+  return (dt: number) => {
+    for (let i = 0; i < count; i++) {
+      sLife[i] += dt;
+      if (sLife[i] > life) sLife[i] = 0;
+      const l = sLife[i], seed = i * 2.11;
+      sPos[i * 3] = Math.sin(seed + l * 0.6) * 0.12 * l + l * l * 0.035;      // heikko tuuli vie savua
+      sPos[i * 3 + 1] = y0 + l * 1.25;
+      sPos[i * 3 + 2] = Math.cos(seed * 1.3 + l * 0.5) * 0.12 * l;
+      const a = Math.sin((l / life) * Math.PI) * alpha;
+      sCol.set([0.42, 0.40, 0.38, a], i * 4);
+    }
+    sGeo.attributes.position.needsUpdate = true;
+    sGeo.attributes.color.needsUpdate = true;
+  };
+}
+
 function buildFire(scene: THREE.Scene) {
   const fy = groundHeight(FIRE.x, FIRE.z);
   const group = new THREE.Group();
@@ -259,21 +412,7 @@ function buildFire(scene: THREE.Scene) {
   embers.frustumCulled = false;
   group.add(embers);
 
-  // Savu: pehmeät harmaat pilvet, jotka nousevat ja haihtuvat.
-  const smokeCount = 22;
-  const sPos = new Float32Array(smokeCount * 3);
-  const sCol = new Float32Array(smokeCount * 4);
-  const sLife = new Float32Array(smokeCount);
-  for (let i = 0; i < smokeCount; i++) sLife[i] = (i / smokeCount) * 7;
-  const sGeo = new THREE.BufferGeometry();
-  sGeo.setAttribute("position", new THREE.BufferAttribute(sPos, 3));
-  sGeo.setAttribute("color", new THREE.BufferAttribute(sCol, 4));
-  const smoke = new THREE.Points(
-    sGeo,
-    new THREE.PointsMaterial({ map: softDot("rgba(255,255,255,0.55)", "rgba(255,255,255,0)"), size: 2.2, transparent: true, depthWrite: false, vertexColors: true }),
-  );
-  smoke.frustumCulled = false;
-  group.add(smoke);
+  const smoke = makeSmoke(group, 22, 7, 1.2, 2.2, 0.16);
 
   let ft = 0;
   return {
@@ -296,18 +435,7 @@ function buildFire(scene: THREE.Scene) {
         ePos[i * 3 + 2] = Math.cos(seed * 1.7 + l * 1.7) * 0.22 * (0.3 + l);
       }
       eGeo.attributes.position.needsUpdate = true;
-      for (let i = 0; i < smokeCount; i++) {
-        sLife[i] += dt;
-        if (sLife[i] > 7) sLife[i] = 0;
-        const l = sLife[i], seed = i * 2.11;
-        sPos[i * 3] = Math.sin(seed + l * 0.6) * 0.12 * l + l * l * 0.035;      // heikko tuuli vie savua
-        sPos[i * 3 + 1] = 1.2 + l * 1.25;
-        sPos[i * 3 + 2] = Math.cos(seed * 1.3 + l * 0.5) * 0.12 * l;
-        const a = Math.sin((l / 7) * Math.PI) * 0.16;
-        sCol.set([0.42, 0.40, 0.38, a], i * 4);
-      }
-      sGeo.attributes.position.needsUpdate = true;
-      sGeo.attributes.color.needsUpdate = true;
+      smoke(dt);
     },
   };
 }
@@ -329,6 +457,18 @@ function prepareMaterials(protos: Map<string, Proto>, maxAniso: number) {
         m.metalness = 0;
         m.color.setRGB(0.82, 0.86, 0.9);
         m.normalScale.setScalar(0.6);
+      }
+      if (/Thatch|Daub|Turf|Wattle|Wood|PoleBark|BirchBark|Dark/.test(m.name)) {
+        // Pihapiirin rakennukset: mattapintaisia; ohuet seinät ja katot näkyvät molemmilta puolilta.
+        m.roughness = 1;
+        m.metalness = 0;
+        m.side = THREE.DoubleSide;
+        m.shadowSide = THREE.DoubleSide;
+        // Sävyn viritys pelin valoon: punos ja puu ovat varjossa muuten lähes mustia, savi ja turve liian kylläisiä.
+        if (/Wattle/.test(m.name)) m.color.setScalar(1.9);
+        else if (/Wood|PoleBark/.test(m.name)) m.color.setScalar(1.45);
+        else if (/Daub/.test(m.name)) m.color.setRGB(0.95, 1.0, 1.04);
+        else if (/Turf/.test(m.name)) m.color.setRGB(0.8, 0.8, 0.8);
       }
       if (/Foliage|Grass|Fern/.test(m.name)) {
         // Alfaleikatut oksakortit: ei läpinäkyvyyslajittelua, pehmeät reunat MSAA:lla.
@@ -360,15 +500,14 @@ function populate(scene: THREE.Scene, protos: Map<string, Proto>) {
     if (!batches.has(key)) batches.set(key, []);
     batches.get(key)!.push(dummy.matrix.clone());
   };
-  const blocked = (x: number, z: number, pad: number) =>
-    Math.hypot(x - FIRE.x, z - FIRE.z) < 2.2 + pad || Math.hypot(x - KOTA.x, z - KOTA.z) < 3.2 + pad ||
-    Math.hypot(x - OFFERING.x, z - OFFERING.z) < 2.4 + pad;
+  /** Rakennus paikalleen pohjansa mukaan, etusivu keskipisteeseen päin. */
+  const place = (key: string, f: Footprint, sink = 0.03) => put(key, f.x, f.z, 1, f.yaw, sink);
 
   // Puut: lähimmät kehänä aukion ympärillä, loput harvenevana metsänä.
   const trees: { x: number; z: number }[] = [];
   const tryTree = (x: number, z: number) => {
     const d = Math.hypot(x, z);
-    if (d < ARENA_RADIUS + 2.2 || blocked(x, z, 1.5)) return;
+    if (d < SITE.treeMin || blocked(x, z, 1.5)) return;
     if (trees.some((t) => Math.hypot(t.x - x, t.z - z) < 2.6)) return;
     trees.push({ x, z });
     const m = moisture(x, z), k = r();
@@ -380,27 +519,27 @@ function populate(scene: THREE.Scene, protos: Map<string, Proto>) {
     put(type + (d < 34 ? "@near" : "@far"), x, z, 0.85 + r() * 0.35, r() * Math.PI * 2, 0.05, 0.05);
   };
   for (let i = 0; i < 26; i++) {
-    const a = (i / 26) * Math.PI * 2 + r() * 0.2, d = ARENA_RADIUS + 2.6 + r() * 3.5;
+    const a = (i / 26) * Math.PI * 2 + r() * 0.2, d = SITE.treeMin + 0.4 + r() * 3.5;
     tryTree(Math.cos(a) * d, Math.sin(a) * d);
   }
   for (let i = 0; i < 520; i++) {
-    const a = r() * Math.PI * 2, d = ARENA_RADIUS + 4 + Math.pow(r(), 0.8) * 62;
+    const a = r() * Math.PI * 2, d = SITE.treeMin + 1.8 + Math.pow(r(), 0.8) * 62;
     tryTree(Math.cos(a) * d, Math.sin(a) * d);
   }
 
   // Kivet, kelot ja risut.
   for (let i = 0; i < 46; i++) {
     const a = r() * Math.PI * 2;
-    const d = i < 9 ? ARENA_RADIUS + 0.6 + r() * 2 : ARENA_RADIUS + 3 + r() * 38;
+    const d = SITE.treeMin - 2.2 + (i < 9 ? 0.6 + r() * 2 : 3 + r() * 38);      // treeMin - 2,2 = aukion reuna
     const x = Math.cos(a) * d, z = Math.sin(a) * d;
     if (blocked(x, z, 0.5)) continue;
     const s = i < 9 ? 0.35 + r() * 0.35 : 0.25 + r() * 0.75;
     put(`rock_${1 + Math.floor(r() * 6)}@near`, x, z, s, r() * 6.28, 0.05, 0.3);
   }
-  put("rock_3@near", OFFERING.x, OFFERING.z, 1.3, 0.7, 0.62);   // uhrikivi: sammaloitunut siirtolohkare
+  if (ARENA === "clearing") put("rock_3@near", OFFERING.x, OFFERING.z, 1.3, 0.7, 0.62);   // uhrikivi: sammaloitunut siirtolohkare
   put("log@near", FIRE.x + 1.9, FIRE.z + 1.3, 0.75, 2.2, 0.02);       // istuinpuu nuotiolla
   for (let i = 0; i < 7; i++) {
-    const a = r() * 6.28, d = ARENA_RADIUS + 3 + r() * 26;
+    const a = r() * 6.28, d = SITE.treeMin + 0.8 + r() * 26;
     put("log@near", Math.cos(a) * d, Math.sin(a) * d, 0.7 + r() * 0.5, r() * 6.28, 0.04, 0.1);
   }
   for (let i = 0; i < 110; i++) {
@@ -412,10 +551,10 @@ function populate(scene: THREE.Scene, protos: Map<string, Proto>) {
 
   // Varvikko: mustikka kosteassa, puolukka ja kanerva kuivalla kankaalla.
   for (let i = 0; i < 26000; i++) {
-    const a = r() * 6.28, d = 5.5 + Math.pow(r(), 0.9) * 34;
+    const a = r() * 6.28, d = SITE.shrub0 + Math.pow(r(), 0.9) * 34;
     const x = Math.cos(a) * d + (r() - 0.5), z = Math.sin(a) * d + (r() - 0.5);
     if (blocked(x, z, -0.6)) continue;
-    const edge = THREE.MathUtils.smoothstep(d + (noise2(x * 0.45, z * 0.45) - 0.5) * 5, 5.5, ARENA_RADIUS);   // repaleinen raja aukioon
+    const edge = THREE.MathUtils.smoothstep(d + (noise2(x * 0.45, z * 0.45) - 0.5) * 5, SITE.shrub0, SITE.shrub1);   // repaleinen raja aukioon
     if (r() > edge * (1 - d / 60)) continue;
     const m = moisture(x, z) + (r() - 0.5) * 0.2, k = r();
     let key: string;
@@ -428,25 +567,50 @@ function populate(scene: THREE.Scene, protos: Map<string, Proto>) {
   for (let i = 0; i < 3200; i++) {
     const a = r() * 6.28, d = 3.5 + Math.pow(r(), 0.8) * 26;
     const x = Math.cos(a) * d, z = Math.sin(a) * d;
-    if (blocked(x, z, -0.4)) continue;
+    if (blocked(x, z, ARENA === "clearing" ? -0.4 : 0.4)) continue;
     if (d < ARENA_RADIUS - 1 && r() > 0.25) continue;         // aukion keskusta on tallattu
     put(d < ARENA_RADIUS ? "grass_d" : `grass_${"abcd"[Math.floor(r() * 4)]}`, x, z, 0.8 + r() * 0.7, r() * 6.28, 0.01);
   }
   for (let i = 0; i < 140; i++) {
-    const a = r() * 6.28, d = ARENA_RADIUS + 1 + r() * 28;
+    const a = r() * 6.28, d = SITE.treeMin - 1.2 + r() * 28;
     const x = Math.cos(a) * d, z = Math.sin(a) * d;
     if (moisture(x, z) < 0.5 || blocked(x, z, 0)) continue;
     put(r() < 0.5 ? "fern_a" : "fern_b", x, z, 0.9 + r() * 0.8, r() * 6.28, 0.01);
   }
 
   put("campfire@near", FIRE.x, FIRE.z, 1, 0.4, 0.02);
-  put("kota@near", KOTA.x, KOTA.z, 1, 2.45, 0.05);     // oviaukko aukiolle päin
+  if (ARENA === "clearing") {
+    put("kota@near", KOTA.x, KOTA.z, 1, 2.45, 0.05);     // oviaukko aukiolle päin
+  } else {
+    place("talo@near", HOUSE);
+    place("kuoppatalo@near", PITHOUSE, 0);
+    place("aitta@near", STOREHOUSE);
+    place("katos@near", SHED);
+    place("haasia@near", RACK);
+    // Punosaita kehänä rakennusten väleissä; portti etelässä.
+    const step = 2.0 / FENCE_R;
+    for (let a = GATE_HALF + step / 2; a < Math.PI * 2 - GATE_HALF - step / 2 + 1e-6; a += step) {
+      const rr = FENCE_R + Math.sin(a * 3.1) * 0.25;
+      const x = Math.sin(a) * rr, z = Math.cos(a) * rr;
+      if (blocked(x, z, 0.9)) continue;
+      put("aita@near", x, z, 1, a + Math.sin(a * 7) * 0.06, 0.02);
+    }
+    for (const s of [-1, 1]) put("portinpieli@near", Math.sin(s * GATE_HALF) * FENCE_R, Math.cos(s * GATE_HALF) * FENCE_R, 1, s, 0);
+    // Pihan tavarat: ruukut keittotulella, hakkuupölkky katoksen edessä, halkopino talon päädyssä.
+    put("ruukku@near", FIRE.x + 0.95, FIRE.z - 0.5, 1, 0.3, 0.01);
+    put("ruukku@near", FIRE.x - 0.7, FIRE.z - 1.0, 0.8, 2.1, 0.01);
+    put("ruukku@near", FIRE.x - 1.05, FIRE.z - 0.55, 1.15, 4.0, 0.01);
+    const [bx, bz] = fromLocal(SHED, 2.2, 2.6);
+    put("polkky@near", bx, bz, 1, 0.8, 0.02);
+    const [px, pz] = fromLocal(HOUSE, 7.2, 1.2);
+    put("pino@near", px, pz, 1, HOUSE.yaw + Math.PI / 2, 0.02);
+  }
 
   let tris = 0;
   for (const [key, mats] of batches) {
     const [name, tag] = key.split("@");
     const parts = protos.get(name);
-    if (!parts) { console.warn("Malli puuttuu forest.glb:stä:", name); continue; }
+    if (!parts) { console.warn("Malli puuttuu:", name); continue; }
     for (const p of parts) {
       const im = new THREE.InstancedMesh(p.geometry, p.material, mats.length);
       mats.forEach((m, i) => im.setMatrixAt(i, m));
@@ -489,20 +653,34 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   const protos = new Map<string, Proto>();
   const fire = buildFire(scene);
 
-  const ready = new GLTFLoader().loadAsync(forestUrl).then((gltf) => {
-    for (const child of gltf.scene.children) {
-      const parts: Proto = [];
-      child.traverse((o) => {
-        const mesh = o as THREE.Mesh;
-        if (mesh.isMesh) parts.push({ geometry: mesh.geometry, material: mesh.material as THREE.Material });
-      });
-      if (parts.length) protos.set(child.name, parts);
+  // Talon savu nousee päädyn savuaukosta (pihapiiri).
+  let houseSmoke: ((dt: number) => void) | null = null;
+  if (ARENA === "homestead") {
+    const [sx, sz] = fromLocal(HOUSE, 5.0, 0);
+    const g = new THREE.Group();
+    g.position.set(sx, groundHeight(sx, sz), sz);
+    scene.add(g);
+    houseSmoke = makeSmoke(g, 16, 8, 4.5, 2.6, 0.1);
+  }
+
+  const loader = new GLTFLoader();
+  const files = ARENA === "homestead" ? [forestUrl, homesteadUrl] : [forestUrl];
+  const ready = Promise.all(files.map((u) => loader.loadAsync(u))).then((gltfs) => {
+    for (const gltf of gltfs) {
+      for (const child of gltf.scene.children) {
+        const parts: Proto = [];
+        child.traverse((o) => {
+          const mesh = o as THREE.Mesh;
+          if (mesh.isMesh) parts.push({ geometry: mesh.geometry, material: mesh.material as THREE.Material });
+        });
+        if (parts.length) protos.set(child.name, parts);
+      }
     }
     prepareMaterials(protos, maxAniso);
     const stats = populate(scene, protos);
     (window as unknown as { __world: unknown }).__world = stats;
   });
-  ready.catch((e) => console.error("Metsän mallien lataus epäonnistui", e));
+  ready.catch((e) => console.error("Maailman mallien lataus epäonnistui", e));
 
   return {
     campfireLight: fire.light,
@@ -510,8 +688,13 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     ready,
     groundTex,
     proto: (name) => protos.get(name) ?? [],
+    clearCamera(pos) {
+      const r = Math.hypot(pos.x, pos.z);
+      if (r > SITE.camMaxR) { pos.x *= SITE.camMaxR / r; pos.z *= SITE.camMaxR / r; }
+    },
     update(_t, dt, camera) {
       fire.update(dt, camera);
+      houseSmoke?.(dt);
     },
   };
 }

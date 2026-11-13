@@ -43,6 +43,24 @@ omistajan referenssikuviin (kansio `Reference Pictures/`, ei Gitissä).
 
 Haku: `tools/fetch-characters.ps1`. Ladattu mutta ei käytössä: `metal_plate_02`.
 
+## `homestead.glb`
+
+| Osa | Lähde (Poly Haven -tunniste) | Käyttö |
+| --- | --- | --- |
+| Olkikatot, heinät haasialla | `thatch_roof_angled` | Vaalennettu ja sävytetty oljen väriseksi |
+| Savirappaus, ruukut, kuopan maalattia | `clay_plaster` | Vaalennettu |
+| Turvekatto ja seinänvieruspenkka | `forest_leaves_02` | Tummennettu |
+| Kuorelliset riu'ut ja halot | `pine_bark` | |
+
+Itse tehty Blenderissä (skripti `assets-src/blender/homestead.py`): kaikki
+geometria sekä oksapunoksen ja harmaantuneen puun tekstuurit (laskettu
+koodilla). Tuohi on metsän koivun tuohitekstuuri (`trees.py`). Rakennusten
+lähteet: J.-M. Vuorinen, *Rakennukset ja rakentajat Raision Ihalassa
+rautakauden lopulla ja varhaisella keskiajalla* (Turun yliopisto 2009), luku 2
+(metallikauden rakennusjäännökset Suomessa).
+
+Haku: `tools/fetch-homestead.ps1`. Ladattu mutta ei käytössä: `reed_roof_03`.
+
 ## `bog.glb`
 
 Itse tehty Blenderissä (skripti `assets-src/blender/bog.py`): mutapinta,
