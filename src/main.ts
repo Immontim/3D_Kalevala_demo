@@ -1439,6 +1439,7 @@ $("startBtn").addEventListener("click", () => {
   /** Laulaa vastustajan suoraan suohon t sekunniksi (savutestit). */
   root(t = 3) { if (enemy && enemy.state !== "dead") { setState(enemy, "rooted"); enemy.rootTime = t; } },
   /** Siirtää pelaajan annettuun kohtaan (savutestit). */
+  get feet() { return { player: player.fighter.feetDebug(), enemy: enemy?.fighter.feetDebug() ?? null }; },
   placePlayer(x: number, z: number) { player.pos.set(x, groundHeight(x, z), z); },
   /** Lennättää vastustajan kypärän päästä (tehosteen kokeiluun). */
   knockHelmet() {
