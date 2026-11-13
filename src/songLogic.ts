@@ -13,7 +13,7 @@ export const SONG = {
    * Laulunauhan nopeus: 1 = alkuperäinen. Nauha näyttää samalta, mutta merkki kulkee sen yli näin
    * paljon nopeammin, joten riimujen väli ja osuma-alueiden kesto lyhenevät samassa suhteessa.
    */
-  speed: 1.25,
+  speed: 1.5,
   /** Aika rytmipelin alusta ensimmäiseen riimuun nauhan nopeudella 1. */
   lead: 1.3,
   /** Riimujen väli nauhan nopeudella 1. */

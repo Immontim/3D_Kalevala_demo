@@ -373,7 +373,12 @@ function flash(color: string, strength: number) {
 function updateHud() {
   $("php").style.width = `${(player.hp / player.stats.maxHp) * 100}%`;
   $("ehp").style.width = enemy ? `${(Math.max(0, enemy.hp) / enemy.stats.maxHp) * 100}%` : "0%";
+  // Lukuarvot: elämä pyöristetään ylöspäin (1 = vielä hengissä), kestävyys alaspäin (käytettävissä oleva).
+  const num = (v: number, max: number, up: boolean) => `${up ? Math.ceil(Math.max(0, v)) : Math.floor(Math.max(0, v))} / ${Math.round(max)}`;
+  $("phpNum").textContent = num(player.hp, player.stats.maxHp, true);
+  $("ehpNum").textContent = enemy ? num(enemy.hp, enemy.stats.maxHp, true) : "";
   const staminaBar = (id: string, a: Actor | null) => {
+    $(id + "Num").textContent = a ? num(a.stamina, a.stats.maxStamina, false) : "";
     $(id).style.width = a ? `${(a.stamina / a.stats.maxStamina) * 100}%` : "0%";
     $(id).parentElement!.classList.toggle("spent", !!a && a.state !== "dead" && exhausted(a.stamina));
   };
@@ -1337,6 +1342,7 @@ function pause() {
   renderBinds();
   openTune();
   $("pause").classList.remove("hidden");
+  $("hud").classList.add("arrange");
 }
 
 function resume() {
@@ -1344,6 +1350,7 @@ function resume() {
   capture = null;
   paused = false;
   $("pause").classList.add("hidden");
+  $("hud").classList.remove("arrange");
   last = performance.now();
   if (!choosing) lockPointer();
 }
@@ -1497,6 +1504,54 @@ showTunedBadge();
   panel.addEventListener("pointercancel", drop);
 }
 
+// Mittarit (oma ja vastustajan) voi tauon aikana raahata haluamaansa kohtaan. Paikka on siirtymä
+// oletuspaikasta pikseleinä ja tallentuu selaimen muistiin.
+const METER_STORE = "laulun-miekka.meters.v1";
+const meterOff: Record<string, { x: number; y: number }> = { meterPlayer: { x: 0, y: 0 }, meterEnemy: { x: 0, y: 0 } };
+function placeMeters(save = false) {
+  for (const id of Object.keys(meterOff)) {
+    const el = $(id), o = meterOff[id];
+    // Mittari pysyy kokonaan ruudulla, vaikka ikkunan koko muuttuisi.
+    el.style.transform = "";
+    const r = el.getBoundingClientRect();
+    o.x = Math.max(-r.left, Math.min(window.innerWidth - r.right, o.x));
+    o.y = Math.max(-r.top, Math.min(window.innerHeight - r.bottom, o.y));
+    el.style.transform = o.x || o.y ? `translate(${o.x}px, ${o.y}px)` : "";
+  }
+  if (save) { try { localStorage.setItem(METER_STORE, JSON.stringify(meterOff)); } catch { /* muisti ei käytössä */ } }
+}
+try {
+  const saved = JSON.parse(localStorage.getItem(METER_STORE) ?? "null") as Record<string, { x?: unknown; y?: unknown }> | null;
+  for (const id of Object.keys(meterOff)) {
+    const s = saved?.[id];
+    if (s && Number.isFinite(s.x) && Number.isFinite(s.y)) meterOff[id] = { x: s.x as number, y: s.y as number };
+  }
+} catch { /* rikkinäinen tallennus: oletuspaikat */ }
+for (const id of Object.keys(meterOff)) {
+  const el = $(id);
+  let drag: { x: number; y: number; ox: number; oy: number } | null = null;
+  el.addEventListener("pointerdown", (e) => {
+    if (!paused) return;
+    drag = { x: e.clientX, y: e.clientY, ox: meterOff[id].x, oy: meterOff[id].y };
+    el.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    meterOff[id] = { x: drag.ox + e.clientX - drag.x, y: drag.oy + e.clientY - drag.y };
+    placeMeters();
+  });
+  const drop = () => { if (drag) { drag = null; placeMeters(true); } };
+  el.addEventListener("pointerup", drop);
+  el.addEventListener("pointercancel", drop);
+}
+$("resetMeters").addEventListener("click", () => {
+  for (const id of Object.keys(meterOff)) meterOff[id] = { x: 0, y: 0 };
+  placeMeters(true);
+});
+window.addEventListener("resize", () => placeMeters());
+placeMeters();
+
 document.addEventListener("pointerlockchange", () => {
   if (document.pointerLockElement === canvas) pointerLockWorked = true;
   else if (choiceUnlock) choiceUnlock = false;
@@ -1526,6 +1581,8 @@ $("startBtn").addEventListener("click", () => {
   get events() { return [...events]; },
   get song() { return songState ? { results: [...songState.results], done: songState.endAt >= 0, realTime, playAt: songState.playAt, beats: songState.beats } : null; },
   fillSong() { song = COMBAT.songMax; },
+  get meters() { return JSON.parse(JSON.stringify(meterOff)); },
+  pause() { pause(); },
   get choosing() { return choosing; },
   /** Savutesti: valitsee laulupaikan kuin pikanäppäimellä. */
   pick(i: number) { pickQueued = i; },
