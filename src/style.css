@@ -60,6 +60,23 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; col
 /* Taukoikkunan voi raahata sivuun; siirrettynä ruutua ei tummenneta. */
 #pause .panel { cursor: move; touch-action: none; user-select: none; }
 #pause.moved { background: transparent; overflow: hidden; }
+#pause input, #pause textarea { user-select: text; cursor: text; touch-action: auto; }
+/* Taukoikkunan välilehdet ja säätövälilehti. */
+.tabs { display: flex; gap: 6px; margin: 0 0 12px; }
+.panel button.tab { margin: 0; padding: 6px 18px; font-size: 15px; background: transparent; color: var(--bronze); border: 1px solid rgba(217, 164, 65, 0.45); }
+.panel button.tab.on { background: var(--bronze); color: #1a1209; }
+.pane.hidden { display: none; }
+.panel button.secondary.first { margin-left: 0; }
+#tuneFields { max-height: min(40vh, 360px); overflow-y: auto; border: 1px solid rgba(217, 164, 65, 0.25); padding: 2px 10px 8px; }
+#tuneFields h3 { margin: 10px 0 4px; font-size: 14px; font-weight: normal; color: var(--bronze); letter-spacing: 0.04em; }
+.tunerow { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14px; padding: 2px 0; cursor: default; }
+.tunerow input { width: 84px; font: inherit; font-size: 14px; padding: 3px 6px; background: rgba(0, 0, 0, 0.45); color: #e8dcc0; border: 1px solid rgba(217, 164, 65, 0.35); border-radius: 2px; text-align: right; }
+.tunerow input.changed { border-color: #ffd27a; color: #ffd27a; background: rgba(217, 164, 65, 0.2); }
+#tuneJson { width: 100%; height: 108px; box-sizing: border-box; font: 12px/1.35 ui-monospace, Consolas, monospace; background: rgba(0, 0, 0, 0.5); color: #e8dcc0; border: 1px solid rgba(217, 164, 65, 0.35); padding: 6px; resize: vertical; }
+.tunebtns button { font-size: 15px; margin-right: 8px; }
+.panel .tunebtns button.secondary { margin-left: 0; }
+.panel button.pending { box-shadow: 0 0 12px #ffd27a; }
+#tuned { color: var(--bronze); }
 @media (max-height: 520px) { .panel { padding: 16px 20px; } .panel ul { line-height: 1.3; font-size: 14px; } .panel .tag { margin-bottom: 8px; } }
 .panel { background: var(--panel); border: 1px solid rgba(217, 164, 65, 0.45); padding: 28px 32px; max-width: 560px; border-radius: 4px; }
 .panel h1 { margin: 0; font-size: clamp(30px, 6vw, 46px); color: var(--bronze); letter-spacing: 0.05em; font-weight: normal; }

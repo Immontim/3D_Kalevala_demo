@@ -1,10 +1,8 @@
 import * as THREE from "three";
 import {
-  ActionState, AttackDef, AttackTiming, BASH, BLOCK_RECOIL, CHARGE_HOLD_MAX, DODGE_COOLDOWN, DODGE_TIME,
-  GUARDBREAK_ADVANTAGE, GUARDBREAK_STAGGER, Loadout, SHIELDS, SONG_GAIN_HIT, SONG_GAIN_PARRY, SONG_MAX,
-  STAGGER_TIME, STYLES, ShieldDef, StrikeStyle, StrikeWeight, WeaponDef, angleBetween, attackPhase, chargeLevel,
+  ActionState, AttackDef, AttackTiming, BASH, COMBAT, ENEMY_AI, Loadout, SHIELDS, STYLES, ShieldDef, WAVES, StrikeStyle, StrikeWeight, WeaponDef, angleBetween, attackPhase, chargeLevel,
   enemyAttackTiming, makeAttack, resolveHit, shieldWear, strikeDamage, styleFor, weaponOf,
-  STAMINA, canStrikeHeavy, exhausted, maxStaminaOf, staminaAfterBlock, staminaTick, strikeCost, strikeTier, weakened,
+  canStrikeHeavy, exhausted, staminaAfterBlock, staminaTick, strikeCost, strikeTier, weakened,
 } from "./combat";
 import { Debris, Fighter, FighterLook, POSES, SwordTrail, setCharacterEnv } from "./fighter";
 import {
@@ -14,8 +12,12 @@ import {
 import { ARENA_RADIUS, buildWorld, groundHeight } from "./world";
 import { Sfx } from "./audio";
 import {
-  BEAT_GAP, SONG_INTRO, SONG_LEAD, SONG_OUTRO, SONG_SLOWMO, SONG_SPEED, SONG_VERSES, inZone, songOutcome, zoneHalf,
+  SONG, SONG_VERSES, beatGap, inZone, songLead, songOutcome, zoneHalf,
 } from "./songLogic";
+import { Modifier, Stats, baseStats, effectiveStats, withModifier } from "./stats";
+import {
+  DEFAULTS, FIELDS, applyChanges, changedValues, exportTuning, parseTuningText,
+} from "./tuning";
 import { Bog } from "./bog";
 import { VERSION } from "./version";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
@@ -73,6 +75,15 @@ resize();
 const $ = (id: string) => document.getElementById(id)!;
 $("ver").textContent = VERSION;
 
+// ---------- Säädetyt arvot ----------
+// Taukoikkunan säätövälilehdellä tehdyt muutokset ovat tallessa selaimen muistissa ja otetaan
+// käyttöön ennen kuin yhtään hahmoa luodaan.
+const TUNE_STORE = "laulun-miekka.tuning.v1";
+try {
+  const saved = parseTuningText(localStorage.getItem(TUNE_STORE) ?? "");
+  if (!("error" in saved)) applyChanges(saved.values);
+} catch { /* muisti ei käytössä: pelataan oletusarvoilla */ }
+
 // ---------- Hahmot ----------
 interface Actor {
   fighter: Fighter;
@@ -93,15 +104,16 @@ interface Actor {
   stance: StrikeStyle;
   /** Pelaaja pitää iskunappia pohjassa: isku virittyy eikä vielä laukea. */
   charging: boolean;
-  /** Lyöjän voima: vahingon perusarvo ennen aseen ja iskun kertoimia. */
-  power: number;
   struck: boolean;
   hp: number;
-  maxHp: number;
   /** Kestävyys: kuluu lyönneistä ja torjunnoista, palautuu itsestään. */
   stamina: number;
-  /** Hahmokohtainen enimmäiskestävyys; esineet tai loitsut voivat myöhemmin muuttaa tätä. */
-  maxStamina: number;
+  /** Hahmon perusarvot (hahmon rivi ja aalto). */
+  base: Stats;
+  /** Ajonaikaiset vaikutukset kykyihin: ruoka, nälkä, loitsut, esineet. */
+  mods: Modifier[];
+  /** Lopulliset kyvyt: perusarvot ja voimassa olevat vaikutukset. Päivitetään joka ruutu. */
+  stats: Stats;
   blockStart: number;
   rootTime: number;
   dodgeDir: THREE.Vector3;
@@ -110,23 +122,24 @@ interface Actor {
   extraRecovery: number;
 }
 
-function makeActor(look: FighterLook, pos: THREE.Vector3, hp: number, trailColor: number, power: number): Actor {
+/** wave = 0 pelaajalle; vastustajilla aalto kasvattaa elämää ja voimaa. */
+function makeActor(look: FighterLook, pos: THREE.Vector3, wave: number, trailColor: number): Actor {
   const fighter = new Fighter(look);
   const trail = new SwordTrail(trailColor);
   scene.add(fighter.root, trail.mesh);
   const weapon = weaponOf(look.loadout);
   const shield = look.loadout === "sword_shield" ? SHIELDS.round : null;
-  const maxStamina = maxStaminaOf(look.character);
+  const base = baseStats(look.character, wave);
+  const stats = effectiveStats(base, [], 0);
   return {
-    stamina: maxStamina, maxStamina,
-    weapon, shield, shieldHp: shield ? shield.durability : 0, stance: "slash", charging: false, power,
+    base, mods: [], stats, stamina: stats.maxStamina,
+    weapon, shield, shieldHp: shield ? shield.durability : 0, stance: "slash", charging: false,
     fighter, trail, pos: pos.clone(), yaw: 0, state: "idle", stateTime: 0, timing: { windup: 0.3, release: 0.1, recovery: 0.3 },
-    attack: makeAttack(weapon, styleFor(weapon, "slash"), "light"), loadout: look.loadout, struck: false, hp, maxHp: hp,
+    attack: makeAttack(weapon, styleFor(weapon, "slash"), "light"), loadout: look.loadout, struck: false, hp: stats.maxHp,
     blockStart: -99, rootTime: 0, dodgeDir: new THREE.Vector3(), dodgeCd: 0, moveSpeed: 0, extraRecovery: 0,
   };
 }
 
-const PLAYER_POWER = 20;
 const debris: Debris[] = [];
 const PLAYER_LOOK: FighterLook = { character: "hero", loadout: "sword_shield" };
 // Vastustajat kiertävät: kaksi hahmoa, kummallakin miekka, miekka ja kilpi sekä keihäs.
@@ -139,7 +152,7 @@ const ENEMIES: { name: string; look: FighterLook }[] = [
   { name: "Pohjan soturi, keihäs", look: { character: "pohja", loadout: "spear" } },
 ];
 
-let player = makeActor(PLAYER_LOOK, new THREE.Vector3(0, 0, -3), 100, 0xffd27a, PLAYER_POWER);
+let player = makeActor(PLAYER_LOOK, new THREE.Vector3(0, 0, -3), 0, 0xffd27a);
 let enemy: Actor | null = null;
 let wave = 0;
 let song = 0;
@@ -175,8 +188,7 @@ function spawnEnemy() {
   const pos = player.pos.clone().add(new THREE.Vector3(Math.sin(a) * 6, 0, Math.cos(a) * 6));
   const r = Math.hypot(pos.x, pos.z);
   if (r > ARENA_RADIUS - 1) pos.multiplyScalar((ARENA_RADIUS - 1) / r);
-  const hp = 80 + wave * 20;
-  enemy = makeActor(def.look, pos, hp, 0xff6a3a, 14 + wave);
+  enemy = makeActor(def.look, pos, wave, 0xff6a3a);
   ai = newAi();
   $("ename").textContent = def.name;
   $("wave").textContent = `Aalto ${wave}`;
@@ -223,8 +235,12 @@ function releaseCode(code: string) {
   else if (a === "slash" || a === "overhead" || a === "thrust") strikeHeld[a] = false;
 }
 
+/** Näppäily säätövälilehden kenttään ei ole pelin ohjausta. */
+function typing(e: Event) { return e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement; }
+
 window.addEventListener("keydown", (e) => {
   if (capture || e.repeat) return;
+  if (typing(e) && e.code !== "Escape") return;
   if (e.code === "Escape") {
     // Esc myös jatkaa peliä: sivuun raahatun taukoikkunan Jatka-nappi voi olla ruudun ulkopuolella.
     // Viive estää sen, että hiiren lukituksen vapauttava Esc sekä pysäyttäisi että jatkaisi.
@@ -352,18 +368,18 @@ function flash(color: string, strength: number) {
   });
 }
 function updateHud() {
-  $("php").style.width = `${(player.hp / player.maxHp) * 100}%`;
-  $("ehp").style.width = enemy ? `${(Math.max(0, enemy.hp) / enemy.maxHp) * 100}%` : "0%";
+  $("php").style.width = `${(player.hp / player.stats.maxHp) * 100}%`;
+  $("ehp").style.width = enemy ? `${(Math.max(0, enemy.hp) / enemy.stats.maxHp) * 100}%` : "0%";
   const staminaBar = (id: string, a: Actor | null) => {
-    $(id).style.width = a ? `${(a.stamina / a.maxStamina) * 100}%` : "0%";
+    $(id).style.width = a ? `${(a.stamina / a.stats.maxStamina) * 100}%` : "0%";
     $(id).parentElement!.classList.toggle("spent", !!a && a.state !== "dead" && exhausted(a.stamina));
   };
   staminaBar("psta", player);
   staminaBar("esta", enemy);
   const s = $("psong");
-  s.style.width = `${(song / SONG_MAX) * 100}%`;
-  s.classList.toggle("full", song >= SONG_MAX);
-  $("songReady").textContent = song >= SONG_MAX ? "· paina Q" : "";
+  s.style.width = `${(song / COMBAT.songMax) * 100}%`;
+  s.classList.toggle("full", song >= COMBAT.songMax);
+  $("songReady").textContent = song >= COMBAT.songMax ? "· paina Q" : "";
 
   // Kilpien kesto.
   const shieldBar = (id: string, a: Actor | null) => {
@@ -488,8 +504,8 @@ function startSong() {
   sfx.startDrone();
   const track = $("track");
   track.querySelectorAll(".rune, .zone").forEach((r) => r.remove());
-  const playAt = realTime + SONG_INTRO;
-  const beats = SONG_VERSES.map((_, i) => playAt + SONG_LEAD + i * BEAT_GAP);
+  const playAt = realTime + SONG.intro;
+  const beats = SONG_VERSES.map((_, i) => playAt + songLead() + i * beatGap());
   const zones = beats.map(() => {
     const d = document.createElement("div");
     d.className = "zone";
@@ -519,7 +535,7 @@ function updateSong() {
   if (!s.shown) { s.shown = true; $("song").classList.remove("hidden"); }
   const trackW = $("track").clientWidth;
   const markerX = trackW * 0.25;
-  const pxPerSec = trackW * 0.45 * SONG_SPEED;
+  const pxPerSec = trackW * 0.45 * SONG.speed;
   s.beats.forEach((bt, i) => {
     const x = markerX + (bt - realTime) * pxPerSec;
     const w = 2 * zoneHalf(i) * pxPerSec;
@@ -531,7 +547,7 @@ function updateSong() {
   // Tikitys ennen jokaista riimua.
   const next = s.beats.findIndex((b, i) => s.results[i] === null && b > realTime);
   if (next >= 0) {
-    const tick = Math.floor((s.beats[next] - realTime) / (BEAT_GAP / 2));
+    const tick = Math.floor((s.beats[next] - realTime) / (beatGap() / 2));
     if (tick !== lastTick && tick <= 1) { sfx.tick(); lastTick = tick; }
   }
   // Painallus arvioidaan aina seuraavaa riimua vastaan: alueen ulkopuolelle osunut painallus on huti.
@@ -539,7 +555,7 @@ function updateSong() {
     const i = s.results.findIndex((r) => r === null);
     if (i >= 0) judge(i, inZone(realTime - s.beats[i], i));
   }
-  if (s.endAt < 0 && s.results.every((r) => r !== null)) s.endAt = realTime + SONG_OUTRO;
+  if (s.endAt < 0 && s.results.every((r) => r !== null)) s.endAt = realTime + SONG.outro;
   if (s.endAt >= 0 && realTime >= s.endAt) {
     const out = songOutcome(s.results as boolean[]);
     endSong(out.success, out.rootTime, out.hits);
@@ -590,27 +606,19 @@ function interruptSong() {
 interface Ai { decide: number; strafeDir: number; reactedTo: number; counter: boolean; /** Suosta päässyt kääntyy vielä pelaajaa kohti. */ reorient: boolean; /** Uupunut: vetäytyy keräämään voimia. */ resting: boolean; }
 let ai: Ai = newAi();
 function newAi(): Ai { return { decide: 1.2, strafeDir: Math.random() < 0.5 ? 1 : -1, reactedTo: -1, counter: false, reorient: false, resting: false }; }
-/** Uupunut vastustaja vetäytyy keräämään voimia, kunnes kestävyyttä on taas näin paljon. */
-const AI_REST_UNTIL = 12;
-/** Lepäävä vastustaja pitää tämän välimatkan ja lyö vain, jos pelaaja tulee tätä lähemmäs. */
-const AI_REST_DISTANCE = 3.8;
-const AI_REST_CORNERED = 2.0;
-/** Suosta päässeen vastustajan kääntymisnopeus (rad/s): puolikierros vie noin sekunnin. */
-const REORIENT_TURN = 3.2;
-/** Kun pelaaja on näin tarkasti edessä (rad), vastustaja on taas valmis toimimaan. */
-const REORIENT_DONE = 0.2;
+// Tekoälyn luvut ovat taulukossa ENEMY_AI (combat.ts).
 let playerAttackId = 0;
 
 /** Kilpi torjuu useammin, keihäsmies harvemmin. */
 function blockChance(e: Actor) {
-  const bonus = e.shield ? 0.2 : e.loadout === "spear" ? -0.1 : 0;
-  return Math.min(0.7, 0.3 + 0.1 * wave) + bonus;
+  const bonus = e.shield ? ENEMY_AI.blockShieldBonus : e.loadout === "spear" ? ENEMY_AI.blockSpearBonus : 0;
+  return Math.min(ENEMY_AI.blockMax, ENEMY_AI.blockBase + ENEMY_AI.blockPerWave * wave) + bonus;
 }
 /** Kuinka usein aseella torjuva vihollinen lukee iskun suunnan oikein. */
-function readChance() { return Math.min(0.9, 0.5 + 0.06 * wave); }
+function readChance() { return Math.min(ENEMY_AI.readMax, ENEMY_AI.readBase + ENEMY_AI.readPerWave * wave); }
 
 /** Pelaaja on seissyt torjunnassa niin pitkään, että suoja kannattaa murtaa. */
-function playerTurtles() { return player.state === "block" && gameTime - player.blockStart > 0.7; }
+function playerTurtles() { return player.state === "block" && gameTime - player.blockStart > ENEMY_AI.turtleTime; }
 
 /** Minkä iskun vihollinen tältä etäisyydeltä aloittaisi, tai null jos mikään ei ylety. */
 function pickEnemyAttack(e: Actor, dist: number, quick = false): { kind: StrikeStyle | "bash"; weight: StrikeWeight } | null {
@@ -619,8 +627,8 @@ function pickEnemyAttack(e: Actor, dist: number, quick = false): { kind: StrikeS
   const kind = styleFor(e.weapon, STYLES[Math.floor(Math.random() * STYLES.length)]);
   // Pelkällä miekalla taisteleva lyö usein raskaasti, kilpimies harvoin.
   // Kilven takana seisovaa pelaajaa vastaan kaikki lyövät raskaasti: kilpi kuluu nopeammin.
-  let heavy = e.loadout === "sword" ? 0.35 : e.loadout === "spear" ? 0.25 : 0.15;
-  if (playerTurtles() && player.shield) heavy = 0.7;
+  let heavy = e.loadout === "sword" ? ENEMY_AI.heavySword : e.loadout === "spear" ? ENEMY_AI.heavySpear : ENEMY_AI.heavyShield;
+  if (playerTurtles() && player.shield) heavy = ENEMY_AI.heavyVsTurtle;
   const weight: StrikeWeight = !quick && canStrikeHeavy(e.stamina) && Math.random() < heavy ? "heavy" : "light";
   const a = makeAttack(e.weapon, kind, weight);
   return dist < a.range + 0.2 && dist > a.minRange + 0.1 ? { kind, weight } : null;
@@ -636,9 +644,9 @@ function updateAi(e: Actor, dt: number) {
   } else if (ai.reorient) {
     // Suosta päässyt kääntyy pelaajaa kohti tasaista vauhtia eikä tee sinä aikana muuta.
     const diff = angleBetween(e.yaw, facing);
-    const step = REORIENT_TURN * dt;
+    const step = ENEMY_AI.reorientTurn * dt;
     e.yaw += Math.max(-step, Math.min(step, diff));
-    if (Math.abs(diff) <= Math.max(step, REORIENT_DONE)) ai.reorient = false;
+    if (Math.abs(diff) <= Math.max(step, ENEMY_AI.reorientDone)) ai.reorient = false;
   } else {
     e.yaw = lerpAngle(e.yaw, facing, 1 - Math.exp(-8 * dt));
   }
@@ -662,29 +670,31 @@ function updateAi(e: Actor, dt: number) {
     // Liiku sopivalle etäisyydelle ja kierrä.
     // Keihäsmies pitää välimatkaa, kilpimies tulee iholle murtamaan pitkän torjunnan.
     if (exhausted(e.stamina)) ai.resting = true;
-    else if (e.stamina >= Math.min(AI_REST_UNTIL, e.maxStamina)) ai.resting = false;
+    else if (e.stamina >= Math.min(ENEMY_AI.restUntil, e.stats.maxStamina)) ai.resting = false;
     const spear = e.loadout === "spear";
-    const want = ai.resting ? AI_REST_DISTANCE : spear ? 2.9 : e.shield && !player.shield && playerTurtles() ? 1.35 : 1.9;
+    const want = ai.resting ? ENEMY_AI.restDistance : spear ? ENEMY_AI.distSpear : e.shield && !player.shield && playerTurtles() ? ENEMY_AI.distBash : ENEMY_AI.distSword;
     const dir = toPlayer.clone().normalize();
     const side = new THREE.Vector3(dir.z, 0, -dir.x).multiplyScalar(ai.strafeDir);
     const move = new THREE.Vector3();
     if (dist > want + 0.3) move.add(dir);
     else if (dist < want - 0.4) move.sub(dir);
     move.addScaledVector(side, 0.45);
-    moveActor(e, move, dist > 4 ? 3.4 : spear && dist < want - 0.4 ? 3.0 : 2.4, dt);
+    // Kaukaa lähestytään juosten, ja keihäsmies perääntyy tavallista kävelyä nopeammin.
+    const pace = dist > 4 ? ENEMY_AI.chaseScale : spear && dist < want - 0.4 ? ENEMY_AI.spearRetreatScale : 1;
+    moveActor(e, move, e.stats.moveSpeed * pace, dt);
 
     ai.decide -= dt;
     // Lepäävä vastustaja ei hyökkää, ellei pelaaja tule iholle.
-    const mayAttack = !ai.resting || dist < AI_REST_CORNERED;
+    const mayAttack = !ai.resting || dist < ENEMY_AI.restCornered;
     const counter = ai.counter && mayAttack ? pickEnemyAttack(e, dist, true) : null;
     if (counter) {
       ai.counter = false;
       startAttack(e, counter.kind, counter.weight);
     } else if (ai.decide <= 0) {
-      ai.decide = 0.5 + Math.random() * 1.0;
+      ai.decide = ENEMY_AI.decideMin + Math.random() * ENEMY_AI.decideRandom;
       if (Math.random() < 0.25) ai.strafeDir *= -1;
       const pick = mayAttack ? pickEnemyAttack(e, dist) : null;
-      if (pick && player.state !== "dead" && Math.random() < (pick.kind === "bash" ? 0.9 : 0.65)) startAttack(e, pick.kind, pick.weight);
+      if (pick && player.state !== "dead" && Math.random() < (pick.kind === "bash" ? ENEMY_AI.bashChance : ENEMY_AI.attackChance)) startAttack(e, pick.kind, pick.weight);
     }
   } else {
     e.moveSpeed = 0;
@@ -694,7 +704,7 @@ function updateAi(e: Actor, dt: number) {
     const playerBusy = player.state === "windup" || player.state === "release";
     if ((!playerBusy && e.stateTime > 0.25) || exhausted(e.stamina)) {
       setState(e, "idle");
-      ai.counter = Math.random() < 0.55;
+      ai.counter = Math.random() < ENEMY_AI.counterChance;
     }
   }
 }
@@ -756,7 +766,7 @@ function resolveStrike(att: Actor, def: Actor) {
   if (events.length > 30) events.shift();
 
   const heavy = atk.weight === "heavy";
-  def.hp -= strikeDamage(att.power, atk, res, defState);
+  def.hp -= strikeDamage(att.stats.power, atk, res, defState) * def.stats.damageTaken;
   // Kilpi kuluu torjutuista iskuista: puolivälissä siihen tulee lovi, lopussa se hajoaa.
   const wear = shieldWear(atk, res, defender);
   if (wear > 0 && def.shield) {
@@ -778,7 +788,7 @@ function resolveStrike(att: Actor, def: Actor) {
     hitstop = heavy ? 0.11 : 0.07;
     shake = (isPlayer ? 0.12 : 0.22) * (heavy ? 1.5 : atk.kind === "bash" ? 0.7 : 1);
     emitSparks(contact, heavy ? 18 : 10, 2);
-    if (isPlayer) song = Math.min(SONG_MAX, song + SONG_GAIN_HIT);
+    if (isPlayer) song = Math.min(COMBAT.songMax, song + COMBAT.songGainHit);
     else flash("#b33a2e", heavy ? 0.45 : atk.kind === "bash" ? 0.15 : 0.35);
     // Tehoste: sivallus tai ylälyönti voi lennättää vastustajan kypärän päästä. Ei vaikuta peliin.
     if (isPlayer && def.fighter.hasHelmet && (atk.kind === "slash" || atk.kind === "overhead")
@@ -795,7 +805,7 @@ function resolveStrike(att: Actor, def: Actor) {
     const interrupts = defState === "idle" || defState === "block" || (defState === "windup" && atk.kind !== "bash");
     if (!died && interrupts) {
       setState(def, "stagger");
-      def.stateTime = STAGGER_TIME * 0.55;
+      def.stateTime = COMBAT.staggerTime - COMBAT.hitStagger;
     }
   } else if (res === "guardbreak") {
     sfx.clang(false);
@@ -805,17 +815,17 @@ function resolveStrike(att: Actor, def: Actor) {
     shake = 0.18;
     if (!died) {
       setState(def, "stagger");
-      def.stateTime = STAGGER_TIME - GUARDBREAK_STAGGER;
+      def.stateTime = COMBAT.staggerTime - COMBAT.guardbreakStagger;
     }
     // Murtaja toipuu nopeasti ja ehtii iskeä ennen kuin puolustaja saa suojan takaisin.
-    att.extraRecovery = -GUARDBREAK_ADVANTAGE;
+    att.extraRecovery = -COMBAT.guardbreakAdvantage;
     if (!isPlayer) ai.counter = true;
     if (isPlayer) showMsg("Suoja murtui!", "Iske nyt", 0.9);
     else { showMsg("Suojasi murtui", "", 0.8); flash("#b33a2e", 0.2); }
   } else if (res === "blocked") {
     sfx.clang(false);
     emitSparks(contact, 18, 4);
-    att.extraRecovery = BLOCK_RECOIL;
+    att.extraRecovery = COMBAT.blockRecoil;
     shake = 0.08;
     if (isPlayer) showMsg("Torjuttu", "", 0.6);
   } else if (res === "parried") {
@@ -825,7 +835,7 @@ function resolveStrike(att: Actor, def: Actor) {
     shake = 0.18;
     setState(att, "stagger");
     if (!isPlayer) {
-      song = Math.min(SONG_MAX, song + SONG_GAIN_PARRY);
+      song = Math.min(COMBAT.songMax, song + COMBAT.songGainParry);
       showMsg("Täydellinen torjunta!", "Vastustaja horjuu, iske nyt", 1);
       flash("#f0c766", 0.25);
     }
@@ -844,7 +854,12 @@ function spendOnStrike(a: Actor) {
 
 function updateCombatant(a: Actor, other: Actor | null, dt: number) {
   a.stateTime += dt;
-  if (a.state !== "dead") a.stamina = staminaTick(a.stamina, a.maxStamina, a.state === "block", dt);
+  // Kyvyt lasketaan joka ruutu, jotta ajastetut vaikutukset (ruoka, loitsut) alkavat ja loppuvat itsestään.
+  a.stats = effectiveStats(a.base, a.mods, gameTime);
+  if (a.state !== "dead") {
+    a.hp = Math.min(a.hp, a.stats.maxHp);
+    a.stamina = staminaTick(a.stamina, a.stats.maxStamina, a.stats.staminaRegen, a.state === "block", dt);
+  }
   a.dodgeCd -= dt;
   const t = a.timing;
 
@@ -869,10 +884,10 @@ function updateCombatant(a: Actor, other: Actor | null, dt: number) {
     if (phase === "recovery") a.state = "recovery";
     if (phase === "done") setState(a, "idle");
   } else if (a.state === "stagger") {
-    if (a.stateTime >= STAGGER_TIME) setState(a, "idle");
+    if (a.stateTime >= COMBAT.staggerTime) setState(a, "idle");
   } else if (a.state === "dodge") {
-    a.pos.addScaledVector(a.dodgeDir, 7 * dt);
-    if (a.stateTime >= DODGE_TIME) setState(a, "idle");
+    a.pos.addScaledVector(a.dodgeDir, COMBAT.dodgeSpeed * dt);
+    if (a.stateTime >= COMBAT.dodgeTime) setState(a, "idle");
   } else if (a.state === "rooted") {
     a.rootTime -= dt;
     if (a.rootTime <= 0) setState(a, "idle");
@@ -906,7 +921,7 @@ function updatePlayer(dt: number) {
     if (full && p.attack.weight === "light" && canStrikeHeavy(p.stamina)) { p.attack = heavy; sfx.tick(); }
     // Nappi lasketaan pohjassa olevaksi myös, jos ase muunsi painetun suunnan toiseksi (keihäs).
     const held = STYLES.some((st) => strikeHeld[st] && styleFor(p.weapon, st) === style);
-    if (!held || p.stateTime >= heavy.timing.windup + CHARGE_HOLD_MAX) {
+    if (!held || p.stateTime >= heavy.timing.windup + COMBAT.chargeHoldMax) {
       p.charging = false;
       // Kevyt isku laukeaa aikaisintaan oman nostonsa jälkeen, viritetty raskas heti.
       const lightWindup = makeAttack(p.weapon, style, "light").timing.windup;
@@ -915,13 +930,13 @@ function updatePlayer(dt: number) {
   }
 
   if (p.state === "idle" || p.state === "block") {
-    if (songQueued && song >= SONG_MAX && enemy && enemy.state !== "dead") {
+    if (songQueued && song >= COMBAT.songMax && enemy && enemy.state !== "dead") {
       startSong();
       return;
     }
     if (dodgeQueued && p.dodgeCd <= 0) {
       setState(p, "dodge");
-      p.dodgeCd = DODGE_COOLDOWN;
+      p.dodgeCd = COMBAT.dodgeCooldown;
       p.dodgeDir.copy(move.lengthSq() > 0 ? move.normalize() : right.clone().negate());
       return;
     }
@@ -937,7 +952,8 @@ function updatePlayer(dt: number) {
     if (blockHeld && !tired && p.state === "idle") { setState(p, "block"); p.blockStart = gameTime; }
     if ((!blockHeld || tired) && p.state === "block") setState(p, "idle");
   }
-  const speed = p.state === "idle" ? 3.4 : p.state === "block" || p.state === "windup" || p.state === "recovery" ? 1.4 : 0;
+  const walk = p.stats.moveSpeed;
+  const speed = p.state === "idle" ? walk : p.state === "block" || p.state === "windup" || p.state === "recovery" ? walk * COMBAT.guardMoveScale : 0;
   if (speed > 0) moveActor(p, move, speed, dt);
   else p.moveSpeed = 0;
 }
@@ -989,7 +1005,7 @@ function syncVisual(a: Actor, dt: number) {
   f.root.position.copy(a.pos);
   f.root.rotation.y = a.yaw;
   const { pose, rate } = targetPose(a);
-  if (a.state === "dodge") f.root.rotation.z = Math.sin((a.stateTime / DODGE_TIME) * Math.PI) * 0.25;
+  if (a.state === "dodge") f.root.rotation.z = Math.sin((a.stateTime / COMBAT.dodgeTime) * Math.PI) * 0.25;
   else f.root.rotation.z = 0;
   const sinkTarget = a.state === "rooted" ? 0.55 : 0;
   f.sink += (sinkTarget - f.sink) * (1 - Math.exp(-4 * dt));
@@ -1066,7 +1082,7 @@ function setShowcase(on: boolean, allPose?: string) {
 // ---------- Kierrokset ----------
 function onEnemyDeath() {
   showMsg("Vastustaja kaatui", "Seuraava saapuu metsästä…", 2.4);
-  nextWaveAt = gameTime + 3;
+  nextWaveAt = gameTime + WAVES.nextWaveDelay;
 }
 function onPlayerDeath() {
   gameOver = true;
@@ -1079,7 +1095,7 @@ function restart() {
   corpses.length = 0;
   for (const d of debris) d.dispose();
   debris.length = 0;
-  player = makeActor(PLAYER_LOOK, new THREE.Vector3(0, 0, -3), 100, 0xffd27a, PLAYER_POWER);
+  player = makeActor(PLAYER_LOOK, new THREE.Vector3(0, 0, -3), 0, 0xffd27a);
   enemy = null;
   wave = 0;
   song = 0;
@@ -1109,7 +1125,7 @@ function simulate(realDt: number) {
   if (gameOver && isTouch && beatQueued) restart();
 
   // Laulu hidastaa maailman nopeasti; paluu normaaliin on pehmeämpi.
-  const targetScale = songState ? SONG_SLOWMO : 1;
+  const targetScale = songState ? SONG.slowmo : 1;
   timeScale += (targetScale - timeScale) * (1 - Math.exp(-(songState ? 16 : 6) * realDt));
   let dt = realDt * timeScale;
   if (hitstop > 0) { hitstop -= realDt; dt = 0; }
@@ -1128,8 +1144,8 @@ function simulate(realDt: number) {
     if (nextWaveAt > 0 && gameTime >= nextWaveAt) {
       nextWaveAt = -1;
       if (enemy) corpses.push({ actor: enemy, removeAt: gameTime + 6 });
-      player.hp = Math.min(player.maxHp, player.hp + 35);
-      player.stamina = Math.min(player.maxStamina, player.stamina + STAMINA.waveRest);
+      player.hp = Math.min(player.stats.maxHp, player.hp + WAVES.restHp);
+      player.stamina = Math.min(player.stats.maxStamina, player.stamina + WAVES.restStamina);
       renewPlayerShield();
       spawnEnemy();
     }
@@ -1212,6 +1228,7 @@ function pause() {
   pausedAt = performance.now();
   clearInputs();
   renderBinds();
+  openTune();
   $("pause").classList.remove("hidden");
 }
 
@@ -1224,6 +1241,128 @@ function resume() {
   lockPointer();
 }
 
+// ---------- Säätövälilehti ----------
+// Luonnos on polku → arvo ja sisältää vain oletuksista poikkeavat arvot. Kentät ja tekstialue
+// näyttävät saman luonnoksen. Mikään ei muutu pelissä ennen kuin luonnos otetaan käyttöön;
+// silloin se tallennetaan selaimen muistiin ja peli alkaa alusta.
+let tuneDraft = new Map<string, number>();
+const tuneInputs = new Map<string, HTMLInputElement>();
+const tuneText = $("tuneJson") as HTMLTextAreaElement;
+const fmtValue = (v: number) => String(+v.toFixed(4));
+
+function buildTuneFields() {
+  const rootEl = $("tuneFields");
+  let group = "";
+  for (const f of FIELDS) {
+    if (f.group !== group) {
+      group = f.group;
+      const h = document.createElement("h3");
+      h.textContent = group;
+      rootEl.appendChild(h);
+    }
+    const def = DEFAULTS.get(f.path)!;
+    const row = document.createElement("label");
+    row.className = "tunerow";
+    const name = document.createElement("span");
+    name.textContent = f.label;
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = String(f.min);
+    input.max = String(f.max);
+    input.step = String(f.step);
+    row.title = `Oletus ${fmtValue(def)} · sallittu ${f.min}–${f.max} · ${f.path}`;
+    const read = (final: boolean) => {
+      const raw = input.valueAsNumber;
+      if (!Number.isFinite(raw)) { if (final) refreshTune(); return; } // kenttä on kesken tai tyhjä
+      const v = final ? Math.max(f.min, Math.min(f.max, raw)) : raw;
+      if (Math.abs(v - def) < 1e-9) tuneDraft.delete(f.path);
+      else tuneDraft.set(f.path, v);
+      refreshTune(final ? undefined : input);
+    };
+    input.addEventListener("input", () => read(false));
+    input.addEventListener("change", () => read(true)); // kentästä poistuttaessa arvo rajataan sallittuun väliin
+    row.append(name, input);
+    rootEl.appendChild(row);
+    tuneInputs.set(f.path, input);
+  }
+}
+
+function sameDraft(a: ReadonlyMap<string, number>, b: ReadonlyMap<string, number>) {
+  if (a.size !== b.size) return false;
+  for (const [k, v] of a) if (Math.abs((b.get(k) ?? NaN) - v) > 1e-9) return false;
+  return true;
+}
+
+/** Päivittää kentät, tekstin ja tilarivin luonnoksesta. skip = kenttä, johon käyttäjä juuri kirjoittaa. */
+function refreshTune(skip?: HTMLInputElement | HTMLTextAreaElement, note = "") {
+  for (const [path, input] of tuneInputs) {
+    if (input !== skip) input.value = fmtValue(tuneDraft.get(path) ?? DEFAULTS.get(path)!);
+    input.classList.toggle("changed", tuneDraft.has(path));
+  }
+  if (skip !== tuneText) tuneText.value = exportTuning(VERSION, tuneDraft);
+  const pending = !sameDraft(tuneDraft, changedValues());
+  $("tuneApply").classList.toggle("pending", pending);
+  const count = tuneDraft.size === 0 ? "Kaikki arvot ovat oletuksissa." : `${tuneDraft.size} arvoa poikkeaa oletuksista.`;
+  $("tuneNote").textContent = note || `${count} ${pending ? "Muutokset eivät ole vielä käytössä." : "Nämä arvot ovat käytössä."}`;
+}
+
+/** Kulmaan merkki, kun pelataan muilla kuin oletusarvoilla. */
+function showTunedBadge() {
+  const n = changedValues().size;
+  $("tuned").textContent = n > 0 ? `säädetyt arvot (${n}) · ` : "";
+}
+
+function openTune() {
+  tuneDraft = new Map(changedValues());
+  refreshTune();
+}
+
+function showTab(tune: boolean) {
+  $("paneTune").classList.toggle("hidden", !tune);
+  $("paneBinds").classList.toggle("hidden", tune);
+  $("tabTune").classList.toggle("on", tune);
+  $("tabBinds").classList.toggle("on", !tune);
+}
+$("tabBinds").addEventListener("click", () => showTab(false));
+$("tabTune").addEventListener("click", () => showTab(true));
+
+tuneText.addEventListener("input", () => {
+  const parsed = parseTuningText(tuneText.value);
+  if ("error" in parsed) { $("tuneNote").textContent = `Tekstiä ei voi lukea: ${parsed.error}`; return; }
+  tuneDraft = parsed.values;
+  const notes: string[] = [];
+  if (parsed.rejected.length) notes.push(`Tuntematon tai virheellinen: ${parsed.rejected.join(", ")}.`);
+  if (parsed.clamped.length) notes.push(`Rajattu sallittuun väliin: ${parsed.clamped.join(", ")}.`);
+  refreshTune(tuneText, notes.join(" "));
+});
+
+$("tuneApply").addEventListener("click", () => {
+  applyChanges(tuneDraft);
+  try {
+    if (changedValues().size > 0) localStorage.setItem(TUNE_STORE, exportTuning(VERSION));
+    else localStorage.removeItem(TUNE_STORE);
+  } catch { /* muisti ei käytössä: arvot ovat voimassa tämän istunnon */ }
+  showTunedBadge();
+  openTune();
+  restart();
+  resume();
+});
+
+$("tuneCopy").addEventListener("click", async () => {
+  let ok = false;
+  try { await navigator.clipboard.writeText(tuneText.value); ok = true; } catch { /* leikepöytä ei sallittu: kokeillaan valintaa */ }
+  if (!ok) { tuneText.select(); ok = document.execCommand("copy"); }
+  refreshTune(tuneText, ok ? "Arvot kopioitu leikepöydälle." : "Kopiointi ei onnistunut: valitse teksti ja kopioi se käsin (Ctrl+C).");
+});
+
+$("tuneReset").addEventListener("click", () => {
+  tuneDraft = new Map();
+  refreshTune();
+});
+
+buildTuneFields();
+showTunedBadge();
+
 // Taukoikkunan voi raahata sivuun, esimerkiksi kuvakaappausta varten. Siirretty ikkuna
 // poistaa myös ruudun tummennuksen. Paikka säilyy seuraavaan taukoon.
 {
@@ -1232,7 +1371,7 @@ function resume() {
   const off = { x: 0, y: 0 };
   let drag: { x: number; y: number; ox: number; oy: number } | null = null;
   panel.addEventListener("pointerdown", (e) => {
-    if (capture || (e.target as HTMLElement).closest("button")) return;
+    if (capture || (e.target as HTMLElement).closest("button, input, textarea, label")) return;
     drag = { x: e.clientX, y: e.clientY, ox: off.x, oy: off.y };
     panel.setPointerCapture(e.pointerId);
   });
@@ -1278,7 +1417,12 @@ $("startBtn").addEventListener("click", () => {
   },
   get events() { return [...events]; },
   get song() { return songState ? { results: [...songState.results], done: songState.endAt >= 0, realTime, playAt: songState.playAt, beats: songState.beats } : null; },
-  fillSong() { song = SONG_MAX; },
+  fillSong() { song = COMBAT.songMax; },
+  /** Lisää ajonaikaisen vaikutuksen kykyihin (savutestit): who = "player" tai "enemy". */
+  addModifier(who: "player" | "enemy", mod: Modifier) { const a = who === "player" ? player : enemy; if (a) a.mods = withModifier(a.mods, mod); },
+  get stats() { return { player: { ...player.stats }, enemy: enemy ? { ...enemy.stats } : null }; },
+  /** Säädetyt arvot polku → arvo. */
+  get tuning() { return Object.fromEntries(changedValues()); },
   /** Asettaa kestävyydet (savutestit); null jättää ennalleen. */
   setStamina(p: number | null, e: number | null = null) { if (p !== null) player.stamina = p; if (e !== null && enemy) enemy.stamina = e; },
   /** Laulaa vastustajan suoraan suohon t sekunniksi (savutestit). */

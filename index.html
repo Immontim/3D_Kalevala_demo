@@ -34,7 +34,7 @@
       <div id="charge"><div id="chargeLabel"></div><div class="bar"><div id="chargeFill" class="fill charge"></div></div></div>
       <div id="msg"></div>
       <div id="sub"></div>
-      <div id="corner"><span id="ver"></span> · <span id="fps"></span> FPS</div>
+      <div id="corner"><span id="tuned"></span><span id="ver"></span> · <span id="fps"></span> FPS</div>
     </div>
 
     <div id="song" class="hidden">
@@ -54,12 +54,30 @@
       <div class="panel">
         <h1>Tauko</h1>
         <p class="tag">Peli on pysähdyksissä. Näppäimet voi vaihtaa tästä. Ikkunan voi raahata sivuun; Esc jatkaa peliä.</p>
-        <h2>Näppäimet</h2>
-        <div id="binds"></div>
-        <p class="small" id="bindNote"></p>
-        <p class="small">Liike (WASD), laulun tahti (välilyönti), uusi peli (R) ja tauko (Esc) ovat kiinteitä. Asetus tallentuu tähän selaimeen.</p>
+        <div class="tabs">
+          <button id="tabBinds" class="tab on">Näppäimet</button>
+          <button id="tabTune" class="tab">Säätö</button>
+        </div>
+        <div id="paneBinds" class="pane">
+          <div id="binds"></div>
+          <p class="small" id="bindNote"></p>
+          <p class="small">Liike (WASD), laulun tahti (välilyönti), uusi peli (R) ja tauko (Esc) ovat kiinteitä. Asetus tallentuu tähän selaimeen.</p>
+          <button id="resetBinds" class="secondary first">Palauta oletusnäppäimet</button>
+        </div>
+        <div id="paneTune" class="pane hidden">
+          <p class="small">Muutokset tulevat voimaan vasta, kun otat ne käyttöön: peli alkaa silloin alusta. Muutettu arvo näkyy korostettuna, ja oletus näkyy, kun viet hiiren kentän päälle.</p>
+          <div id="tuneFields"></div>
+          <h2>Arvot tekstinä</h2>
+          <p class="small">Vain oletuksista poikkeavat arvot. Tekstiä voi myös muokata tai liittää tähän aiemmin kopioidun.</p>
+          <textarea id="tuneJson" spellcheck="false"></textarea>
+          <p class="small" id="tuneNote"></p>
+          <div class="tunebtns">
+            <button id="tuneApply">Ota käyttöön ja aloita alusta</button>
+            <button id="tuneCopy" class="secondary">Kopioi arvot</button>
+            <button id="tuneReset" class="secondary">Palauta oletusarvot</button>
+          </div>
+        </div>
         <button id="resumeBtn">Jatka</button>
-        <button id="resetBinds" class="secondary">Palauta oletukset</button>
       </div>
     </div>
 
