@@ -5,22 +5,31 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-12 (Claude, kotikone, Windows)
+Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
 
-- **Versio v00.07.00**, branch `claude/song-sequence` (tarkista merge-tila
-  `git merge-base --is-ancestor`). Mainissa on v00.06.00 (kypärät,
-  näppäinasetukset).
+- **Versio v00.08.00**, branch `claude/song-spear` (tarkista merge-tila
+  `git merge-base --is-ancestor`). Mainissa on v00.07.00 (laulun kulku, suo).
 - **Laulu** (`src/songLogic.ts` puhdas logiikka ja kaikki luvut, kulku
   `src/main.ts`): Q täydellä mittarilla → maailma hidastuu
   (`SONG_SLOWMO` 1/20) → pelaaja ottaa asennon `POSES.sing` reaaliajassa
-  (`SONG_INTRO` 1,5 s, painallukset eivät vielä laske) → rytmipeli: neljä
-  riimua, kunkin alla osuma-alue (`ZONE_FIRST` ±0,24 s, jokainen seuraava
-  `ZONE_SHRINK` 0,8 × edellinen). Painallus arvioidaan aina seuraavaa
-  riimua vastaan, joten alueen ulkopuolelle osunut painallus on huti.
-  Loitsu laukeaa `SONG_MIN_HITS` 2 osumalla; kesto on osumat ×
-  `ROOT_TIME_PER_HIT` 1,5 s. Vastustajan osuma kesken laulun kutsuu
+  (`SONG_INTRO` 1,5 s, painallukset eivät vielä laske) → rytmipeli:
+  riimuja on yhtä monta kuin säkeitä listassa `SONG_VERSES` (nyt 8), kunkin
+  alla osuma-alue (`ZONE_FIRST` ±0,24 s, jokainen seuraava `ZONE_SHRINK`
+  0,84 × edellinen, viimeinen noin ±0,07 s). Painallus arvioidaan aina
+  seuraavaa riimua vastaan, joten alueen ulkopuolelle osunut painallus on
+  huti. Loitsu laukeaa `SONG_MIN_HITS` 4 osumalla; kesto on osumat ×
+  `ROOT_TIME_PER_HIT` 0,75 s. Vastustajan osuma kesken laulun kutsuu
   `interruptSong()`: loitsu raukeaa ja aika palaa heti. Voima nollataan
   laulun alussa. Tauko pysäyttää myös riimut.
+- **Keihäsote** (`src/fighter.ts`; tehty Opus-ali-agentilla, orkestroija
+  arvioi kuvista): käsien verkkoon on Blenderissä kaiverrettu otekanava
+  (`grip_carve`, `GRIP_P`/`GRIP_D` tiedostossa `char_build.py`; sama
+  kanava koodissa `GRIP_CHANNEL`). Keihäs (2,14 m) kiinnitetään oikean
+  käden kanavaan, ja taulukko `SPEAR_HOLD` määrää asennoittain otteen
+  paikan, varren suunnan ja etukäden etäisyyden. `holdShaft()` +
+  `twoBone()` vievät molemmat kädet varrelle käänteiskinematiikalla.
+  Mittari: `fighter.spearGripDebug()` (käden etäisyys varresta, ranteen
+  kulmat). Vanha `reachShaft()` on poistettu.
 - **Suo** (`src/bog.ts`, malli `assets/bog.glb`, skripti
   `assets-src/blender/bog.py`): mutapinta, sammalreunus ja kuplan malli
   tulevat Blenderistä ilman tekstuureja; pinnat tehdään maaston
@@ -78,29 +87,32 @@ Päivitetty: 2026-11-12 (Claude, kotikone, Windows)
   `tools/fetch-characters.ps1` (ei Gitissä). `.blend`-tiedostot eivät ole
   Gitissä, eikä lähdemallien tuontia SRC-kokoelmaan ole skriptattu.
 - **Deployattu:** GitHub Pages julkaisee mainin heti mergen jälkeen
-  (Actions-ajo "Julkaise GitHub Pagesiin"); v00.07.00 ei ole mainissa.
+  (Actions-ajo "Julkaise GitHub Pagesiin"); v00.08.00 ei ole mainissa.
   **Omistaja testaa julkaistusta osoitteesta**, ei dev-serveriltä.
-- **Käsin testattu 2026-11-12** (Clauden in-app browser, dev-serveri,
-  skriptattu syöte `__game.tick`-askelin): laulu 4, 3 ja 2 osumalla antaa
-  6, 4,5 ja 3 s suon, 1 ja 0 osumalla loitsu epäonnistuu; voima on nolla
-  joka tapauksessa; alkuanimaation aikainen painallus ei laske; hidastus
-  käy arvossa 0,05; vastustajan isku, josta oli 0,11 s jäljellä laulun
-  alkaessa, osui noin 0,9 s:n kuluttua ja katkaisi laulun, aika palasi
-  heti; suo, reunus ja kuplat näkyvät, vastustaja vajoaa siihen; ei
-  konsolivirheitä. **FPS** 52–60 suon ollessa näkyvissä (paneeli kuristaa
-  ajoittain, joten lukema on suuntaa antava).
-  **Ei testattu:** ihmisen pelaamana (osuma-alueiden vaikeus on arvaus),
-  kosketusnäyttö, buildattu versio selaimessa.
-- **Komennot 2026-11-12:** `bun run test` (38/38), `bun run lint`,
+- **Käsin testattu 2026-11-13** (Clauden in-app browser, dev-serveri,
+  skriptattu syöte): laulu 8, 5 ja 4 osumalla antaa 6, 3,8 ja 3 s suon,
+  3 osumalla epäonnistuu, voima nollautuu; kypärä lähtee pään korkeudelta
+  (1,7 m) ja päätyy maahan (0,09 m) kuudessa kokeessa kuudesta;
+  keihäsmiehet (urho, pohja) asennoissa guard, thrustWindup, thrustStrike
+  ja block usealta suunnalta: varsi kulkee molempien nyrkkien läpi, kärki
+  osoittaa eteen, pisto on selvä syöksy; miekkahahmot ennallaan;
+  keihäsvastustaja taistelee ja osuu pelitilanteessa. Ali-agentin mittaus:
+  vasen käsi enintään 0,1 cm varresta kaikissa asennoissa ja siirtymissä,
+  ranne enintään 63°.
+  **Ei testattu:** ihmisen pelaamana, kosketusnäyttö, buildattu versio
+  selaimessa. FPS-lukema 50–60, suuntaa antava.
+- **Komennot 2026-11-13:** `bun run test` (39/39), `bun run lint`,
   `bun run build` ok.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Savutestien apuna `window.__game`: `tick(n, dt)` ajaa peliä askelin
   ruudunpäivityksestä riippumatta, `skipTo(n)`, `showcase(true, "asento")`,
   `poses` (asentojen säätö lennossa), `setCamera(pos, look)`, `state`,
   `events` muodossa `kuka:isku/paino:tulos`, `fillSong()`, `beat()`
-  (välilyönti laululle), `nextBeatIn`, `bog([x,0,z])` (suo näkyviin).
-  Selainpaneeli pysäyttää pelin, kun se menettää fokuksen: napsauta
-  `#resumeBtn` jokaisen skriptin alussa.
+  (välilyönti laululle), `nextBeatIn`, `bog([x,0,z])` (suo näkyviin),
+  `debrisHeights` (irtokappaleiden korkeus maasta). Selainpaneeli pysäyttää
+  pelin, kun se menettää fokuksen: kutsu `autoPause(false)` jokaisen
+  latauksen jälkeen. `skipTo` rakentaa hahmon vasta seuraavalla
+  kierroksella, joten `knockHelmet()` vaatii erillisen kutsun tai odotuksen.
 
 ## Tunnetut rajoitteet ja riskit
 
@@ -108,6 +120,12 @@ Päivitetty: 2026-11-12 (Claude, kotikone, Windows)
   Suuntatorjunta ilman kilpeä voi olla liian vaikea: iskun suunta pitää
   lukea vastustajan asennosta tai HUD-vihjeestä noin puolessa sekunnissa.
 - **Keihäällä on vain pisto**, joten sitä vastaan riittää pistotorjunta.
+  Keihään malli piteni (kärki 1,5 m takaotteesta), mutta `combat.ts`:n
+  kantamaa ei muutettu: osuma ratkeaa yhä vanhalla etäisyydellä.
+- **Keihäsotteen avoimet viat:** sormet ovat lähdemallissa erillään, joten
+  ote harittaa läheltä (ei sormiluita); kämmenen kierto näkyy kyynärvarren
+  hihassa; pistossa etukäsi on ulottuvuutensa rajalla, minkä vuoksi vartalo
+  kiertyy nyt vasen olka edellä; iskun alussa ranne hypähtää noin 40°.
 - **Kosketusnäytöllä** on vain sivallus; ylälyönnille, pistolle ja
   torjunta-asennon vaihdolle ei ole nappeja.
 - **Asennot on viritetty silmämääräisesti** kuvakaappauksista. Raskaalla
@@ -138,9 +156,9 @@ Päivitetty: 2026-11-12 (Claude, kotikone, Windows)
 
 ## Seuraava tehtävä
 
-Omistaja pelaa v00.07.00:n julkaistusta osoitteesta mergen jälkeen ja kertoo
-tuntuman (laulun kulku ja osuma-alueiden vaikeus, suon ulkoasu, taistelun
-tasapaino). Sen perusteella säädetään `songLogic.ts`:n ja taulukoiden luvut.
+Omistaja pelaa v00.08.00:n julkaistusta osoitteesta mergen jälkeen ja kertoo
+tuntuman (8 riimun laulun vaikeus, keihäsote, kypärät, taistelun tasapaino).
+Sen perusteella säädetään `songLogic.ts`:n ja taulukoiden luvut.
 
 ## Ei vielä aloiteta
 

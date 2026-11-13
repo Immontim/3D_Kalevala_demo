@@ -436,6 +436,37 @@ def assemble(name, parts, col_name="GAME", rig=True):
 
 
 # ---------- hahmon osat ----------
+# Otekanava: suora, jonka ympäri oikean käden sormet kiertyvät (lepoasennon maailmakoordinaatit,
+# vasen käsi on peilikuva x:n suhteen). Lähdemallin käsi on löysästi koukussa ja sormenpäät
+# painuvat kämmeneen, joten 2,8 cm varsi ei mahdu väliin. grip_carve() työntää kanavan sisään
+# jäävät pinnat varren pinnalle, jolloin sormet kietoutuvat varren ympäri. Sama suora on
+# pelissä vakiona GRIP_CHANNEL (src/fighter.ts); jos tätä muutetaan, päivitä myös se.
+GRIP_P = V((-0.383, -0.112, 0.795))
+GRIP_D = V((0.31, -0.95, -0.06)).normalized()     # peukalon puolelle = keihään kärjen suunta;
+                                                   # noin 63° kämmenen akseliin, kuten oikeassa otteessa
+
+
+def grip_carve(p, R=0.0145, Rf=0.028, half=0.07):
+    """Avaa kämmenen ja sormien väliin putken (säde R), johon keihäänvarsi mahtuu.
+    Etäisyydellä r < Rf olevat pinnat siirretään säteittäin välille R..Rf."""
+    for i, c in enumerate(p.co):
+        for g, s in (("hand_R", 1), ("hand_L", -1)):
+            w = p.w[i].get(g, 0.0)
+            if w < 0.05:
+                continue
+            ctr = V((GRIP_P.x * s, GRIP_P.y, GRIP_P.z))
+            d = V((GRIP_D.x * s, GRIP_D.y, GRIP_D.z))
+            rel = c - ctr
+            t = rel.dot(d)
+            rad = rel - d * t
+            r = rad.length
+            if r >= Rf or abs(t) > half or r < 1e-6:
+                continue
+            r2 = R + (Rf - R) * (r / Rf)
+            k = min(1.0, w / 0.5)
+            p.co[i] = ctr + d * t + rad.normalized() * (r + (r2 - r) * k)
+
+
 def skin_parts(C, hands_from=0.45, hair=(0.62, 0.45, 0.2), skin=(0.72, 0.47, 0.33)):
     L = C.L
     def colfn(c):
@@ -446,6 +477,7 @@ def skin_parts(C, hands_from=0.45, hair=(0.62, 0.45, 0.2), skin=(0.72, 0.47, 0.3
         return skin
     head = shell(C, lambda i, c: c.z > 1.37 and C.arm_frac[i] < 0.3, lambda c: 0.0, "skin", smooth=0, colfn=colfn)
     hands = shell(C, lambda i, c: C.arm_frac[i] > 0.5 and C.arm_t(c) > hands_from, lambda c: 0.0, "skin", smooth=0, col=skin)
+    grip_carve(hands)
     eyes = Part()
     for nm in ("GEO-body_male_realistic.eye.L", "GEO-body_male_realistic.eye.R"):
         eo = bpy.data.objects[nm]
@@ -779,15 +811,17 @@ def build_equipment():
     p.extend(pommel)
     stats["sword"] = assemble("sword", [p], rig=False)[1]
 
-    # keihäs: ote origossa, kärki -Y
+    # keihäs: takakäden ote origossa, kärki -Y. Kokonaispituus 2,14 m: tyvi 0,62 m otteen
+    # takana, varsi 2,7 cm, putkiholkki ja 30 cm lehtimäinen kärki keskiharjalla.
     p = Part()
-    p.extend(tube_part([V((0, 0.85, 0)), V((0, -1.05, 0))], [0.014, 0.0125], 8, "wood", W, (1.0, 0.92, 0.8), tile=0.3))
-    p.extend(tube_part([V((0, -1.0, 0)), V((0, -1.12, 0))], [0.016, 0.012], 8, "metal", W, iron))
+    p.extend(tube_part([V((0, 0.62, 0)), V((0, -1.12, 0))], [0.0135, 0.012], 8, "wood", W, (1.0, 0.92, 0.8), tile=0.3))
+    p.extend(tube_part([V((0, 0.625, 0)), V((0, 0.58, 0))], [0.012, 0.0145], 8, "metal", W, iron))   # tyvihela
+    p.extend(tube_part([V((0, -1.07, 0)), V((0, -1.22, 0))], [0.0155, 0.011], 8, "metal", W, iron))  # holkki
     q = Part()
-    secs = [(0.0, 0.25), (0.25, 1.0), (0.7, 0.55), (1.0, 0.03)]
+    secs = [(0.0, 0.2), (0.12, 0.62), (0.32, 1.0), (0.6, 0.8), (0.85, 0.38), (1.0, 0.02)]
     rings = []
     for t, k in secs:
-        rings.append([q.v(V((x * 0.027 * k, -(1.12 + 0.24 * t), z * 0.006 * max(k, 0.3))), W) for x, z in ((1, 0), (0, 1), (-1, 0), (0, -1))])
+        rings.append([q.v(V((x * 0.024 * k, -(1.22 + 0.30 * t), z * 0.0065 * max(k, 0.35))), W) for x, z in ((1, 0), (0, 1), (-1, 0), (0, -1))])
     for a, b in zip(rings, rings[1:]):
         for k in range(4):
             q.f([a[k], a[(k + 1) % 4], b[(k + 1) % 4], b[k]], "metal", None, steel, False)

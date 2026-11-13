@@ -458,7 +458,7 @@ interface SongState {
 let songState: SongState | null = null;
 let timeScale = 1;
 let realTime = 0;
-const RUNES = ["ᚠ", "ᚹ", "ᛃ", "ᛟ"];
+const RUNES = ["ᚠ", "ᚹ", "ᛃ", "ᛟ", "ᚱ", "ᛉ", "ᛏ", "ᛗ"];
 
 function startSong() {
   song = 0; // voima kuluu kokonaan, kävi laululle miten tahansa
@@ -476,7 +476,7 @@ function startSong() {
   const runes = beats.map((_, i) => {
     const d = document.createElement("div");
     d.className = "rune";
-    d.textContent = RUNES[i];
+    d.textContent = RUNES[i % RUNES.length];
     track.appendChild(d);
     return d;
   });
@@ -528,7 +528,7 @@ function judge(i: number, hit: boolean) {
   s.results[i] = hit;
   s.runes[i].classList.add(hit ? "hit" : "miss");
   s.zones[i].classList.add(hit ? "hit" : "miss");
-  sfx.pluck(i * 2 + 1, hit);
+  sfx.pluck(i + 1, hit);
   $("verse").textContent = hit ? SONG_VERSES[i] : "…";
   if (hit) flash("#f0c766", 0.14);
 }
@@ -1160,11 +1160,14 @@ function resume() {
 
 document.addEventListener("pointerlockchange", () => {
   if (document.pointerLockElement === canvas) pointerLockWorked = true;
-  else if (pointerLockWorked) pause();
+  else if (pointerLockWorked) autoPauseNow();
 });
-window.addEventListener("blur", () => { clearInputs(); pause(); });
-document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
-document.addEventListener("mouseleave", () => { if (!pointerLockWorked && !isTouch) pause(); });
+// Savutesteissä selainpaneeli menettää fokuksen jatkuvasti: __game.autoPause(false) estää automaattisen tauon.
+let autoPause = true;
+function autoPauseNow() { if (autoPause) pause(); }
+window.addEventListener("blur", () => { clearInputs(); autoPauseNow(); });
+document.addEventListener("visibilitychange", () => { if (document.hidden) autoPauseNow(); });
+document.addEventListener("mouseleave", () => { if (!pointerLockWorked && !isTouch) autoPauseNow(); });
 $("resumeBtn").addEventListener("click", resume);
 
 $("startBtn").addEventListener("click", () => {
@@ -1191,6 +1194,8 @@ $("startBtn").addEventListener("click", () => {
     return !!prop;
   },
   get bindings() { return cloneBindings(bindings); },
+  /** Irtokappaleiden (kypärät, kilven palat) korkeus maasta metreinä: leijuvan kappaleen tunnistaa tästä. */
+  get debrisHeights() { return debris.map((d) => +(d.group.position.y - groundHeight(d.group.position.x, d.group.position.z)).toFixed(2)); },
   /** Ajaa peliä n askelta eteenpäin ruudunpäivityksestä riippumatta (savutestit). */
   tick(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) simulate(dt); },
   /** Asennot muokattavina: hahmorivin kanssa asentoja voi säätää lennossa konsolista. */
@@ -1214,6 +1219,8 @@ $("startBtn").addEventListener("click", () => {
     const i = songState.results.findIndex((r) => r === null);
     return i < 0 ? null : songState.beats[i] - realTime;
   },
+  /** Automaattinen tauko fokuksen kadotessa päälle tai pois (savutestit). */
+  autoPause(on: boolean) { autoPause = on; if (!on && paused) resume(); },
   /** Vie välilyönnin painalluksen laululle (savutestit). */
   beat() { beatQueued = true; },
   /** Suo näkyviin annettuun kohtaan tai pois (kuvakaappaukset). */

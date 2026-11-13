@@ -141,6 +141,8 @@ export function setCharacterEnv(tex: THREE.Texture) {
 }
 
 const DOWN = new THREE.Vector3(0, -1, 0);
+/** Vianetsintä: elossa olevat keihäshahmot (selaimessa `await import("/src/fighter.ts")`). */
+export const debugSpearFighters = new Set<Fighter>();
 const qA = new THREE.Quaternion(), qB = new THREE.Quaternion(), qC = new THREE.Quaternion();
 const eul = new THREE.Euler();
 const vTmp = new THREE.Vector3();
@@ -176,6 +178,13 @@ export class Fighter {
   /** Onko kilpi kädessä. Hajonnut kilpi poistuu, ja hahmo taistelee kuin ilman kilpeä. */
   hasShield: boolean;
   private pose: Pose = { ...POSES.guard };
+  /** Keihään otekanava kummankin käden virtuaalikehyksessä: keskipiste ranteesta ja suunta. */
+  private gripV = { R: { c: new THREE.Vector3(), d: new THREE.Vector3(0, 0, 1) }, L: { c: new THREE.Vector3(), d: new THREE.Vector3(0, 0, 1) } };
+  /** Keihään nykyinen ote (liukuu kohti asennon otetta) ja kuinka paljon oikea käsi seuraa sitä. */
+  private hold = spearHold(SPEAR_HOLD.get(POSES.guard)!);
+  private spearW = 1;
+  /** Käden edellinen kierto varren ympäri (holdShaft), jotta ratkaisu pysyy jatkuvana. */
+  private roll: { L: number | null; R: number | null } = { L: null, R: null };
   private walkPhase = 0;
   private disposed = false;
   sink = 0; // suohon vajoaminen metreinä
@@ -188,15 +197,17 @@ export class Fighter {
     this.weapon.position.set(-0.3, 1.0, 0.2);
     this.body.add(this.weapon);
     const spear = look.loadout === "spear";
-    this.bladeBase.position.z = spear ? 1.08 : 0.12;
-    this.bladeTip.position.z = spear ? 1.36 : 0.8;
+    this.bladeBase.position.z = spear ? 1.22 : 0.12;
+    this.bladeTip.position.z = spear ? 1.52 : 0.8;
     this.weapon.add(this.bladeBase, this.bladeTip);
     characterAssets.then((gltf) => { if (!this.disposed) this.build(gltf.scene); });
+    if (spear) debugSpearFighters.add(this);
   }
 
   /** Vapauttaa taistelijan omat materiaalikopiot ja luurangon tekstuurin. Kutsutaan, kun hahmo poistetaan. */
   dispose() {
     this.disposed = true;
+    debugSpearFighters.delete(this);
     for (const m of [...this.bladeMats, ...this.shieldMats]) { envTargets.delete(m); m.dispose(); }
     this.bladeMats = [];
     this.shieldMats = [];
@@ -259,6 +270,7 @@ export class Fighter {
     const cInv = hand.canon.clone().invert();
     this.weapon.quaternion.copy(cInv).multiply(qA.setFromEuler(eul.set(0, HAND_TWIST, 0)));
     this.weapon.position.copy(vTmp.set(GRIP.x, GRIP.y, GRIP.z).applyQuaternion(cInv));
+    if (this.look.loadout === "spear") this.prepareSpearGrip(clone);
     const weaponModel = equip[this.look.loadout === "spear" ? "spear" : "sword"];
     if (weaponModel) {
       weaponModel.position.set(0, 0, 0);
@@ -369,29 +381,163 @@ export class Fighter {
     if (this.shieldHolder) this.shieldHolder.visible = true;
   }
 
-  /** Keihään etukäsi: vasen käsi viedään varrelle kahden luun käänteiskinematiikalla. */
-  private reachShaft() {
-    this.body.updateMatrixWorld(true);
-    const S = this.body.worldToLocal(this.bones.get("upper_arm_L")!.bone.getWorldPosition(new THREE.Vector3()));
-    const T = this.body.worldToLocal(this.weapon.localToWorld(new THREE.Vector3(0, 0, SPEAR_FRONT_GRIP)));
-    T.y += 0.04;
+  /**
+   * Keihään ote: varsi kulkee nyrkin otekanavan (GRIP_CHANNEL) läpi. Kanava muunnetaan
+   * kummankin käden virtuaalikehykseen, ja keihään tyviote asetetaan oikean käden kanavaan.
+   */
+  private prepareSpearGrip(clone: THREE.Object3D) {
+    const bodyInv = new THREE.Quaternion().copy(this.body.getWorldQuaternion(new THREE.Quaternion())).invert();
+    for (const side of ["R", "L"] as const) {
+      const s = side === "R" ? 1 : -1;
+      const b = this.bones.get(`hand_${side}`)!;
+      const pW = clone.localToWorld(GRIP_CHANNEL.p.clone().setX(GRIP_CHANNEL.p.x * s));
+      const dW = GRIP_CHANNEL.d.clone().setX(GRIP_CHANNEL.d.x * s).transformDirection(clone.matrixWorld);
+      const rest = b.bone.getWorldQuaternion(new THREE.Quaternion()).premultiply(bodyInv);
+      const wrist = this.body.worldToLocal(b.bone.getWorldPosition(new THREE.Vector3()));
+      const pB = this.body.worldToLocal(pW.clone());
+      const dB = dW.clone().applyQuaternion(bodyInv);
+      // Virtuaalikehykseen: luun asento = v * canon, joten kanava = canon * rest⁻¹ * (lepoasennon kanava).
+      const toV = b.canon.clone().multiply(rest.clone().invert());
+      this.gripV[side].c.copy(pB.sub(wrist).applyQuaternion(toV));
+      this.gripV[side].d.copy(dB.applyQuaternion(toV)).normalize();
+      if (side === "R") {
+        // Keihään origo (takaote) kanavan keskelle, varsi kanavan suuntaan (kärki peukalon puolelle).
+        const pLoc = b.bone.worldToLocal(pW.clone());
+        const dLoc = dW.clone().applyQuaternion(b.bone.getWorldQuaternion(new THREE.Quaternion()).invert()).normalize();
+        this.weapon.position.copy(pLoc);
+        this.weapon.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dLoc);
+      }
+    }
+  }
+
+  /** Kahden luun käänteiskinematiikka: kyynärpää tasossa, jonka napa määrää; palauttaa olkavarren ja kyynärvarren kehykset. */
+  private twoBone(S: THREE.Vector3, W: THREE.Vector3, pole: THREE.Vector3, v1: THREE.Quaternion, v2: THREE.Quaternion) {
     const [l1, l2] = this.armLen;
-    const to = T.clone().sub(S);
+    const to = W.clone().sub(S);
     const d = Math.min(Math.max(to.length(), 0.05), l1 + l2 - 0.005);
     to.normalize();
     const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d);
     const h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
-    // Kyynärpää osoittaa alas ja ulos vasemmalle.
-    const pole = new THREE.Vector3(0.55, -1, -0.15);
-    pole.addScaledVector(to, -pole.dot(to)).normalize();
-    const elbow = to.clone().multiplyScalar(a).addScaledVector(pole, h);
-    const wrist = to.clone().multiplyScalar(d);
+    const pp = pole.clone().addScaledVector(to, -pole.dot(to)).normalize();
+    const elbow = to.clone().multiplyScalar(a).addScaledVector(pp, h);
     const d1 = elbow.clone().normalize();
-    const d2 = wrist.sub(elbow).normalize();
-    this.setBone("upper_arm_L", new THREE.Quaternion().setFromUnitVectors(DOWN, d1));
-    const fo = new THREE.Quaternion().setFromUnitVectors(DOWN, d2);
-    this.setBone("forearm_L", fo);
-    this.setBone("hand_L", fo);
+    const d2 = to.multiplyScalar(d).sub(elbow).normalize();
+    // Kyynärnivel on sarana: olkavarren x-akseli = saranan akseli, jolloin kyynärvarsi
+    // kääntyy x:n ympäri kuten suoraan ohjatussa asennossa (el < 0 taivuttaa).
+    const X = new THREE.Vector3().crossVectors(d2, d1);
+    if (X.lengthSq() < 1e-8) X.crossVectors(pp, d1);
+    X.normalize();
+    const Y = d1.clone().negate();
+    const Z = new THREE.Vector3().crossVectors(X, Y);
+    v1.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, Y, Z));
+    const th = Math.acos(THREE.MathUtils.clamp(d1.dot(d2), -1, 1));
+    v2.copy(v1).multiply(qA.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -th));
+  }
+
+  /**
+   * Käsi varrelle: kämmenen otekanavan keskipiste pisteeseen G ja kanava varren suuntaan dir.
+   * Kierto varren ympäri valitaan niin, että ranne kääntyy kyynärvarteen nähden mahdollisimman vähän.
+   */
+  private holdShaft(side: "L" | "R", G: THREE.Vector3, dir: THREE.Vector3, pole: THREE.Vector3) {
+    const S = this.body.worldToLocal(this.bones.get(`upper_arm_${side}`)!.bone.getWorldPosition(new THREE.Vector3()));
+    const g = this.gripV[side];
+    const q0 = new THREE.Quaternion().setFromUnitVectors(g.d, dir);
+    const v = new THREE.Quaternion(), v1 = new THREE.Quaternion(), v2 = new THREE.Quaternion();
+    const W = new THREE.Vector3(), rel = new THREE.Quaternion(), axis = new THREE.Vector3();
+    // Hinta kierrolle phi: ranteen taivutus + puolet kämmenen kierrosta kyynärvarteen nähden.
+    const cost = (phi: number) => {
+      v.setFromAxisAngle(dir, phi).multiply(q0);
+      W.copy(G).sub(axis.copy(g.c).applyQuaternion(v));
+      this.twoBone(S, W, pole, v1, v2);
+      rel.copy(v2).invert().multiply(v);
+      const bend = DOWN.angleTo(axis.copy(DOWN).applyQuaternion(rel));
+      const twist = 2 * Math.acos(Math.min(1, Math.abs(rel.w) / (Math.hypot(rel.y, rel.w) || 1)));
+      return bend + 0.5 * twist;
+    };
+    // Kierto haetaan edellisen ruudun kierron läheltä, jotta käsi ei hyppää ratkaisusta toiseen.
+    // Koko kierros tarkistetaan myös, ja siihen vaihdetaan vain selvästi parempaan (yli 25°).
+    const local = (from: number, span: number) => {
+      let best = from, bestC = cost(from);
+      for (let step = span; step > 0.005; step /= 2) {
+        for (const phi of [best - step, best + step]) {
+          const c = cost(phi);
+          if (c < bestC) { bestC = c; best = phi; }
+        }
+      }
+      return [best, bestC] as const;
+    };
+    let gBest = 0, gC = Infinity;
+    for (let i = 0; i < 24; i++) {
+      const phi = (i / 24) * Math.PI * 2, c = cost(phi);
+      if (c < gC) { gC = c; gBest = phi; }
+    }
+    const prev = this.roll[side];
+    let [best, bestC] = local(gBest, Math.PI / 24);
+    if (prev !== null) {
+      const [lb, lc] = local(prev, Math.PI / 8);
+      if (lc < bestC + 0.45) [best, bestC] = [lb, lc];
+    }
+    this.roll[side] = best;
+    cost(best);
+    // Kämmenen kierto (pronaatio) tapahtuu kyynärvarressa, ei ranteessa: siirretään suurin osa
+    // käden kierrosta kyynärvarren oman akselin ympäri. Hihan alla kierto ei näy ranteen saumana.
+    rel.copy(v2).invert().multiply(v);
+    const tw = qC.set(0, rel.y, 0, rel.w);
+    if (tw.lengthSq() > 1e-9) v2.multiply(tw.normalize().slerp(IDENT, 1 - FOREARM_TWIST));
+    return [v1, v2, v] as const;
+  }
+
+  /** Keihään kädet: oikea käsi asennon mukaiseen otteeseen (sulautuen suoraan ohjattuun), vasen varrelle. */
+  private spearArms() {
+    this.body.updateMatrixWorld(true);
+    const rigY = this.rig ? this.rig.position.y : 0;
+    if (this.spearW > 0.001) {
+      const G = this.hold.grip.clone();
+      G.y += rigY;
+      const ik = this.holdShaft("R", G, this.hold.dir, this.hold.poleR);
+      (["upper_arm_R", "forearm_R", "hand_R"] as const).forEach((n, i) => {
+        const b = this.bones.get(n)!;
+        const fk = b.world.clone().multiply(qA.copy(b.canon).invert());
+        this.setBone(n, fk.slerp(ik[i], this.spearW));
+      });
+      this.body.updateMatrixWorld(true);
+    }
+    const P0 = this.body.worldToLocal(this.weapon.localToWorld(new THREE.Vector3(0, 0, 0)));
+    const dir = this.body.worldToLocal(this.weapon.localToWorld(new THREE.Vector3(0, 0, 1))).sub(P0).normalize();
+    const G = P0.addScaledVector(dir, this.hold.front);
+    const [l1, l2, l3] = this.holdShaft("L", G, dir, this.hold.poleL);
+    this.setBone("upper_arm_L", l1);
+    this.setBone("forearm_L", l2);
+    this.setBone("hand_L", l3);
+  }
+
+  /**
+   * Mittari: kummankin käden otekanavan keskipisteen etäisyys keihään akselista (m),
+   * kanavan ja varren välinen kulma (deg) sekä ranteen kääntö kyynärvarteen nähden (deg).
+   */
+  spearGripDebug() {
+    if (this.look.loadout !== "spear" || !this.rig) return null;
+    this.root.updateMatrixWorld(true);
+    const P0 = this.weapon.localToWorld(new THREE.Vector3(0, 0, 0));
+    const dir = this.weapon.localToWorld(new THREE.Vector3(0, 0, 1)).sub(P0).normalize();
+    const out: Record<string, number> = {};
+    for (const side of ["R", "L"] as const) {
+      const h = this.bones.get(`hand_${side}`)!, f = this.bones.get(`forearm_${side}`)!;
+      const vH = h.world.clone().multiply(h.canon.clone().invert());
+      const vF = f.world.clone().multiply(f.canon.clone().invert());
+      const bq = this.body.getWorldQuaternion(new THREE.Quaternion());
+      const c = h.bone.getWorldPosition(new THREE.Vector3()).add(this.gripV[side].c.clone().applyQuaternion(vH).applyQuaternion(bq));
+      const rel = c.sub(P0);
+      out[`grip${side}`] = rel.addScaledVector(dir, -rel.dot(dir)).length();
+      const cd = this.gripV[side].d.clone().applyQuaternion(vH).applyQuaternion(bq);
+      out[`angle${side}`] = THREE.MathUtils.radToDeg(Math.acos(Math.min(1, Math.abs(cd.dot(dir)))));
+      // Ranteen taivutus (kämmenen akselin kulma kyynärvarteen) ja kierto kyynärvarren ympäri.
+      const r = vF.invert().multiply(vH);
+      out[`wrist${side}`] = THREE.MathUtils.radToDeg(DOWN.angleTo(DOWN.clone().applyQuaternion(r)));
+      const tw = new THREE.Quaternion(0, r.y, 0, r.w).normalize();
+      out[`twist${side}`] = THREE.MathUtils.radToDeg(2 * Math.acos(Math.min(1, Math.abs(tw.w))));
+    }
+    return out;
   }
 
   private boneY(name: BoneName) {
@@ -428,7 +574,7 @@ export class Fighter {
     arm("R", p.rShX, p.rShZ, p.rEl, qB.setFromEuler(eul.set(p.rHandX, p.rHandY, 0, "YXZ")).clone());
     arm("L", p.lShX, p.lShZ, p.lEl, null);
     eul.order = "XYZ";
-    if (this.look.loadout === "spear" && this.fall < 0.05) this.reachShaft();
+    if (this.look.loadout === "spear") this.spearArms();
 
     // Kävely: reidet heiluvat vastakkain, polvet koukistuvat.
     const s = Math.sin(this.walkPhase);
@@ -465,6 +611,18 @@ export class Fighter {
       const goal = over && key in over ? over[key as keyof typeof over]! : target[key];
       this.pose[key] += (goal - this.pose[key]) * k;
     }
+    if (this.look.loadout === "spear") {
+      const st = SPEAR_HOLD.get(target);
+      this.spearW += ((st ? 1 : 0) - this.spearW) * k;
+      if (st) {
+        const h = spearHold(st);
+        this.hold.grip.lerp(h.grip, k);
+        this.hold.dir.lerp(h.dir, k).normalize();
+        this.hold.poleR.lerp(h.poleR, k);
+        this.hold.poleL.lerp(h.poleL, k);
+        this.hold.front += (h.front - this.hold.front) * k;
+      }
+    }
     this.walkPhase += dt * moveSpeed * 3.2;
     // Kaatuminen selälleen.
     this.body.rotation.x = -this.fall * (Math.PI / 2) * 0.95;
@@ -490,17 +648,62 @@ const SHIELD_ARM = new Set<Pose>([
   POSES.slashWindup, POSES.slashStrike, POSES.thrustWindup, POSES.thrustStrike,
 ]);
 
-// Keihäs: kärki eteen vaakatasossa (olkapään, kyynärpään ja ranteen kulmien summa noin nolla),
-// takakäsi lantion vieressä. Etukäden vie varrelle reachShaft(). Keihäällä vain pistetään.
+// Keihäs: vartalon asento (kierto, kyyry, haara-asento) tulee näistä; kädet vie otteeseen
+// SPEAR_HOLD + käänteiskinematiikka. Käsien kulmia käytetään vain siirtymissä asentoihin,
+// joille ei ole keihäsotetta (horjahdus, juuttuminen, laulu). Keihäällä vain pistetään.
 const SPEAR_BLOCK: Partial<Pose> = { spineYaw: -0.2, rShX: -0.3, rShZ: -0.3, rEl: -1.5, rHandX: 0.6, rHandY: 1.2, lShX: -1.3, lShZ: 0.2, lEl: -0.9 };
-const SPEAR = new Map<Pose, Partial<Pose>>([
+export const SPEAR = new Map<Pose, Partial<Pose>>([
   [POSES.guard, { spineYaw: -0.45, rShX: 0.35, rShZ: -0.15, rEl: -1.3, rHandX: 0.95, rHandY: 0, lShX: -0.85, lShZ: -0.3, lEl: -0.55 }],
   [POSES.thrustWindup, { spineYaw: -0.8, rShX: 0.85, rShZ: -0.2, rEl: -1.7, rHandX: 0.85, rHandY: 0, lShX: -0.6, lShZ: -0.35, lEl: -0.9 }],
-  [POSES.thrustStrike, { stride: 0.55, crouch: 0.22, spineYaw: 0.35, spinePitch: 0.3, rShX: -1.15, rShZ: 0.1, rEl: -0.2, rHandX: 1.35, rHandY: 0, lShX: -1.2, lShZ: -0.2, lEl: -0.25 }],
+  [POSES.thrustStrike, { stride: 0.55, crouch: 0.22, spineYaw: -0.55, spinePitch: 0.42, rShX: -1.15, rShZ: 0.1, rEl: -0.2, rHandX: 1.35, rHandY: 0, lShX: -1.2, lShZ: -0.2, lEl: -0.25 }],
   [POSES.block, SPEAR_BLOCK], [POSES.blockSide, SPEAR_BLOCK], [POSES.blockThrust, SPEAR_BLOCK],
 ]);
-/** Etukäden paikka keihään varrella metreinä takakädestä kärkeen päin. */
-const SPEAR_FRONT_GRIP = 0.46;
+
+/**
+ * Keihään ote asennoittain hahmon koordinaatistossa (+z eteen, +y ylös, oikea käsi −x):
+ * grip = takakäden otteen paikka (m), yaw/pitch = varren suunta (rad, yaw > 0 kääntää kärjen
+ * vartalon keskilinjaa kohti), front = etukäden etäisyys takakädestä varrella (m),
+ * poleR/poleL = suunta, johon kyynärpää osoittaa. Kädet viedään otteeseen käänteiskinematiikalla.
+ */
+interface SpearHoldDef {
+  grip: [number, number, number];
+  yaw: number;
+  pitch: number;
+  front: number;
+  poleR: [number, number, number];
+  poleL: [number, number, number];
+}
+// Perusasento: takakäsi oikean lonkan vieressä, kärki vastustajan rinnan korkeudella.
+const SPEAR_HOLD_GUARD: SpearHoldDef = { grip: [-0.2, 1.0, 0.04], yaw: 0.1, pitch: 0.24, front: 0.53, poleR: [-0.3, -1, -0.6], poleL: [-0.3, -1, 0] };
+// Torjunta: varsi vinosti ylös vartalon eteen.
+const SPEAR_HOLD_BLOCK: SpearHoldDef = { grip: [-0.16, 1.02, 0.22], yaw: 0.3, pitch: 0.95, front: 0.55, poleR: [-0.3, -1, -0.6], poleL: [0.6, -1, -0.2] };
+export const SPEAR_HOLD = new Map<Pose, SpearHoldDef>([
+  [POSES.guard, SPEAR_HOLD_GUARD],
+  // Pisto: varsi vedetään taakse lonkalle ja työnnetään molemmin käsin eteen (tyviote liikkuu 0,5 m).
+  [POSES.thrustWindup, { grip: [-0.22, 1.02, -0.22], yaw: 0.08, pitch: 0.2, front: 0.5, poleR: [-0.3, -1, -0.6], poleL: [-0.3, -1, 0] }],
+  [POSES.thrustStrike, { grip: [-0.12, 1.15, 0.28], yaw: 0.05, pitch: 0.1, front: 0.45, poleR: [-0.8, -0.5, -0.6], poleL: [-0.3, -1, 0] }],
+  [POSES.block, SPEAR_HOLD_BLOCK], [POSES.blockSide, SPEAR_HOLD_BLOCK], [POSES.blockThrust, SPEAR_HOLD_BLOCK],
+  // Horjahdus (myös kaatuminen) ja suohon juuttuminen: keihäs pysyy molemmissa käsissä.
+  [POSES.stagger, { grip: [-0.22, 1.05, -0.08], yaw: 0.15, pitch: 0.55, front: 0.5, poleR: [-0.3, -1, -0.6], poleL: [0.6, -1, -0.2] }],
+  [POSES.rooted, { grip: [-0.2, 1.15, 0.05], yaw: 0.2, pitch: 0.45, front: 0.55, poleR: [-0.3, -1, -0.6], poleL: [0.6, -1, -0.2] }],
+]);
+function spearHold(d: SpearHoldDef) {
+  return {
+    grip: new THREE.Vector3(...d.grip),
+    dir: new THREE.Vector3(Math.sin(d.yaw) * Math.cos(d.pitch), Math.sin(d.pitch), Math.cos(d.yaw) * Math.cos(d.pitch)),
+    front: d.front,
+    poleR: new THREE.Vector3(...d.poleR),
+    poleL: new THREE.Vector3(...d.poleL),
+  };
+}
+
+/** Kuinka suuri osa kämmenen kierrosta viedään kyynärvarteen (loput näkyy ranteessa). */
+const FOREARM_TWIST = 0.85;
+
+// Nyrkin otekanava glTF-koordinaateissa (oikea käsi lepoasennossa; vasen = peilikuva x:n suhteen).
+// Sama suora kuin GRIP_P/GRIP_D tiedostossa assets-src/blender/char_build.py, jonka mukaan
+// sormet on muotoiltu varren ympärille. d osoittaa peukalon puolelle eli keihään kärkeen päin.
+const GRIP_CHANNEL = { p: new THREE.Vector3(-0.383, 0.795, 0.112), d: new THREE.Vector3(0.31, -0.06, 0.95).normalize() };
 
 // Aseen paikka kädessä virtuaalisessa käsikehyksessä (käsi suorana alas: y alas rannetta pitkin).
 const GRIP = { x: 0, y: -0.085, z: 0.0 };
@@ -590,11 +793,16 @@ export class FlyingProp implements Debris {
     const pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3();
     obj.matrixWorld.decompose(pos, quat, scl);
     obj.removeFromParent();
-    // Kääntöpiste kappaleen keskelle, jotta se pyörii luontevasti eikä kierrä hahmon jalkoja.
-    const center = new THREE.Box3().setFromObject(obj).getCenter(new THREE.Vector3());
-    obj.position.copy(pos).sub(center);
+    // Kappale ensin maailman koordinaatteihin: vasta sitten sen keskipiste on oikea.
+    // (Aiemmin keskipiste laskettiin pääluun koordinaateissa, jolloin kypärä saattoi
+    // "laskeutua" heti ja jäädä leijumaan.)
+    obj.position.copy(pos);
     obj.quaternion.copy(quat);
     obj.scale.copy(scl);
+    obj.updateMatrixWorld(true);
+    // Kääntöpiste kappaleen keskelle, jotta se pyörii luontevasti eikä kierrä hahmon jalkoja.
+    const center = new THREE.Box3().setFromObject(obj).getCenter(new THREE.Vector3());
+    obj.position.sub(center);
     this.group.position.copy(center);
     this.group.add(obj);
     this.vel = dir.clone().setY(0).normalize().multiplyScalar(2.2 + Math.random() * 1.2).add(new THREE.Vector3(0, 2.6 + Math.random(), 0));
