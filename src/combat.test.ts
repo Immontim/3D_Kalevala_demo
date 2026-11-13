@@ -97,6 +97,10 @@ describe("aseet ja iskut parametreina", () => {
     expect(resolveHit({ distance: 3.0, angleToDefender: 0 }, idle, 5, swordThrust)).toBe("miss");
     expect(resolveHit({ distance: 3.0, angleToDefender: 0 }, idle, 5, spearThrust)).toBe("hit");
     expect(resolveHit({ distance: 1.1, angleToDefender: 0 }, idle, 5, spearThrust)).toBe("miss");
+    // Kantama ja syöksy on mitoitettu mallin mukaan: 3,5 m ja 0,3 m miekkaa pidempi askel.
+    expect(spearThrust.range).toBeCloseTo(3.5);
+    expect(resolveHit({ distance: 3.4, angleToDefender: 0 }, idle, 5, spearThrust)).toBe("hit");
+    expect(spearThrust.lunge).toBeCloseTo(swordThrust.lunge + 0.3);
   });
   it("piston kaari on kapea: sivuaskel riittää", () => {
     expect(resolveHit({ distance: 2.2, angleToDefender: 0.6 }, idle, 5, swordThrust)).toBe("miss");

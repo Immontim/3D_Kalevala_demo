@@ -13,7 +13,7 @@ import {
 import { ARENA_RADIUS, buildWorld, groundHeight } from "./world";
 import { Sfx } from "./audio";
 import {
-  BEAT_GAP, SONG_INTRO, SONG_LEAD, SONG_OUTRO, SONG_SLOWMO, SONG_VERSES, inZone, songOutcome, zoneHalf,
+  BEAT_GAP, SONG_INTRO, SONG_LEAD, SONG_OUTRO, SONG_SLOWMO, SONG_SPEED, SONG_VERSES, inZone, songOutcome, zoneHalf,
 } from "./songLogic";
 import { Bog } from "./bog";
 import { VERSION } from "./version";
@@ -218,7 +218,13 @@ function releaseCode(code: string) {
 
 window.addEventListener("keydown", (e) => {
   if (capture || e.repeat) return;
-  if (e.code === "Escape") { pause(); return; }
+  if (e.code === "Escape") {
+    // Esc myös jatkaa peliä: sivuun raahatun taukoikkunan Jatka-nappi voi olla ruudun ulkopuolella.
+    // Viive estää sen, että hiiren lukituksen vapauttava Esc sekä pysäyttäisi että jatkaisi.
+    if (!paused) pause();
+    else if (performance.now() - pausedAt > 400) resume();
+    return;
+  }
   keys.add(e.code);
   if (pressCode(e.code)) e.preventDefault();
   if (e.code === "Space") { beatQueued = true; e.preventDefault(); }
@@ -496,7 +502,7 @@ function updateSong() {
   if (!s.shown) { s.shown = true; $("song").classList.remove("hidden"); }
   const trackW = $("track").clientWidth;
   const markerX = trackW * 0.25;
-  const pxPerSec = trackW * 0.45;
+  const pxPerSec = trackW * 0.45 * SONG_SPEED;
   s.beats.forEach((bt, i) => {
     const x = markerX + (bt - realTime) * pxPerSec;
     const w = 2 * zoneHalf(i) * pxPerSec;
@@ -564,9 +570,13 @@ function interruptSong() {
 }
 
 // ---------- Tekoäly ----------
-interface Ai { decide: number; strafeDir: number; reactedTo: number; counter: boolean; }
+interface Ai { decide: number; strafeDir: number; reactedTo: number; counter: boolean; /** Suosta päässyt kääntyy vielä pelaajaa kohti. */ reorient: boolean; }
 let ai: Ai = newAi();
-function newAi(): Ai { return { decide: 1.2, strafeDir: Math.random() < 0.5 ? 1 : -1, reactedTo: -1, counter: false }; }
+function newAi(): Ai { return { decide: 1.2, strafeDir: Math.random() < 0.5 ? 1 : -1, reactedTo: -1, counter: false, reorient: false }; }
+/** Suosta päässeen vastustajan kääntymisnopeus (rad/s): puolikierros vie noin sekunnin. */
+const REORIENT_TURN = 3.2;
+/** Kun pelaaja on näin tarkasti edessä (rad), vastustaja on taas valmis toimimaan. */
+const REORIENT_DONE = 0.2;
 let playerAttackId = 0;
 
 /** Kilpi torjuu useammin, keihäsmies harvemmin. */
@@ -597,9 +607,23 @@ function pickEnemyAttack(e: Actor, dist: number, quick = false): { kind: StrikeS
 function updateAi(e: Actor, dt: number) {
   const toPlayer = player.pos.clone().sub(e.pos);
   const dist = toPlayer.length();
-  e.yaw = lerpAngle(e.yaw, Math.atan2(toPlayer.x, toPlayer.z), 1 - Math.exp(-8 * dt));
+  const facing = Math.atan2(toPlayer.x, toPlayer.z);
+  if (e.state === "rooted") {
+    // Suossa ei käännytä: pelaaja voi kiertää selän taakse.
+    ai.reorient = true;
+  } else if (ai.reorient) {
+    // Suosta päässyt kääntyy pelaajaa kohti tasaista vauhtia eikä tee sinä aikana muuta.
+    const diff = angleBetween(e.yaw, facing);
+    const step = REORIENT_TURN * dt;
+    e.yaw += Math.max(-step, Math.min(step, diff));
+    if (Math.abs(diff) <= Math.max(step, REORIENT_DONE)) ai.reorient = false;
+  } else {
+    e.yaw = lerpAngle(e.yaw, facing, 1 - Math.exp(-8 * dt));
+  }
 
-  if (e.state === "idle") {
+  if (e.state === "idle" && ai.reorient) {
+    e.moveSpeed = 0;
+  } else if (e.state === "idle") {
     // Reagoi pelaajan nostoon: torju joskus.
     if (player.state === "windup" && ai.reactedTo !== playerAttackId && dist < 3.2) {
       ai.reactedTo = playerAttackId;
@@ -616,7 +640,7 @@ function updateAi(e: Actor, dt: number) {
     // Liiku sopivalle etäisyydelle ja kierrä.
     // Keihäsmies pitää välimatkaa, kilpimies tulee iholle murtamaan pitkän torjunnan.
     const spear = e.loadout === "spear";
-    const want = spear ? 2.7 : e.shield && !player.shield && playerTurtles() ? 1.35 : 1.9;
+    const want = spear ? 2.9 : e.shield && !player.shield && playerTurtles() ? 1.35 : 1.9;
     const dir = toPlayer.clone().normalize();
     const side = new THREE.Vector3(dir.z, 0, -dir.x).multiplyScalar(ai.strafeDir);
     const move = new THREE.Vector3();
@@ -1119,6 +1143,7 @@ function simulate(realDt: number) {
 // klikkauksia muualle. Jos lukitus ei ole saatavilla (esim. upotettu näkymä),
 // peli pysähtyy, kun hiiri tai fokus lähtee ikkunasta.
 let paused = false;
+let pausedAt = 0;
 let pointerLockWorked = false;
 
 function clearInputs() {
@@ -1144,6 +1169,7 @@ function lockPointer() {
 function pause() {
   if (!running || paused || gameOver) return;
   paused = true;
+  pausedAt = performance.now();
   clearInputs();
   renderBinds();
   $("pause").classList.remove("hidden");
@@ -1156,6 +1182,33 @@ function resume() {
   $("pause").classList.add("hidden");
   last = performance.now();
   lockPointer();
+}
+
+// Taukoikkunan voi raahata sivuun, esimerkiksi kuvakaappausta varten. Siirretty ikkuna
+// poistaa myös ruudun tummennuksen. Paikka säilyy seuraavaan taukoon.
+{
+  const overlay = $("pause");
+  const panel = overlay.querySelector(".panel") as HTMLElement;
+  const off = { x: 0, y: 0 };
+  let drag: { x: number; y: number; ox: number; oy: number } | null = null;
+  panel.addEventListener("pointerdown", (e) => {
+    if (capture || (e.target as HTMLElement).closest("button")) return;
+    drag = { x: e.clientX, y: e.clientY, ox: off.x, oy: off.y };
+    panel.setPointerCapture(e.pointerId);
+  });
+  panel.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    // Ikkunasta jää aina kaistale näkyviin, jotta sen saa takaisin.
+    const maxX = (window.innerWidth + panel.offsetWidth) / 2 - 80;
+    const maxY = (window.innerHeight + panel.offsetHeight) / 2 - 60;
+    off.x = Math.max(-maxX, Math.min(maxX, drag.ox + e.clientX - drag.x));
+    off.y = Math.max(-maxY, Math.min(maxY, drag.oy + e.clientY - drag.y));
+    panel.style.transform = `translate(${off.x}px, ${off.y}px)`;
+    overlay.classList.toggle("moved", off.x !== 0 || off.y !== 0);
+  });
+  const drop = () => { drag = null; };
+  panel.addEventListener("pointerup", drop);
+  panel.addEventListener("pointercancel", drop);
 }
 
 document.addEventListener("pointerlockchange", () => {
@@ -1181,11 +1234,15 @@ $("startBtn").addEventListener("click", () => {
 // Kehityskäyttöön ja savutesteihin: tila näkyy konsolista.
 (window as unknown as { __game: unknown }).__game = {
   get state() {
-    return { pos: player.pos.toArray().map((v) => +v.toFixed(2)), yaw: +player.yaw.toFixed(2), dist: enemy ? +enemy.pos.distanceTo(player.pos).toFixed(2) : null, ai: { ...ai }, player: player.state, playerAttack: `${player.attack.kind}/${player.attack.weight}`, playerHp: player.hp, playerShield: player.shieldHp, stance: player.stance, enemy: enemy?.state, enemyAttack: enemy ? `${enemy.attack.kind}/${enemy.attack.weight}` : null, enemyShield: enemy?.shieldHp, enemyHp: enemy?.hp, song, wave, timeScale };
+    return { pos: player.pos.toArray().map((v) => +v.toFixed(2)), yaw: +player.yaw.toFixed(2), dist: enemy ? +enemy.pos.distanceTo(player.pos).toFixed(2) : null, ai: { ...ai }, player: player.state, playerAttack: `${player.attack.kind}/${player.attack.weight}`, playerHp: player.hp, playerShield: player.shieldHp, stance: player.stance, enemy: enemy?.state, enemyYaw: enemy ? +enemy.yaw.toFixed(2) : null, enemyPos: enemy ? [+enemy.pos.x.toFixed(2), +enemy.pos.z.toFixed(2)] : null, enemyAttack: enemy ? `${enemy.attack.kind}/${enemy.attack.weight}` : null, enemyShield: enemy?.shieldHp, enemyHp: enemy?.hp, song, wave, timeScale };
   },
   get events() { return [...events]; },
   get song() { return songState ? { results: [...songState.results], done: songState.endAt >= 0, realTime, playAt: songState.playAt, beats: songState.beats } : null; },
   fillSong() { song = SONG_MAX; },
+  /** Laulaa vastustajan suoraan suohon t sekunniksi (savutestit). */
+  root(t = 3) { if (enemy && enemy.state !== "dead") { setState(enemy, "rooted"); enemy.rootTime = t; } },
+  /** Siirtää pelaajan annettuun kohtaan (savutestit). */
+  placePlayer(x: number, z: number) { player.pos.set(x, groundHeight(x, z), z); },
   /** Lennättää vastustajan kypärän päästä (tehosteen kokeiluun). */
   knockHelmet() {
     if (!enemy) return false;
@@ -1211,6 +1268,13 @@ $("startBtn").addEventListener("click", () => {
   },
   /** Hahmorivi: kaikki hahmot ja varustukset näkyviin aukion keskelle. */
   showcase(on = true, pose?: string) { setShowcase(on, pose); },
+  /** Hahmorivin aseiden kärjen vaakaetäisyys hahmon keskipisteestä (m): kantaman vertailuun malliin. */
+  get showcaseReach() {
+    return showcase.map((s) => {
+      s.fighter.bladeTip.getWorldPosition(tmpB);
+      return { look: `${s.fighter.look.character}/${s.fighter.look.loadout}`, pose: s.pose, reach: +Math.hypot(tmpB.x - s.fighter.root.position.x, tmpB.z - s.fighter.root.position.z).toFixed(2) };
+    });
+  },
   /** Vapaa kamera kuvakaappauksia varten; null palauttaa pelikameran. */
   setCamera(pos: number[] | null, look: number[] = [0, 1, 0]) { camOverride = pos ? { pos, look } : null; },
   /** Sekunteja (reaaliaikaa) seuraavaan laulun tahtiin, tai null. */
