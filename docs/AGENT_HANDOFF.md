@@ -7,8 +7,19 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
 
-- **Versio v00.12.00**, branch `claude/fallen-pose` (tarkista merge-tila
-  `git merge-base --is-ancestor`). Mainissa on v00.11.00.
+- **Versio v00.13.00**, branch `claude/walk-cycle` (tarkista merge-tila
+  `git merge-base --is-ancestor`). Mainissa on v00.12.00.
+- **Askellus ja elävyys** (`src/fighter.ts`, taulukko `GAIT`): hahmon
+  nopeus mitataan `root`in todellisesta siirtymästä hahmon omassa
+  koordinaatistossa (`animate`), ja `apply` laskee kummallekin jalalle
+  paikan (asennon mukainen paikka + askel) ja ratkaisee siitä reiden ja
+  polven kulmat. Maassa olon aikana jalka kulkee vartaloon nähden hahmon
+  nopeudella taaksepäin, joten se ei liu'u. `animate`n `moveSpeed` kertoo
+  vain, onko liike kävelyä: iskun työntö ja väistö eivät askella.
+  Lantion kierto, kallistus ja sivusiirtymä sekä paikallaan painon siirto
+  ja hengitys lasketaan samassa kohdassa; hartiat ja pää tekevät
+  vastaliikkeen. Kaikki sulautuu pois kaatuessa. `GAIT` on ulkonäköä, ei
+  pelisääntö, eikä se ole säätövälilehdellä. Mittari: `__game.feet`.
 - **Kaatuminen** (`src/fighter.ts`): taulukko `FALLEN` sisältää neljä
   makuuasentoa (kolme selällään, yksi vatsallaan). Asennossa on tavalliset
   asentokentät (kädet, selkä) sekä vain kaatuneella käytetyt jalkojen
@@ -147,15 +158,18 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   ole mainissa. **Omistaja testaa julkaistusta osoitteesta**, ei
   dev-serveriltä.
 - **Käsin testattu 2026-11-13** (Clauden in-app browser, dev-serveri,
-  skriptattu syöte): kaikki neljä makuuasentoa katsottu hahmorivillä
-  ylhäältä ja sivulta kolmella hahmolla ja kaikilla varustuksilla: vartalo
-  ja raajat ovat maan tasossa, polvi koholla -asennoissa jalkapohja on
-  maassa, varusteet lepäävät 3–6 cm maasta. Pelitilanteessa vastustajan ja
-  pelaajan kuolema: kaatuu, ase ja kilpi putoavat viereen, uusi peli (R)
-  siivoaa ne. FPS 60 kahdella ruumiilla.
-  **Ei testattu:** ihmisen pelaamana, kosketusnäyttö, buildattu versio
-  selaimessa, kaltevalla maalla (vartalo ei mukaudu rinteeseen), suossa
-  kuoleva vastustaja.
+  skriptattu syöte, `__game.feet`): tukijalan liukuma juostessa eteen ja
+  taakse noin 2 mm ruutua kohti (hahmo kulkee 56 mm), torjunta-asennossa
+  kävellen noin 1 mm, sivulle noin 5 mm. Askeltahti: kävely noin 2,
+  juoksu noin 4 ja sivuttain noin 5 askelta sekunnissa. Lantion
+  pystyliike kävellessä noin 6 cm, juostessa noin 10 cm, sivuttain noin
+  13 cm. Paikallaan jalat pysyvät alle 1 cm:n sisällä ja lantio huojuu
+  noin ±3 cm. Juoksun asennot katsottu kuvista sivulta. FPS 56–60.
+  **Ei testattu:** ihmisen pelaamana eikä liikkuvana kuvana (vain
+  yksittäiset ruudut ja mittaus), vastustajan askellus mitattuna,
+  keihäsmies ja kaksikätinen ote liikkeessä, kosketusnäyttö, buildattu
+  versio selaimessa. Edellisestä versiosta yhä kokeilematta: kaatuneet
+  kaltevalla maalla ja suossa kuoleva vastustaja.
 - **Komennot 2026-11-13:** `bun run test` (60/60), `bun run lint`,
   `bun run build` ok.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
@@ -182,6 +196,11 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   raskaita lyöntejä ja torjuntaa. Vastustajan täydellistä torjuntaa ei ole,
   joten pelaaja ei voi kuluttaa sen kestävyyttä muuten kuin lyömällä
   torjuntaan (2 per torjunta).
+- **Askellus:** paikallaan kääntyvä hahmo ei ota askelia (jalat kiertyvät
+  vartalon mukana). Sivuttaisliike on pelin nopeudella (3,4 m/s) tiheää
+  askellusta, koska nopeus on sivulle epärealistisen suuri. Ei
+  lentovaihetta juoksussa. Kilpikäsi ja asekäsi eivät heilu askeleen
+  tahdissa.
 - **Keihäällä on vain pisto**, joten sitä vastaan riittää pistotorjunta.
   Keihään kantama (3,5 m kevyt, 3,6 m raskas) on mitoitettu mallista samalla
   pelivaralla kuin miekan: kärki pistossa 1,9 m + syöksy 0,6 m + 0,95 m.

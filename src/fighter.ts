@@ -211,6 +211,28 @@ export function setCharacterEnv(tex: THREE.Texture) {
 }
 
 const DOWN = new THREE.Vector3(0, -1, 0);
+
+/**
+ * Kävelyn ja paikallaan seisomisen elävyys. Nämä ovat ulkonäköä, eivät pelisääntöjä:
+ * hahmon nopeus tulee pelistä, ja askelpituus ja tahti sovitetaan siihen niin, että
+ * maassa oleva jalka pysyy paikallaan (ei liu'u).
+ */
+export const GAIT = {
+  /** Askelsyklin pituus (m) = stepBase + stepPerSpeed · nopeus, enintään stepMax. */
+  stepBase: 0.36, stepPerSpeed: 0.2, stepMax: 0.68,
+  /** Sivuaskel on lyhyempi kuin askel eteen. */
+  sideStep: 0.75,
+  /** Osuus syklistä, jonka jalka on maassa: kävellessä yli puolet, juostessa (runSpeed) alle. */
+  duty: 0.58, dutyRun: 0.4, walkSpeed: 1.6, runSpeed: 3.4,
+  /** Jalan nosto heilahduksessa (m): perusosa ja nopeuden mukaan kasvava osa. */
+  liftBase: 0.05, liftPerSpeed: 0.022,
+  /** Nopeus, jolla askellus alkaa ja jolla se on täydessä laajuudessa (m/s). */
+  startSpeed: 0.2, fullSpeed: 0.9,
+  /** Kävellessä: lantion kierto, kallistus ja sivusiirtymä (rad, rad, m) sekä hartioiden vastaliike. */
+  hipYaw: 0.11, hipRoll: 0.05, hipShift: 0.022, counter: 0.7, lean: 0.07,
+  /** Paikallaan: painon siirto jalalta toiselle, lantion kallistus ja kierto, hengitys. */
+  idleShift: 0.03, idleRoll: 0.045, idleYaw: 0.04, breath: 0.016,
+};
 /** Vianetsintä: elossa olevat keihäshahmot (selaimessa `await import("/src/fighter.ts")`). */
 export const debugSpearFighters = new Set<Fighter>();
 const qA = new THREE.Quaternion(), qB = new THREE.Quaternion(), qC = new THREE.Quaternion();
@@ -255,7 +277,18 @@ export class Fighter {
   private spearW = 1;
   /** Käden edellinen kierto varren ympäri (holdShaft), jotta ratkaisu pysyy jatkuvana. */
   private roll: { L: number | null; R: number | null } = { L: null, R: null };
-  private walkPhase = 0;
+  private walkPhase = Math.random();
+  /** Reiden ja säären pituus sekä vasemman lonkan puoli (+1 tai -1) hahmon x-akselilla. */
+  private legLen: [number, number] = [0.42, 0.42];
+  private leftX = 1;
+  /** Hahmon oma nopeus sen omassa koordinaatistossa (x sivulle, y eteen), tasoitettuna. */
+  private vel = new THREE.Vector2();
+  private stepDir = new THREE.Vector2(0, 1);
+  private stepLen = GAIT.stepBase;
+  private duty = GAIT.duty;
+  private lastPos: THREE.Vector3 | null = null;
+  /** Oma kello ja vaihe, jotta kaksi hahmoa ei huoju samassa tahdissa. */
+  private idleT = Math.random() * 100;
   private disposed = false;
   sink = 0; // suohon vajoaminen metreinä
   fall = 0; // 0..1 kaatuminen
@@ -336,6 +369,11 @@ export class Fighter {
     const pHa = this.bones.get("hand_L")!.bone.getWorldPosition(new THREE.Vector3());
     this.armLen = [pUp.distanceTo(pFo), pFo.distanceTo(pHa)];
     this.footRestY = Math.min(this.boneY("foot_L"), this.boneY("foot_R"));
+    const pTh = this.bones.get("thigh_L")!.bone.getWorldPosition(new THREE.Vector3());
+    const pSh = this.bones.get("shin_L")!.bone.getWorldPosition(new THREE.Vector3());
+    const pFt = this.bones.get("foot_L")!.bone.getWorldPosition(new THREE.Vector3());
+    this.legLen = [pTh.distanceTo(pSh), pSh.distanceTo(pFt)];
+    this.leftX = this.body.worldToLocal(pTh.clone()).x >= 0 ? 1 : -1;
 
     // Ase oikeaan käteen: pidikkeen asento = virtuaalinen käsikehys (terä +z).
     const hand = this.bones.get("hand_R")!;
@@ -391,7 +429,7 @@ export class Fighter {
       this.bones.get("head")!.bone.attach(helmet);
       this.helmet = helmet;
     }
-    this.apply(0);
+    this.apply();
   }
 
   get hasHelmet() { return this.helmet !== null; }
@@ -610,6 +648,17 @@ export class Fighter {
     this.setBone("hand_L", l3);
   }
 
+  /** Mittari: jalkaterien paikka maailmassa (x, y, z) ja askelsyklin vaihe. Savutestiin. */
+  feetDebug() {
+    if (!this.rig) return null;
+    this.root.updateMatrixWorld(true);
+    const at = (n: BoneName) => this.bones.get(n)!.bone.getWorldPosition(new THREE.Vector3()).toArray().map((v) => +v.toFixed(3));
+    return {
+      L: at("foot_L"), R: at("foot_R"), hips: at("hips"), root: this.root.position.toArray().map((v) => +v.toFixed(3)),
+      phase: +this.walkPhase.toFixed(3), duty: +this.duty.toFixed(3), speed: +this.vel.length().toFixed(2),
+    };
+  }
+
   /**
    * Mittari: kummankin käden otekanavan keskipisteen etäisyys keihään akselista (m),
    * kanavan ja varren välinen kulma (deg) sekä ranteen kääntö kyynärvarteen nähden (deg).
@@ -651,16 +700,33 @@ export class Fighter {
     b.bone.quaternion.copy(qC.copy(pw).invert()).multiply(b.world);
   }
 
-  private apply(moveAmp: number) {
+  private apply() {
     if (!this.rig) return;
     const p = this.pose;
     // Kaatumisen osuus 0..1: jalat, selän sivutaivutus ja pään kääntö sulautuvat makuuasentoon.
     const fw = this.fall * this.fall * (3 - 2 * this.fall);
     const fp = this.fallen;
-    const S = new THREE.Quaternion().setFromEuler(eul.set(p.spinePitch, p.spineYaw, fp.spineRoll * fw));
-    const H = new THREE.Quaternion().setFromEuler(eul.set(p.headPitch, -p.spineYaw * 0.5 + fp.headYaw * fw, 0));
+    // Elävyys: paikallaan paino siirtyy hitaasti jalalta toiselle ja hahmo hengittää; kävellessä
+    // lantio kiertyy askeleen mukaan ja hartiat tekevät vastaliikkeen. Kaatuneella ei mitään näistä.
+    const G = GAIT, TAU = Math.PI * 2;
+    const life = 1 - fw;
+    const speed = this.vel.length();
+    const w = THREE.MathUtils.smoothstep(speed, G.startSpeed, G.fullSpeed) * life;
+    const calm = (1 - 0.7 * w) * life;
+    const t = this.idleT;
+    const idle = Math.sin(t * 1.15) * 0.75 + Math.sin(t * 2.63 + 1.3) * 0.25;
+    const breath = Math.sin(t * 1.75) * G.breath * life;
+    const dir = this.stepDir, duty = this.duty;
+    const onLeft = Math.cos(TAU * (this.walkPhase - duty / 2)); // +1 = paino vasemmalla jalalla
+    const leftLead = Math.cos(TAU * this.walkPhase); // +1 = vasen jalka edessä
+    const pelvisX = idle * G.idleShift * calm + this.leftX * onLeft * G.hipShift * w;
+    const hipRoll = idle * G.idleRoll * calm + this.leftX * onLeft * G.hipRoll * w;
+    const hipYaw = Math.sin(t * 0.83 + 2) * G.idleYaw * calm - this.leftX * leftLead * G.hipYaw * w * dir.y;
+    const lean = G.lean * w * dir.y * Math.min(1, speed / 3.4);
+    const S = new THREE.Quaternion().setFromEuler(eul.set(p.spinePitch + breath + lean, p.spineYaw - hipYaw * G.counter, fp.spineRoll * fw - hipRoll * G.counter));
+    const H = new THREE.Quaternion().setFromEuler(eul.set(p.headPitch - breath * 0.6 - lean * 0.7, -p.spineYaw * 0.5 + hipYaw * G.counter * 0.8 + fp.headYaw * fw, hipRoll * G.counter * 0.8));
     const half = new THREE.Quaternion().slerpQuaternions(IDENT, S, 0.5);
-    this.setBone("hips", IDENT);
+    this.setBone("hips", new THREE.Quaternion().setFromEuler(eul.set(0, hipYaw, hipRoll)));
     this.setBone("spine", half);
     this.setBone("chest", S);
     this.setBone("neck", qA.copy(S).multiply(qB.slerpQuaternions(IDENT, H, 0.5)));
@@ -678,31 +744,69 @@ export class Fighter {
     eul.order = "XYZ";
     if (this.look.loadout === "spear") this.spearArms();
 
-    // Kävely: reidet heiluvat vastakkain, polvet koukistuvat.
-    const s = Math.sin(this.walkPhase);
+    // Jalat: asennon mukainen jalan paikka lasketaan ensin (reisi ja polvi), siihen lisätään
+    // askel, ja nivelkulmat ratkaistaan jalan paikasta. Näin maassa oleva jalka liikkuu
+    // vartaloon nähden täsmälleen hahmon nopeudella taaksepäin eikä liu'u maata pitkin.
     // Kesken kaatumisen polvet pettävät hetkeksi, jotta hahmo ei kaadu jäykkänä lautana.
     const buckle = Math.sin(this.fall * Math.PI) * 0.35;
-    const leg = (side: "L" | "R", thighRot: number, kneeRot: number) => {
+    const [l1, l2] = this.legLen;
+    const reach = (l1 + l2) * 0.995;
+    const stepLen = this.stepLen;
+    const lift = (G.liftBase + G.liftPerSpeed * speed) * w;
+    const foot = (side: "L" | "R", thighRot: number, kneeRot: number) => {
+      const a = -thighRot;
+      const out = { x: 0, y: -(l1 * Math.cos(a) + l2 * Math.cos(a - kneeRot)), z: l1 * Math.sin(a) + l2 * Math.sin(a - kneeRot), up: 0 };
+      const ph = (this.walkPhase + (side === "L" ? 0 : 0.5)) % 1;
+      let along: number;
+      if (ph < duty) along = 0.5 - ph / duty; // maassa: tasaisesti edestä taakse
+      else {
+        // Heilahdus takaa eteen. Alku- ja loppunopeus vastaavat maassa oloa, jotta jalka ei nykäise.
+        const u = (ph - duty) / (1 - duty), m = Math.max(-1, -(1 - duty) / duty);
+        const u2 = u * u, u3 = u2 * u;
+        along = (2 * u3 - 3 * u2 + 1) * -0.5 + (u3 - 2 * u2 + u) * m + (-2 * u3 + 3 * u2) * 0.5 + (u3 - u2) * m;
+        out.up = Math.sin(Math.PI * u);
+      }
+      // Sivuaskeleessa kumpikin jalka askeltaa enimmäkseen oman puolensa ulkopuolella, jotta jalat eivät mene ristiin.
+      const sideSign = side === "L" ? this.leftX : -this.leftX;
+      out.x += (dir.x * along + sideSign * 0.25 * Math.abs(dir.x)) * stepLen * w - pelvisX;
+      out.z += dir.y * along * stepLen * w;
+      out.y += out.up * lift;
+      return out;
+    };
+    // Haara-asento sulautuu osin pois kävellessä, jotta askel ei jää toispuoleiseksi.
+    const st = p.stride * (1 - w * 0.6);
+    const sf = Math.max(0, st), sb = Math.max(0, -st);
+    const fL = foot("L", -p.crouch * 1.2 - st, p.crouch * 2 + sf * 0.35 + sb * 0.6);
+    const fR = foot("R", -p.crouch * 1.2 + st, p.crouch * 2 + sb * 0.35 + sf * 0.6);
+    // Jos jalka ei yllä paikkaansa, lantio laskeutuu: tästä syntyy askelluksen pieni pystyliike.
+    let drop = 0;
+    // Ilmassa oleva jalka ei vedä lantiota alas.
+    for (const f of [fL, fR]) drop = Math.max(drop, 0.55 * (1 - f.up * w) * (-f.y - Math.sqrt(Math.max(0.01, reach * reach - f.x * f.x - f.z * f.z))));
+    const leg = (side: "L" | "R", tgt: { x: number; y: number; z: number; up: number }) => {
+      const x = tgt.x, y = tgt.y + drop, z = tgt.z;
+      const r = Math.min(reach, Math.max(Math.abs(l1 - l2) + 0.01, Math.hypot(x, y, z)));
+      const knee = Math.PI - Math.acos(THREE.MathUtils.clamp((l1 * l1 + l2 * l2 - r * r) / (2 * l1 * l2), -1, 1));
+      const open = Math.acos(THREE.MathUtils.clamp((l1 * l1 + r * r - l2 * l2) / (2 * l1 * r), -1, 1));
+      const thighRot = -(Math.atan2(z, Math.hypot(x, y)) + open);
+      const spread = Math.atan2(x, -y);
       const f = side === "L" ? fp.legL : fp.legR;
       const tx = thighRot + (f.x - thighRot) * fw - buckle * 1.1;
-      const kn = kneeRot + (f.knee - kneeRot) * fw + buckle * 2;
-      const th = new THREE.Quaternion().setFromEuler(eul.set(tx, f.y * fw, f.z * fw, "ZXY"));
+      const kn = knee + (f.knee - knee) * fw + buckle * 2;
+      const th = new THREE.Quaternion().setFromEuler(eul.set(tx, f.y * fw, spread + (f.z - spread) * fw, "ZXY"));
       eul.order = "XYZ";
       this.setBone(`thigh_${side}`, th);
       const sh = th.clone().multiply(qA.setFromEuler(eul.set(kn, 0, 0)));
       this.setBone(`shin_${side}`, sh);
-      this.setBone(`foot_${side}`, qA.slerpQuaternions(sh, IDENT, 0.7));
+      // Ilmassa jalkaterä seuraa säärtä enemmän, jolloin varpaat osoittavat alas ponnistuksen jälkeen.
+      this.setBone(`foot_${side}`, qA.slerpQuaternions(sh, IDENT, 0.7 - 0.3 * tgt.up * w));
     };
-    // Haara-asento sulautuu pois kävellessä, jotta askel ei jää toispuoleiseksi.
-    const st = p.stride * (1 - moveAmp * 0.6);
-    const sf = Math.max(0, st), sb = Math.max(0, -st);
-    leg("L", -s * moveAmp - p.crouch * 1.2 - st, Math.max(0, s) * moveAmp * 1.4 + p.crouch * 2 + sf * 0.35 + sb * 0.6);
-    leg("R", s * moveAmp - p.crouch * 1.2 + st, Math.max(0, -s) * moveAmp * 1.4 + p.crouch * 2 + sb * 0.35 + sf * 0.6);
+    leg("L", fL);
+    leg("R", fR);
 
     // Lantio seuraa jalkoja: alempi jalka pysyy maassa kyykyssä ja askeleessa.
     const hips = this.bones.get("hips")!.bone;
     hips.position.copy(this.hipsRest);
-    this.rig.position.y = 0;
+    this.rig.position.set(pelvisX, 0, 0);
     this.rig.updateMatrixWorld(true);
     const low = Math.min(this.boneY("foot_L"), this.boneY("foot_R"));
     this.rig.position.y = this.footRestY - low - this.sink;
@@ -732,13 +836,38 @@ export class Fighter {
         this.hold.front += (h.front - this.hold.front) * k;
       }
     }
-    this.walkPhase += dt * moveSpeed * 3.2;
+    // Nopeus mitataan hahmon todellisesta siirtymästä, jolloin askel osoittaa liikkeen suuntaan
+    // (eteen, taakse tai sivulle) eikä hahmo kävele paikallaan seinää vasten. moveSpeed kertoo,
+    // onko liike kävelyä: syöksyn ja iskun työntö eivät ole askellusta.
+    const G = GAIT, pos = this.root.position;
+    let vx = 0, vz = 0;
+    if (this.lastPos && dt > 1e-6 && moveSpeed > 0) {
+      const dx = pos.x - this.lastPos.x, dz = pos.z - this.lastPos.z;
+      if (Math.hypot(dx, dz) < 1) {
+        const yaw = this.root.rotation.y, c = Math.cos(yaw), sn = Math.sin(yaw);
+        vx = (dx * c - dz * sn) / dt;
+        vz = (dx * sn + dz * c) / dt;
+        const len = Math.hypot(vx, vz);
+        if (len > 6) { vx *= 6 / len; vz *= 6 / len; }
+      }
+    }
+    (this.lastPos ??= new THREE.Vector3()).copy(pos);
+    const kv = 1 - Math.exp(-10 * dt);
+    this.vel.x += (vx - this.vel.x) * kv;
+    this.vel.y += (vz - this.vel.y) * kv;
+    const speed = this.vel.length();
+    if (speed > 0.05) this.stepDir.copy(this.vel).divideScalar(speed);
+    this.stepLen = Math.min(G.stepMax, G.stepBase + G.stepPerSpeed * speed) * (1 - (1 - G.sideStep) * Math.abs(this.stepDir.x));
+    // Sykli etenee niin, että maassa olon aikana vartalo kulkee täsmälleen askelsyklin pituuden.
+    this.duty = THREE.MathUtils.lerp(G.duty, G.dutyRun, THREE.MathUtils.smoothstep(speed, G.walkSpeed, G.runSpeed));
+    this.walkPhase = (this.walkPhase + dt * this.duty * speed / this.stepLen) % 1;
+    this.idleT += dt;
     // Kaatuminen: kiihtyy kuin painovoimassa ja päättyy makuulle selälleen tai vatsalleen.
     const tip = this.fall * this.fall;
     this.body.rotation.x = (this.fallen.prone ? 1 : -1) * tip * (Math.PI / 2);
     this.body.rotation.y = this.fallen.bodyYaw * this.fall;
     this.body.position.y = tip * this.fallen.lift;
-    this.apply(Math.min(1, moveSpeed / 3) * 0.6);
+    this.apply();
   }
 
   setGlow(amount: number) {
