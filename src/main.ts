@@ -4,6 +4,7 @@ import {
   GUARDBREAK_ADVANTAGE, GUARDBREAK_STAGGER, Loadout, SHIELDS, SONG_GAIN_HIT, SONG_GAIN_PARRY, SONG_MAX,
   STAGGER_TIME, STYLES, ShieldDef, StrikeStyle, StrikeWeight, WeaponDef, angleBetween, attackPhase, chargeLevel,
   enemyAttackTiming, makeAttack, resolveHit, shieldWear, strikeDamage, styleFor, weaponOf,
+  STAMINA, canStrikeHeavy, exhausted, maxStaminaOf, staminaAfterBlock, staminaTick, strikeCost, strikeTier, weakened,
 } from "./combat";
 import { Debris, Fighter, FighterLook, POSES, SwordTrail, setCharacterEnv } from "./fighter";
 import {
@@ -97,6 +98,10 @@ interface Actor {
   struck: boolean;
   hp: number;
   maxHp: number;
+  /** Kestävyys: kuluu lyönneistä ja torjunnoista, palautuu itsestään. */
+  stamina: number;
+  /** Hahmokohtainen enimmäiskestävyys; esineet tai loitsut voivat myöhemmin muuttaa tätä. */
+  maxStamina: number;
   blockStart: number;
   rootTime: number;
   dodgeDir: THREE.Vector3;
@@ -111,7 +116,9 @@ function makeActor(look: FighterLook, pos: THREE.Vector3, hp: number, trailColor
   scene.add(fighter.root, trail.mesh);
   const weapon = weaponOf(look.loadout);
   const shield = look.loadout === "sword_shield" ? SHIELDS.round : null;
+  const maxStamina = maxStaminaOf(look.character);
   return {
+    stamina: maxStamina, maxStamina,
     weapon, shield, shieldHp: shield ? shield.durability : 0, stance: "slash", charging: false, power,
     fighter, trail, pos: pos.clone(), yaw: 0, state: "idle", stateTime: 0, timing: { windup: 0.3, release: 0.1, recovery: 0.3 },
     attack: makeAttack(weapon, styleFor(weapon, "slash"), "light"), loadout: look.loadout, struck: false, hp, maxHp: hp,
@@ -347,6 +354,12 @@ function flash(color: string, strength: number) {
 function updateHud() {
   $("php").style.width = `${(player.hp / player.maxHp) * 100}%`;
   $("ehp").style.width = enemy ? `${(Math.max(0, enemy.hp) / enemy.maxHp) * 100}%` : "0%";
+  const staminaBar = (id: string, a: Actor | null) => {
+    $(id).style.width = a ? `${(a.stamina / a.maxStamina) * 100}%` : "0%";
+    $(id).parentElement!.classList.toggle("spent", !!a && a.state !== "dead" && exhausted(a.stamina));
+  };
+  staminaBar("psta", player);
+  staminaBar("esta", enemy);
   const s = $("psong");
   s.style.width = `${(song / SONG_MAX) * 100}%`;
   s.classList.toggle("full", song >= SONG_MAX);
@@ -368,15 +381,19 @@ function updateHud() {
   if (p.state === "windup" && p.attack.kind !== "bash") {
     charge = p.charging ? chargeLevel(p.stateTime, heavyOf(p)) : p.attack.weight === "heavy" ? 1 : 0;
   } else if (p.state === "release" && p.attack.weight === "heavy") charge = 1;
+  // Jos voimat eivät riitä raskaaseen lyöntiin, mittari ei täyty.
+  const tooTired = p.state === "windup" && p.charging && !canStrikeHeavy(p.stamina);
+  if (tooTired) charge = Math.min(charge, 0.6);
   $("charge").classList.toggle("on", charge > 0.12);
   $("charge").classList.toggle("full", charge >= 1);
   $("chargeFill").style.width = `${charge * 100}%`;
-  $("chargeLabel").textContent = charge >= 1 ? `${STYLE_NAME[p.attack.kind]} · raskas` : charge > 0 ? STYLE_NAME[p.attack.kind] : "";
+  $("chargeLabel").textContent = charge >= 1 ? `${STYLE_NAME[p.attack.kind]} · raskas` : charge > 0 ? `${STYLE_NAME[p.attack.kind]}${tooTired ? " · voimat eivät riitä raskaaseen" : ""}` : "";
 
   // Vastustajan tuleva isku ja oma torjunta-asento tekstinä.
   const e = enemy;
   $("cue").textContent = e && e.state === "windup" ? `${STYLE_ICON[e.attack.kind]} ${STYLE_NAME[e.attack.kind]}${e.attack.weight === "heavy" ? " (raskas)" : ""}` : "";
-  $("pstance").textContent = p.state === "block" && !p.shield ? `Torjunta: ${BLOCK_NAME[p.stance]}` : "";
+  $("pstance").textContent = p.state !== "dead" && exhausted(p.stamina) ? "Uupunut: et voi torjua, ja lyöntisi ovat heikkoja"
+    : p.state === "block" && !p.shield ? `Torjunta: ${BLOCK_NAME[p.stance]}` : "";
 }
 const STYLE_NAME: Record<AttackDef["kind"], string> = { overhead: "Ylälyönti", slash: "Sivallus", thrust: "Pisto", bash: "Kilpityöntö" };
 const STYLE_ICON: Record<AttackDef["kind"], string> = { overhead: "↓", slash: "→", thrust: "•", bash: "◐" };
@@ -570,9 +587,14 @@ function interruptSong() {
 }
 
 // ---------- Tekoäly ----------
-interface Ai { decide: number; strafeDir: number; reactedTo: number; counter: boolean; /** Suosta päässyt kääntyy vielä pelaajaa kohti. */ reorient: boolean; }
+interface Ai { decide: number; strafeDir: number; reactedTo: number; counter: boolean; /** Suosta päässyt kääntyy vielä pelaajaa kohti. */ reorient: boolean; /** Uupunut: vetäytyy keräämään voimia. */ resting: boolean; }
 let ai: Ai = newAi();
-function newAi(): Ai { return { decide: 1.2, strafeDir: Math.random() < 0.5 ? 1 : -1, reactedTo: -1, counter: false, reorient: false }; }
+function newAi(): Ai { return { decide: 1.2, strafeDir: Math.random() < 0.5 ? 1 : -1, reactedTo: -1, counter: false, reorient: false, resting: false }; }
+/** Uupunut vastustaja vetäytyy keräämään voimia, kunnes kestävyyttä on taas näin paljon. */
+const AI_REST_UNTIL = 12;
+/** Lepäävä vastustaja pitää tämän välimatkan ja lyö vain, jos pelaaja tulee tätä lähemmäs. */
+const AI_REST_DISTANCE = 3.8;
+const AI_REST_CORNERED = 2.0;
 /** Suosta päässeen vastustajan kääntymisnopeus (rad/s): puolikierros vie noin sekunnin. */
 const REORIENT_TURN = 3.2;
 /** Kun pelaaja on näin tarkasti edessä (rad), vastustaja on taas valmis toimimaan. */
@@ -599,7 +621,7 @@ function pickEnemyAttack(e: Actor, dist: number, quick = false): { kind: StrikeS
   // Kilven takana seisovaa pelaajaa vastaan kaikki lyövät raskaasti: kilpi kuluu nopeammin.
   let heavy = e.loadout === "sword" ? 0.35 : e.loadout === "spear" ? 0.25 : 0.15;
   if (playerTurtles() && player.shield) heavy = 0.7;
-  const weight: StrikeWeight = !quick && Math.random() < heavy ? "heavy" : "light";
+  const weight: StrikeWeight = !quick && canStrikeHeavy(e.stamina) && Math.random() < heavy ? "heavy" : "light";
   const a = makeAttack(e.weapon, kind, weight);
   return dist < a.range + 0.2 && dist > a.minRange + 0.1 ? { kind, weight } : null;
 }
@@ -627,7 +649,7 @@ function updateAi(e: Actor, dt: number) {
     // Reagoi pelaajan nostoon: torju joskus.
     if (player.state === "windup" && ai.reactedTo !== playerAttackId && dist < 3.2) {
       ai.reactedTo = playerAttackId;
-      if (Math.random() < blockChance(e)) {
+      if (!exhausted(e.stamina) && Math.random() < blockChance(e)) {
         setState(e, "block");
         // Aseella torjuva arvaa iskun suunnan: myöhemmillä aalloilla useammin oikein.
         const real = player.attack.kind === "bash" ? "slash" : player.attack.kind;
@@ -639,8 +661,10 @@ function updateAi(e: Actor, dt: number) {
     }
     // Liiku sopivalle etäisyydelle ja kierrä.
     // Keihäsmies pitää välimatkaa, kilpimies tulee iholle murtamaan pitkän torjunnan.
+    if (exhausted(e.stamina)) ai.resting = true;
+    else if (e.stamina >= Math.min(AI_REST_UNTIL, e.maxStamina)) ai.resting = false;
     const spear = e.loadout === "spear";
-    const want = spear ? 2.9 : e.shield && !player.shield && playerTurtles() ? 1.35 : 1.9;
+    const want = ai.resting ? AI_REST_DISTANCE : spear ? 2.9 : e.shield && !player.shield && playerTurtles() ? 1.35 : 1.9;
     const dir = toPlayer.clone().normalize();
     const side = new THREE.Vector3(dir.z, 0, -dir.x).multiplyScalar(ai.strafeDir);
     const move = new THREE.Vector3();
@@ -650,14 +674,16 @@ function updateAi(e: Actor, dt: number) {
     moveActor(e, move, dist > 4 ? 3.4 : spear && dist < want - 0.4 ? 3.0 : 2.4, dt);
 
     ai.decide -= dt;
-    const counter = ai.counter ? pickEnemyAttack(e, dist, true) : null;
+    // Lepäävä vastustaja ei hyökkää, ellei pelaaja tule iholle.
+    const mayAttack = !ai.resting || dist < AI_REST_CORNERED;
+    const counter = ai.counter && mayAttack ? pickEnemyAttack(e, dist, true) : null;
     if (counter) {
       ai.counter = false;
       startAttack(e, counter.kind, counter.weight);
     } else if (ai.decide <= 0) {
       ai.decide = 0.5 + Math.random() * 1.0;
       if (Math.random() < 0.25) ai.strafeDir *= -1;
-      const pick = pickEnemyAttack(e, dist);
+      const pick = mayAttack ? pickEnemyAttack(e, dist) : null;
       if (pick && player.state !== "dead" && Math.random() < (pick.kind === "bash" ? 0.9 : 0.65)) startAttack(e, pick.kind, pick.weight);
     }
   } else {
@@ -666,7 +692,7 @@ function updateAi(e: Actor, dt: number) {
 
   if (e.state === "block") {
     const playerBusy = player.state === "windup" || player.state === "release";
-    if (!playerBusy && e.stateTime > 0.25) {
+    if ((!playerBusy && e.stateTime > 0.25) || exhausted(e.stamina)) {
       setState(e, "idle");
       ai.counter = Math.random() < 0.55;
     }
@@ -738,6 +764,7 @@ function resolveStrike(att: Actor, def: Actor) {
     if (def.shieldHp <= 0) breakShield(def);
     else if (def.shieldHp <= def.shield.durability * def.shield.notchAt) def.fighter.setShieldNotch(true);
   }
+  if (res === "blocked" || res === "parried") def.stamina = staminaAfterBlock(def.stamina);
   const died = def.hp <= 0;
   if (def === player && songState && (res === "hit" || res === "guardbreak")) interruptSong();
   if (died) {
@@ -807,8 +834,17 @@ function resolveStrike(att: Actor, def: Actor) {
   }
 }
 
+/** Lyönti laukeaa: kestävyys ratkaisee, onko se raskas, kevyt vai uupuneen heikko, ja hinta maksetaan. */
+function spendOnStrike(a: Actor) {
+  const tier = strikeTier(a.stamina, a.attack.weight);
+  if (tier !== "heavy" && a.attack.weight === "heavy" && a.attack.kind !== "bash") a.attack = makeAttack(a.weapon, a.attack.kind, "light");
+  if (tier === "weak") a.attack = weakened(a.attack);
+  a.stamina = Math.max(0, a.stamina - strikeCost(tier));
+}
+
 function updateCombatant(a: Actor, other: Actor | null, dt: number) {
   a.stateTime += dt;
+  if (a.state !== "dead") a.stamina = staminaTick(a.stamina, a.maxStamina, a.state === "block", dt);
   a.dodgeCd -= dt;
   const t = a.timing;
 
@@ -816,6 +852,7 @@ function updateCombatant(a: Actor, other: Actor | null, dt: number) {
     const phase = a.charging ? "windup" : attackPhase(a.stateTime, { ...t, recovery: t.recovery + a.extraRecovery });
     if (phase === "release" && a.state !== "release") {
       a.state = "release";
+      spendOnStrike(a);
       sfx.swing();
     }
     if (phase === "release") {
@@ -866,7 +903,7 @@ function updatePlayer(dt: number) {
     const style = p.attack.kind;
     const heavy = makeAttack(p.weapon, style, "heavy");
     const full = p.stateTime >= heavy.timing.windup;
-    if (full && p.attack.weight === "light") { p.attack = heavy; sfx.tick(); }
+    if (full && p.attack.weight === "light" && canStrikeHeavy(p.stamina)) { p.attack = heavy; sfx.tick(); }
     // Nappi lasketaan pohjassa olevaksi myös, jos ase muunsi painetun suunnan toiseksi (keihäs).
     const held = STYLES.some((st) => strikeHeld[st] && styleFor(p.weapon, st) === style);
     if (!held || p.stateTime >= heavy.timing.windup + CHARGE_HOLD_MAX) {
@@ -895,8 +932,10 @@ function updatePlayer(dt: number) {
       // Asennon vaihto aloittaa torjunnan alusta, joten oikeaan aikaan vaihdettu asento on täydellinen torjunta.
       if (strikeQueued !== p.stance) { p.stance = strikeQueued; p.blockStart = gameTime; }
     }
-    if (blockHeld && p.state === "idle") { setState(p, "block"); p.blockStart = gameTime; }
-    if (!blockHeld && p.state === "block") setState(p, "idle");
+    // Uupunut ei pysty torjumaan: suoja laskee itsestään.
+    const tired = exhausted(p.stamina);
+    if (blockHeld && !tired && p.state === "idle") { setState(p, "block"); p.blockStart = gameTime; }
+    if ((!blockHeld || tired) && p.state === "block") setState(p, "idle");
   }
   const speed = p.state === "idle" ? 3.4 : p.state === "block" || p.state === "windup" || p.state === "recovery" ? 1.4 : 0;
   if (speed > 0) moveActor(p, move, speed, dt);
@@ -1090,6 +1129,7 @@ function simulate(realDt: number) {
       nextWaveAt = -1;
       if (enemy) corpses.push({ actor: enemy, removeAt: gameTime + 6 });
       player.hp = Math.min(player.maxHp, player.hp + 35);
+      player.stamina = Math.min(player.maxStamina, player.stamina + STAMINA.waveRest);
       renewPlayerShield();
       spawnEnemy();
     }
@@ -1234,11 +1274,13 @@ $("startBtn").addEventListener("click", () => {
 // Kehityskäyttöön ja savutesteihin: tila näkyy konsolista.
 (window as unknown as { __game: unknown }).__game = {
   get state() {
-    return { pos: player.pos.toArray().map((v) => +v.toFixed(2)), yaw: +player.yaw.toFixed(2), dist: enemy ? +enemy.pos.distanceTo(player.pos).toFixed(2) : null, ai: { ...ai }, player: player.state, playerAttack: `${player.attack.kind}/${player.attack.weight}`, playerHp: player.hp, playerShield: player.shieldHp, stance: player.stance, enemy: enemy?.state, enemyYaw: enemy ? +enemy.yaw.toFixed(2) : null, enemyPos: enemy ? [+enemy.pos.x.toFixed(2), +enemy.pos.z.toFixed(2)] : null, enemyAttack: enemy ? `${enemy.attack.kind}/${enemy.attack.weight}` : null, enemyShield: enemy?.shieldHp, enemyHp: enemy?.hp, song, wave, timeScale };
+    return { pos: player.pos.toArray().map((v) => +v.toFixed(2)), yaw: +player.yaw.toFixed(2), dist: enemy ? +enemy.pos.distanceTo(player.pos).toFixed(2) : null, ai: { ...ai }, player: player.state, playerAttack: `${player.attack.kind}/${player.attack.weight}`, playerHp: player.hp, playerStamina: +player.stamina.toFixed(2), enemyStamina: enemy ? +enemy.stamina.toFixed(2) : null, playerShield: player.shieldHp, stance: player.stance, enemy: enemy?.state, enemyYaw: enemy ? +enemy.yaw.toFixed(2) : null, enemyPos: enemy ? [+enemy.pos.x.toFixed(2), +enemy.pos.z.toFixed(2)] : null, enemyAttack: enemy ? `${enemy.attack.kind}/${enemy.attack.weight}` : null, enemyShield: enemy?.shieldHp, enemyHp: enemy?.hp, song, wave, timeScale };
   },
   get events() { return [...events]; },
   get song() { return songState ? { results: [...songState.results], done: songState.endAt >= 0, realTime, playAt: songState.playAt, beats: songState.beats } : null; },
   fillSong() { song = SONG_MAX; },
+  /** Asettaa kestävyydet (savutestit); null jättää ennalleen. */
+  setStamina(p: number | null, e: number | null = null) { if (p !== null) player.stamina = p; if (e !== null && enemy) enemy.stamina = e; },
   /** Laulaa vastustajan suoraan suohon t sekunniksi (savutestit). */
   root(t = 3) { if (enemy && enemy.state !== "dead") { setState(enemy, "rooted"); enemy.rootTime = t; } },
   /** Siirtää pelaajan annettuun kohtaan (savutestit). */

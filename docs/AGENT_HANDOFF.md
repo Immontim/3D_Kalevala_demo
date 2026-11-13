@@ -7,8 +7,21 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
 
-- **Versio v00.09.00**, branch `claude/pause-root-reach` (tarkista
-  merge-tila `git merge-base --is-ancestor`). Mainissa on v00.08.00.
+- **Versio v00.10.00**, branch `claude/stamina` (tarkista merge-tila
+  `git merge-base --is-ancestor`). Mainissa on v00.09.00.
+- **Kestävyys (stamina)**: kaikki luvut taulukossa `STAMINA`
+  (`src/combat.ts`, testit vieressä): enimmäismäärä hahmoittain (hero 100,
+  urho 60, pohja 80), kevyt lyönti 3, raskas 9, toteutunut torjunta 2,
+  torjunta-asento 1/s, palautuminen 1/s, uupuneen vahinkokerroin 0,25,
+  pelaajan lepo aaltojen välissä +35. `Actor.stamina` ja
+  `Actor.maxStamina` ovat hahmokohtaisia, joten esineet ja loitsut voivat
+  myöhemmin muuttaa niitä. Hinta maksetaan, kun lyönti laukeaa
+  (`spendOnStrike`): keskeytynyt nosto ei maksa. **Uupunut** = kestävyyttä
+  alle kevyen lyönnin hinnan (`exhausted`): ei torjuntaa, lyönnit keveitä,
+  ilmaisia ja 25 % vahingosta. Jos voimat eivät riitä raskaaseen, lyönti jää
+  kevyeksi. Tekoäly: ei torju uupuneena, ei valitse raskasta ilman varaa, ja
+  uupuneena vetäytyy 3,8 m:n päähän, kunnes kestävyyttä on 12
+  (`ai.resting`); iholle (alle 2 m) tulevaa pelaajaa se lyö silti.
 - **Laulu** (`src/songLogic.ts` puhdas logiikka ja kaikki luvut, kulku
   `src/main.ts`): Q täydellä mittarilla → maailma hidastuu
   (`SONG_SLOWMO` 1/20) → pelaaja ottaa asennon `POSES.sing` reaaliajassa
@@ -95,20 +108,18 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   `tools/fetch-characters.ps1` (ei Gitissä). `.blend`-tiedostot eivät ole
   Gitissä, eikä lähdemallien tuontia SRC-kokoelmaan ole skriptattu.
 - **Deployattu:** GitHub Pages julkaisee mainin heti mergen jälkeen
-  (Actions-ajo "Julkaise GitHub Pagesiin"); v00.09.00 ei ole mainissa.
+  (Actions-ajo "Julkaise GitHub Pagesiin"); v00.10.00 ei ole mainissa.
   **Omistaja testaa julkaistusta osoitteesta**, ei dev-serveriltä.
 - **Käsin testattu 2026-11-13** (Clauden in-app browser, dev-serveri,
-  skriptattu syöte): suossa vastustajan suunta ei muutu, kun pelaaja
-  siirretään selän taakse; vapauduttua puolikierros kestää noin 1 s, eikä
-  vastustaja liiku sinä aikana. Laulun riimujen väli 0,64 s, kahdeksan
-  osumaa alueiden sisältä antaa 6 s suon. Taukoikkuna raahattu hiirellä
-  kulmaan: tummennus poistuu, Esc jatkaa. Keihäs asennoissa guard, block ja
-  thrustStrike sivusta: molemmat kädet varrella, kärki 1,9 m hahmon
-  keskeltä (miekka 1,25 m). Keihäsvastustaja lyö 2,5–3,0 m:n päästä ja osuu
-  paikallaan seisovaan pelaajaan.
-  **Ei testattu:** ihmisen pelaamana, kosketusnäyttö (ikkunan raahaus),
-  buildattu versio selaimessa. FPS-lukema 54–56, suuntaa antava.
-- **Komennot 2026-11-13:** `bun run test` (40/40), `bun run lint`,
+  skriptattu syöte): palautuminen 2 s:ssa +2; kevyt lyönti −3, raskas −9;
+  kestävyydellä 6 viritetty lyönti jää kevyeksi ja mittari kertoo syyn;
+  uupuneen lyönti tekee 10 vahinkoa, kun kevyt tekee 40; torjunta-asennossa
+  kestävyys ei muutu, ja uupuneena suoja laskee; uupunut vastustaja
+  vetäytyy noin 3,4 m:n päähän eikä lyö; vastustajan kestävyys kuluu
+  lyönneistä; palkit näkyvät ja uupuneen kehys hehkuu.
+  **Ei testattu:** ihmisen pelaamana, kosketusnäyttö, buildattu versio
+  selaimessa. FPS 60 (suuntaa antava; muutos ei koske renderöintiä).
+- **Komennot 2026-11-13:** `bun run test` (46/46), `bun run lint`,
   `bun run build` ok.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Savutestien apuna `window.__game`: `tick(n, dt)` ajaa peliä askelin
@@ -117,7 +128,7 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   `events` muodossa `kuka:isku/paino:tulos`, `fillSong()`, `beat()`
   (välilyönti laululle), `nextBeatIn`, `bog([x,0,z])` (suo näkyviin),
   `debrisHeights` (irtokappaleiden korkeus maasta), `root(t)` (vastustaja
-  suohon), `placePlayer(x, z)`, `showcaseReach` (aseen kärjen etäisyys). Selainpaneeli pysäyttää
+  suohon), `setStamina(pelaaja, vastustaja)`, `placePlayer(x, z)`, `showcaseReach` (aseen kärjen etäisyys). Selainpaneeli pysäyttää
   pelin, kun se menettää fokuksen: kutsu `autoPause(false)` jokaisen
   latauksen jälkeen. `skipTo` rakentaa hahmon vasta seuraavalla
   kierroksella, joten `knockHelmet()` vaatii erillisen kutsun tai odotuksen.
@@ -127,6 +138,12 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
 - **Tasapainoa ei ole pelitestattu.** Kaikki luvut ovat arvauksia.
   Suuntatorjunta ilman kilpeä voi olla liian vaikea: iskun suunta pitää
   lukea vastustajan asennosta tai HUD-vihjeestä noin puolessa sekunnissa.
+- **Kestävyyden tasapaino on arvaus.** Palautuminen 1/s on hidas
+  suhteessa hintoihin: vastustaja lyö noin 2,5 s välein, joten sen kevyet
+  lyönnit lähes maksavat itsensä takaisin, ja kestävyys rajoittaa lähinnä
+  raskaita lyöntejä ja torjuntaa. Vastustajan täydellistä torjuntaa ei ole,
+  joten pelaaja ei voi kuluttaa sen kestävyyttä muuten kuin lyömällä
+  torjuntaan (2 per torjunta).
 - **Keihäällä on vain pisto**, joten sitä vastaan riittää pistotorjunta.
   Keihään kantama (3,5 m kevyt, 3,6 m raskas) on mitoitettu mallista samalla
   pelivaralla kuin miekan: kärki pistossa 1,9 m + syöksy 0,6 m + 0,95 m.
@@ -167,10 +184,10 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
 
 ## Seuraava tehtävä
 
-Omistaja pelaa v00.09.00:n julkaistusta osoitteesta mergen jälkeen ja kertoo
-tuntuman (laulun vaikeus nopeudella 1,25, keihäsmiehen vaarallisuus, suosta
-vapautuvan kääntyminen). Sen perusteella säädetään `songLogic.ts`:n ja
-`combat.ts`:n luvut.
+Omistaja pelaa v00.10.00:n julkaistusta osoitteesta mergen jälkeen ja kertoo
+tuntuman (kestävyyden hinnat ja palautuminen, uupuneen vastustajan
+vetäytyminen, laulun vaikeus, keihäsmies). Sen perusteella säädetään
+`STAMINA`-taulukon ja muiden taulukoiden luvut.
 
 ## Ei vielä aloiteta
 

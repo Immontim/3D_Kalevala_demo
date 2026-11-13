@@ -16,6 +16,13 @@ import {
   strikeDamage,
   styleFor,
   weaponOf,
+  exhausted,
+  maxStaminaOf,
+  staminaAfterBlock,
+  staminaTick,
+  strikeCost,
+  strikeTier,
+  weakened,
 } from "./combat";
 
 const sword = WEAPONS.sword;
@@ -29,6 +36,41 @@ const shield = SHIELDS.round;
 
 const inFront = { distance: 1.5, angleToDefender: 0 };
 const idle = { state: "idle" as const, blockStart: 0, angleToAttacker: 0 };
+
+describe("kestävyys", () => {
+  it("hahmoilla on eri määrä kestävyyttä", () => {
+    expect(maxStaminaOf("hero")).toBe(100);
+    expect(maxStaminaOf("urho")).toBe(60);
+    expect(maxStaminaOf("pohja")).toBe(80);
+  });
+  it("kevyt lyönti maksaa 3 ja raskas 9", () => {
+    expect(strikeCost(strikeTier(50, "light"))).toBe(3);
+    expect(strikeCost(strikeTier(50, "heavy"))).toBe(9);
+  });
+  it("raskas lyönti jää kevyeksi, jos voimat eivät riitä siihen", () => {
+    expect(strikeTier(8.9, "heavy")).toBe("light");
+    expect(strikeTier(9, "heavy")).toBe("heavy");
+  });
+  it("uupunut lyö heikosti ja ilmaiseksi: neljännes vahingosta", () => {
+    expect(exhausted(2.9)).toBe(true);
+    expect(exhausted(3)).toBe(false);
+    expect(strikeTier(2.9, "heavy")).toBe("weak");
+    expect(strikeCost("weak")).toBe(0);
+    const heavy = makeAttack(WEAPONS.sword, "slash", "heavy");
+    const light = makeAttack(WEAPONS.sword, "slash", "light");
+    expect(weakened(light).damage).toBeCloseTo(light.damage * 0.25);
+    expect(weakened(heavy).weight).toBe("light");
+  });
+  it("palautuu 1/s, mutta torjunta-asennossa ei lainkaan", () => {
+    expect(staminaTick(10, 100, false, 2)).toBeCloseTo(12);
+    expect(staminaTick(10, 100, true, 2)).toBeCloseTo(10);
+    expect(staminaTick(99.5, 100, false, 2)).toBe(100);
+  });
+  it("toteutunut torjunta vie 2 eikä mene alle nollan", () => {
+    expect(staminaAfterBlock(10)).toBe(8);
+    expect(staminaAfterBlock(1)).toBe(0);
+  });
+});
 
 describe("resolveHit", () => {
   it("osuu suojaamattomaan", () => {
