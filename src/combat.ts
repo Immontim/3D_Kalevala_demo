@@ -90,6 +90,8 @@ export const WAVES = {
   restStamina: 35,
   /** Sekunteja vastustajan kaatumisesta seuraavan saapumiseen. */
   nextWaveDelay: 3,
+  /** Kaatunut vastustaja jää maahan näin pitkäksi aikaa seuraavan saavuttua (sama kuin pudonneilla varusteilla). */
+  corpseTime: 40,
 };
 
 /** Vastustajan tekoälyn luvut. */

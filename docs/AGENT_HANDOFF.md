@@ -7,10 +7,21 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
 
-- **Versio v00.11.00**, branch `claude/tuning`. Se on tehty branchin
-  `claude/stamina` (v00.10.00) päälle ja sisältää sen. Tarkista molempien
-  merge-tila `git merge-base --is-ancestor`. Mainissa on v00.09.00, ellei
-  omistaja ole mergannut.
+- **Versio v00.12.00**, branch `claude/fallen-pose` (tarkista merge-tila
+  `git merge-base --is-ancestor`). Mainissa on v00.11.00.
+- **Kaatuminen** (`src/fighter.ts`): taulukko `FALLEN` sisältää neljä
+  makuuasentoa (kolme selällään, yksi vatsallaan). Asennossa on tavalliset
+  asentokentät (kädet, selkä) sekä vain kaatuneella käytetyt jalkojen
+  kierrot, selän sivutaivutus, pään kääntö, vartalon korkeus maasta ja
+  kierto. `Fighter.fall` 0..1 sulauttaa ne; kesken kaatumisen polvet
+  pettävät (`buckle`). `main.ts`:n `fallDown()` valitsee asennon:
+  selkään lyöty kaatuu vatsalleen. `Fighter.dropGear()` irrottaa aseen ja
+  ehjän kilven (`DroppedProp`): ase lähtee oikealle ja kilpi vasemmalle ja
+  asettuu maahan lappeelleen. Ruumis säilyy `WAVES.corpseTime` 40 s.
+  **Päätös:** kaatuneet tehdään luurangolla, ei omina malleina, koska sama
+  ratkaisu toimii kaikilla hahmoilla ja varustuksilla. Taistelukentän
+  "maastoksi" kaatuneen saa luomalla `Fighter`in, asettamalla `fallen` ja
+  `fall = 1`; savutestissä `__game.fallShowcase(n)`.
 - **Kaikki pelin luvut ovat parametritaulukoissa**, eikä uusia lukuja
   kovakoodata `main.ts`:ään:
   - `src/combat.ts`: `CHARACTERS` (hahmon hp, stamina, staminaRegen, power,
@@ -136,18 +147,15 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   ole mainissa. **Omistaja testaa julkaistusta osoitteesta**, ei
   dev-serveriltä.
 - **Käsin testattu 2026-11-13** (Clauden in-app browser, dev-serveri,
-  skriptattu syöte): oletusarvoilla hahmojen kyvyt ja keihäsmiehen
-  25 s:n taistelu ovat samat kuin ennen siirtoa taulukoihin. Säätö:
-  kenttien muutos näkyy tekstissä, yläraja rajaa arvon, käyttöönotto
-  aloittaa pelin alusta uusilla arvoilla (hp 150, vastustajan stamina
-  1000, laulun väli 0,53 s nopeudella 1,5), merkki näkyy kulmassa, arvot
-  säilyvät sivun latauksen yli, liitetty teksti päivittää kentät ja
-  ilmoittaa tuntemattomat ja rajatut polut, rikkinäinen teksti ei muuta
-  mitään, oletusten palautus tyhjentää tallennuksen. Muunnin: +50
-  enimmäiskestävyyttä ja 5× palautuminen vaikuttivat heti.
-  **Ei testattu:** ihmisen käyttämänä (myös leikepöydälle kopiointi on
-  kokeilematta: selainpaneelissa ei ole leikepöytää), kosketusnäyttö,
-  buildattu versio selaimessa. FPS 60 (muutos ei koske renderöintiä).
+  skriptattu syöte): kaikki neljä makuuasentoa katsottu hahmorivillä
+  ylhäältä ja sivulta kolmella hahmolla ja kaikilla varustuksilla: vartalo
+  ja raajat ovat maan tasossa, polvi koholla -asennoissa jalkapohja on
+  maassa, varusteet lepäävät 3–6 cm maasta. Pelitilanteessa vastustajan ja
+  pelaajan kuolema: kaatuu, ase ja kilpi putoavat viereen, uusi peli (R)
+  siivoaa ne. FPS 60 kahdella ruumiilla.
+  **Ei testattu:** ihmisen pelaamana, kosketusnäyttö, buildattu versio
+  selaimessa, kaltevalla maalla (vartalo ei mukaudu rinteeseen), suossa
+  kuoleva vastustaja.
 - **Komennot 2026-11-13:** `bun run test` (60/60), `bun run lint`,
   `bun run build` ok.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
@@ -214,9 +222,9 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
 
 ## Seuraava tehtävä
 
-Omistaja pelaa julkaistusta osoitteesta mergen jälkeen, säätää arvoja
-taukoikkunan Säätö-välilehdellä ja liittää löytämänsä arvot (Kopioi arvot)
-keskusteluun. Agentti kirjoittaa ne taulukoiden oletuksiksi.
+Omistaja pelaa julkaistusta osoitteesta mergen jälkeen ja kertoo, miltä
+kaatuneet näyttävät, sekä säätää arvoja Säätö-välilehdellä ja liittää
+löytämänsä arvot (Kopioi arvot) keskusteluun oletuksiksi kirjattaviksi.
 
 ## Ei vielä aloiteta
 

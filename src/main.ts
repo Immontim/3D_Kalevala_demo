@@ -4,7 +4,7 @@ import {
   enemyAttackTiming, makeAttack, resolveHit, shieldWear, strikeDamage, styleFor, weaponOf,
   canStrikeHeavy, exhausted, staminaAfterBlock, staminaTick, strikeCost, strikeTier, weakened,
 } from "./combat";
-import { Debris, Fighter, FighterLook, POSES, SwordTrail, setCharacterEnv } from "./fighter";
+import { Debris, FALLEN, Fighter, FighterLook, POSES, SwordTrail, setCharacterEnv } from "./fighter";
 import {
   ACTIONS, Action, Bindings, DEFAULT_BINDINGS, RESERVED, SLOTS, actionFor, assign, clearSlot, cloneBindings, codeLabel,
   mouseCode, parseBindings,
@@ -779,6 +779,7 @@ function resolveStrike(att: Actor, def: Actor) {
   if (def === player && songState && (res === "hit" || res === "guardbreak")) interruptSong();
   if (died) {
     setState(def, "dead");
+    fallDown(def, Math.abs(angleToAttacker) > Math.PI / 2);
     if (def === player) onPlayerDeath();
     else onEnemyDeath();
   }
@@ -850,6 +851,16 @@ function spendOnStrike(a: Actor) {
   if (tier !== "heavy" && a.attack.weight === "heavy" && a.attack.kind !== "bash") a.attack = makeAttack(a.weapon, a.attack.kind, "light");
   if (tier === "weak") a.attack = weakened(a.attack);
   a.stamina = Math.max(0, a.stamina - strikeCost(tier));
+}
+
+/**
+ * Kaatuminen: valitaan makuuasento ja pudotetaan ase ja kilpi maahan.
+ * Selkään lyöty kaatuu vatsalleen, edestä lyöty selälleen (kolme eri asentoa).
+ */
+function fallDown(a: Actor, fromBehind: boolean) {
+  const fits = FALLEN.filter((f) => f.prone === fromBehind);
+  a.fighter.fallen = fits[Math.floor(Math.random() * fits.length)] ?? FALLEN[0];
+  for (const d of a.fighter.dropGear()) { scene.add(d.group); debris.push(d); }
 }
 
 function updateCombatant(a: Actor, other: Actor | null, dt: number) {
@@ -1143,7 +1154,7 @@ function simulate(realDt: number) {
     keepApartAndInside(player, enemy);
     if (nextWaveAt > 0 && gameTime >= nextWaveAt) {
       nextWaveAt = -1;
-      if (enemy) corpses.push({ actor: enemy, removeAt: gameTime + 6 });
+      if (enemy) corpses.push({ actor: enemy, removeAt: gameTime + WAVES.corpseTime });
       player.hp = Math.min(player.stats.maxHp, player.hp + WAVES.restHp);
       player.stamina = Math.min(player.stats.maxStamina, player.stamina + WAVES.restStamina);
       renewPlayerShield();
@@ -1454,6 +1465,17 @@ $("startBtn").addEventListener("click", () => {
   },
   /** Hahmorivi: kaikki hahmot ja varustukset näkyviin aukion keskelle. */
   showcase(on = true, pose?: string) { setShowcase(on, pose); },
+  /** Kaataa hahmorivin annettuun makuuasentoon (0..n-1) kuvakaappauksia varten; drop = pudota varusteet. */
+  fallShowcase(variant = 0, drop = true) {
+    for (const s of showcase) {
+      s.fighter.fallen = FALLEN[variant % FALLEN.length];
+      s.fighter.fall = 1;
+      if (drop) for (const d of s.fighter.dropGear()) { scene.add(d.group); debris.push(d); }
+    }
+    return FALLEN[variant % FALLEN.length].name;
+  },
+  /** Makuuasennot muokattavina konsolista. */
+  fallen: FALLEN,
   /** Hahmorivin aseiden kärjen vaakaetäisyys hahmon keskipisteestä (m): kantaman vertailuun malliin. */
   get showcaseReach() {
     return showcase.map((s) => {

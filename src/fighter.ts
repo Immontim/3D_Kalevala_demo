@@ -29,6 +29,76 @@ const KEYS = Object.keys({
   lShX: 0, lShZ: 0, lEl: 0, crouch: 0, headPitch: 0, stride: 0,
 } satisfies Pose) as (keyof Pose)[];
 
+/** Jalan asento kaatuneena: reiden kierto eteen (x), ulkokierto (y) ja loitonnus (z) sekä polven koukistus. */
+export interface FallenLeg { x: number; y: number; z: number; knee: number; }
+
+/**
+ * Kaatuneen asento. Hahmo makaa selällään tai vatsallaan, ja raajat lepäävät maan tasossa.
+ * Kädet ja selkä ovat tavallisia asentokenttiä; lisäksi tulevat jalat, selän sivutaivutus ja
+ * pään kääntö, joita taisteluasennot eivät tarvitse.
+ */
+export interface FallenPose {
+  name: string;
+  /** true = vatsallaan (kaatuu eteenpäin), false = selällään. */
+  prone: boolean;
+  /** Vartalon keskilinjan korkeus maasta makuulla (m). */
+  lift: number;
+  /** Vartalon kierto pystyakselin ympäri kaatuessa (rad), jotta kaikki eivät kaadu samaan suuntaan. */
+  bodyYaw: number;
+  pose: Pose;
+  /** Selän sivutaivutus (rad). */
+  spineRoll: number;
+  /** Pään kääntö sivulle (rad). */
+  headYaw: number;
+  legL: FallenLeg;
+  legR: FallenLeg;
+}
+
+// Käsien loitonnus: oikea käsi negatiivinen, vasen positiivinen. Noin 1,57 = suoraan sivulle,
+// yli sen = pään yläpuolelle. shX > 0 vie kättä selän puolelle eli selällään maata kohti.
+export const FALLEN: FallenPose[] = [
+  {
+    name: "selällään, polvi koholla", prone: false, lift: 0.13, bodyYaw: 0.25,
+    pose: {
+      spineYaw: 0.1, spinePitch: -0.06, rShX: 0.1, rShZ: -1.0, rEl: -0.2, rHandX: 0, rHandY: 0,
+      lShX: 0.08, lShZ: 2.2, lEl: -0.25, crouch: 0, headPitch: -0.1, stride: 0,
+    },
+    spineRoll: 0.1, headYaw: 0.7,
+    legL: { x: 0.02, y: 0.35, z: 0.3, knee: 0.08 },
+    legR: { x: -0.5, y: -0.1, z: -0.12, knee: 1.0 },
+  },
+  {
+    name: "selällään, suorana", prone: false, lift: 0.13, bodyYaw: -0.3,
+    pose: {
+      spineYaw: -0.08, spinePitch: -0.04, rShX: 0.12, rShZ: -0.5, rEl: -0.15, rHandX: 0, rHandY: 0,
+      lShX: 0.12, lShZ: 0.75, lEl: -0.2, crouch: 0, headPitch: -0.15, stride: 0,
+    },
+    spineRoll: -0.2, headYaw: -0.8,
+    legL: { x: 0.0, y: 0.2, z: 0.16, knee: 0.05 },
+    legR: { x: 0.02, y: -0.5, z: -0.34, knee: 0.1 },
+  },
+  {
+    name: "selällään, käsi pään yllä", prone: false, lift: 0.13, bodyYaw: 0.1,
+    pose: {
+      spineYaw: 0.12, spinePitch: -0.05, rShX: 0.08, rShZ: -2.4, rEl: -0.3, rHandX: 0, rHandY: 0,
+      lShX: 0.1, lShZ: 0.9, lEl: -0.15, crouch: 0, headPitch: -0.12, stride: 0,
+    },
+    spineRoll: 0.18, headYaw: -0.5,
+    legL: { x: -0.4, y: 0.15, z: 0.2, knee: 0.8 },
+    legR: { x: 0.02, y: -0.3, z: -0.22, knee: 0.06 },
+  },
+  {
+    name: "vatsallaan", prone: true, lift: 0.14, bodyYaw: -0.2,
+    pose: {
+      spineYaw: 0.1, spinePitch: 0.04, rShX: -0.1, rShZ: -2.1, rEl: -0.2, rHandX: 0, rHandY: 0,
+      lShX: -0.1, lShZ: 0.7, lEl: -0.15, crouch: 0, headPitch: 0.05, stride: 0,
+    },
+    spineRoll: 0.12, headYaw: 1.1,
+    legL: { x: -0.02, y: 0.3, z: 0.14, knee: 0.05 },
+    legR: { x: -0.02, y: -0.2, z: -0.3, knee: 0.25 },
+  },
+];
+
 export const POSES: Record<string, Pose> = {
   guard: {
     spineYaw: -0.15, spinePitch: 0.08, rShX: -0.55, rShZ: -0.15, rEl: -1.15, rHandX: 0.95, rHandY: 0,
@@ -189,10 +259,14 @@ export class Fighter {
   private disposed = false;
   sink = 0; // suohon vajoaminen metreinä
   fall = 0; // 0..1 kaatuminen
+  /** Asento, johon hahmo kaatuu. Valitaan kuolinhetkellä (setFallen). */
+  fallen: FallenPose = FALLEN[0];
 
   constructor(readonly look: FighterLook) {
     this.hasShield = look.loadout === "sword_shield";
     this.root.add(this.body);
+    // Kaatuessa vartalo ensin kallistuu ja kääntyy vasta sitten pystyakselin ympäri.
+    this.body.rotation.order = "YXZ";
     // Terän pisteet ovat olemassa heti, vaikka malli latautuu vasta hetken päästä.
     this.weapon.position.set(-0.3, 1.0, 0.2);
     this.body.add(this.weapon);
@@ -323,6 +397,31 @@ export class Fighter {
   get hasHelmet() { return this.helmet !== null; }
 
   /** Kypärä lentää päästä suuntaan dir (maailmankoordinaateissa). Pelkkä tehoste. */
+/**
+   * Kaatuva pudottaa aseensa ja ehjän kilpensä: ne irtoavat käsistä ja jäävät maahan lappeelleen.
+   * Ase lähtee hahmon oikealle ja kilpi vasemmalle, jotta kaatuva vartalo ei jää niiden päälle.
+   */
+  dropGear(): DroppedProp[] {
+    if (!this.rig) return [];
+    this.root.updateWorldMatrix(true, true);
+    const out: DroppedProp[] = [];
+    const yaw = this.root.rotation.y;
+    const left = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+    const fwd = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+    const toSide = (sign: number) => left.clone().multiplyScalar(sign).addScaledVector(fwd, Math.random() * 0.6 - 0.2);
+    if (this.weapon.parent && this.weapon.parent !== this.body) {
+      // Aseen pituusakseli on sen oma z: maassa se on vaakasuorassa.
+      out.push(new DroppedProp(this.weapon, toSide(-1), { long: new THREE.Vector3(0, 0, 1), rest: 0.03 }));
+    }
+    if (this.shieldHolder && this.shieldHolder.visible && this.shieldModel && this.shieldBasis) {
+      // Kilven pinnan normaali pidikkeen koordinaateissa.
+      const normal = new THREE.Vector3().crossVectors(this.shieldBasis.u, this.shieldBasis.v).normalize().applyQuaternion(this.shieldModel.quaternion);
+      out.push(new DroppedProp(this.shieldHolder, toSide(1), { normal, rest: 0.06 }));
+      this.shieldHolder = null;
+    }
+    return out;
+  }
+
   knockHelmet(dir: THREE.Vector3): FlyingProp | null {
     const h = this.helmet;
     if (!h) return null;
@@ -555,8 +654,11 @@ export class Fighter {
   private apply(moveAmp: number) {
     if (!this.rig) return;
     const p = this.pose;
-    const S = new THREE.Quaternion().setFromEuler(eul.set(p.spinePitch, p.spineYaw, 0));
-    const H = new THREE.Quaternion().setFromEuler(eul.set(p.headPitch, -p.spineYaw * 0.5, 0));
+    // Kaatumisen osuus 0..1: jalat, selän sivutaivutus ja pään kääntö sulautuvat makuuasentoon.
+    const fw = this.fall * this.fall * (3 - 2 * this.fall);
+    const fp = this.fallen;
+    const S = new THREE.Quaternion().setFromEuler(eul.set(p.spinePitch, p.spineYaw, fp.spineRoll * fw));
+    const H = new THREE.Quaternion().setFromEuler(eul.set(p.headPitch, -p.spineYaw * 0.5 + fp.headYaw * fw, 0));
     const half = new THREE.Quaternion().slerpQuaternions(IDENT, S, 0.5);
     this.setBone("hips", IDENT);
     this.setBone("spine", half);
@@ -578,10 +680,16 @@ export class Fighter {
 
     // Kävely: reidet heiluvat vastakkain, polvet koukistuvat.
     const s = Math.sin(this.walkPhase);
+    // Kesken kaatumisen polvet pettävät hetkeksi, jotta hahmo ei kaadu jäykkänä lautana.
+    const buckle = Math.sin(this.fall * Math.PI) * 0.35;
     const leg = (side: "L" | "R", thighRot: number, kneeRot: number) => {
-      const th = new THREE.Quaternion().setFromEuler(eul.set(thighRot, 0, 0));
+      const f = side === "L" ? fp.legL : fp.legR;
+      const tx = thighRot + (f.x - thighRot) * fw - buckle * 1.1;
+      const kn = kneeRot + (f.knee - kneeRot) * fw + buckle * 2;
+      const th = new THREE.Quaternion().setFromEuler(eul.set(tx, f.y * fw, f.z * fw, "ZXY"));
+      eul.order = "XYZ";
       this.setBone(`thigh_${side}`, th);
-      const sh = th.clone().multiply(qA.setFromEuler(eul.set(kneeRot, 0, 0)));
+      const sh = th.clone().multiply(qA.setFromEuler(eul.set(kn, 0, 0)));
       this.setBone(`shin_${side}`, sh);
       this.setBone(`foot_${side}`, qA.slerpQuaternions(sh, IDENT, 0.7));
     };
@@ -603,6 +711,7 @@ export class Fighter {
   /** Liu'uttaa asentoa kohti kohdeasentoa. rate = kuinka nopeasti (1/s). */
   animate(target: Pose, rate: number, dt: number, moveSpeed: number) {
     const k = 1 - Math.exp(-rate * dt);
+    if (this.fall > 0) target = this.fallen.pose;
     // Kilpikäsi: kilpi pysyy vartalon edessä ja nousee torjunnassa eteen, ei pään päälle.
     const over = this.hasShield
       ? (BLOCK_POSES.has(target) ? SHIELD_BLOCK : SHIELD_ARM.has(target) ? SHIELD_GUARD : null)
@@ -624,9 +733,11 @@ export class Fighter {
       }
     }
     this.walkPhase += dt * moveSpeed * 3.2;
-    // Kaatuminen selälleen.
-    this.body.rotation.x = -this.fall * (Math.PI / 2) * 0.95;
-    this.body.position.y = this.fall * 0.15;
+    // Kaatuminen: kiihtyy kuin painovoimassa ja päättyy makuulle selälleen tai vatsalleen.
+    const tip = this.fall * this.fall;
+    this.body.rotation.x = (this.fallen.prone ? 1 : -1) * tip * (Math.PI / 2);
+    this.body.rotation.y = this.fallen.bodyYaw * this.fall;
+    this.body.position.y = tip * this.fallen.lift;
     this.apply(Math.min(1, moveSpeed / 3) * 0.6);
   }
 
@@ -826,6 +937,72 @@ export class FlyingProp implements Debris {
         this.vel.set(this.vel.x * 0.45, -this.vel.y * 0.35, this.vel.z * 0.45);
         this.spin.multiplyScalar(0.5);
       } else this.rest = true;
+    }
+    return true;
+  }
+
+  dispose() { this.group.removeFromParent(); }
+}
+
+/**
+ * Kädestä pudonnut ase tai kilpi: putoaa lähelle ja asettuu maahan lappeelleen.
+ * long = kappaleen pituusakseli (ase), normal = pinnan normaali (kilpi), kappaleen omissa koordinaateissa.
+ */
+export class DroppedProp implements Debris {
+  readonly group = new THREE.Group();
+  private vel: THREE.Vector3;
+  private rest = false;
+  private age = 0;
+  private yawSpin: number;
+
+  constructor(private obj: THREE.Object3D, dir: THREE.Vector3, private shape: { long?: THREE.Vector3; normal?: THREE.Vector3; rest: number }) {
+    const pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3();
+    obj.matrixWorld.decompose(pos, quat, scl);
+    obj.removeFromParent();
+    obj.position.copy(pos);
+    obj.quaternion.copy(quat);
+    obj.scale.copy(scl);
+    obj.updateMatrixWorld(true);
+    const center = new THREE.Box3().setFromObject(obj).getCenter(new THREE.Vector3());
+    obj.position.sub(center);
+    this.group.position.copy(center);
+    this.group.add(obj);
+    this.vel = dir.clone().setY(0).normalize().multiplyScalar(0.8 + Math.random() * 0.6).setY(0.6);
+    this.yawSpin = (Math.random() - 0.5) * 3;
+  }
+
+  /** Kierto, joka vie kappaleen nykyisestä asennosta lappeelleen. */
+  private toFlat(out: THREE.Quaternion) {
+    const q = this.group.quaternion.clone().multiply(this.obj.quaternion);
+    const up = new THREE.Vector3(0, 1, 0);
+    let n: THREE.Vector3;
+    if (this.shape.normal) {
+      n = this.shape.normal.clone().applyQuaternion(q);
+      if (n.y < 0) n.negate();
+    } else {
+      // Aseelle: pituusakselia vastaan kohtisuora suunta, joka on lähinnä ylöspäin.
+      const d = this.shape.long!.clone().applyQuaternion(q);
+      n = up.clone().addScaledVector(d, -d.y);
+      if (n.lengthSq() < 1e-6) n.set(1, 0, 0);
+      n.normalize();
+    }
+    return out.setFromUnitVectors(n, up);
+  }
+
+  update(dt: number, groundAt: (x: number, z: number) => number): boolean {
+    this.age += dt;
+    if (this.rest) return this.age < 40;
+    const g = this.group;
+    this.vel.y -= 9.8 * dt;
+    g.position.addScaledVector(this.vel, dt);
+    // Kääntyy pudotessaan kohti lappeellaan olevaa asentoa ja pyörähtää hieman.
+    g.quaternion.premultiply(this.toFlat(qB).slerp(IDENT, Math.exp(-9 * dt)));
+    g.quaternion.premultiply(qA.setFromEuler(eul.set(0, this.yawSpin * dt, 0)));
+    const floor = groundAt(g.position.x, g.position.z) + this.shape.rest;
+    if (g.position.y <= floor && this.vel.y < 0) {
+      g.position.y = floor;
+      g.quaternion.premultiply(this.toFlat(qB));
+      this.rest = true;
     }
     return true;
   }
