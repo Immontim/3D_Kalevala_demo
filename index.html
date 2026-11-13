@@ -13,19 +13,19 @@
 
     <div id="hud">
       <div class="bars">
-        <div class="bar-wrap">
+        <div class="bar-wrap" id="meterPlayer">
           <div class="label">Sinä</div>
-          <div class="bar"><div id="php" class="fill hp"></div></div>
-          <div class="bar stamina"><div id="psta" class="fill stamina"></div></div>
+          <div class="bar"><div id="php" class="fill hp"></div><span class="num" id="phpNum"></span></div>
+          <div class="bar stamina"><div id="psta" class="fill stamina"></div><span class="num" id="pstaNum"></span></div>
           <div class="bar thin shieldbar"><div id="pshield" class="fill shield"></div></div>
           <div class="label small">Laulun voima <span id="songReady"></span></div>
           <div class="bar thin"><div id="psong" class="fill song"></div></div>
           <div class="label small" id="pstance"></div>
         </div>
-        <div class="bar-wrap right">
+        <div class="bar-wrap right" id="meterEnemy">
           <div class="label" id="ename">Pohjolan soturi</div>
-          <div class="bar"><div id="ehp" class="fill hp enemy"></div></div>
-          <div class="bar stamina"><div id="esta" class="fill stamina"></div></div>
+          <div class="bar"><div id="ehp" class="fill hp enemy"></div><span class="num" id="ehpNum"></span></div>
+          <div class="bar stamina"><div id="esta" class="fill stamina"></div><span class="num" id="estaNum"></span></div>
           <div class="bar thin shieldbar"><div id="eshield" class="fill shield"></div></div>
           <div class="label small" id="wave">Aalto 1</div>
           <div class="label cue" id="cue"></div>
@@ -67,6 +67,8 @@
           <p class="small" id="bindNote"></p>
           <p class="small">Liike (WASD), laulun tahti (välilyönti), uusi peli (R) ja tauko (Esc) ovat kiinteitä. Asetus tallentuu tähän selaimeen.</p>
           <button id="resetBinds" class="secondary first">Palauta oletusnäppäimet</button>
+          <p class="small">Elämä- ja kestävyysmittarit voi tauon aikana raahata haluamaansa kohtaan ruudulla. Paikat tallentuvat tähän selaimeen.</p>
+          <button id="resetMeters" class="secondary first">Palauta mittarien paikat</button>
         </div>
         <div id="paneTune" class="pane hidden">
           <p class="small">Muutokset tulevat voimaan vasta, kun otat ne käyttöön: peli alkaa silloin alusta. Muutettu arvo näkyy korostettuna, ja oletus näkyy, kun viet hiiren kentän päälle.</p>

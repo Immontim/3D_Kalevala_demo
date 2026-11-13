@@ -16,17 +16,24 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; col
 #flash { position: fixed; inset: 0; pointer-events: none; background: var(--blood); opacity: 0; }
 #hud { position: fixed; inset: 0; pointer-events: none; }
 .bars { display: flex; justify-content: space-between; padding: 16px; gap: 16px; }
-.bar-wrap { width: min(340px, 42vw); }
+.bar-wrap { width: min(460px, 44vw); }
+/* Tauon aikana mittarit nousevat taukoikkunan tummennuksen päälle ja niitä voi raahata. */
+#hud.arrange { z-index: 20; }
+#hud.arrange .bar-wrap { pointer-events: auto; cursor: move; touch-action: none; user-select: none; outline: 1px dashed rgba(217, 164, 65, 0.7); outline-offset: 6px; border-radius: 2px; }
+#hud.arrange .bar-wrap:hover { outline-color: #ffd27a; background: rgba(217, 164, 65, 0.08); }
 .bar-wrap.right { text-align: right; }
 .label { font-size: 15px; text-shadow: 0 1px 3px #000; margin-bottom: 4px; letter-spacing: 0.04em; }
 .label.small { font-size: 12px; color: var(--muted); margin-top: 6px; }
-.bar { height: 14px; background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(217, 164, 65, 0.5); border-radius: 2px; overflow: hidden; }
+.bar { position: relative; height: 20px; background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(217, 164, 65, 0.5); border-radius: 2px; overflow: hidden; }
 .bar.thin { height: 8px; }
 .fill { height: 100%; width: 100%; transition: width 0.15s; }
 .fill.hp { background: linear-gradient(#c8473a, #7d2219); }
 .right .fill.hp, .right .fill.stamina { margin-left: auto; }
 /* Kestävyys: sininen palkki elämän alla. Uupuneena kehys vilkkuu. */
-.bar.stamina { height: 10px; margin-top: 3px; }
+.bar.stamina { height: 15px; margin-top: 3px; }
+/* Lukuarvo palkin päällä: nykyinen / enimmäismäärä. */
+.num { position: absolute; inset: 0; display: grid; place-items: center; font: 12px/1 ui-monospace, Consolas, monospace; color: #fff; text-shadow: 0 0 3px #000, 0 1px 2px #000; letter-spacing: 0.03em; pointer-events: none; }
+.bar.stamina .num { font-size: 11px; }
 .fill.stamina { background: linear-gradient(#4a78d0, #1f3a86); transition: width 0.1s linear; }
 .bar.stamina.spent { border-color: #7fa2e8; animation: spent 0.5s infinite alternate; }
 @keyframes spent { from { box-shadow: 0 0 0 rgba(90, 140, 240, 0); } to { box-shadow: 0 0 9px rgba(90, 140, 240, 0.9); } }

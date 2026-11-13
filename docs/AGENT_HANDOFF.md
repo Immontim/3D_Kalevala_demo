@@ -7,8 +7,15 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
 
-- **Versio v00.14.00**, branch `claude/songs-shield` (tarkista merge-tila
-  `git merge-base --is-ancestor`). Mainissa on v00.13.00.
+- **Versio v00.15.00**, branch `claude/hud-meters` (tarkista merge-tila
+  `git merge-base --is-ancestor`). Mainissa on v00.14.00.
+- **Mittarit** (`index.html` `#meterPlayer`, `#meterEnemy`; `main.ts`
+  `meterOff`, `placeMeters`): tauolla `#hud.arrange` nostaa mittarit
+  taukoikkunan päälle ja ne voi raahata; siirtymä oletuspaikasta tallentuu
+  avaimeen `laulun-miekka.meters.v1` ja rajataan ruudulle. Palkeissa
+  lukuarvo (`.num`): elämä pyöristetään ylös, kestävyys alas.
+- **Omistajan säätämät oletukset 2026-11-13:** urhon elämä 70 (oli 80),
+  laulunauhan nopeus 1,5 (oli 1,25).
 - **Laulut ja valinta** (`src/songLogic.ts`: `SONGS`, `SONG_SLOTS`,
   `HEAL_VERSES`, `healOnHit`, `slotPositions`; kulku `main.ts` kohdassa
   "Laulun valinta"): laulunappi täydellä voimalla → `openChoice()`:
@@ -91,8 +98,8 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   hidastuu (`slowmo` 1/15), `intro` 0,6 s (lauluasento `POSES.sing` on
   otettu jo valinnan aikana), sitten riimuja yhtä monta kuin laulussa on
   säkeitä (8), kunkin alla osuma-alue (`zoneFirst` 0,24, jokainen seuraava
-  `zoneShrink` 0,84 × edellinen). `speed` 1,25 on nauhan nopeus: riimujen
-  väli (0,64 s) ja alueiden kesto jaetaan sillä; vaikeutta säädetään
+  `zoneShrink` 0,84 × edellinen). `speed` 1,5 on nauhan nopeus: riimujen
+  väli (0,53 s) ja alueiden kesto jaetaan sillä; vaikeutta säädetään
   ensisijaisesti siitä. Painallus arvioidaan aina seuraavaa riimua
   vastaan. Suolaulu laukeaa `minHits` 4 osumalla; kesto on osumat ×
   `rootTimePerHit` 0,75 s. Vastustajan osuma kesken laulun kutsuu
@@ -174,21 +181,17 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   ole mainissa. **Omistaja testaa julkaistusta osoitteesta**, ei
   dev-serveriltä.
 - **Käsin testattu 2026-11-13** (Clauden in-app browser, dev-serveri,
-  skriptattu syöte): laulunappi täydellä voimalla avaa valinnan ja
-  vastustaja pysyy paikallaan; tyhjä paikka (F4) ei tee mitään; laulunappi
-  peruu ja voima säilyy; F2 aloittaa Parannuslaulun heti (hidastus
-  0,067), 6/8 osumaa nosti elämän 40 → 70; Suolaulu napsauttamalla,
-  8/8 osumaa juurrutti vastustajan 6 s. Kilpi katsottu takaa ja edestä:
-  roikkuu pystyssä vasemmalla kyljellä maalattu puoli ulospäin.
-  **Ei testattu:** ihmisen pelaamana; oikea hiiri (lukituksen vapautus ja
-  uudelleenlukitus valinnassa: selainpaneelissa ei ole hiiren lukitusta);
-  F1–F5 oikeassa selaimessa (F5 ei saa ladata sivua uudelleen);
-  kosketusnäyttö; laulupaikkojen asettelu eri ikkunakoossa; kilven
-  siirtymä torjuntaan liikkuvana kuvana ja kilven osuminen jalkaan
-  askeltaessa; buildattu versio selaimessa. Aiemmista yhä kokeilematta:
-  askellus ihmisen silmin, kaatuneet kaltevalla maalla, suossa kuoleva
-  vastustaja.
-- **Komennot 2026-11-13:** `bun run test` (60/60), `bun run lint`,
+  skriptattu syöte): palkeissa luvut (64 / 100, 41 / 100, vastustaja
+  90 / 90 aallossa 1), mittarin raahaus tauolla siirtää ja tallentaa
+  paikan, ruudun yli raahattu mittari jää ruudun reunaan, palautusnappi
+  nollaa paikat, pelin jatkuessa mittareihin ei voi tarttua.
+  **Ei testattu:** ihmisen pelaamana; oikea hiiri ja kosketus raahauksessa;
+  buildattu versio selaimessa. Versiosta v00.14.00 yhä kokeilematta:
+  hiiren lukituksen vapautus ja uudelleenlukitus laulun valinnassa, F1–F5
+  oikeassa selaimessa, laulupaikkojen asettelu eri ikkunakoossa, kilven
+  siirtymä torjuntaan liikkuvana kuvana. Aiemmista: askellus ihmisen
+  silmin, kaatuneet kaltevalla maalla, suossa kuoleva vastustaja.
+- **Komennot 2026-11-13:** `bun run test` (66/66), `bun run lint`,
   `bun run build` ok.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Savutestien apuna `window.__game`: `tick(n, dt)` ajaa peliä askelin
@@ -247,8 +250,6 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   vastustajaa, joten aaltojen välissä sen voi laulaa rauhassa.
 - **Kalevalan säkeet on kirjoitettu muistista** (9. runo, verensulkusanat);
   sanamuoto kannattaa tarkistaa painetusta tekstistä.
-- **F1–F5 estävät selaimen omat toiminnot** pelin aikana (F5 ei lataa
-  sivua; Ctrl+R toimii).
 - **Suon reunus** on erillinen kumpu maan päällä: sen ulkoreunan ja
   tallatun maan raja näkyy läheltä. Muta ei heijasta hahmoja.
 - **Kilven lovi** leikkaa pinnan shaderilla, joten loven reunassa ei ole

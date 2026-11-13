@@ -11,7 +11,7 @@ afterEach(() => resetTuning());
 describe("hahmon kyvyt", () => {
   it("perusarvot tulevat hahmon rivistä, ja aalto kasvattaa vastustajan elämää ja voimaa", () => {
     expect(baseStats("hero")).toMatchObject({ maxHp: 100, maxStamina: 100, power: 20, staminaRegen: 1, moveSpeed: 3.4 });
-    expect(baseStats("urho", 1)).toMatchObject({ maxHp: 100, maxStamina: 60, power: 15 });
+    expect(baseStats("urho", 1)).toMatchObject({ maxHp: 90, maxStamina: 60, power: 15 });
     expect(baseStats("pohja", 3)).toMatchObject({ maxHp: 140, maxStamina: 80, power: 17 });
   });
   it("vaikutukset lasketaan perusarvojen päälle: ensin lisäykset, sitten kertoimet", () => {
@@ -51,10 +51,10 @@ describe("säädettävät arvot", () => {
     expect(new Set(FIELDS.map((f) => f.path)).size).toBe(FIELDS.length);
   });
   it("muutos vaikuttaa pelin taulukoihin ja palautuu oletuksiin", () => {
-    applyTuning({ characters: { hero: { hp: 150 } }, song: { speed: 1.5 }, weapons: { spear: { reach: 1.4 } } });
+    applyTuning({ characters: { hero: { hp: 150 } }, song: { speed: 1.75 }, weapons: { spear: { reach: 1.4 } } });
     expect(CHARACTERS.hero.hp).toBe(150);
     expect(baseStats("hero").maxHp).toBe(150);
-    expect(SONG.speed).toBe(1.5);
+    expect(SONG.speed).toBe(1.75);
     expect(WEAPONS.spear.reach).toBe(1.4);
     expect(changedValues().size).toBe(3);
     resetTuning();

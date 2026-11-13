@@ -76,7 +76,7 @@ export interface CharacterDef {
 /** Vastustajien arvot ovat aallon 0 arvoja: aalto lisää niihin WAVES-taulukon verran. */
 export const CHARACTERS: Record<string, CharacterDef> = {
   hero: { hp: 100, stamina: 100, staminaRegen: 1, power: 20, moveSpeed: 3.4 },
-  urho: { hp: 80, stamina: 60, staminaRegen: 1, power: 14, moveSpeed: 2.4 },
+  urho: { hp: 70, stamina: 60, staminaRegen: 1, power: 14, moveSpeed: 2.4 },
   pohja: { hp: 80, stamina: 80, staminaRegen: 1, power: 14, moveSpeed: 2.4 },
 };
 

@@ -7,9 +7,9 @@ describe("laulun osuma-alueet", () => {
     expect(zoneHalf(0)).toBeCloseTo(SONG.zoneFirst / SONG.speed);
   });
   it("nauhan nopeus lyhentää riimujen väliä ja alueita samassa suhteessa", () => {
-    expect(SONG.speed).toBe(1.25);
-    expect(beatGap()).toBeCloseTo(0.64);
-    expect(zoneHalf(0)).toBeCloseTo(0.192);
+    expect(SONG.speed).toBe(1.5);
+    expect(beatGap()).toBeCloseTo(0.8 / 1.5);
+    expect(zoneHalf(0)).toBeCloseTo(0.16);
   });
   it("painallus osuu, kun se on alueen sisällä, eikä vaadi täsmäosumaa", () => {
     expect(inZone(0, 0)).toBe(true);
