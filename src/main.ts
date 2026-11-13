@@ -9,7 +9,7 @@ import {
   ACTIONS, Action, Bindings, DEFAULT_BINDINGS, RESERVED, SLOTS, SONG_SLOT_ACTIONS, actionFor, assign, clearSlot, cloneBindings, codeLabel,
   mouseCode, parseBindings,
 } from "./bindings";
-import { ARENA_RADIUS, buildWorld, groundHeight } from "./world";
+import { ARENA, ARENAS, ARENA_RADIUS, ArenaId, buildWorld, groundHeight, saveArena } from "./world";
 import { Sfx } from "./audio";
 import {
   SONG, SONGS, SONG_SLOTS, SongId, beatGap, healOnHit, inZone, slotPositions, songLead, songOutcome, zoneHalf,
@@ -1147,6 +1147,7 @@ function updateCamera(dt: number) {
   const back = singing ? 3.2 : 4.4;
   const height = singing ? 1.7 : 2.3;
   const desired = player.pos.clone().addScaledVector(dir, -back).addScaledVector(right, singing ? -1.6 : -1.3).setY(player.pos.y + height);
+  world.clearCamera(desired);
   camPos.lerp(desired, 1 - Math.exp(-5 * dt));
   const look = player.pos.clone().lerp(target, 0.6).setY(player.pos.y + 1.2);
   camLook.lerp(look, 1 - Math.exp(-8 * dt));
@@ -1565,6 +1566,25 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) autoP
 document.addEventListener("mouseleave", () => { if (!pointerLockWorked && !isTouch) autoPauseNow(); });
 $("resumeBtn").addEventListener("click", resume);
 
+// Maaston valinta: maailma rakennetaan kerran latauksen alussa, joten toisen maaston valinta
+// tallentaa valinnan ja lataa sivun uudelleen. Aloitusikkuna on silloin yhä auki.
+{
+  const box = $("arenaPick");
+  for (const id of Object.keys(ARENAS) as ArenaId[]) {
+    const btn = document.createElement("button");
+    btn.className = "arena" + (id === ARENA ? " on" : "");
+    btn.dataset.arena = id;
+    btn.innerHTML = `<b>${ARENAS[id].name}</b><span>${ARENAS[id].desc}</span>`;
+    btn.addEventListener("click", () => {
+      if (id === ARENA) return;
+      if (!saveArena(id)) { $("arenaNote").textContent = "Valintaa ei voitu tallentaa tähän selaimeen, joten maastoa ei voi vaihtaa."; return; }
+      $("arenaNote").textContent = `Ladataan: ${ARENAS[id].name}…`;
+      location.reload();
+    });
+    box.appendChild(btn);
+  }
+}
+
 $("startBtn").addEventListener("click", () => {
   $("start").classList.add("hidden");
   sfx.start();
@@ -1579,6 +1599,8 @@ $("startBtn").addEventListener("click", () => {
     return { pos: player.pos.toArray().map((v) => +v.toFixed(2)), yaw: +player.yaw.toFixed(2), dist: enemy ? +enemy.pos.distanceTo(player.pos).toFixed(2) : null, ai: { ...ai }, player: player.state, playerAttack: `${player.attack.kind}/${player.attack.weight}`, playerHp: player.hp, playerStamina: +player.stamina.toFixed(2), enemyStamina: enemy ? +enemy.stamina.toFixed(2) : null, playerShield: player.shieldHp, stance: player.stance, enemy: enemy?.state, enemyYaw: enemy ? +enemy.yaw.toFixed(2) : null, enemyPos: enemy ? [+enemy.pos.x.toFixed(2), +enemy.pos.z.toFixed(2)] : null, enemyAttack: enemy ? `${enemy.attack.kind}/${enemy.attack.weight}` : null, enemyShield: enemy?.shieldHp, enemyHp: enemy?.hp, song, wave, timeScale };
   },
   get events() { return [...events]; },
+  /** Käytössä oleva taistelualue ("clearing" tai "homestead"). */
+  get arena() { return ARENA; },
   get song() { return songState ? { results: [...songState.results], done: songState.endAt >= 0, realTime, playAt: songState.playAt, beats: songState.beats } : null; },
   fillSong() { song = COMBAT.songMax; },
   get meters() { return JSON.parse(JSON.stringify(meterOff)); },

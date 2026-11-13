@@ -7,15 +7,36 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
 
-- **Versio v00.15.00**, branch `claude/hud-meters` (tarkista merge-tila
-  `git merge-base --is-ancestor`). Mainissa on v00.14.00.
-- **Mittarit** (`index.html` `#meterPlayer`, `#meterEnemy`; `main.ts`
-  `meterOff`, `placeMeters`): tauolla `#hud.arrange` nostaa mittarit
-  taukoikkunan päälle ja ne voi raahata; siirtymä oletuspaikasta tallentuu
-  avaimeen `laulun-miekka.meters.v1` ja rajataan ruudulle. Palkeissa
-  lukuarvo (`.num`): elämä pyöristetään ylös, kestävyys alas.
-- **Omistajan säätämät oletukset 2026-11-13:** urhon elämä 70 (oli 80),
-  laulunauhan nopeus 1,5 (oli 1,25).
+- **Versio v00.16.00**, branch `claude/homestead` (tarkista merge-tila
+  `git merge-base --is-ancestor`). Mainissa on v00.15.00.
+- **Kaksi taistelupaikkaa** (`src/world.ts`): `ARENA` on tällä latauksella
+  käytössä oleva paikka (`"clearing"` = nuotioaukio, `"homestead"` =
+  pihapiiri), luettu avaimesta `laulun-miekka.arena.v1`. Maailma
+  rakennetaan kerran moduulin latautuessa, joten aloitusikkunan valinta
+  (`#arenaPick`, `main.ts`) kutsuu `saveArena()` ja lataa sivun uudelleen.
+  Paikkojen erot ovat taulukossa `SITES` (tasaisen alueen säde, puiden
+  ja varvikon raja, tallattu maa, nuotion paikka, rakennusten pohjat
+  `footprints`, kameran raja `camMaxR`). Metsä, valo ja taistelukehä
+  (`ARENA_RADIUS` 11) ovat yhteiset, ja nuotioaukio on ennallaan.
+  **Uusi paikka:** lisää `ArenaId`, rivi `ARENAS`iin ja `SITES`iin sekä
+  sijoittelu `populate`n loppuun.
+- **Pihapiiri** (malli `assets/homestead.glb`, skripti
+  `assets-src/blender/homestead.py` → `build_homestead()` tyhjässä
+  tiedostossa): `talo`, `kuoppatalo`, `aitta`, `katos`, `aita` (2 m pätkä,
+  instansseina kehällä `FENCE_R`), `portinpieli`, `pino`, `polkky`,
+  `haasia`, `ruukku`. Rakennukset ovat kehällä taistelukehän ulkopuolella
+  (`onRing(kulma, etäisyys, ...)`), etusivu keskelle. Kuoppatalon
+  kulkukuilu leikataan maastoon shaderilla (`PIT_HOLE`, `uHole*`), ja
+  kuilun pohja ja seinät ovat mallissa; luvut on pidettävä samoina
+  skriptissä ja `world.ts`:ssä. Rakennuksiin ei voi törmätä, joten
+  kamera pidetään säteen `camMaxR` 12,2 sisällä (`World.clearCamera`).
+  Materiaalien sävyt viritetään pelin valoon `prepareMaterials`issa.
+  Skripti ajettiin taustalla (`blender --background --factory-startup
+  --python`), koska Blender MCP:n taustatyökalu ei löydä Blenderiä
+  (`BLENDER_PATH` puuttuu) ja avoimessa Blenderissä oli tallentamaton
+  `characters.blend`.
+- **Mittarit** (`main.ts` `meterOff`, `placeMeters`): tauolla raahattavat,
+  siirtymä tallentuu avaimeen `laulun-miekka.meters.v1`.
 - **Laulut ja valinta** (`src/songLogic.ts`: `SONGS`, `SONG_SLOTS`,
   `HEAL_VERSES`, `healOnHit`, `slotPositions`; kulku `main.ts` kohdassa
   "Laulun valinta"): laulunappi täydellä voimalla → `openChoice()`:
@@ -86,13 +107,6 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   `{ peli, versio, muutokset: { ...vain poikkeavat arvot puuna } }`.
   **Kun omistaja liittää JSONin keskusteluun, sen arvot kirjoitetaan
   taulukoiden oletuksiksi** ja omistaja palauttaa säätönsä oletuksiin.
-- **Kestävyys (stamina)**: hinnat taulukossa `STAMINA` (kevyt 3, raskas 9,
-  toteutunut torjunta 2, torjunta-asento 1/s, uupuneen vahinkokerroin
-  0,25); määrä ja palautuminen ovat hahmon arvoja. Hinta maksetaan, kun
-  lyönti laukeaa (`spendOnStrike`). **Uupunut** = kestävyyttä alle kevyen
-  lyönnin hinnan (`exhausted`): ei torjuntaa, lyönnit keveitä, ilmaisia ja
-  25 % vahingosta. Tekoäly ei torju uupuneena, ei valitse raskasta ilman
-  varaa ja vetäytyy lepäämään (`ai.resting`).
 - **Laulun rytmipeli** (`src/songLogic.ts` puhdas logiikka ja kaikki luvut
   taulukossa `SONG`, kulku `src/main.ts`): valinnan jälkeen maailma
   hidastuu (`slowmo` 1/15), `intro` 0,6 s (lauluasento `POSES.sing` on
@@ -115,11 +129,6 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   Mittari: `fighter.spearGripDebug()` (käden etäisyys varresta, ranteen
   kulmat). Vanha `reachShaft()` on poistettu. `SPEAR_SLIDE` 0,3 m siirtää
   keihästä otteessa eteenpäin (takakäden taakse jää noin 0,3 m vartta).
-- **Suohon laulettu vastustaja** ei käänny (`updateAi`). Vapauduttuaan se
-  kääntyy pelaajaa kohti nopeudella `REORIENT_TURN` 3,2 rad/s eikä liiku,
-  torju tai lyö ennen kuin pelaaja on edessä (`ai.reorient`).
-- **Taukoikkuna** on raahattava (`main.ts`, luokka `#pause.moved` poistaa
-  tummennuksen); Esc myös jatkaa peliä.
 - **Suo** (`src/bog.ts`, malli `assets/bog.glb`, skripti
   `assets-src/blender/bog.py`): mutapinta, sammalreunus ja kuplan malli
   tulevat Blenderistä ilman tekstuureja; pinnat tehdään maaston
@@ -127,18 +136,6 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   (`World.proto`). Mudan vellonta, kuplat ja puhkeamisrenkaat lasketaan
   koodissa joka ruutu (529 verteksiä). Luvut taulukossa `BOG`. Suohon
   juuttunutta vastustajaa ei voi enää työntää paikaltaan.
-- **Kypärät** (`helmet_hero`, `helmet_pohja`) ovat `characters.glb`:ssä omia
-  kappaleitaan ilman luurankoa. `Fighter.build()` kiinnittää kypärän
-  pääluuhun lepoasennossa. `knockHelmet(dir)` irrottaa sen lentämään
-  (`FlyingProp`). Pelaajan sivallus tai ylälyönti lennättää vastustajan
-  kypärän: kevyt 25 %, raskas 60 %, kaatava isku aina. Ei pelivaikutusta.
-  Hiukset ovat nyt kokonaiset myös kypärän alla. Urholla on myssy, ei kypärää.
-- **Näppäinsidonnat** (`src/bindings.ts`, testit vieressä): toiminnot
-  sivallus, ylälyönti, pisto, torjunta, väistö ja laulu, kullakin kaksi
-  paikkaa. Koodit ovat `KeyboardEvent.code`-arvoja tai `Mouse0`…`MouseN`.
-  Asetusikkuna on taukoikkunassa (Esc); tallennus `localStorage`-avaimeen
-  `laulun-miekka.bindings.v1`. WASD, välilyönti, R ja Esc ovat kiinteitä.
-  Hiiren nappien 4 ja 5 oletustoiminto (selaimen takaisin/eteenpäin) on estetty.
 - **Taistelusäännöt ovat parametritaulukoita** tiedostossa `src/combat.ts`
   (puhdasta logiikkaa, testit vieressä):
   - `STRIKES`: iskusuunta (`overhead`, `slash`, `thrust`) × paino (`light`,
@@ -153,44 +150,39 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   täydellinen torjunta ei kuluta). Aseella torjunta onnistuu vain, jos
   torjunta-asento vastaa iskun suuntaa. Kilpityöntö murtaa asetorjunnan,
   mutta kilpeen se vain osuu. Raskas isku ei enää murra torjuntaa.
-- **Ohjaus:** sivallus hiiren vasen / J, ylälyönti F / I, pisto E / L.
-  Nappi pohjassa virittää: kun raskaan iskun viritysaika täyttyy, isku on
-  raskas; vapautus laukaisee. Täyttä viritystä voi pidätellä 0,8 s.
-  Torjunnan aikana iskunappi on kilven kanssa kilpityöntö ja ilman kilpeä
-  torjunta-asennon vaihto.
-- **HUD:** viritysmittari, kilpien kestopalkit, vastustajan tulevan iskun
-  suunta nimen alla, oma torjunta-asento.
 - **Kilven hajoaminen** (`src/fighter.ts`): lovi ja sirpaleet tehdään
   shaderilla kilven materiaaliin (`patchShield`, `ShieldDebris`), ei omilla
   malleilla. Pelaaja saa uuden kilven jokaiseen aaltoon.
-- **Animaatio on yhä kokonaan koodia.** Uudet asennot: `slashWindup/Strike`,
-  `thrustWindup/Strike`, `blockSide`, `blockThrust` (`block` on ylätorjunta,
-  `windup/strike` ylälyönti). Keihään etukäsi viedään varrelle kahden luun
-  käänteiskinematiikalla (`reachShaft`).
 - **Tekoäly** (`pickEnemyAttack`, `src/main.ts`): arpoo iskusuunnan ja
   painon varustuksen mukaan, lyö raskaasti kilven takana seisovaa pelaajaa,
   ja aseella torjuessaan arvaa suunnan oikein sitä useammin, mitä pidemmällä
   aalloissa ollaan. Keihäällä voi vain pistää.
 - **Blender-putket:** metsä `assets-src/blender/build_all.py`, hahmot
-  `char_all.py` → `run_chars()`, suo `bog.py` → `build_bog()` (tyhjässä
-  tiedostossa; vienti samassa kutsussa tiedoston avauksen kanssa kaatuu). Lähteet: `tools/fetch-polyhaven.ps1` ja
-  `tools/fetch-characters.ps1` (ei Gitissä). `.blend`-tiedostot eivät ole
-  Gitissä, eikä lähdemallien tuontia SRC-kokoelmaan ole skriptattu.
+  `char_all.py` → `run_chars()`, suo `bog.py` → `build_bog()`, pihapiiri
+  `homestead.py` → `build_homestead()` (kaksi viimeistä tyhjässä
+  tiedostossa; suon vienti samassa kutsussa tiedoston avauksen kanssa
+  kaatuu). Lähteet: `tools/fetch-polyhaven.ps1`,
+  `tools/fetch-characters.ps1` ja `tools/fetch-homestead.ps1`
+  (PowerShell-skriptien ajo on kotikoneella estetty: tiedostot haettiin
+  samoista osoitteista käsin). `.blend`-tiedostot eivät ole Gitissä, eikä
+  lähdemallien tuontia SRC-kokoelmaan ole skriptattu. `homestead.py`
+  tarvitsee metsäputken tekemän `assets-src/textures/birch_bark_diff.png`n.
 - **Deployattu:** GitHub Pages julkaisee mainin heti mergen jälkeen
   (Actions-ajo "Julkaise GitHub Pagesiin"); v00.10.00 ja v00.11.00 eivät
   ole mainissa. **Omistaja testaa julkaistusta osoitteesta**, ei
   dev-serveriltä.
 - **Käsin testattu 2026-11-13** (Clauden in-app browser, dev-serveri,
-  skriptattu syöte): palkeissa luvut (64 / 100, 41 / 100, vastustaja
-  90 / 90 aallossa 1), mittarin raahaus tauolla siirtää ja tallentaa
-  paikan, ruudun yli raahattu mittari jää ruudun reunaan, palautusnappi
-  nollaa paikat, pelin jatkuessa mittareihin ei voi tarttua.
-  **Ei testattu:** ihmisen pelaamana; oikea hiiri ja kosketus raahauksessa;
-  buildattu versio selaimessa. Versiosta v00.14.00 yhä kokeilematta:
-  hiiren lukituksen vapautus ja uudelleenlukitus laulun valinnassa, F1–F5
-  oikeassa selaimessa, laulupaikkojen asettelu eri ikkunakoossa, kilven
-  siirtymä torjuntaan liikkuvana kuvana. Aiemmista: askellus ihmisen
-  silmin, kaatuneet kaltevalla maalla, suossa kuoleva vastustaja.
+  skriptattu syöte): pihapiiri latautuu ilman konsolivirheitä, kaikki
+  rakennukset, aita, tuli ja savu näkyvät; paikan vaihto aloitusikkunasta
+  molempiin suuntiin lataa oikean maailman ja merkitsee valitun; aalto 1
+  alkaa pihapiirissä; pelaaja kehän reunalla selkä taloon päin: kamera
+  pysyy pihalla; 60 FPS / 800×600 / RTX 4080 (1,9 milj. kolmiota,
+  nuotioaukio 2,0 milj.). Nuotioaukio näyttää samalta kuin ennen.
+  **Ei testattu:** ihmisen pelaamana; buildattu versio selaimessa;
+  hitaampi kone; kosketusnäyttö. Aiemmista yhä kokeilematta: mittarien
+  raahaus oikealla hiirellä, hiiren lukitus laulun valinnassa, F1–F5
+  oikeassa selaimessa, askellus ihmisen silmin, kaatuneet kaltevalla
+  maalla, suossa kuoleva vastustaja.
 - **Komennot 2026-11-13:** `bun run test` (66/66), `bun run lint`,
   `bun run build` ok.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
@@ -234,6 +226,15 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   kiertyy nyt vasen olka edellä; iskun alussa ranne hypähtää noin 40°.
 - **Kosketusnäytöllä** on vain sivallus; ylälyönnille, pistolle ja
   torjunta-asennon vaihdolle ei ole nappeja.
+- **Pihapiirin avoimet viat:** rakennuksiin, aitaan ja tuleen ei voi
+  törmätä (taistelukehä pitää hahmot pihalla, mutta kaatuneen varusteet
+  voivat lentää aidan läpi); kamera on kehän reunalla lähellä pelaajaa;
+  punosaita on sileä levy, jonka punos on tekstuuria; sisätilat ovat
+  mustia laatikoita; kuoppatalon kuilun reunassa maaston ja mallin raja
+  on jyrkkä. Patsasaitta ja luukulliset valoaukot ovat uskottavia mutta
+  eivät Suomen varhaisrautakaudelta todistettuja; hirsisalvosta ja
+  savupiippua ei ole käytetty, koska ne ovat myöhempiä. Paikan vaihto
+  lataa sivun uudelleen eikä onnistu kesken pelin.
 - **Asennot on viritetty silmämääräisesti** kuvakaappauksista. Raskaalla
   sivalluksella ja pistolla ei ole omaa asentoa (sama kuin kevyellä).
   Keihäsmiehen torjunta näyttää samalta kaikissa kolmessa asennossa.
@@ -266,9 +267,10 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
 
 ## Seuraava tehtävä
 
-Omistaja pelaa julkaistusta osoitteesta mergen jälkeen ja kertoo, miltä
-kaatuneet näyttävät, sekä säätää arvoja Säätö-välilehdellä ja liittää
-löytämänsä arvot (Kopioi arvot) keskusteluun oletuksiksi kirjattaviksi.
+Omistaja pelaa pihapiirissä julkaistusta osoitteesta mergen jälkeen ja
+kertoo, miltä rakennukset ja pihan mittasuhteet näyttävät ja haittaako
+kameran rajaus kehän reunalla. Lisäksi yhä auki: kaatuneiden ulkonäkö ja
+Säätö-välilehden arvot (Kopioi arvot) oletuksiksi kirjattaviksi.
 
 ## Ei vielä aloiteta
 
