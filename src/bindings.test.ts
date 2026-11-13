@@ -46,6 +46,12 @@ describe("näppäinsidonnat", () => {
     expect(actionFor(b, "KeyJ")).toBe("song");
     expect(b.slash).toEqual(["Mouse0", ""]);
   });
+  it("laulupaikoilla on omat pikanäppäimet, oletuksena F1–F5", () => {
+    expect(actionFor(DEFAULT_BINDINGS, "F1")).toBe("song1");
+    expect(actionFor(DEFAULT_BINDINGS, "F5")).toBe("song5");
+    // Vanha tallennus ilman laulupaikkoja saa oletukset.
+    expect(parseBindings({ slash: ["Mouse0", "KeyJ"] }).song2).toEqual(["F2", ""]);
+  });
   it("napeilla on luettavat nimet", () => {
     expect(codeLabel("Mouse0")).toBe("Hiiren vasen");
     expect(codeLabel("Mouse3")).toBe("Hiiren nappi 4");

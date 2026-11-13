@@ -3,9 +3,12 @@
 
 export const SONG = {
   /** Maailman nopeus laulun aikana (vastustaja liikkuu, mutta näin hitaasti). */
-  slowmo: 1 / 20,
-  /** Pelaajan lauluasennon kesto ennen kuin rytmipeli alkaa (sekunteja, reaaliaikaa). */
-  intro: 1.5,
+  slowmo: 1 / 15,
+  /**
+   * Aika laulun valinnasta rytmipelin alkuun (sekunteja, reaaliaikaa). Lauluasento otetaan jo
+   * valinnan aikana, joten tämä on vain lyhyt hengähdys.
+   */
+  intro: 0.6,
   /**
    * Laulunauhan nopeus: 1 = alkuperäinen. Nauha näyttää samalta, mutta merkki kulkee sen yli näin
    * paljon nopeammin, joten riimujen väli ja osuma-alueiden kesto lyhenevät samassa suhteessa.
@@ -25,6 +28,8 @@ export const SONG = {
   minHits: 4,
   /** Suohon laulamisen kesto jokaista osumaa kohti (pelin sekunteja). */
   rootTimePerHit: 0.75,
+  /** Parannuslaulu: elämää jokaisesta osumasta, heti osuman hetkellä. */
+  healPerHit: 5,
 };
 
 /** Riimujen väli sekunteina nykyisellä nauhan nopeudella. */
@@ -61,7 +66,7 @@ export function songOutcome(results: boolean[]): SongOutcome {
 }
 
 /** Kalevalan 3. runo (1849, vapaa käyttää). Yksi säe per riimu: säkeiden määrä on riimujen määrä. */
-export const SONG_VERSES = [
+export const SONG_VERSES: readonly string[] = [
   "Lauloi vanha Väinämöinen:",
   "järvet läikkyi, maa järisi,",
   "vuoret vaskiset vapisi,",
@@ -71,3 +76,50 @@ export const SONG_VERSES = [
   "Lauloi nuoren Joukahaisen",
   "suohon suonivyötäisistä.",
 ];
+
+/** Kalevalan 9. runo (1849, vapaa käyttää): verensulkusanat. */
+export const HEAL_VERSES: readonly string[] = [
+  "Piäty, veri, vuotamasta,",
+  "hurme, huppelehtamasta,",
+  "päälleni päräjämästä,",
+  "riuskumasta rinnoilleni!",
+  "Veri, seiso kuin seinä,",
+  "asu, hurme, kuin aita,",
+  "kuin miekka meressä seiso,",
+  "saraheinä sammalessa!",
+];
+
+export type SongId = "bog" | "heal";
+export interface SongDef {
+  id: SongId;
+  name: string;
+  /** Laulun oma riimu valintaringissä. */
+  rune: string;
+  verses: readonly string[];
+  /** Tarvitseeko laulu elävän vastustajan. */
+  needsEnemy: boolean;
+}
+export const SONGS: Record<SongId, SongDef> = {
+  bog: { id: "bog", name: "Suolaulu", rune: "ᛚ", verses: SONG_VERSES, needsEnemy: true },
+  heal: { id: "heal", name: "Parannuslaulu", rune: "ᛒ", verses: HEAL_VERSES, needsEnemy: false },
+};
+
+/** Laulupaikat valintaringissä. null = tyhjä paikka. */
+export const SONG_SLOTS: readonly (SongId | null)[] = ["bog", "heal", null, null, null];
+
+/** Parannuslaulun yhden osuman vaikutus: palauttaa uuden elämän, enintään maksimin. */
+export function healOnHit(hp: number, maxHp: number): number {
+  return Math.min(maxHp, hp + SONG.healPerHit);
+}
+
+/**
+ * Laulupaikkojen keskipisteet ruudulla: kaari hahmon yläpuolella vasemmalta oikealle.
+ * cx, cy = hahmon keskikohta ruudulla, r = kaaren säde (px). Palauttaa [x, y] jokaiselle paikalle.
+ */
+export function slotPositions(cx: number, cy: number, r: number, count = SONG_SLOTS.length): [number, number][] {
+  const from = (200 * Math.PI) / 180, to = (-20 * Math.PI) / 180;
+  return Array.from({ length: count }, (_, i) => {
+    const a = from + ((to - from) * i) / Math.max(1, count - 1);
+    return [cx + Math.cos(a) * r, cy - Math.sin(a) * r];
+  });
+}

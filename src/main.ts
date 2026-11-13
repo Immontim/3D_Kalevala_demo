@@ -6,13 +6,13 @@ import {
 } from "./combat";
 import { Debris, FALLEN, Fighter, FighterLook, POSES, SwordTrail, setCharacterEnv } from "./fighter";
 import {
-  ACTIONS, Action, Bindings, DEFAULT_BINDINGS, RESERVED, SLOTS, actionFor, assign, clearSlot, cloneBindings, codeLabel,
+  ACTIONS, Action, Bindings, DEFAULT_BINDINGS, RESERVED, SLOTS, SONG_SLOT_ACTIONS, actionFor, assign, clearSlot, cloneBindings, codeLabel,
   mouseCode, parseBindings,
 } from "./bindings";
 import { ARENA_RADIUS, buildWorld, groundHeight } from "./world";
 import { Sfx } from "./audio";
 import {
-  SONG, SONG_VERSES, beatGap, inZone, songLead, songOutcome, zoneHalf,
+  SONG, SONGS, SONG_SLOTS, SongId, beatGap, healOnHit, inZone, slotPositions, songLead, songOutcome, zoneHalf,
 } from "./songLogic";
 import { Modifier, Stats, baseStats, effectiveStats, withModifier } from "./stats";
 import {
@@ -206,6 +206,8 @@ let blockHeld = false;
 let dodgeQueued = false;
 let songQueued = false;
 let beatQueued = false;
+/** Laulun pikavalinta: valintaringin paikka 0–4, tai null. */
+let pickQueued: number | null = null;
 
 // Näppäinsidonnat: vaihdettavissa taukoikkunassa ja tallessa selaimen muistissa.
 const BIND_STORE = "laulun-miekka.bindings.v1";
@@ -226,7 +228,8 @@ function pressCode(code: string): boolean {
   if (a === "block") blockHeld = true;
   else if (a === "dodge") dodgeQueued = true;
   else if (a === "song") songQueued = true;
-  else pressStrike(a);
+  else if (a === "slash" || a === "overhead" || a === "thrust") pressStrike(a);
+  else pickQueued = SONG_SLOT_ACTIONS.indexOf(a);
   return true;
 }
 function releaseCode(code: string) {
@@ -259,7 +262,7 @@ window.addEventListener("keyup", (e) => {
 });
 canvas.addEventListener("mousedown", (e) => {
   if (capture) return;
-  if (running && !document.pointerLockElement) lockPointer();
+  if (running && !choosing && !document.pointerLockElement) lockPointer();
   if (e.button === 0) beatQueued = true;
   pressCode(mouseCode(e.button));
 });
@@ -483,6 +486,9 @@ scene.add(ring);
 // 3) rytmipeli: välilyönti, kun merkki on riimun osuma-alueella, 4) loitsu laukeaa tai ei.
 // Jos hidastettu vastustaja ehtii osua, laulu katkeaa heti.
 interface SongState {
+  id: SongId;
+  /** Parannuslaulun tähän mennessä palauttama elämä. */
+  healed: number;
   start: number; // reaaliaika
   /** Rytmipeli alkaa, kun lauluasento on otettu. */
   playAt: number;
@@ -499,13 +505,87 @@ let timeScale = 1;
 let realTime = 0;
 const RUNES = ["ᚠ", "ᚹ", "ᛃ", "ᛟ", "ᚱ", "ᛉ", "ᛏ", "ᛗ"];
 
-function startSong() {
+// ---------- Laulun valinta ----------
+// Laulunappi pysäyttää pelin kokonaan ja näyttää laulupaikat hahmon ympärillä. Laulu alkaa heti,
+// kun paikka valitaan pikanäppäimellä tai napsauttamalla; laulunappi uudestaan peruu valinnan.
+let choosing = false;
+/** Valinta vapauttaa hiiren itse, eikä se saa laukaista automaattista taukoa. */
+let choiceUnlock = false;
+const slotEls: HTMLDivElement[] = SONG_SLOTS.map((id, i) => {
+  const d = document.createElement("div");
+  d.className = "slot " + (id ?? "empty");
+  const rune = document.createElement("span");
+  rune.textContent = id ? SONGS[id].rune : "";
+  const label = document.createElement("small");
+  d.append(rune, label);
+  d.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); pickQueued = i; });
+  $("choice").appendChild(d);
+  return d;
+});
+function songAvailable(id: SongId | null): id is SongId {
+  return id !== null && (!SONGS[id].needsEnemy || (enemy !== null && enemy.state !== "dead"));
+}
+function openChoice() {
+  choosing = true;
+  clearInputs();
+  setState(player, "idle");
+  SONG_SLOTS.forEach((id, i) => {
+    const key = codeLabel(bindings[SONG_SLOT_ACTIONS[i]].find((c) => c) ?? "");
+    slotEls[i].classList.toggle("off", id !== null && !songAvailable(id));
+    (slotEls[i].lastChild as HTMLElement).innerHTML = "";
+    (slotEls[i].lastChild as HTMLElement).append(key === "–" ? "" : key, document.createElement("br"), id ? SONGS[id].name : "tyhjä");
+  });
+  $("choiceHint").textContent = isTouch ? "Valitse laulu napauttamalla" : `Valitse laulu: napsauta tai paina pikanäppäintä. ${codeLabel(bindings.song.find((c) => c) ?? "")} peruu.`;
+  $("choice").classList.remove("hidden");
+  canvas.classList.add("singing");
+  $("vignette").classList.add("on");
+  if (document.pointerLockElement) { choiceUnlock = true; document.exitPointerLock(); }
+}
+function closeChoice() {
+  choosing = false;
+  pickQueued = null;
+  $("choice").classList.add("hidden");
+  canvas.classList.remove("singing");
+  $("vignette").classList.remove("on");
+  clearInputs();
+  if (!paused) lockPointer();
+}
+/** Asettelee laulupaikat hahmon ympärille ruudulla ja käsittelee valinnan. */
+const choiceP = new THREE.Vector3();
+function updateChoice() {
+  const w = window.innerWidth, h = window.innerHeight;
+  const toScreen = (y: number) => {
+    choiceP.copy(player.pos).setY(player.pos.y + y).project(camera);
+    return [(choiceP.x * 0.5 + 0.5) * w, (-choiceP.y * 0.5 + 0.5) * h];
+  };
+  const [cx, cy] = toScreen(1.0);
+  const pxPerM = Math.abs(toScreen(0.5)[1] - toScreen(1.5)[1]);
+  // Paikka on noin pään kokoinen, mutta aina niin iso, että siihen osuu hiirellä ja sormella.
+  const size = Math.max(56, Math.min(110, pxPerM * 0.34));
+  const r = Math.max(size * 2.1, Math.min(pxPerM * 1.35, Math.min(w, h) * 0.42));
+  slotPositions(cx, cy, r).forEach(([x, y], i) => {
+    const el = slotEls[i];
+    el.style.left = `${Math.max(size / 2 + 4, Math.min(w - size / 2 - 4, x))}px`;
+    el.style.top = `${Math.max(size / 2 + 4, Math.min(h - size - 20, y))}px`;
+    el.style.width = el.style.height = `${size}px`;
+    el.style.fontSize = `${size * 0.58}px`;
+  });
+  if (songQueued) { closeChoice(); return; }
+  if (pickQueued !== null) {
+    const id = SONG_SLOTS[pickQueued] ?? null;
+    pickQueued = null;
+    if (songAvailable(id)) { closeChoice(); startSong(id); }
+  }
+}
+
+function startSong(id: SongId) {
+  const verses = SONGS[id].verses;
   song = 0; // voima kuluu kokonaan, kävi laululle miten tahansa
   sfx.startDrone();
   const track = $("track");
   track.querySelectorAll(".rune, .zone").forEach((r) => r.remove());
   const playAt = realTime + SONG.intro;
-  const beats = SONG_VERSES.map((_, i) => playAt + songLead() + i * beatGap());
+  const beats = verses.map((_, i) => playAt + songLead() + i * beatGap());
   const zones = beats.map(() => {
     const d = document.createElement("div");
     d.className = "zone";
@@ -519,12 +599,13 @@ function startSong() {
     track.appendChild(d);
     return d;
   });
-  songState = { start: realTime, playAt, shown: false, beats, results: beats.map(() => null), runes, zones, endAt: -1 };
+  songState = { id, healed: 0, start: realTime, playAt, shown: false, beats, results: beats.map(() => null), runes, zones, endAt: -1 };
   $("verse").textContent = "";
   canvas.classList.add("singing");
   $("vignette").classList.add("on");
+  $("song").classList.toggle("heal", id === "heal");
   setState(player, "idle");
-  showMsg("Laulu alkaa", "", 1);
+  showMsg(SONGS[id].name, "", 1);
 }
 
 let lastTick = -1;
@@ -558,7 +639,7 @@ function updateSong() {
   if (s.endAt < 0 && s.results.every((r) => r !== null)) s.endAt = realTime + SONG.outro;
   if (s.endAt >= 0 && realTime >= s.endAt) {
     const out = songOutcome(s.results as boolean[]);
-    endSong(out.success, out.rootTime, out.hits);
+    endSong(s.id, out.success, out.rootTime, out.hits, s.healed);
   }
 }
 
@@ -568,8 +649,14 @@ function judge(i: number, hit: boolean) {
   s.runes[i].classList.add(hit ? "hit" : "miss");
   s.zones[i].classList.add(hit ? "hit" : "miss");
   sfx.pluck(i + 1, hit);
-  $("verse").textContent = hit ? SONG_VERSES[i] : "…";
-  if (hit) flash("#f0c766", 0.14);
+  $("verse").textContent = hit ? SONGS[s.id].verses[i] : "…";
+  if (hit && s.id === "heal") {
+    // Parannus tulee heti jokaisesta osumasta, joten katkennutkin laulu ehtii auttaa.
+    const before = player.hp;
+    player.hp = healOnHit(player.hp, player.stats.maxHp);
+    s.healed += player.hp - before;
+    flash("#e8736a", 0.16);
+  } else if (hit) flash("#f0c766", 0.14);
 }
 
 /** Sulkee laulun näkymän ja palauttaa ajan kulun. */
@@ -582,15 +669,19 @@ function closeSong(instant = false) {
   if (instant) timeScale = 1;
 }
 
-function endSong(success: boolean, rootTime: number, hits: number) {
+function endSong(id: SongId, success: boolean, rootTime: number, hits: number, healed: number) {
   closeSong();
-  if (success && enemy && enemy.state !== "dead") {
+  const total = SONGS[id].verses.length;
+  if (id === "heal") {
+    if (hits > 0) showMsg("Veri seisoi kuin seinä", `${hits}/${total} osumaa: ${Math.round(healed)} elämää takaisin`, 2.4);
+    else showMsg("Laulu katkesi", "Tahti ei pitänyt", 1.6);
+  } else if (success && enemy && enemy.state !== "dead") {
     enemy.state = "rooted";
     enemy.stateTime = 0;
     enemy.rootTime = rootTime;
     sfx.swamp();
     shake = 0.25;
-    showMsg("Suohon suonivyötäisistä!", `${hits}/${SONG_VERSES.length} osumaa: vastustaja on kiinni ${rootTime.toFixed(1)} s ja ottaa tuplavahingon`, 2.4);
+    showMsg("Suohon suonivyötäisistä!", `${hits}/${total} osumaa: vastustaja on kiinni ${rootTime.toFixed(1)} s ja ottaa tuplavahingon`, 2.4);
   } else {
     showMsg("Laulu katkesi", "Tahti ei pitänyt", 1.6);
   }
@@ -941,8 +1032,8 @@ function updatePlayer(dt: number) {
   }
 
   if (p.state === "idle" || p.state === "block") {
-    if (songQueued && song >= COMBAT.songMax && enemy && enemy.state !== "dead") {
-      startSong();
+    if (songQueued && song >= COMBAT.songMax) {
+      openChoice();
       return;
     }
     if (dodgeQueued && p.dodgeCd <= 0) {
@@ -1005,7 +1096,7 @@ function targetPose(a: Actor) {
     case "rooted": return { pose: POSES.rooted, rate: 6 };
     case "dead": return { pose: POSES.stagger, rate: 6 };
     case "dodge": return { pose: POSES.guard, rate: 10 };
-    default: return a === player && songState ? { pose: POSES.sing, rate: 4.5 } : { pose: POSES.guard, rate: 8 };
+    default: return a === player && (songState || choosing) ? { pose: POSES.sing, rate: 4.5 } : { pose: POSES.guard, rate: 8 };
   }
 }
 
@@ -1047,7 +1138,7 @@ function updateCamera(dt: number) {
   if (dir.lengthSq() < 0.01) dir.set(0, 0, 1);
   dir.normalize();
   const right = new THREE.Vector3(-dir.z, 0, dir.x);
-  const singing = songState !== null;
+  const singing = songState !== null || choosing;
   const back = singing ? 3.2 : 4.4;
   const height = singing ? 1.7 : 2.3;
   const desired = player.pos.clone().addScaledVector(dir, -back).addScaledVector(right, singing ? -1.6 : -1.3).setY(player.pos.y + height);
@@ -1111,6 +1202,7 @@ function restart() {
   wave = 0;
   song = 0;
   if (songState) closeSong(true);
+  if (choosing) closeChoice();
   gameOver = false;
   spawnEnemy();
   lockPointer();
@@ -1141,8 +1233,10 @@ function simulate(realDt: number) {
   let dt = realDt * timeScale;
   if (hitstop > 0) { hitstop -= realDt; dt = 0; }
 
-  if (paused) dt = 0;
-  if (running && !paused) {
+  // Laulun valinta pysäyttää maailman kokonaan; vain laulaja ottaa asentonsa.
+  if (paused || choosing) dt = 0;
+  if (running && !paused && choosing) updateChoice();
+  else if (running && !paused) {
     gameTime += dt;
     updateSong();
     updatePlayer(dt);
@@ -1169,7 +1263,7 @@ function simulate(realDt: number) {
   }
 
   // Laulaja liikkuu omassa ajassaan, vaikka maailma on hidastettu.
-  syncVisual(player, songState && !paused ? realDt : dt);
+  syncVisual(player, (songState || choosing) && !paused ? realDt : dt);
   if (enemy) syncVisual(enemy, dt);
   for (const c of corpses) syncVisual(c.actor, dt);
   for (const s of showcase) s.fighter.animate(POSES[s.pose], 8, realDt, 0);
@@ -1182,7 +1276,7 @@ function simulate(realDt: number) {
 
   // Laulurengas (pyörii reaaliajassa, vaikka maailma on hidastettu).
   const ringMat = ring.material as THREE.PointsMaterial;
-  ringMat.opacity += ((songState ? 0.9 : 0) - ringMat.opacity) * (1 - Math.exp(-5 * realDt));
+  ringMat.opacity += ((songState || choosing ? 0.9 : 0) - ringMat.opacity) * (1 - Math.exp(-5 * realDt));
   for (let i = 0; i < ringCount; i++) {
     const a = (i / ringCount) * Math.PI * 2 + realTime * 0.8;
     const h = 0.2 + ((i * 0.37 + realTime * 0.6) % 1) * 2.0;
@@ -1203,6 +1297,7 @@ function simulate(realDt: number) {
   }
   strikeQueued = null;
   dodgeQueued = songQueued = beatQueued = false;
+  pickQueued = null;
 }
 
 // ---------- Hiiren lukitus ja tauko ----------
@@ -1221,6 +1316,7 @@ function clearInputs() {
   releaseStrikes();
   strikeQueued = null;
   dodgeQueued = songQueued = beatQueued = false;
+  pickQueued = null;
 }
 
 function lockPointer() {
@@ -1249,7 +1345,7 @@ function resume() {
   paused = false;
   $("pause").classList.add("hidden");
   last = performance.now();
-  lockPointer();
+  if (!choosing) lockPointer();
 }
 
 // ---------- Säätövälilehti ----------
@@ -1403,6 +1499,7 @@ showTunedBadge();
 
 document.addEventListener("pointerlockchange", () => {
   if (document.pointerLockElement === canvas) pointerLockWorked = true;
+  else if (choiceUnlock) choiceUnlock = false;
   else if (pointerLockWorked) autoPauseNow();
 });
 // Savutesteissä selainpaneeli menettää fokuksen jatkuvasti: __game.autoPause(false) estää automaattisen tauon.
@@ -1429,12 +1526,17 @@ $("startBtn").addEventListener("click", () => {
   get events() { return [...events]; },
   get song() { return songState ? { results: [...songState.results], done: songState.endAt >= 0, realTime, playAt: songState.playAt, beats: songState.beats } : null; },
   fillSong() { song = COMBAT.songMax; },
+  get choosing() { return choosing; },
+  /** Savutesti: valitsee laulupaikan kuin pikanäppäimellä. */
+  pick(i: number) { pickQueued = i; },
+  get slots() { return slotEls.map((e) => ({ cls: e.className, text: e.textContent, x: Math.round(parseFloat(e.style.left)), y: Math.round(parseFloat(e.style.top)), size: Math.round(parseFloat(e.style.width)) })); },
   /** Lisää ajonaikaisen vaikutuksen kykyihin (savutestit): who = "player" tai "enemy". */
   addModifier(who: "player" | "enemy", mod: Modifier) { const a = who === "player" ? player : enemy; if (a) a.mods = withModifier(a.mods, mod); },
   get stats() { return { player: { ...player.stats }, enemy: enemy ? { ...enemy.stats } : null }; },
   /** Säädetyt arvot polku → arvo. */
   get tuning() { return Object.fromEntries(changedValues()); },
   /** Asettaa kestävyydet (savutestit); null jättää ennalleen. */
+  setHp(p: number) { player.hp = Math.min(player.stats.maxHp, p); },
   setStamina(p: number | null, e: number | null = null) { if (p !== null) player.stamina = p; if (e !== null && enemy) enemy.stamina = e; },
   /** Laulaa vastustajan suoraan suohon t sekunniksi (savutestit). */
   root(t = 3) { if (enemy && enemy.state !== "dead") { setState(enemy, "rooted"); enemy.rootTime = t; } },

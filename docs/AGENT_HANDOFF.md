@@ -7,8 +7,26 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
 
-- **Versio v00.13.00**, branch `claude/walk-cycle` (tarkista merge-tila
-  `git merge-base --is-ancestor`). Mainissa on v00.12.00.
+- **Versio v00.14.00**, branch `claude/songs-shield` (tarkista merge-tila
+  `git merge-base --is-ancestor`). Mainissa on v00.13.00.
+- **Laulut ja valinta** (`src/songLogic.ts`: `SONGS`, `SONG_SLOTS`,
+  `HEAL_VERSES`, `healOnHit`, `slotPositions`; kulku `main.ts` kohdassa
+  "Laulun valinta"): laulunappi täydellä voimalla → `openChoice()`:
+  `choosing` pysäyttää maailman kokonaan (dt = 0), hiiren lukitus
+  vapautetaan (`choiceUnlock` estää automaattisen tauon) ja viisi
+  laulupaikkaa (`#choice .slot`, HTML) asetellaan joka ruutu kaarelle
+  hahmon ympärille. Valinta pikanäppäimellä (toiminnot `song1`–`song5`,
+  oletus F1–F5, `bindings.ts`) tai napsauttamalla → `startSong(id)`;
+  laulunappi uudestaan peruu ja voima säilyy. Laulu, joka tarvitsee elävän
+  vastustajan (`needsEnemy`), näkyy himmeänä eikä valikoidu ilman sitä.
+  **Uusi laulu:** lisää `SongId`, rivi `SONGS`iin, paikka `SONG_SLOTS`iin,
+  väri `.slot.<id>` (style.css) ja vaikutus `judge`/`endSong`iin.
+  Parannuslaulu antaa `SONG.healPerHit` (5) elämää heti osumasta, joten
+  katkennutkin laulu auttaa, eikä sillä ole osumarajaa.
+- **Kilven asento** (`src/fighter.ts`): `shieldHang` 0..1 kääntää kilven
+  pidikkeen kyynärvarren edestä (torjunta, kilpi-isku: `SHIELD_FRONT`)
+  roikkumaan kahvastaan pystyssä kyljellä pinta ulospäin
+  (`SHIELD_HANG_YAW`); käden lepoasento `SHIELD_GUARD`.
 - **Askellus ja elävyys** (`src/fighter.ts`, taulukko `GAIT`): hahmon
   nopeus mitataan `root`in todellisesta siirtymästä hahmon omassa
   koordinaatistossa (`animate`), ja `apply` laskee kummallekin jalalle
@@ -68,20 +86,18 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   lyönnin hinnan (`exhausted`): ei torjuntaa, lyönnit keveitä, ilmaisia ja
   25 % vahingosta. Tekoäly ei torju uupuneena, ei valitse raskasta ilman
   varaa ja vetäytyy lepäämään (`ai.resting`).
-- **Laulu** (`src/songLogic.ts` puhdas logiikka ja kaikki luvut, kulku
-  `src/main.ts`): Q täydellä mittarilla → maailma hidastuu
-  (`SONG_SLOWMO` 1/20) → pelaaja ottaa asennon `POSES.sing` reaaliajassa
-  (`SONG_INTRO` 1,5 s, painallukset eivät vielä laske) → rytmipeli:
-  riimuja on yhtä monta kuin säkeitä listassa `SONG_VERSES` (nyt 8), kunkin
-  alla osuma-alue (`ZONE_FIRST` 0,24, jokainen seuraava `ZONE_SHRINK`
-  0,84 × edellinen). `SONG_SPEED` 1,25 on nauhan nopeus: nauha näyttää
-  samalta, mutta riimujen väli (0,64 s) ja alueiden kesto (±0,19 s … ±0,06 s)
-  jaetaan sillä. Vaikeutta säädetään ensisijaisesti tästä yhdestä luvusta. Painallus arvioidaan aina
-  seuraavaa riimua vastaan, joten alueen ulkopuolelle osunut painallus on
-  huti. Loitsu laukeaa `SONG_MIN_HITS` 4 osumalla; kesto on osumat ×
-  `ROOT_TIME_PER_HIT` 0,75 s. Vastustajan osuma kesken laulun kutsuu
-  `interruptSong()`: loitsu raukeaa ja aika palaa heti. Voima nollataan
-  laulun alussa. Tauko pysäyttää myös riimut.
+- **Laulun rytmipeli** (`src/songLogic.ts` puhdas logiikka ja kaikki luvut
+  taulukossa `SONG`, kulku `src/main.ts`): valinnan jälkeen maailma
+  hidastuu (`slowmo` 1/15), `intro` 0,6 s (lauluasento `POSES.sing` on
+  otettu jo valinnan aikana), sitten riimuja yhtä monta kuin laulussa on
+  säkeitä (8), kunkin alla osuma-alue (`zoneFirst` 0,24, jokainen seuraava
+  `zoneShrink` 0,84 × edellinen). `speed` 1,25 on nauhan nopeus: riimujen
+  väli (0,64 s) ja alueiden kesto jaetaan sillä; vaikeutta säädetään
+  ensisijaisesti siitä. Painallus arvioidaan aina seuraavaa riimua
+  vastaan. Suolaulu laukeaa `minHits` 4 osumalla; kesto on osumat ×
+  `rootTimePerHit` 0,75 s. Vastustajan osuma kesken laulun kutsuu
+  `interruptSong()`. Voima nollataan laulun alussa. Tauko pysäyttää myös
+  riimut.
 - **Keihäsote** (`src/fighter.ts`; tehty Opus-ali-agentilla, orkestroija
   arvioi kuvista): käsien verkkoon on Blenderissä kaiverrettu otekanava
   (`grip_carve`, `GRIP_P`/`GRIP_D` tiedostossa `char_build.py`; sama
@@ -158,18 +174,20 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   ole mainissa. **Omistaja testaa julkaistusta osoitteesta**, ei
   dev-serveriltä.
 - **Käsin testattu 2026-11-13** (Clauden in-app browser, dev-serveri,
-  skriptattu syöte, `__game.feet`): tukijalan liukuma juostessa eteen ja
-  taakse noin 2 mm ruutua kohti (hahmo kulkee 56 mm), torjunta-asennossa
-  kävellen noin 1 mm, sivulle noin 5 mm. Askeltahti: kävely noin 2,
-  juoksu noin 4 ja sivuttain noin 5 askelta sekunnissa. Lantion
-  pystyliike kävellessä noin 6 cm, juostessa noin 10 cm, sivuttain noin
-  13 cm. Paikallaan jalat pysyvät alle 1 cm:n sisällä ja lantio huojuu
-  noin ±3 cm. Juoksun asennot katsottu kuvista sivulta. FPS 56–60.
-  **Ei testattu:** ihmisen pelaamana eikä liikkuvana kuvana (vain
-  yksittäiset ruudut ja mittaus), vastustajan askellus mitattuna,
-  keihäsmies ja kaksikätinen ote liikkeessä, kosketusnäyttö, buildattu
-  versio selaimessa. Edellisestä versiosta yhä kokeilematta: kaatuneet
-  kaltevalla maalla ja suossa kuoleva vastustaja.
+  skriptattu syöte): laulunappi täydellä voimalla avaa valinnan ja
+  vastustaja pysyy paikallaan; tyhjä paikka (F4) ei tee mitään; laulunappi
+  peruu ja voima säilyy; F2 aloittaa Parannuslaulun heti (hidastus
+  0,067), 6/8 osumaa nosti elämän 40 → 70; Suolaulu napsauttamalla,
+  8/8 osumaa juurrutti vastustajan 6 s. Kilpi katsottu takaa ja edestä:
+  roikkuu pystyssä vasemmalla kyljellä maalattu puoli ulospäin.
+  **Ei testattu:** ihmisen pelaamana; oikea hiiri (lukituksen vapautus ja
+  uudelleenlukitus valinnassa: selainpaneelissa ei ole hiiren lukitusta);
+  F1–F5 oikeassa selaimessa (F5 ei saa ladata sivua uudelleen);
+  kosketusnäyttö; laulupaikkojen asettelu eri ikkunakoossa; kilven
+  siirtymä torjuntaan liikkuvana kuvana ja kilven osuminen jalkaan
+  askeltaessa; buildattu versio selaimessa. Aiemmista yhä kokeilematta:
+  askellus ihmisen silmin, kaatuneet kaltevalla maalla, suossa kuoleva
+  vastustaja.
 - **Komennot 2026-11-13:** `bun run test` (60/60), `bun run lint`,
   `bun run build` ok.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
@@ -221,10 +239,16 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   Joissain selaimissa napit 4 ja 5 voivat silti selata historiaa.
 - **Kypärän tekstuuri** on sama metallilevy kuin muissa osissa, ja kupu on
   melko sileä; lentävä kypärä voi pudota puun tai kiven läpi (ei törmäyksiä).
-- **Laulun hidastus 1/20** tarkoittaa, että koko laulu (noin 5,7 s) on
-  vastustajalle noin 0,3 s. Vastustaja ehtii osua vain, jos sen isku oli
-  jo nostossa laulun alkaessa. Jos keskeytyksen halutaan olevan todellinen
-  uhka, `SONG_SLOWMO` pitää nostaa (esim. 1/8).
+- **Laulun hidastus 1/15** tarkoittaa, että koko laulu (noin 5,7 s) on
+  vastustajalle noin 0,4 s. Vastustaja ehtii osua lähinnä, jos sen isku oli
+  jo nostossa valinnan alkaessa. Arvo on säädettävissä (`song.slowmo`
+  JSON-tekstin kautta).
+- **Parannuslaulun teho on arvaus:** 8 osumaa = 40 elämää, eikä laulu vaadi
+  vastustajaa, joten aaltojen välissä sen voi laulaa rauhassa.
+- **Kalevalan säkeet on kirjoitettu muistista** (9. runo, verensulkusanat);
+  sanamuoto kannattaa tarkistaa painetusta tekstistä.
+- **F1–F5 estävät selaimen omat toiminnot** pelin aikana (F5 ei lataa
+  sivua; Ctrl+R toimii).
 - **Suon reunus** on erillinen kumpu maan päällä: sen ulkoreunan ja
   tallatun maan raja näkyy läheltä. Muta ei heijasta hahmoja.
 - **Kilven lovi** leikkaa pinnan shaderilla, joten loven reunassa ei ole
