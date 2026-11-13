@@ -7,21 +7,45 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
 
-- **Versio v00.10.00**, branch `claude/stamina` (tarkista merge-tila
-  `git merge-base --is-ancestor`). Mainissa on v00.09.00.
-- **Kestävyys (stamina)**: kaikki luvut taulukossa `STAMINA`
-  (`src/combat.ts`, testit vieressä): enimmäismäärä hahmoittain (hero 100,
-  urho 60, pohja 80), kevyt lyönti 3, raskas 9, toteutunut torjunta 2,
-  torjunta-asento 1/s, palautuminen 1/s, uupuneen vahinkokerroin 0,25,
-  pelaajan lepo aaltojen välissä +35. `Actor.stamina` ja
-  `Actor.maxStamina` ovat hahmokohtaisia, joten esineet ja loitsut voivat
-  myöhemmin muuttaa niitä. Hinta maksetaan, kun lyönti laukeaa
-  (`spendOnStrike`): keskeytynyt nosto ei maksa. **Uupunut** = kestävyyttä
-  alle kevyen lyönnin hinnan (`exhausted`): ei torjuntaa, lyönnit keveitä,
-  ilmaisia ja 25 % vahingosta. Jos voimat eivät riitä raskaaseen, lyönti jää
-  kevyeksi. Tekoäly: ei torju uupuneena, ei valitse raskasta ilman varaa, ja
-  uupuneena vetäytyy 3,8 m:n päähän, kunnes kestävyyttä on 12
-  (`ai.resting`); iholle (alle 2 m) tulevaa pelaajaa se lyö silti.
+- **Versio v00.11.00**, branch `claude/tuning`. Se on tehty branchin
+  `claude/stamina` (v00.10.00) päälle ja sisältää sen. Tarkista molempien
+  merge-tila `git merge-base --is-ancestor`. Mainissa on v00.09.00, ellei
+  omistaja ole mergannut.
+- **Kaikki pelin luvut ovat parametritaulukoissa**, eikä uusia lukuja
+  kovakoodata `main.ts`:ään:
+  - `src/combat.ts`: `CHARACTERS` (hahmon hp, stamina, staminaRegen, power,
+    moveSpeed; vastustajilla aallon 0 arvot), `WAVES` (kasvu per aalto,
+    pelaajan lepo, aaltojen väli), `STAMINA` (hinnat), `COMBAT` (ajat ja
+    kertoimet, mm. `windupScale`, `recoveryScale`, `parryWindow`, laulun
+    voiman kertyminen), `ENEMY_AI` (torjunta- ja lukutodennäköisyydet,
+    etäisyydet, lepo, kääntyminen), `STRIKES`, `WEAPONS`, `SHIELDS`.
+  - `src/songLogic.ts`: `SONG` (nopeus, välit, alueet, vaaditut osumat,
+    suon kesto). Johdetut arvot funktioina `beatGap()`, `songLead()`.
+- **Hahmon kyvyt** (`src/stats.ts`, testit `tuning.test.ts`):
+  `baseStats(hahmo, aalto)` → `Stats` (maxHp, maxStamina, staminaRegen,
+  power, moveSpeed, damageTaken). `Actor.mods` on lista vaikutuksia
+  (`Modifier`: id, stat, add/mul, until = pelin aika), ja
+  `effectiveStats` laskee `Actor.stats`in joka ruutu. **Ruoka, nälkä,
+  loitsut ja esineet tehdään lisäämällä muunnin** (`withModifier`), ei
+  muuttamalla taistelukoodia. Pelissä ei vielä ole yhtään muunninta;
+  savutestissä `__game.addModifier("player", {...})`.
+- **Säätö** (`src/tuning.ts`, käyttöliittymä `main.ts` kohdassa
+  "Säätövälilehti"): jokainen taulukon luku on säädettävissä polulla
+  (esim. `weapons.spear.reach`). `FIELDS` listaa taukoikkunan 31 kenttää
+  rajoineen; muut polut voi muuttaa JSON-tekstin kautta. Malli: luonnos →
+  "Ota käyttöön ja aloita alusta" → `applyChanges` + `restart()`.
+  Tallennus `localStorage`-avaimeen `laulun-miekka.tuning.v1`, ja arvot
+  otetaan käyttöön ennen hahmojen luontia. Vientimuoto:
+  `{ peli, versio, muutokset: { ...vain poikkeavat arvot puuna } }`.
+  **Kun omistaja liittää JSONin keskusteluun, sen arvot kirjoitetaan
+  taulukoiden oletuksiksi** ja omistaja palauttaa säätönsä oletuksiin.
+- **Kestävyys (stamina)**: hinnat taulukossa `STAMINA` (kevyt 3, raskas 9,
+  toteutunut torjunta 2, torjunta-asento 1/s, uupuneen vahinkokerroin
+  0,25); määrä ja palautuminen ovat hahmon arvoja. Hinta maksetaan, kun
+  lyönti laukeaa (`spendOnStrike`). **Uupunut** = kestävyyttä alle kevyen
+  lyönnin hinnan (`exhausted`): ei torjuntaa, lyönnit keveitä, ilmaisia ja
+  25 % vahingosta. Tekoäly ei torju uupuneena, ei valitse raskasta ilman
+  varaa ja vetäytyy lepäämään (`ai.resting`).
 - **Laulu** (`src/songLogic.ts` puhdas logiikka ja kaikki luvut, kulku
   `src/main.ts`): Q täydellä mittarilla → maailma hidastuu
   (`SONG_SLOWMO` 1/20) → pelaaja ottaa asennon `POSES.sing` reaaliajassa
@@ -78,7 +102,7 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
     minimikantama, hitaus, sallitut iskusuunnat kertoimineen, torjuntakaari.
   - `SHIELDS`: kesto 10, torjuntakaari, loven raja 0,5. `BASH`: kilpityöntö.
   - `makeAttack(ase, suunta, paino)` yhdistää nämä. Vahinko =
-    lyöjän voima (`Actor.power`) × ase × isku. Uusi aselaatu on uusi rivi
+    lyöjän voima (`Actor.stats.power`) × ase × isku. Uusi aselaatu on uusi rivi
     `WEAPONS`-taulukkoon; hajontaa ei vielä ole.
 - **Säännöt:** kilpi torjuu kaikki iskut ja kuluu (kevyt 1, raskas 2;
   täydellinen torjunta ei kuluta). Aseella torjunta onnistuu vain, jos
@@ -108,18 +132,23 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   `tools/fetch-characters.ps1` (ei Gitissä). `.blend`-tiedostot eivät ole
   Gitissä, eikä lähdemallien tuontia SRC-kokoelmaan ole skriptattu.
 - **Deployattu:** GitHub Pages julkaisee mainin heti mergen jälkeen
-  (Actions-ajo "Julkaise GitHub Pagesiin"); v00.10.00 ei ole mainissa.
-  **Omistaja testaa julkaistusta osoitteesta**, ei dev-serveriltä.
+  (Actions-ajo "Julkaise GitHub Pagesiin"); v00.10.00 ja v00.11.00 eivät
+  ole mainissa. **Omistaja testaa julkaistusta osoitteesta**, ei
+  dev-serveriltä.
 - **Käsin testattu 2026-11-13** (Clauden in-app browser, dev-serveri,
-  skriptattu syöte): palautuminen 2 s:ssa +2; kevyt lyönti −3, raskas −9;
-  kestävyydellä 6 viritetty lyönti jää kevyeksi ja mittari kertoo syyn;
-  uupuneen lyönti tekee 10 vahinkoa, kun kevyt tekee 40; torjunta-asennossa
-  kestävyys ei muutu, ja uupuneena suoja laskee; uupunut vastustaja
-  vetäytyy noin 3,4 m:n päähän eikä lyö; vastustajan kestävyys kuluu
-  lyönneistä; palkit näkyvät ja uupuneen kehys hehkuu.
-  **Ei testattu:** ihmisen pelaamana, kosketusnäyttö, buildattu versio
-  selaimessa. FPS 60 (suuntaa antava; muutos ei koske renderöintiä).
-- **Komennot 2026-11-13:** `bun run test` (46/46), `bun run lint`,
+  skriptattu syöte): oletusarvoilla hahmojen kyvyt ja keihäsmiehen
+  25 s:n taistelu ovat samat kuin ennen siirtoa taulukoihin. Säätö:
+  kenttien muutos näkyy tekstissä, yläraja rajaa arvon, käyttöönotto
+  aloittaa pelin alusta uusilla arvoilla (hp 150, vastustajan stamina
+  1000, laulun väli 0,53 s nopeudella 1,5), merkki näkyy kulmassa, arvot
+  säilyvät sivun latauksen yli, liitetty teksti päivittää kentät ja
+  ilmoittaa tuntemattomat ja rajatut polut, rikkinäinen teksti ei muuta
+  mitään, oletusten palautus tyhjentää tallennuksen. Muunnin: +50
+  enimmäiskestävyyttä ja 5× palautuminen vaikuttivat heti.
+  **Ei testattu:** ihmisen käyttämänä (myös leikepöydälle kopiointi on
+  kokeilematta: selainpaneelissa ei ole leikepöytää), kosketusnäyttö,
+  buildattu versio selaimessa. FPS 60 (muutos ei koske renderöintiä).
+- **Komennot 2026-11-13:** `bun run test` (60/60), `bun run lint`,
   `bun run build` ok.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Savutestien apuna `window.__game`: `tick(n, dt)` ajaa peliä askelin
@@ -128,7 +157,8 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   `events` muodossa `kuka:isku/paino:tulos`, `fillSong()`, `beat()`
   (välilyönti laululle), `nextBeatIn`, `bog([x,0,z])` (suo näkyviin),
   `debrisHeights` (irtokappaleiden korkeus maasta), `root(t)` (vastustaja
-  suohon), `setStamina(pelaaja, vastustaja)`, `placePlayer(x, z)`, `showcaseReach` (aseen kärjen etäisyys). Selainpaneeli pysäyttää
+  suohon), `setStamina(pelaaja, vastustaja)`, `addModifier(kuka, muunnin)`,
+  `stats`, `tuning`, `placePlayer(x, z)`, `showcaseReach` (aseen kärjen etäisyys). Selainpaneeli pysäyttää
   pelin, kun se menettää fokuksen: kutsu `autoPause(false)` jokaisen
   latauksen jälkeen. `skipTo` rakentaa hahmon vasta seuraavalla
   kierroksella, joten `knockHelmet()` vaatii erillisen kutsun tai odotuksen.
@@ -184,10 +214,9 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
 
 ## Seuraava tehtävä
 
-Omistaja pelaa v00.10.00:n julkaistusta osoitteesta mergen jälkeen ja kertoo
-tuntuman (kestävyyden hinnat ja palautuminen, uupuneen vastustajan
-vetäytyminen, laulun vaikeus, keihäsmies). Sen perusteella säädetään
-`STAMINA`-taulukon ja muiden taulukoiden luvut.
+Omistaja pelaa julkaistusta osoitteesta mergen jälkeen, säätää arvoja
+taukoikkunan Säätö-välilehdellä ja liittää löytämänsä arvot (Kopioi arvot)
+keskusteluun. Agentti kirjoittaa ne taulukoiden oletuksiksi.
 
 ## Ei vielä aloiteta
 

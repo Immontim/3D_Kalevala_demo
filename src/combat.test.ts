@@ -5,6 +5,8 @@ import {
   STRIKES,
   STYLES,
   WEAPONS,
+  CHARACTERS,
+  COMBAT,
   angleBetween,
   attackPhase,
   chargeLevel,
@@ -17,7 +19,6 @@ import {
   styleFor,
   weaponOf,
   exhausted,
-  maxStaminaOf,
   staminaAfterBlock,
   staminaTick,
   strikeCost,
@@ -37,11 +38,25 @@ const shield = SHIELDS.round;
 const inFront = { distance: 1.5, angleToDefender: 0 };
 const idle = { state: "idle" as const, blockStart: 0, angleToAttacker: 0 };
 
+describe("yleiset kertoimet", () => {
+  it("noston ja palautumisen kerroin skaalaa kaikki lyönnit", () => {
+    const before = makeAttack(WEAPONS.sword, "slash", "light").timing;
+    COMBAT.recoveryScale = 2;
+    COMBAT.windupScale = 0.5;
+    const after = makeAttack(WEAPONS.sword, "slash", "light").timing;
+    COMBAT.recoveryScale = 1;
+    COMBAT.windupScale = 1;
+    expect(after.recovery).toBeCloseTo(before.recovery * 2);
+    expect(after.windup).toBeCloseTo(before.windup * 0.5);
+    expect(after.release).toBe(before.release);
+  });
+});
+
 describe("kestävyys", () => {
   it("hahmoilla on eri määrä kestävyyttä", () => {
-    expect(maxStaminaOf("hero")).toBe(100);
-    expect(maxStaminaOf("urho")).toBe(60);
-    expect(maxStaminaOf("pohja")).toBe(80);
+    expect(CHARACTERS.hero.stamina).toBe(100);
+    expect(CHARACTERS.urho.stamina).toBe(60);
+    expect(CHARACTERS.pohja.stamina).toBe(80);
   });
   it("kevyt lyönti maksaa 3 ja raskas 9", () => {
     expect(strikeCost(strikeTier(50, "light"))).toBe(3);
@@ -62,9 +77,13 @@ describe("kestävyys", () => {
     expect(weakened(heavy).weight).toBe("light");
   });
   it("palautuu 1/s, mutta torjunta-asennossa ei lainkaan", () => {
-    expect(staminaTick(10, 100, false, 2)).toBeCloseTo(12);
-    expect(staminaTick(10, 100, true, 2)).toBeCloseTo(10);
-    expect(staminaTick(99.5, 100, false, 2)).toBe(100);
+    expect(staminaTick(10, 100, 1, false, 2)).toBeCloseTo(12);
+    expect(staminaTick(10, 100, 1, true, 2)).toBeCloseTo(10);
+    expect(staminaTick(99.5, 100, 1, false, 2)).toBe(100);
+  });
+  it("hahmon oma palautumisnopeus ratkaisee", () => {
+    expect(staminaTick(10, 100, 3, false, 2)).toBeCloseTo(16);
+    expect(staminaTick(10, 100, 0.5, true, 2)).toBeCloseTo(9);
   });
   it("toteutunut torjunta vie 2 eikä mene alle nollan", () => {
     expect(staminaAfterBlock(10)).toBe(8);

@@ -24,6 +24,122 @@ export interface AttackTiming {
   recovery: number; // palautuminen
 }
 
+/**
+ * Taistelun yleiset ajat ja kertoimet. Kaikki ovat säädettävissä (ks. tuning.ts).
+ */
+export const COMBAT = {
+  /** Kuinka kauan täyteen viritettyä iskua voi pidätellä, ennen kuin se laukeaa itsestään. */
+  chargeHoldMax: 0.8,
+  /** Torjunta, joka on aloitettu enintään näin vähän ennen osumaa, on täydellinen torjunta. */
+  parryWindow: 0.2,
+  /** Horjahdus täydellisen torjunnan jälkeen, sekunteja. */
+  staggerTime: 0.9,
+  /** Osuman aiheuttama horjahdus, sekunteja. */
+  hitStagger: 0.405,
+  /** Murretun torjunnan jälkeinen horjahdus, sekunteja. */
+  guardbreakStagger: 0.9,
+  /** Suojan murtanut pääsee jatkamaan näin paljon nopeammin (lyhentää palautumista). */
+  guardbreakAdvantage: 0.25,
+  /** Torjuttu lyöjä palautuu näin paljon hitaammin. */
+  blockRecoil: 0.3,
+  dodgeTime: 0.35,
+  dodgeCooldown: 0.6,
+  /** Väistön nopeus, m/s. */
+  dodgeSpeed: 7,
+  /** Kaikkien lyöntien noston kerroin (1 = taulukon ajat). */
+  windupScale: 1,
+  /** Kaikkien lyöntien palautumisajan kerroin (1 = taulukon ajat). */
+  recoveryScale: 1,
+  /** Liikenopeuden kerroin torjunnan, noston ja palautumisen aikana. */
+  guardMoveScale: 0.41,
+  /** Suohon laulettu ottaa vahingon tällä kertoimella. */
+  rootedDamage: 2,
+  /** Laulun voiman kertyminen osumasta ja täydellisestä torjunnasta, ja mittarin koko. */
+  songGainHit: 15,
+  songGainParry: 30,
+  songMax: 100,
+};
+
+/** Hahmon perusarvot. Ajonaikaiset muutokset (ruoka, nälkä, loitsut) tehdään stats.ts:n muuntimilla. */
+export interface CharacterDef {
+  hp: number;
+  /** Enimmäiskestävyys. */
+  stamina: number;
+  /** Kestävyyden palautuminen sekunnissa. */
+  staminaRegen: number;
+  /** Lyöjän voima: vahingon perusarvo ennen aseen ja iskun kertoimia. */
+  power: number;
+  /** Kävelynopeus, m/s. */
+  moveSpeed: number;
+}
+
+/** Vastustajien arvot ovat aallon 0 arvoja: aalto lisää niihin WAVES-taulukon verran. */
+export const CHARACTERS: Record<string, CharacterDef> = {
+  hero: { hp: 100, stamina: 100, staminaRegen: 1, power: 20, moveSpeed: 3.4 },
+  urho: { hp: 80, stamina: 60, staminaRegen: 1, power: 14, moveSpeed: 2.4 },
+  pohja: { hp: 80, stamina: 80, staminaRegen: 1, power: 14, moveSpeed: 2.4 },
+};
+
+/** Aaltojen vaikeutuminen ja pelaajan lepo aaltojen välissä. */
+export const WAVES = {
+  /** Vastustajan elämän ja voiman lisäys jokaista aaltoa kohti. */
+  hpPerWave: 20,
+  powerPerWave: 1,
+  /** Pelaajan palautuminen aaltojen välissä. */
+  restHp: 35,
+  restStamina: 35,
+  /** Sekunteja vastustajan kaatumisesta seuraavan saapumiseen. */
+  nextWaveDelay: 3,
+};
+
+/** Vastustajan tekoälyn luvut. */
+export const ENEMY_AI = {
+  /** Nosto on aluksi näin paljon pelaajan nostoa pidempi ja lyhenee aalto aallolta. */
+  windupHandicap: 0.23,
+  windupPerWave: 0.05,
+  /** Lopulta nosto on tämän verran pelaajan nostoa nopeampi. */
+  windupEdge: 0.02,
+  extraRecovery: 0.07,
+  /** Kuinka usein vastustaja torjuu pelaajan noston: perusarvo, lisäys aaltoa kohti ja katto. */
+  blockBase: 0.3,
+  blockPerWave: 0.1,
+  blockMax: 0.7,
+  blockShieldBonus: 0.2,
+  blockSpearBonus: -0.1,
+  /** Kuinka usein aseella torjuva lukee iskun suunnan oikein. */
+  readBase: 0.5,
+  readPerWave: 0.06,
+  readMax: 0.9,
+  /** Raskaan lyönnin osuus varustuksen mukaan, ja kilven takana seisovaa pelaajaa vastaan. */
+  heavySword: 0.35,
+  heavySpear: 0.25,
+  heavyShield: 0.15,
+  heavyVsTurtle: 0.7,
+  /** Pelaaja on seissyt torjunnassa näin pitkään: suoja kannattaa murtaa. */
+  turtleTime: 0.7,
+  /** Tavoite-etäisyydet. */
+  distSword: 1.9,
+  distSpear: 2.9,
+  distBash: 1.35,
+  /** Liikenopeuden kertoimet: kaukaa lähestyessä ja keihäsmiehen perääntyessä. */
+  chaseScale: 1.42,
+  spearRetreatScale: 1.25,
+  /** Päätösten väli sekunteina (vähintään + satunnainen lisä) ja hyökkäyksen todennäköisyys. */
+  decideMin: 0.5,
+  decideRandom: 1.0,
+  attackChance: 0.65,
+  bashChance: 0.9,
+  /** Vastaisku torjunnan jälkeen. */
+  counterChance: 0.55,
+  /** Uupunut vetäytyy tälle etäisyydelle, kunnes kestävyyttä on taas restUntil; lyö silti, jos pelaaja tulee restCornered lähemmäs. */
+  restUntil: 12,
+  restDistance: 3.8,
+  restCornered: 2.0,
+  /** Suosta päässeen kääntymisnopeus (rad/s) ja kulma, jonka sisällä se on taas valmis. */
+  reorientTurn: 3.2,
+  reorientDone: 0.2,
+};
+
 export type Loadout = "sword" | "sword_shield" | "spear";
 export type WeaponId = "sword" | "spear";
 /** Iskun suunta: ylälyönti, sivallus sivulta tai pisto suoraan eteen. */
@@ -136,7 +252,11 @@ export function makeAttack(w: WeaponDef, style: StrikeStyle, weight: StrikeWeigh
   return {
     kind: style,
     weight,
-    timing: { windup: s.timing.windup * w.slowness, release: s.timing.release, recovery: s.timing.recovery * w.slowness },
+    timing: {
+      windup: s.timing.windup * w.slowness * COMBAT.windupScale,
+      release: s.timing.release,
+      recovery: s.timing.recovery * w.slowness * COMBAT.recoveryScale,
+    },
     range: s.range + w.reach,
     minRange: w.minRange,
     arc: s.arc,
@@ -158,9 +278,6 @@ export function styleFor(w: WeaponDef, wanted: StrikeStyle): StrikeStyle {
   return STYLES.find((s) => w.styles[s]) ?? "slash";
 }
 
-/** Kuinka kauan täyteen viritettyä iskua voi pidätellä, ennen kuin se laukeaa itsestään. */
-export const CHARGE_HOLD_MAX = 0.8;
-
 /**
  * Viritysmittarin täyttö 0..1, kun iskunappia on pidetty pohjassa `held` sekuntia.
  * Täysi mittari tarkoittaa, että raskas isku on viritetty.
@@ -169,45 +286,23 @@ export function chargeLevel(held: number, heavy: AttackDef): number {
   return Math.max(0, Math.min(1, held / heavy.timing.windup));
 }
 
-/** Torjunta, joka on aloitettu enintään näin vähän ennen osumaa, on täydellinen torjunta. */
-export const PARRY_WINDOW = 0.2;
-export const STAGGER_TIME = 0.9;
-export const BLOCK_RECOIL = 0.3;
-export const DODGE_TIME = 0.35;
-export const DODGE_COOLDOWN = 0.6;
-/** Murretun torjunnan jälkeinen horjahdus sekunteina. */
-export const GUARDBREAK_STAGGER = 0.9;
-/** Suojan murtanut pääsee jatkamaan näin paljon nopeammin (lyhentää palautumista). */
-export const GUARDBREAK_ADVANTAGE = 0.25;
-
 // ---------- Kestävyys (stamina) ----------
 /**
  * Kaikki kestävyyden luvut. Lyönnit ja torjunnat kuluttavat kestävyyttä, ja se palautuu
- * tasaisesti. Enimmäismäärä on hahmokohtainen (Actor.maxStamina), joten esineet, loitsut tai
- * ruoka voivat myöhemmin muuttaa sitä.
+ * tasaisesti. Enimmäismäärä ja palautumisnopeus ovat hahmon arvoja (CHARACTERS, stats.ts).
  */
 export const STAMINA = {
-  /** Enimmäiskestävyys hahmoittain. */
-  max: { hero: 100, urho: 60, pohja: 80 } as Record<string, number>,
   /** Kevyen lyönnin (ja kilpityönnön) hinta. Tätä vähemmällä hahmo on uupunut. */
   light: 3,
   /** Raskaan lyönnin hinta. */
   heavy: 9,
   /** Toteutuneen torjunnan hinta osumahetkellä (myös täydellinen torjunta). */
   blockHit: 2,
-  /** Torjunta-asennon ylläpito sekunnissa. */
+  /** Torjunta-asennon ylläpito sekunnissa. Palautuminen (hahmon staminaRegen) jatkuu samalla. */
   blockHold: 1,
-  /** Palautuminen sekunnissa, aina. Torjunta-asennossa ylläpito kumoaa sen. */
-  regen: 1,
   /** Uupuneen lyönnin vahinkokerroin. */
   weakDamage: 0.25,
-  /** Pelaajan palautuminen aaltojen välissä. */
-  waveRest: 35,
 };
-
-export function maxStaminaOf(character: string): number {
-  return STAMINA.max[character] ?? 80;
-}
 
 /** Uupunut: ei pysty torjumaan, ja lyönnit ovat heikkoja. Raja on kevyen lyönnin hinta. */
 export function exhausted(stamina: number): boolean {
@@ -236,8 +331,8 @@ export function weakened(a: AttackDef): AttackDef {
 }
 
 /** Kestävyys dt sekunnin kuluttua. */
-export function staminaTick(stamina: number, max: number, blocking: boolean, dt: number): number {
-  const rate = STAMINA.regen - (blocking ? STAMINA.blockHold : 0);
+export function staminaTick(stamina: number, max: number, regen: number, blocking: boolean, dt: number): number {
+  const rate = regen - (blocking ? STAMINA.blockHold : 0);
   return Math.max(0, Math.min(max, stamina + rate * dt));
 }
 
@@ -246,9 +341,6 @@ export function staminaAfterBlock(stamina: number): number {
   return Math.max(0, stamina - STAMINA.blockHit);
 }
 
-export const SONG_GAIN_HIT = 15;
-export const SONG_GAIN_PARRY = 30;
-export const SONG_MAX = 100;
 
 export type HitResult = "hit" | "blocked" | "guardbreak" | "parried" | "dodged" | "miss";
 
@@ -293,7 +385,7 @@ export function resolveHit(g: Geometry, d: Defender, now: number, a: AttackDef =
   if (Math.abs(d.angleToAttacker) > arc) return "hit";
   const covers = !!d.shield || a.kind === "bash" || (d.stance ?? "slash") === a.kind;
   if (!covers) return "hit";
-  if (now - d.blockStart <= PARRY_WINDOW) return "parried";
+  if (now - d.blockStart <= COMBAT.parryWindow) return "parried";
   if (a.kind === "bash" && !d.shield) return "guardbreak";
   return "blocked";
 }
@@ -304,7 +396,7 @@ export function shieldWear(a: AttackDef, res: HitResult, d: Defender): number {
 }
 
 export function damageFor(base: number, defenderState: ActionState): number {
-  return defenderState === "rooted" ? base * 2 : base;
+  return defenderState === "rooted" ? base * COMBAT.rootedDamage : base;
 }
 
 /** Iskun vahinko: lyöjän voima × iskun ja aseen kerroin. Vain osuma tekee vahinkoa. */
@@ -327,8 +419,8 @@ export function attackPhase(elapsed: number, t: AttackTiming): AttackPhase {
  */
 export function enemyAttackTiming(a: AttackDef, wave: number): AttackTiming {
   const t = a.timing;
-  const windup = Math.max(t.windup - 0.02, t.windup + 0.23 - 0.05 * (wave - 1));
-  return { windup, release: t.release, recovery: t.recovery + 0.07 };
+  const windup = Math.max(t.windup - ENEMY_AI.windupEdge, t.windup + ENEMY_AI.windupHandicap - ENEMY_AI.windupPerWave * (wave - 1));
+  return { windup, release: t.release, recovery: t.recovery + ENEMY_AI.extraRecovery };
 }
 
 /** Kahden suunnan välinen etumerkillinen kulma välillä [-PI, PI]. */
