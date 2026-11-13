@@ -24,7 +24,12 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; col
 .bar.thin { height: 8px; }
 .fill { height: 100%; width: 100%; transition: width 0.15s; }
 .fill.hp { background: linear-gradient(#c8473a, #7d2219); }
-.right .fill.hp { margin-left: auto; }
+.right .fill.hp, .right .fill.stamina { margin-left: auto; }
+/* Kestävyys: sininen palkki elämän alla. Uupuneena kehys vilkkuu. */
+.bar.stamina { height: 10px; margin-top: 3px; }
+.fill.stamina { background: linear-gradient(#4a78d0, #1f3a86); transition: width 0.1s linear; }
+.bar.stamina.spent { border-color: #7fa2e8; animation: spent 0.5s infinite alternate; }
+@keyframes spent { from { box-shadow: 0 0 0 rgba(90, 140, 240, 0); } to { box-shadow: 0 0 9px rgba(90, 140, 240, 0.9); } }
 .fill.song { background: linear-gradient(#f0c766, #a8761e); width: 0; }
 .fill.song.full { box-shadow: 0 0 10px #f0c766; animation: pulse 1s infinite alternate; }
 @keyframes pulse { from { filter: brightness(1); } to { filter: brightness(1.5); } }

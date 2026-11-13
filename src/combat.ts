@@ -180,6 +180,72 @@ export const GUARDBREAK_STAGGER = 0.9;
 /** Suojan murtanut pääsee jatkamaan näin paljon nopeammin (lyhentää palautumista). */
 export const GUARDBREAK_ADVANTAGE = 0.25;
 
+// ---------- Kestävyys (stamina) ----------
+/**
+ * Kaikki kestävyyden luvut. Lyönnit ja torjunnat kuluttavat kestävyyttä, ja se palautuu
+ * tasaisesti. Enimmäismäärä on hahmokohtainen (Actor.maxStamina), joten esineet, loitsut tai
+ * ruoka voivat myöhemmin muuttaa sitä.
+ */
+export const STAMINA = {
+  /** Enimmäiskestävyys hahmoittain. */
+  max: { hero: 100, urho: 60, pohja: 80 } as Record<string, number>,
+  /** Kevyen lyönnin (ja kilpityönnön) hinta. Tätä vähemmällä hahmo on uupunut. */
+  light: 3,
+  /** Raskaan lyönnin hinta. */
+  heavy: 9,
+  /** Toteutuneen torjunnan hinta osumahetkellä (myös täydellinen torjunta). */
+  blockHit: 2,
+  /** Torjunta-asennon ylläpito sekunnissa. */
+  blockHold: 1,
+  /** Palautuminen sekunnissa, aina. Torjunta-asennossa ylläpito kumoaa sen. */
+  regen: 1,
+  /** Uupuneen lyönnin vahinkokerroin. */
+  weakDamage: 0.25,
+  /** Pelaajan palautuminen aaltojen välissä. */
+  waveRest: 35,
+};
+
+export function maxStaminaOf(character: string): number {
+  return STAMINA.max[character] ?? 80;
+}
+
+/** Uupunut: ei pysty torjumaan, ja lyönnit ovat heikkoja. Raja on kevyen lyönnin hinta. */
+export function exhausted(stamina: number): boolean {
+  return stamina < STAMINA.light;
+}
+
+export function canStrikeHeavy(stamina: number): boolean {
+  return stamina >= STAMINA.heavy;
+}
+
+/** Millainen lyönti näillä voimilla syntyy: raskas, kevyt vai uupuneen heikko lyönti. */
+export type StrikeTier = "heavy" | "light" | "weak";
+export function strikeTier(stamina: number, weight: StrikeWeight): StrikeTier {
+  if (exhausted(stamina)) return "weak";
+  return weight === "heavy" && canStrikeHeavy(stamina) ? "heavy" : "light";
+}
+
+/** Heikko lyönti ei maksa mitään: sen hinta on jo maksettu vahingossa. */
+export function strikeCost(tier: StrikeTier): number {
+  return tier === "heavy" ? STAMINA.heavy : tier === "light" ? STAMINA.light : 0;
+}
+
+/** Uupuneen lyönti: sama isku, mutta vain neljännes vahingosta. */
+export function weakened(a: AttackDef): AttackDef {
+  return { ...a, weight: "light", damage: a.damage * STAMINA.weakDamage };
+}
+
+/** Kestävyys dt sekunnin kuluttua. */
+export function staminaTick(stamina: number, max: number, blocking: boolean, dt: number): number {
+  const rate = STAMINA.regen - (blocking ? STAMINA.blockHold : 0);
+  return Math.max(0, Math.min(max, stamina + rate * dt));
+}
+
+/** Kestävyys toteutuneen torjunnan jälkeen. */
+export function staminaAfterBlock(stamina: number): number {
+  return Math.max(0, stamina - STAMINA.blockHit);
+}
+
 export const SONG_GAIN_HIT = 15;
 export const SONG_GAIN_PARRY = 30;
 export const SONG_MAX = 100;
