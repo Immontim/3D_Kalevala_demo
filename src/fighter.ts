@@ -197,8 +197,8 @@ export class Fighter {
     this.weapon.position.set(-0.3, 1.0, 0.2);
     this.body.add(this.weapon);
     const spear = look.loadout === "spear";
-    this.bladeBase.position.z = spear ? 1.22 : 0.12;
-    this.bladeTip.position.z = spear ? 1.52 : 0.8;
+    this.bladeBase.position.z = spear ? 1.22 + SPEAR_SLIDE : 0.12;
+    this.bladeTip.position.z = spear ? 1.52 + SPEAR_SLIDE : 0.8;
     this.weapon.add(this.bladeBase, this.bladeTip);
     characterAssets.then((gltf) => { if (!this.disposed) this.build(gltf.scene); });
     if (spear) debugSpearFighters.add(this);
@@ -273,7 +273,7 @@ export class Fighter {
     if (this.look.loadout === "spear") this.prepareSpearGrip(clone);
     const weaponModel = equip[this.look.loadout === "spear" ? "spear" : "sword"];
     if (weaponModel) {
-      weaponModel.position.set(0, 0, 0);
+      weaponModel.position.set(0, 0, this.look.loadout === "spear" ? SPEAR_SLIDE : 0);
       weaponModel.traverse((o) => {
         const m = o as THREE.Mesh;
         if (!m.isMesh) return;
@@ -703,6 +703,8 @@ const FOREARM_TWIST = 0.85;
 // Nyrkin otekanava glTF-koordinaateissa (oikea käsi lepoasennossa; vasen = peilikuva x:n suhteen).
 // Sama suora kuin GRIP_P/GRIP_D tiedostossa assets-src/blender/char_build.py, jonka mukaan
 // sormet on muotoiltu varren ympärille. d osoittaa peukalon puolelle eli keihään kärkeen päin.
+/** Kuinka paljon keihästä on työnnetty otteessa eteenpäin (m): takakäden taakse jää noin 0,3 m vartta. */
+const SPEAR_SLIDE = 0.3;
 const GRIP_CHANNEL = { p: new THREE.Vector3(-0.383, 0.795, 0.112), d: new THREE.Vector3(0.31, -0.06, 0.95).normalize() };
 
 // Aseen paikka kädessä virtuaalisessa käsikehyksessä (käsi suorana alas: y alas rannetta pitkin).

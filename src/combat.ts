@@ -73,6 +73,8 @@ export interface WeaponDef {
   damage: number;
   /** Lisäys iskun kantamaan metreinä. */
   reach: number;
+  /** Lisäys iskun askeleeseen metreinä: keihäsmies syöksyy piston mukana. */
+  lunge: number;
   /** Tätä lähempänä ase ei osu (keihään varsi on tiellä). */
   minRange: number;
   /** Noston ja palautumisen kerroin: yli 1 on hitaampi ase. */
@@ -85,11 +87,13 @@ export interface WeaponDef {
 
 export const WEAPONS: Record<WeaponId, WeaponDef> = {
   sword: {
-    id: "sword", name: "Miekka", damage: 1, reach: 0, minRange: 0, slowness: 1,
+    id: "sword", name: "Miekka", damage: 1, reach: 0, lunge: 0, minRange: 0, slowness: 1,
     styles: { overhead: 1, slash: 1, thrust: 1 }, blockArc: Math.PI / 2.2,
   },
+  // Kantama on mitattu mallista: pistossa keihään kärki on 1,91 m hahmon keskeltä ja miekan
+  // 1,25 m, ja syöksy on 0,3 m pidempi. Samalla pelivaralla kuin miekalla ero on 1,0 m.
   spear: {
-    id: "spear", name: "Keihäs", damage: 1, reach: 0.8, minRange: 1.3, slowness: 1.35,
+    id: "spear", name: "Keihäs", damage: 1, reach: 1.0, lunge: 0.3, minRange: 1.3, slowness: 1.35,
     styles: { thrust: 1.3 }, blockArc: Math.PI / 2.2,
   },
 };
@@ -137,7 +141,7 @@ export function makeAttack(w: WeaponDef, style: StrikeStyle, weight: StrikeWeigh
     minRange: w.minRange,
     arc: s.arc,
     damage: s.damage * w.damage * (w.styles[style] ?? 0),
-    lunge: s.lunge,
+    lunge: s.lunge + w.lunge,
     shieldDamage: s.shieldDamage,
   };
 }
