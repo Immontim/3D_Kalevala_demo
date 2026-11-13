@@ -14,13 +14,13 @@ export const SONG_OUTRO = 0.45;
 
 /** Ensimmäisen osuma-alueen puolikas: painallus saa osua näin paljon ohi riimun keskikohdan. */
 export const ZONE_FIRST = 0.24;
-/** Jokainen seuraava alue on tämän verran edellisestä (0.8 = viidenneksen lyhyempi). */
-export const ZONE_SHRINK = 0.8;
+/** Jokainen seuraava alue on tämän verran edellisestä. Kahdeksalla riimulla viimeinen on noin ±0,07 s. */
+export const ZONE_SHRINK = 0.84;
 
 /** Loitsu laukeaa, kun osumia on vähintään näin monta. */
-export const SONG_MIN_HITS = 2;
+export const SONG_MIN_HITS = 4;
 /** Suohon laulamisen kesto jokaista osumaa kohti (pelin sekunteja). */
-export const ROOT_TIME_PER_HIT = 1.5;
+export const ROOT_TIME_PER_HIT = 0.75;
 
 /** Osuma-alueen puolikas sekunteina riimulle i (0 = ensimmäinen). */
 export function zoneHalf(i: number): number {
@@ -46,10 +46,14 @@ export function songOutcome(results: boolean[]): SongOutcome {
   return { success, hits, rootTime: success ? hits * ROOT_TIME_PER_HIT : 0 };
 }
 
-/** Kalevalan 3. runo (1849, vapaa käyttää). Yksi säe per riimu. */
+/** Kalevalan 3. runo (1849, vapaa käyttää). Yksi säe per riimu: säkeiden määrä on riimujen määrä. */
 export const SONG_VERSES = [
   "Lauloi vanha Väinämöinen:",
   "järvet läikkyi, maa järisi,",
-  "lauloi nuoren Joukahaisen",
+  "vuoret vaskiset vapisi,",
+  "paaet vahvat paukahteli,",
+  "kalliot kaheksi lenti,",
+  "kivet rannoilla rakoili.",
+  "Lauloi nuoren Joukahaisen",
   "suohon suonivyötäisistä.",
 ];

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ROOT_TIME_PER_HIT, SONG_VERSES, ZONE_FIRST, inZone, songOutcome, zoneHalf } from "./songLogic";
+import { ROOT_TIME_PER_HIT, SONG_MIN_HITS, SONG_VERSES, ZONE_FIRST, inZone, songOutcome, zoneHalf } from "./songLogic";
 
 describe("laulun osuma-alueet", () => {
   it("jokainen alue on edellistä lyhyempi", () => {
@@ -13,18 +13,23 @@ describe("laulun osuma-alueet", () => {
   });
   it("sama ohilyönti kelpaa ensimmäiseen alueeseen mutta ei viimeiseen", () => {
     expect(inZone(0.2, 0)).toBe(true);
-    expect(inZone(0.2, 3)).toBe(false);
+    expect(inZone(0.2, SONG_VERSES.length - 1)).toBe(false);
   });
 });
 
 describe("laulun lopputulos", () => {
-  it("kesto kasvaa osumien määrän mukaan", () => {
-    expect(songOutcome([true, true, false, false]).rootTime).toBe(2 * ROOT_TIME_PER_HIT);
-    expect(songOutcome([true, true, true, false]).rootTime).toBe(3 * ROOT_TIME_PER_HIT);
-    expect(songOutcome([true, true, true, true]).rootTime).toBe(4 * ROOT_TIME_PER_HIT);
+  const hits = (n: number) => SONG_VERSES.map((_, i) => i < n);
+  it("riimuja on kahdeksan ja loitsuun vaaditaan puolet", () => {
+    expect(SONG_VERSES.length).toBe(8);
+    expect(SONG_MIN_HITS).toBe(4);
   });
-  it("yhdellä osumalla tai ilman loitsu epäonnistuu", () => {
-    expect(songOutcome([false, true, false, false])).toMatchObject({ success: false, rootTime: 0 });
-    expect(songOutcome([false, false, false, false]).success).toBe(false);
+  it("kesto kasvaa osumien määrän mukaan", () => {
+    expect(songOutcome(hits(4)).rootTime).toBe(4 * ROOT_TIME_PER_HIT);
+    expect(songOutcome(hits(6)).rootTime).toBe(6 * ROOT_TIME_PER_HIT);
+    expect(songOutcome(hits(8)).rootTime).toBe(6);
+  });
+  it("liian vähillä osumilla loitsu epäonnistuu", () => {
+    expect(songOutcome(hits(3))).toMatchObject({ success: false, rootTime: 0 });
+    expect(songOutcome(hits(0)).success).toBe(false);
   });
 });
