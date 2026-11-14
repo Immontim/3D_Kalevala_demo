@@ -7,9 +7,9 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-14 (Codex, Windows)
 
-- **Versio v01.03.00**, branch `codex/hit-blood-block-sparks`, commit
+- **Versio v01.04.00**, branch `codex/pohja-shield-bash`, commit
   `HEAD` (tämän muutoksen commit; tarkista merge-tila
-  `git merge-base --is-ancestor`). Mainissa on v01.02.00.
+  `git merge-base --is-ancestor`). Mainissa on v01.03.00.
 - **Rakenne.** `src/engine/` on kohtaus- ja taistelumoottori, `src/ui/` sivun
   ikkunat (aloitus, tauko, säätö), `src/main.ts` vain käynnistys ja
   `src/debug.ts` savutestien `__game`. Säännöt ja luvut ovat yhä puhtaissa
@@ -40,10 +40,6 @@ Päivitetty: 2026-11-14 (Codex, Windows)
   `spread` (2,4 m) väliä ja kääntyvät takaisin, jos kulma pelaajan
   katseesta ylittää `flankMax` (115°). Lukituksen kohde vaihtuu hiiren
   rullalla (`cycleLock`, vasemmalta oikealle).
-- **Palkit ja varoitus** (`hud.ts` `updateFoeBars`, `updateRearWarn`):
-  elämäpalkki jokaisen vastustajan pään päällä (`#foeBars`, DOM-elementti
-  vastustajaa kohti), ja nuoli `#rearWarn` osoittaa lyöjään, joka ei näy
-  ruudulla (ehto on ruudulle projisoitu paikka, ei kulma).
 - **Suoja-aika** (`COMBAT.graceBlock` 0,6 s, `graceParry` 1,0 s, `graceArc`
   75°; `graceAfter`, `graceCovers`; `melee.ts` `resolveStrike`): torjunta
   asettaa `Actor.graceUntil` ja `graceFrom`, ja sinä aikana muiden kuin
@@ -154,19 +150,18 @@ Päivitetty: 2026-11-14 (Codex, Windows)
   - `makeAttack(ase, suunta, paino)` yhdistää nämä. Vahinko =
     lyöjän voima (`Actor.stats.power`) × ase × isku. Uusi aselaatu on uusi rivi
     `WEAPONS`-taulukkoon; hajontaa ei vielä ole.
-- **Säännöt:** kilpi torjuu kaikki iskut ja kuluu (kevyt 1, raskas 2;
+- **Säännöt:** kilpi torjuu aseiskut ja kuluu (kevyt 1, raskas 2;
   täydellinen torjunta ei kuluta). Aseella torjunta onnistuu vain, jos
-  torjunta-asento vastaa iskun suuntaa. Kilpityöntö murtaa asetorjunnan,
-  mutta kilpeen se vain osuu. Raskas isku ei enää murra torjuntaa.
-- **Kilven hajoaminen** (`src/fighter.ts`): lovi ja sirpaleet tehdään
-  shaderilla kilven materiaaliin (`patchShield`, `ShieldDebris`), ei omilla
-  malleilla. Pelaaja saa uuden kilven jokaiseen aaltoon.
-- **Osuma- ja torjuntaefektit** (`engine/effects.ts`, käyttö
-  `engine/melee.ts`): läpimennyt isku käyttää omaa tummanpunaista
-  partikkelipoolia, jonka pisarat lähtevät alaspäin. Tavallinen torjunta,
-  suojan murto ja täydellinen torjunta käyttävät ylöspäin lentäviä kultaisia
-  kipinöitä; määrät ovat 32 / 36 / 56. Efektit eivät muuta vahinkoa tai
-  taistelusääntöjä.
+  torjunta-asento vastaa iskun suuntaa. Raskas isku ei murra torjuntaa.
+- **Kilpityöntö** (`BASH`, `shouldShieldBash`, `melee.ts`): vain kilvellinen
+  Pohjan soturi osaa käyttää sitä; lähietäisyydellä satunnainen valinta on
+  12 % AI:n päätöksistä, ja pitkään torjuvaa vastaan valinta on
+  varma (hyökkäysvuoro ja `attackChance` ratkaisevat vielä aloituksen).
+  Nuori urho ei käytä liikettä. Osuma tekee 0,25 × voima vahinkoa myös
+  murtaessaan ase- tai kilpitorjunnan, pysäyttää jo alkaneen iskun ja
+  yrittää siirtää puolustajaa 0,65 m taakse nopeudella 2,6 m/s (areenaraja
+  tai toinen hahmo voi lyhentää nettosiirtymää). Suohon juuttunut ottaa
+  vahingon mutta ei siirry.
 - **Tekoäly** (`pickEnemyAttack`, `src/engine/ai.ts`): arpoo iskusuunnan ja
   painon varustuksen mukaan, lyö raskaasti kilven takana seisovaa pelaajaa,
   ja aseella torjuessaan arvaa suunnan oikein sitä useammin, mitä pidemmällä
@@ -181,17 +176,17 @@ Päivitetty: 2026-11-14 (Codex, Windows)
   samoista osoitteista käsin). `.blend`-tiedostot eivät ole Gitissä, eikä
   lähdemallien tuontia SRC-kokoelmaan ole skriptattu. `homestead.py`
   tarvitsee metsäputken tekemän `assets-src/textures/birch_bark_diff.png`n.
-- **Koodi valmis:** v01.03.00 branchissa `codex/hit-blood-block-sparks`.
+- **Koodi valmis:** v01.04.00 branchissa `codex/pohja-shield-bash`.
   **Ei deployattu:** GitHub Pages julkaisee mainin mergen jälkeen
   (Actions-ajo "Julkaise GitHub Pagesiin"). **Omistaja testaa julkaistusta
   osoitteesta**, ei dev-serveriltä.
-- **Käsin testattu 2026-11-14** (in-app browser, oikea pelisyöte): osuma
-  vähensi vastustajan elämää 90 → 70 ja punaiset pisarat näkyivät osumakohdasta
-  alaspäin; onnistunut torjunta vähensi kestävyyttä 100 → 98 viemättä elämää,
-  ja tuotti kultaisen kontaktiefektin. 60 FPS, ei konsolivirheitä.
+- **Käsin testattu 2026-11-14** (in-app browser, oikea pelisyöte): pelaajan
+  kilpityöntö vähensi vastustajan elämää 90 → 85, käynnisti horjahdusasennon
+  ja siirsi vastustajaa taakse. 60 FPS, ei konsolivirheitä. AI:n rajaus
+  Pohjan soturiin ja 0,65 m liike varmennettu puhtailla testeillä.
   **Ei testattu:** buildattu versio selaimessa, hitaampi kone, eri ikkunakoot.
-- **Komennot 2026-11-14:** `bun run test` (74/74), `bun run lint`,
-  `bun run build` ok. Build varoittaa ennestään yli 500 kt:n JS-palasta.
+- **Komennot 2026-11-14:** `bun run test` 151/151 (mukana Clauden sisäinen
+  worktree), nykyinen checkout rajattuna 77/77; `bun run lint` ja `bun run build` ok. Build varoittaa ennestään yli 500 kt:n JS-palasta.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Savutestien apuna `window.__game` (`src/debug.ts`, lue sieltä koko
   lista): `tick(n, dt)` ajaa peliä askelin ruudunpäivityksestä riippumatta,
@@ -228,6 +223,14 @@ Päivitetty: 2026-11-14 (Codex, Windows)
   `enemyAi.attackGap`ia, jos sen halutaan tuntuvan. Hajaantuminen on
   pehmeää, joten vastustajat voivat ajautua metrin päähän toisistaan.
   Sankarin isku osuu aina vain yhteen (myös leveä sivallus).
+- **Hahmo–maailma-törmäyksiä ei ole.** Liike, väistö, tukiaskel ja uusi
+  kilpityönnön horjahdus voivat viedä kiven, nuotion, kodan, puun tai
+  rakennuksen läpi. Vain areenan ympyräraja ja elävien hahmojen keskinäinen
+  erottelu ovat käytössä. `world.ts`-tiedoston `blocked()` ohjaa vain
+  maailman sommittelua; kamera rajataan pihapiirissä vain säteen mukaan.
+  Tässä loopissa hylättiin vain kilpityönnölle tehtävä kivitarkistus, koska
+  se jättäisi muun liikkeen epäjohdonmukaisesti läpikulkevaksi. Kunnollinen
+  korjaus on erillinen kaikkien liikkeiden yhteinen törmäysfeature.
 - **Pihapiirin avoimet viat:** rakennuksiin, aitaan ja tuleen ei voi
   törmätä (taistelukehä pitää hahmot pihalla, mutta kaatuneen varusteet
   voivat lentää aidan läpi); kamera on kehän reunalla lähellä pelaajaa;
@@ -266,8 +269,8 @@ Päivitetty: 2026-11-14 (Codex, Windows)
 
 ## Seuraava tehtävä
 
-Omistaja tarkistaa v01.03.00:n julkaistusta osoitteesta ja päättää, ovatko
-veren määrä ja torjuntakipinöiden määrä sopivat normaalissa pelaamisessa.
+Omistaja tarkistaa v01.04.00:n julkaistusta osoitteesta, onko Pohjan soturin
+12 % kilpityöntövalinta sopivan harvinainen ja 0,65 m horjahdus sopivan pitkä.
 
 ## Ei vielä aloiteta
 
