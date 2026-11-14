@@ -51,6 +51,14 @@ Meshes -vartalo (CC0) ja Poly Havenin kankaat ja nahka (CC0). Itse tehty
 kudottu vyö, kanteleen tuohikotelo ja sauva. Tuohipunos on sama laskettu
 tekstuuri kuin tiedostossa `household.glb`.
 
+## `villagers_f.glb`
+
+Vartalo, pää, kädet ja silmät: Human Base Meshes v1.4.1,
+`GEO-body_female_realistic` (CC0), skaalattu ja hieman muotoiltu. Kankaat ja
+nahka kuten tiedostossa `characters.glb` (Poly Haven, CC0). Itse tehty
+(`char_folk.py`): luuranko ja painot, jousineidon vaatteet, letti, olkaviitta,
+nuoliviini ja jousi.
+
 ## `homestead.glb`
 
 | Osa | Lähde (Poly Haven -tunniste) | Käyttö |
