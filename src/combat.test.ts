@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   turnToward,
+  WAVES,
+  groupHpScale,
+  groupSize,
+  mayStartAttack,
   lungeProgress,
   strikeLands,
   BASH,
@@ -256,5 +260,31 @@ describe("ajoitukset", () => {
   });
   it("kulmaero kiertyy välille -PI..PI", () => {
     expect(angleBetween(0.1, Math.PI * 2 - 0.1)).toBeCloseTo(-0.2);
+  });
+});
+
+describe("usea vastustaja", () => {
+  it("aallon koko kasvaa: 1, sitten 2, sitten 3", () => {
+    expect(groupSize(1)).toBe(1);
+    expect(groupSize(WAVES.twoFrom - 1)).toBe(1);
+    expect(groupSize(WAVES.twoFrom)).toBe(2);
+    expect(groupSize(WAVES.threeFrom - 1)).toBe(2);
+    expect(groupSize(WAVES.threeFrom)).toBe(3);
+    expect(groupSize(40)).toBe(3);
+  });
+  it("ryhmässä yksittäisen vastustajan elämä on pienempi, mutta ryhmän yhteensä suurempi", () => {
+    expect(groupHpScale(1)).toBe(1);
+    expect(groupHpScale(2)).toBeLessThan(1);
+    expect(groupHpScale(3)).toBeLessThan(groupHpScale(2));
+    expect(2 * groupHpScale(2)).toBeGreaterThan(1);
+    expect(3 * groupHpScale(3)).toBeGreaterThan(2 * groupHpScale(2));
+  });
+  it("vain yksi lyö kerrallaan, ja toinen odottaa välin", () => {
+    expect(mayStartAttack(true, 10, 0, false)).toBe(false);
+    expect(mayStartAttack(false, 10, 10.4, false)).toBe(false);
+    expect(mayStartAttack(false, 10.4, 10.4, false)).toBe(true);
+    // Oma edellinen isku ei viivytä: yksin taisteleva lyö kuten ennen.
+    expect(mayStartAttack(false, 10, 10.4, true)).toBe(true);
+    expect(mayStartAttack(true, 10, 0, true)).toBe(false);
   });
 });

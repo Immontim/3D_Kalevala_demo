@@ -20,9 +20,10 @@ import { camera, canvas, composer, world } from "./view";
 
 export function onPlayerDeath() {
   g.gameOver = true;
-  showMsg("Kaaduit", isTouch ? "Napauta aloittaaksesi alusta" : "Paina R aloittaaksesi alusta", 9999);
+  showMsg("Kaaduit", isTouch ? "Napauta aloittaaksesi alusta" : "R: uusi yritys · Enter: alkuvalikko", 9999);
 }
-export function restart() {
+/** Tyhjentää kentän ja luo sankarin uudelleen aloituspaikalleen. */
+function resetField() {
   clearEnemies();
   for (const a of [g.player, ...g.corpses.map((c) => c.actor)]) removeActor(a);
   g.corpses.length = 0;
@@ -35,8 +36,25 @@ export function restart() {
   if (songState) closeSong(true);
   if (choosing) closeChoice();
   g.gameOver = false;
+}
+
+/** Uusi yritys samalla paikalla ja samoilla varusteilla. */
+export function restart() {
+  resetField();
   g.encounter.start();
   lockPointer();
+}
+
+/** Paluu aloitusikkunaan: taistelupaikan ja varusteet voi valita uudelleen. */
+export function toStartMenu() {
+  resetField();
+  g.running = false;
+  paused = false;
+  $("pause").classList.add("hidden");
+  $("hud").classList.remove("arrange");
+  showMsg("", "", 0.01);
+  $("start").classList.remove("hidden");
+  if (document.pointerLockElement) document.exitPointerLock();
 }
 
 // ---------- Pääsilmukka ----------
@@ -160,4 +178,5 @@ export function initLoop() {
   document.addEventListener("visibilitychange", () => { if (document.hidden) autoPauseNow(); });
   document.addEventListener("mouseleave", () => { if (!pointerLockWorked && !isTouch) autoPauseNow(); });
   $("resumeBtn").addEventListener("click", resume);
+  $("menuBtn").addEventListener("click", toStartMenu);
 }

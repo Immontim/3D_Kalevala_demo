@@ -39,7 +39,7 @@ export function updateHud() {
   // Ilman vastustajaa mittari on piilossa; tauolla se näkyy, jotta sen voi raahata paikalleen.
   $("meterEnemy").style.visibility = foe || paused ? "" : "hidden";
   $("ename").textContent = foe ? foe.name : "";
-  $("php").style.width = `${(g.player.hp / g.player.stats.maxHp) * 100}%`;
+  $("php").style.width = `${(Math.max(0, g.player.hp) / g.player.stats.maxHp) * 100}%`;
   $("ehp").style.width = foe ? `${(Math.max(0, foe.hp) / foe.stats.maxHp) * 100}%` : "0%";
   // Lukuarvot: elämä pyöristetään ylöspäin (1 = vielä hengissä), kestävyys alaspäin (käytettävissä oleva).
   const num = (v: number, max: number, up: boolean) => `${up ? Math.ceil(Math.max(0, v)) : Math.floor(Math.max(0, v))} / ${Math.round(max)}`;
@@ -91,7 +91,8 @@ export function updateHud() {
   $("chargeLabel").textContent = charge >= 1 ? `${STYLE_NAME[p.attack.kind]} · raskas` : charge > 0 ? `${STYLE_NAME[p.attack.kind]}${tooTired ? " · voimat eivät riitä raskaaseen" : ""}` : "";
 
   // Vastustajan tuleva isku ja oma torjunta-asento tekstinä.
-  const e = foe;
+  // Vihje näytetään siitä vastustajasta, joka on lyömässä (vain yksi lyö kerrallaan).
+  const e = g.enemies.find((x) => x.state === "windup") ?? null;
   $("cue").textContent = e && e.state === "windup" ? `${STYLE_ICON[e.attack.kind]} ${STYLE_NAME[e.attack.kind]}${e.attack.weight === "heavy" ? " (raskas)" : ""}` : "";
   $("pstance").textContent = p.state !== "dead" && exhausted(p.stamina) ? "Uupunut: et voi torjua, ja lyöntisi ovat heikkoja"
     : p.state === "block" && !p.shield ? `Torjunta: ${BLOCK_NAME[p.stance]}` : "";

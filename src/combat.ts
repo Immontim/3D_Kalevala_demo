@@ -98,11 +98,27 @@ export const WAVES = {
   /** Pelaajan palautuminen aaltojen välissä. */
   restHp: 35,
   restStamina: 35,
+  /** Aallosta twoFrom alkaen vastustajia on kaksi, aallosta threeFrom alkaen kolme. */
+  twoFrom: 4,
+  threeFrom: 6,
+  /** Ryhmässä jokaisen vastustajan elämä kerrotaan tällä (kaksi tai kolme vastustajaa). */
+  hpScaleTwo: 0.6,
+  hpScaleThree: 0.45,
   /** Sekunteja vastustajan kaatumisesta seuraavan saapumiseen. */
   nextWaveDelay: 3,
   /** Kaatunut vastustaja jää maahan näin pitkäksi aikaa seuraavan saavuttua (sama kuin pudonneilla varusteilla). */
   corpseTime: 40,
 };
+
+/** Montako vastustajaa aallossa on. */
+export function groupSize(wave: number): number {
+  return wave >= WAVES.threeFrom ? 3 : wave >= WAVES.twoFrom ? 2 : 1;
+}
+
+/** Ryhmän koon mukainen kerroin jokaisen vastustajan elämälle. */
+export function groupHpScale(size: number): number {
+  return size >= 3 ? WAVES.hpScaleThree : size === 2 ? WAVES.hpScaleTwo : 1;
+}
 
 /** Vastustajan tekoälyn luvut. */
 export const ENEMY_AI = {
@@ -140,6 +156,14 @@ export const ENEMY_AI = {
   decideMin: 0.5,
   decideRandom: 1.0,
   attackChance: 0.65,
+  /** Usea vastustaja: vain yksi lyö kerrallaan, ja toinen saa aloittaa aikaisintaan näin monta sekuntia edellisen iskun jälkeen. */
+  attackGap: 0.5,
+  /** Vuoroaan odottava pysyy näin paljon lyöntietäisyyttä kauempana (m). */
+  waitBack: 0.9,
+  /** Vastustajat pitävät toisiinsa vähintään tämän välin (m), jolloin ryhmä levittäytyy sankarin ympärille. */
+  spread: 2.4,
+  /** Ryhmässä vastustaja ei kierrä sankarin selän taakse tätä kulmaa (astetta sankarin katseesta) pidemmälle. */
+  flankMax: 115,
   bashChance: 0.9,
   /** Vastaisku torjunnan jälkeen. */
   counterChance: 0.55,
@@ -465,4 +489,13 @@ export function angleBetween(a: number, b: number): number {
   while (d > Math.PI) d -= Math.PI * 2;
   while (d < -Math.PI) d += Math.PI * 2;
   return d;
+}
+
+/**
+ * Hyökkäysvuoro usealle vastustajalle: iskun saa aloittaa, kun kukaan muu ei ole lyömässä ja
+ * toisen vastustajan edellisestä iskusta on kulunut ENEMY_AI.attackGap. Oma edellinen isku ei
+ * viivytä (lastWasOwn), joten yksin taisteleva vastustaja käyttäytyy kuten ennen.
+ */
+export function mayStartAttack(othersStriking: boolean, now: number, freeAt: number, lastWasOwn: boolean): boolean {
+  return !othersStriking && (lastWasOwn || now >= freeAt);
 }

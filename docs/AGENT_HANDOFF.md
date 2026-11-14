@@ -7,8 +7,8 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
 
-- **Versio v01.00.00**, branch `claude/engine-split` (tarkista merge-tila
-  `git merge-base --is-ancestor`). Mainissa on v00.18.00.
+- **Versio v01.01.00**, branch `claude/melee-many` (tarkista merge-tila
+  `git merge-base --is-ancestor`). Mainissa on v01.00.00.
 - **Rakenne.** `src/engine/` on kohtaus- ja taistelumoottori, `src/ui/` sivun
   ikkunat (aloitus, tauko, säätö), `src/main.ts` vain käynnistys ja
   `src/debug.ts` savutestien `__game`. Säännöt ja luvut ovat yhä puhtaissa
@@ -29,20 +29,28 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
   `onEnemyDown`) päättää, keitä kentälle tuodaan (`addEnemy`). Moottori ei
   tiedä aalloista: aaltotaistelu on `skirmish.ts`, tyhjä kohtaus `peace`.
   Vaihto `startEncounter()`. Tuleva RPG-kerros kutsuu moottoria tätä kautta.
-- **Tukiaskel ja osumahetki** (`COMBAT.strikePoint`, `lungeProgress`,
-  `strikeLands`; `melee.ts` `updateCombatant`): lyöjä astuu `lunge` metriä
-  eteen, ja isku ratkeaa `strikePoint` (0,7) × release kohdalla. Kantama
-  mitataan askeleen lähtöpaikasta (`Actor.stepFrom`). Vihollisen terän
-  kärjen välähdys (`Fighter.setGlow`) näkyy hahmojen läpi.
+- **Yksi vastaan monta** (luvut `combat.ts` `WAVES` ja `ENEMY_AI`, kaikki
+  Säätö-välilehdellä): `groupSize(wave)` antaa 1 / 2 (aalto 4–) / 3 (aalto
+  6–) vastustajaa, `groupHpScale` elämän kertoimen 0,6 / 0,45
+  (`EnemyDef.hpScale`). **Hyökkäysvuoro** (`ai.ts` `hasTurn`,
+  `mayStartAttack`): vain yksi vastustaja lyö kerrallaan, ja toinen saa
+  aloittaa aikaisintaan `attackGap` (0,5 s) edellisen iskun jälkeen.
+  Vuoroton pysyy `waitBack` (0,9 m) kauempana, vastustajat pitävät
+  `spread` (2,4 m) väliä ja kääntyvät takaisin, jos kulma pelaajan
+  katseesta ylittää `flankMax` (115°). Lukituksen kohde vaihtuu hiiren
+  rullalla (`cycleLock`, vasemmalta oikealle).
+- **Paluu aloitusikkunaan** (`loop.ts` `toStartMenu`): Enter kaatumisen
+  jälkeen tai taukoikkunan nappi. R on uusi yritys samoilla valinnoilla.
+- **Tukiaskel ja osumahetki** (`COMBAT.strikePoint`, `melee.ts`
+  `updateCombatant`): lyöjä astuu `lunge` metriä eteen, ja isku ratkeaa
+  `strikePoint` (0,7) × release kohdalla. Kantama mitataan askeleen
+  lähtöpaikasta (`Actor.stepFrom`).
 - **Sankarin varusteet** valitaan aloitusikkunassa (`hero.ts` `LOADOUTS`).
 - **Vapaa kääntyminen** (`aim.yaw`/`aim.pitch`, luvut `controls.ts`):
   hiiri kääntää katsetta, sankari kääntyy sitä kohti nopeudella
   `Stats.turnSpeed`, WASD liikkuu katseen suhteen. Lukitus (Tab /
-  keskinappi) on kytkin `aim.lockOn`.
-- **Vastustajan kääntyminen** (`updateAi`): kohti `ai.seen`ia, joka seuraa
-  pelaajaa `Stats.reaction` jäljessä; iskun aikana kertoimella
-  `ENEMY_AI.attackTurnScale`. `pickEnemyAttack` ei aloita iskua, jos
-  pelaaja on yli 0,9 × iskun kaaren sivussa.
+  keskinappi) on kytkin `aim.lockOn`. Vastustaja kääntyy kohti
+  `ai.seen`ia, joka seuraa pelaajaa `Stats.reaction` jäljessä.
 - **Torjuntasektorit** (`WEAPONS.*.blockArc` π/4 = ±45°,
   `SHIELDS.round.blockArc` π/3 = ±60°; omistajan päätös 2026-11-14).
 - **Kaksi taistelupaikkaa** (`src/world.ts`): `ARENA` on tällä latauksella
@@ -175,29 +183,23 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
   (Actions-ajo "Julkaise GitHub Pagesiin"); v00.10.00 ja v00.11.00 eivät
   ole mainissa. **Omistaja testaa julkaistusta osoitteesta**, ei
   dev-serveriltä.
-- **Käsin testattu 2026-11-14** (in-app browser, skriptattu syöte): aallot
-  1–3 läpi, laulun valinta, tyhjä kohtaus (`__game.encounter("peace")`:
-  kävely, isku ilmaan, lukitus, suolaulu pois käytöstä), kaksi vastustajaa
-  (`__game.addEnemy`): molemmat hyökkäävät, lukitus siirtyy, seuraava aalto
-  vasta molempien kaaduttua; ei konsolivirheitä. **Ei testattu:** oikea
-  hiiri ja näppäimistö jaon jälkeen, tauko- ja säätöikkuna käsin.
-  Aiemmista yhä kokeilematta: buildattu versio, hitaampi kone, hiiren
-  lukitus laulun valinnassa, kaatuneet kaltevalla maalla.
-- **Komennot 2026-11-14:** `bun run test` (69/69), `bun run lint`,
+- **Käsin testattu 2026-11-14** (in-app browser, skriptattu syöte): aalto
+  4 (kaksi, elämä × 0,6) läpi ja aalto 5 perään vasta molempien kaaduttua;
+  aalto 6 (kolme) 40 s: yhtä aikaa iskussa enintään yksi, 21 iskua,
+  selän takana 3 % ajasta, 60 FPS; rulla vaihtaa kohdetta; kaatuessa
+  palkki 0 %, Enter ja taukoikkunan nappi tuovat aloitusikkunan ja uusi
+  peli käynnistyy; ei konsolivirheitä. **Ei testattu:** ihmisen pelaamana
+  (tasapaino!), oikea hiiren rulla, buildattu versio selaimessa, hitaampi
+  kone, hiiren lukitus laulun valinnassa, kaatuneet kaltevalla maalla.
+- **Komennot 2026-11-14:** `bun run test` (72/72), `bun run lint`,
   `bun run build` ok.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
-- Savutestien apuna `window.__game`: `tick(n, dt)` ajaa peliä askelin
-  ruudunpäivityksestä riippumatta, `skipTo(n)`, `showcase(true, "asento")`,
-  `poses` (asentojen säätö lennossa), `setCamera(pos, look)`, `state`,
-  `events` muodossa `kuka:isku/paino:tulos`, `fillSong()`, `beat()`
-  (välilyönti laululle), `nextBeatIn`, `bog([x,0,z])` (suo näkyviin),
-  `debrisHeights` (irtokappaleiden korkeus maasta), `root(t)` (vastustaja
-  suohon), `setStamina(pelaaja, vastustaja)`, `addModifier(kuka, muunnin)`,
-  `stats`, `tuning`, `placePlayer(x, z)`, `showcaseReach` (aseen kärjen etäisyys),
-  `look`, `setLook(yaw, pitch)`, `setLock(bool)`. Selainpaneeli pysäyttää
-  pelin, kun se menettää fokuksen: kutsu `autoPause(false)` jokaisen
-  latauksen jälkeen. `skipTo` rakentaa hahmon vasta seuraavalla
-  kierroksella, joten `knockHelmet()` vaatii erillisen kutsun tai odotuksen.
+- Savutestien apuna `window.__game` (`src/debug.ts`, lue sieltä koko
+  lista): `tick(n, dt)` ajaa peliä askelin ruudunpäivityksestä riippumatta,
+  `skipTo(n)`, `state`, `events` (`kuka:isku/paino:tulos`), `enemies`,
+  `addEnemy`, `encounter("peace")`, `setHp`, `setLock`, `placePlayer`,
+  `showcase`, `setCamera`. Selainpaneeli pysäyttää pelin, kun se menettää
+  fokuksen: kutsu `autoPause(false)` jokaisen latauksen jälkeen.
 
 ## Tunnetut rajoitteet ja riskit
 
@@ -228,9 +230,11 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
 - **Vapaan kääntymisen avoimet asiat:** tasapaino on arvaus. Kosketusnäytön
   napit ovat yhä koodissa, mutta niitä ei ylläpidetä. Hiiren pystyliike
   vaikuttaa vain kameraan.
-- **Usean vastustajan avoimet asiat:** hyökkäysvuoroa ei vielä ole, joten
-  kaksi vastustajaa lyö yhtä aikaa (vain `__game.addEnemy`lla kokeiltavissa).
-  Vastustajan iskuvihje (`#cue`) näyttää vain mittarin kohteen.
+- **Usean vastustajan avoimet asiat:** tasapaino on arvaus. Hajaantuminen
+  on pehmeää ohjausta, joten vastustajat voivat silti ajautua metrin
+  päähän toisistaan. Sankarin isku osuu aina vain yhteen (myös leveä
+  sivallus). Selän takaa tulevasta iskusta ei varoiteta; iskuvihje
+  (`#cue`) näyttää sen, joka on nostossa.
 - **Pihapiirin avoimet viat:** rakennuksiin, aitaan ja tuleen ei voi
   törmätä (taistelukehä pitää hahmot pihalla, mutta kaatuneen varusteet
   voivat lentää aidan läpi); kamera on kehän reunalla lähellä pelaajaa;
@@ -243,15 +247,12 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
 - **Asennot on viritetty silmämääräisesti** kuvakaappauksista. Raskaalla
   sivalluksella ja pistolla ei ole omaa asentoa (sama kuin kevyellä).
   Keihäsmiehen torjunta näyttää samalta kaikissa kolmessa asennossa.
-- **Hiiren lisänapit:** jos hiiren ajuri on määrittänyt napin omaan
-  toimintoonsa (makro, DPI-vaihto), selain ei näe painallusta lainkaan.
-  Joissain selaimissa napit 4 ja 5 voivat silti selata historiaa.
+- **Hiiren lisänapit:** ajurin omaan toimintoon sidottu nappi ei näy
+  selaimelle; napit 4 ja 5 voivat joissain selaimissa selata historiaa.
 - **Kypärän tekstuuri** on sama metallilevy kuin muissa osissa, ja kupu on
   melko sileä; lentävä kypärä voi pudota puun tai kiven läpi (ei törmäyksiä).
-- **Laulun hidastus 1/15** tarkoittaa, että koko laulu (noin 5,7 s) on
-  vastustajalle noin 0,4 s. Vastustaja ehtii osua lähinnä, jos sen isku oli
-  jo nostossa valinnan alkaessa. Arvo on säädettävissä (`song.slowmo`
-  JSON-tekstin kautta).
+- **Laulun hidastus 1/15:** koko laulu (noin 5,7 s) on vastustajalle noin
+  0,4 s (`song.slowmo`).
 - **Parannuslaulun teho on arvaus:** 8 osumaa = 40 elämää, eikä laulu vaadi
   vastustajaa, joten aaltojen välissä sen voi laulaa rauhassa.
 - **Kalevalan säkeet on kirjoitettu muistista** (9. runo, verensulkusanat);
@@ -272,15 +273,12 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
 
 ## Seuraava tehtävä
 
-Omistaja kokeilee julkaistusta osoitteesta, että peli toimii jaon jälkeen
-kuten ennen (aloitus, tauko, säätö, laulu, uusi peli). Sitten **askel 2**
-(v01.01.00): aaltojen kokoonpano taulukkoon (aallot 1–3 yksi, 4–5 kaksi,
-6+ kolme), elämän ryhmäkerroin (ehdotus 60 % / 45 %), hyökkäysvuoro (yksi
-lyö kerrallaan, seuraava aikaisintaan 0,5 s päästä), asemointi kyljille,
-vastustajat väistävät toisiaan. **Askel 3:** lukituksen kohteen vaihto,
-pienet palkit päiden päällä, varoitus selän takaa. **Askel 4:** suoja-aika
-onnistuneen torjunnan jälkeen (0,6 s, täydellisellä 1,0 s) torjuntasektorin
-sisällä; omistajan päätös 2026-11-14: ei 180°:n sektoria.
+Omistaja pelaa aallot 4–6 julkaistusta osoitteesta ja kertoo, tuntuuko
+ryhmätaistelu reilulta (ryhmän koko, elämä, iskujen väli). Sitten
+**askel 3:** pienet palkit päiden päällä ja varoitus selän takaa
+tulevasta iskusta. **Askel 4:** suoja-aika onnistuneen torjunnan jälkeen
+(0,6 s, täydellisellä 1,0 s) torjuntasektorin sisällä; omistajan päätös
+2026-11-14: ei 180°:n sektoria. Päätettävä: osuuko leveä sivallus useaan.
 Lisäksi yhä auki: kaatuneiden ulkonäkö ja
 Säätö-välilehden arvot (Kopioi arvot) oletuksiksi kirjattaviksi.
 

@@ -1,7 +1,8 @@
 // Vastustajat kentällä: tuonti, kaatuminen ja kohteen valinta.
 import * as THREE from "three";
-import { WAVES } from "../combat";
+import { WAVES, angleBetween } from "../combat";
 import { FighterLook } from "../fighter";
+import { effectiveStats } from "../stats";
 import { Actor, makeActor, removeActor } from "./actor";
 import { newAi } from "./ai";
 import { Encounter } from "./encounter";
@@ -12,12 +13,19 @@ export interface EnemyDef {
   look: FighterLook;
   /** Taso kasvattaa elämää, voimaa ja tekoälyn taitoa (aaltotaistelussa aallon numero). */
   level: number;
+  /** Elämän kerroin (ryhmässä alle 1). */
+  hpScale?: number;
 }
 
 /** Tuo vastustajan kentälle annettuun paikkaan. */
 export function addEnemy(def: EnemyDef, pos: THREE.Vector3): Actor {
   const a = makeActor(def.look, pos, def.level, 0xff6a3a);
   a.name = def.name;
+  if (def.hpScale !== undefined && def.hpScale !== 1) {
+    a.base = { ...a.base, maxHp: Math.round(a.base.maxHp * def.hpScale) };
+    a.stats = effectiveStats(a.base, a.mods, g.gameTime);
+    a.hp = a.stats.maxHp;
+  }
   a.ai = newAi();
   g.enemies.push(a);
   return a;
@@ -65,4 +73,15 @@ export function lockTarget(): Actor | null {
 /** Vastustaja, jota mittarit ja laulut koskevat: lukittu, tai muuten lähin. */
 export function focusEnemy(): Actor | null {
   return lockTarget() ?? nearestEnemy();
+}
+
+/** Siirtää lukituksen seuraavaan vastustajaan ruudulla: dir 1 = oikealle, -1 = vasemmalle. */
+export function cycleLock(dir: number) {
+  if (g.enemies.length < 2) return;
+  const p = g.player.pos;
+  // Katseen suunnasta mitattu kulma kasvaa vasemmalle, joten järjestys käännetään: vasemmalta oikealle.
+  const side = (e: Actor) => -angleBetween(aim.yaw, Math.atan2(e.pos.x - p.x, e.pos.z - p.z));
+  const order = [...g.enemies].sort((a, b) => side(a) - side(b));
+  const i = order.indexOf(lockTarget() ?? order[0]);
+  aim.target = order[(i + dir + order.length) % order.length];
 }
