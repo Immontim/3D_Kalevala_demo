@@ -154,8 +154,11 @@ class Part:
 
 class Ctx:
     """Vartalon geometria, painot ja haut osien rakentamista varten."""
-    def __init__(self):
-        self.body = bpy.data.objects["BODY"]
+    def __init__(self, body="BODY", src="GEO-body_male_realistic", rig="RIG", P=None, xf=None):
+        """Oletus on miesvartalo; toinen vartalo annetaan nimillä (body, src, rig), maamerkkien
+        korvauksilla P ja lähdemallin muunnoksella xf (ks. char_folk.py)."""
+        self.body = bpy.data.objects[body]
+        self.src, self.rig, self.xf = src, rig, xf
         me = self.body.data
         names = [g.name for g in self.body.vertex_groups]
         self.co = [v.co.copy() for v in me.vertices]
@@ -168,7 +171,7 @@ class Ctx:
         for i, c in enumerate(self.co):
             self.kd.insert(c, i)
         self.kd.balance()
-        self.L = landmarks(bpy.data.objects["GEO-body_male_realistic"])
+        self.L = landmarks(bpy.data.objects[src], P, xf)
         self.arm_frac = [self._frac(i, ARM) for i in range(len(self.co))]
         self.leg_frac = [self._frac(i, LEG) for i in range(len(self.co))]
 
@@ -383,7 +386,7 @@ def box_part(center, size, mat, w, col=(1, 1, 1), rot=None):
     return p
 
 
-def assemble(name, parts, col_name="GAME", rig=True):
+def assemble(name, parts, col_name="GAME", rig=True, rig_name="RIG"):
     """Kokoaa osat yhdeksi mesh-objektiksi (materiaalit, UV, verteksivärit, painot)."""
     allp = Part()
     for p in parts:
@@ -428,7 +431,7 @@ def assemble(name, parts, col_name="GAME", rig=True):
             for g, v in top:
                 if g in groups and v > 0:
                     groups[g].add([i], v / s, 'REPLACE')
-        r = bpy.data.objects["RIG"]
+        r = bpy.data.objects[rig_name]
         ob.parent = r
         mod = ob.modifiers.new("Armature", 'ARMATURE')
         mod.object = r
@@ -467,21 +470,24 @@ def grip_carve(p, R=0.0145, Rf=0.028, half=0.07):
             p.co[i] = ctr + d * t + rad.normalized() * (r + (r2 - r) * k)
 
 
-def skin_parts(C, hands_from=0.45, hair=(0.62, 0.45, 0.2), skin=(0.72, 0.47, 0.33)):
+def skin_parts(C, hands_from=0.45, hair=(0.62, 0.45, 0.2), skin=(0.72, 0.47, 0.33), lips=(0.50, 0.30, 0.26), face=(0.0, 0.0), carve=True):
+    """face = (dy, dz): kasvojen värialueiden (huulet, kulmakarvat) siirto toisella vartalolla."""
     L = C.L
+    fy, fz = face
     def colfn(c):
-        if c.y < -0.128 and abs(c.x) < 0.026 and 1.492 < c.z < 1.503:
-            return (0.50, 0.30, 0.26)                    # huulet
-        if c.y < -0.105 and 0.010 < abs(c.x) < 0.055 and 1.590 < c.z < 1.604:
+        if c.y - fy < -0.128 and abs(c.x) < 0.026 and 1.492 < c.z - fz < 1.503:
+            return lips                                  # huulet
+        if c.y - fy < -0.105 and 0.010 < abs(c.x) < 0.055 and 1.590 < c.z - fz < 1.604:
             return tuple(x * 0.55 for x in hair)         # kulmakarvat
         return skin
     head = shell(C, lambda i, c: c.z > 1.37 and C.arm_frac[i] < 0.3, lambda c: 0.0, "skin", smooth=0, colfn=colfn)
     hands = shell(C, lambda i, c: C.arm_frac[i] > 0.5 and C.arm_t(c) > hands_from, lambda c: 0.0, "skin", smooth=0, col=skin)
-    grip_carve(hands)
+    if carve:                                          # otekanava on mitattu miesvartalon kädestä
+        grip_carve(hands)
     eyes = Part()
-    for nm in ("GEO-body_male_realistic.eye.L", "GEO-body_male_realistic.eye.R"):
+    for nm in (C.src + ".eye.L", C.src + ".eye.R"):
         eo = bpy.data.objects[nm]
-        mw = eo.matrix_world
+        mw = (C.xf @ eo.matrix_local) if C.xf else eo.matrix_world
         ctr = mw.translation
         base = len(eyes.co)
         for v in eo.data.vertices:

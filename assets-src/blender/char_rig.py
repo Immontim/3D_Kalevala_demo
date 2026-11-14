@@ -46,15 +46,18 @@ def make_body():
     return ob
 
 
-def landmarks(ob):
-    """Nivelpisteet vartalon geometriasta (vasen puoli, +X). Oikea peilataan."""
-    co = np.array([v.co[:] for v in ob.data.vertices])
+def landmarks(ob, P=None, xf=None):
+    """Nivelpisteet vartalon geometriasta (vasen puoli, +X). Oikea peilataan.
+    P korvaa käsin asetetut pisteet (shoulder, hip, hips, spine, chest, neck, head) ja polven
+    korkeuden (knee_z); xf on lähdemallin verteksien muunnos (4x4), jos malli ei ole paikallaan."""
+    P = P or {}
+    co = np.array([(xf @ v.co)[:] if xf else v.co[:] for v in ob.data.vertices])
     L = {}
     def cen(mask):
         return V(co[mask].mean(axis=0))
     # käsivarsi: olkapäästä sormenpäähän
     tip = V(co[np.argmax(co[:, 0])])
-    sh = V((0.175, 0.025, 1.39))
+    sh = V(P.get("shoulder", (0.175, 0.025, 1.39)))
     axis = (tip - sh)
     alen = axis.length
     a = axis.normalized()
@@ -69,17 +72,18 @@ def landmarks(ob):
     L["fingertip"] = tip
     # jalka
     leg = co[:, 0] > 0.015
-    L["hip"] = V((0.095, 0.02, 0.93))
-    L["knee"] = cen(leg & (co[:, 2] > 0.47) & (co[:, 2] < 0.53))
+    L["hip"] = V(P.get("hip", (0.095, 0.02, 0.93)))
+    kz = P.get("knee_z", 0.50)
+    L["knee"] = cen(leg & (co[:, 2] > kz - 0.03) & (co[:, 2] < kz + 0.03))
     L["ankle"] = cen(leg & (co[:, 2] > 0.07) & (co[:, 2] < 0.11) & (co[:, 1] > -0.02))
     foot = leg & (co[:, 2] < 0.06)
     L["toe"] = V((float(co[foot][:, 0].mean()), float(co[foot][:, 1].min()), 0.02))
     # selkäranka ja pää
-    L["hips"] = V((0, 0.02, 0.96))
-    L["spine"] = V((0, 0.02, 1.08))
-    L["chest"] = V((0, 0.015, 1.22))
-    L["neck"] = V((0, 0.0, 1.43))
-    L["head"] = V((0, -0.02, 1.50))
+    L["hips"] = V(P.get("hips", (0, 0.02, 0.96)))
+    L["spine"] = V(P.get("spine", (0, 0.02, 1.08)))
+    L["chest"] = V(P.get("chest", (0, 0.015, 1.22)))
+    L["neck"] = V(P.get("neck", (0, 0.0, 1.43)))
+    L["head"] = V(P.get("head", (0, -0.02, 1.50)))
     L["head_top"] = V((0, -0.03, float(co[:, 2].max())))
     head = co[:, 2] > 1.46
     L["nose_tip"] = V(co[head][np.argmin(co[head][:, 1])])
@@ -149,11 +153,11 @@ for sfx, sgn in (("L", 1), ("R", -1)):
     ]
 
 
-def make_rig(L):
-    remove_obj("RIG")
-    arm = bpy.data.armatures.new("RIG")
-    ob = bpy.data.objects.new("RIG", arm)
-    get_col("GAME").objects.link(ob)
+def make_rig(L, name="RIG", col="GAME"):
+    remove_obj(name)
+    arm = bpy.data.armatures.new(name)
+    ob = bpy.data.objects.new(name, arm)
+    get_col(col).objects.link(ob)
     bpy.context.view_layer.objects.active = ob
     for o in bpy.context.view_layer.objects:
         o.select_set(o == ob)

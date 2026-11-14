@@ -96,16 +96,29 @@ Päivitetty: 2026-11-14 (Codex, Windows)
   viitan alla sivulla, oikea on vapaa sauvalle. Lepoasennossa (kädet
   levällään) vasen käsi tulee viitan läpi, mikä on tarkoituksellista.
   Uusi hahmo: oma `build_…` ja rivi `run_folk`iin.
-- **Kumpaakaan tiedostoa peli ei vielä lataa.** Tarkistettu vain Blenderin
-  kuvista (tietäjä myös kädet alhaalla), ei pelin valossa; materiaalit
-  `M_HH_*` ja `F_Weave` pitää ottaa mukaan `prepareMaterials`iin.
+- **Naishahmot** (`assets/villagers_f.glb`, 2,0 Mt): `char_jousineito`
+  (27 900 kolmiota) ja `jousi` (ote origossa, lavat Z-suunnassa, jänne +Y).
+  Naisvartalo (Human Base Meshes, skaalattu miehen pituiseksi ×1,026 ja
+  hieman muotoiltu, `shape_body_f`) käyttää **omaa luurankoa**: Blenderissä
+  `RIG_F`, tiedostossa nimellä `RIG`, samat 17 luun nimet mutta eri
+  lepoasento (pidemmät jalat, kädet jyrkemmin alas). Siksi naiset ovat
+  omassa tiedostossaan. Pelin pitää pienentää hahmoa sijoittaessaan (noin
+  0,95), ja `GRIP_CHANNEL` (keihäsote) on mitattu miehen kädestä eikä käy
+  naiselle. Olkaviitta on painotettu vartaloon: kädet alhaalla toimii,
+  jousen jännitys toisi käsivarret viitan läpi. Emäntä tehdään samalle
+  pohjalle (`Ctx(FEM…)`, `fitted_skirt`).
+- **Mitään näistä tiedostoista peli ei vielä lataa.** Tarkistettu vain
+  Blenderin kuvista (hahmot myös kädet alhaalla), ei pelin valossa eikä
+  liikkeessä; materiaalit `M_HH_*` ja `F_Weave` pitää ottaa mukaan
+  `prepareMaterials`iin.
 - **Rauhallisen pihakohtauksen suunnitelma** (omistaja hyväksyi 2026-11-14):
-  tehty 1 talousesineet ja 3 tietäjä (branch `claude/villager-tietaja`,
-  tarkista merge-tila). Jäljellä: 2 rauhan piha koodina (uusi paikka,
-  esineet pihalle, pysyvien hahmojen tyyppi, törmäys pöytään), 4
-  naisvartalo ja jousineito, 5 emäntä, 6 eläimet (sika, koira, kanat:
-  omistaja lataa CC-BY-mallit Sketchfabista agentin ehdokaslistan mukaan).
-  Hahmot seisovat aluksi paikallaan. Dialogijärjestelmä myöhemmin.
+  tehty 1 talousesineet, 3 tietäjä ja 4 jousineito (branch
+  `claude/villager-jousineito`, sisältää tietäjän branchin; tarkista
+  merge-tila). Jäljellä: 2 rauhan piha koodina (uusi paikka, esineet
+  pihalle, pysyvien hahmojen tyyppi, törmäys pöytään), 5 emäntä, 6 eläimet
+  (sika, koira, kanat: omistaja lataa CC-BY-mallit Sketchfabista agentin
+  ehdokaslistan mukaan). Hahmot seisovat aluksi paikallaan.
+  Dialogijärjestelmä myöhemmin.
 - **Laulut ja valinta** (`src/songLogic.ts`: `SONGS`, `SONG_SLOTS`; kulku
   `engine/song.ts`): laulunappi täydellä voimalla → `openChoice()`:
   `choosing` pysäyttää maailman (dt = 0), hiiri vapautetaan
