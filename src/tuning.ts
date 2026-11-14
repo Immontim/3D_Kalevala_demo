@@ -99,6 +99,7 @@ export const FIELDS: readonly Field[] = [
   { group: "Aseet ja lyönnit", label: "Miekan vahinkokerroin", path: "weapons.sword.damage", min: 0, max: 10, step: 0.05 },
   { group: "Aseet ja lyönnit", label: "Keihään vahinkokerroin", path: "weapons.spear.damage", min: 0, max: 10, step: 0.05 },
   { group: "Aseet ja lyönnit", label: "Noston kerroin (kaikki lyönnit)", path: "combat.windupScale", min: 0.2, max: 5, step: 0.05 },
+  { group: "Aseet ja lyönnit", label: "Osumahetki iskuvaiheessa (0–1, tukiaskel sitä ennen)", path: "combat.strikePoint", min: 0.1, max: 1, step: 0.05 },
   { group: "Aseet ja lyönnit", label: "Palautumisen kerroin (kaikki lyönnit)", path: "combat.recoveryScale", min: 0.2, max: 5, step: 0.05 },
   { group: "Aseet ja lyönnit", label: "Täydellisen torjunnan ikkuna, s", path: "combat.parryWindow", min: 0, max: 1, step: 0.01 },
   { group: "Laulu", label: "Laulunauhan nopeus", path: "song.speed", min: 0.25, max: 4, step: 0.05 },

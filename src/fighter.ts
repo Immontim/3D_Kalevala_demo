@@ -143,22 +143,25 @@ export const POSES: Record<string, Pose> = {
     lShX: -1.35, lShZ: 0.1, lEl: -0.3, crouch: 0.2, headPitch: 0.05, stride: 0.5,
   },
   // Sivallus: miekka viedään oikealle sivulle ja vedetään vaakaan vartalon poikki.
+  // Lataus: vartalo kiertyy reilusti oikealle, käsi viedään taakse ja paino takajalalle.
+  // Isku: tukiaskel eteen (stride kasvaa) ja terä vedetään koko vartalon kierrolla poikki.
   slashWindup: {
-    spineYaw: -0.85, spinePitch: 0.05, rShX: 0, rShZ: -1.3, rEl: -0.3, rHandX: 2.2, rHandY: 0,
-    lShX: -0.8, lShZ: 0.3, lEl: -0.9, crouch: 0.12, headPitch: 0, stride: 0.12,
+    spineYaw: -1.2, spinePitch: -0.02, rShX: 0.45, rShZ: -1.4, rEl: -0.55, rHandX: 2.4, rHandY: 0,
+    lShX: -0.9, lShZ: 0.2, lEl: -0.8, crouch: 0.18, headPitch: 0, stride: 0,
   },
   slashStrike: {
-    spineYaw: 0.85, spinePitch: 0.2, rShX: -1.25, rShZ: 0.75, rEl: -0.25, rHandX: 1.3, rHandY: 0.5,
-    lShX: -0.3, lShZ: 0.6, lEl: -0.5, crouch: 0.16, headPitch: 0.05, stride: 0.4,
+    spineYaw: 0.95, spinePitch: 0.24, rShX: -1.25, rShZ: 0.75, rEl: -0.25, rHandX: 1.3, rHandY: 0.5,
+    lShX: -0.3, lShZ: 0.6, lEl: -0.5, crouch: 0.24, headPitch: 0.05, stride: 0.66,
   },
   // Pisto: kahva vedetään kylkeen terä edellä ja työnnetään suoraan eteen.
+  // Lataus: paino takajalalle ja kahva selvästi taakse. Pisto: pitkä tukiaskel eteen.
   thrustWindup: {
-    spineYaw: -0.7, spinePitch: 0.1, rShX: 0.55, rShZ: -0.25, rEl: -2.0, rHandX: 1.45, rHandY: 0,
-    lShX: -1.0, lShZ: 0.2, lEl: -0.6, crouch: 0.14, headPitch: 0, stride: 0.15,
+    spineYaw: -0.95, spinePitch: 0, rShX: 0.85, rShZ: -0.25, rEl: -2.1, rHandX: 1.45, rHandY: 0,
+    lShX: -1.2, lShZ: 0.1, lEl: -0.4, crouch: 0.2, headPitch: 0, stride: 0,
   },
   thrustStrike: {
-    spineYaw: 0.55, spinePitch: 0.3, rShX: -1.35, rShZ: 0.1, rEl: -0.1, rHandX: 1.45, rHandY: 0,
-    lShX: 0.2, lShZ: 0.5, lEl: -0.6, crouch: 0.22, headPitch: 0.05, stride: 0.55,
+    spineYaw: 0.6, spinePitch: 0.36, rShX: -1.35, rShZ: 0.1, rEl: -0.1, rHandX: 1.45, rHandY: 0,
+    lShX: 0.2, lShZ: 0.5, lEl: -0.6, crouch: 0.27, headPitch: 0.05, stride: 0.74,
   },
   // Torjunnat aseella: block = ylätorjunta (terä vaakasuoraan pään yllä),
   // blockSide = sivutorjunta (terä pystyssä kyljellä), blockThrust = piston ohjaus sivuun (terä alaviistoon).
@@ -291,6 +294,10 @@ export class Fighter {
   private stepLen = GAIT.stepBase;
   private duty = GAIT.duty;
   private lastPos: THREE.Vector3 | null = null;
+  /** Haara-asennon muutosnopeus (rad/s): tukiaskeleessa etujalka nousee maasta. */
+  private strideVel = 0;
+  /** Terän kärjen välähdys, joka näkyy myös toisen hahmon takaa (vihollisen iskuvihje). */
+  private glint: THREE.Sprite | null = null;
   /** Oma kello ja vaihe, jotta kaksi hahmoa ei huoju samassa tahdissa. */
   private idleT = Math.random() * 100;
   private disposed = false;
@@ -322,6 +329,7 @@ export class Fighter {
     for (const m of [...this.bladeMats, ...this.shieldMats]) { envTargets.delete(m); m.dispose(); }
     this.bladeMats = [];
     this.shieldMats = [];
+    this.glint?.material.dispose();
     this.body.traverse((o) => {
       const sk = o as THREE.SkinnedMesh;
       if (sk.isSkinnedMesh) sk.skeleton.dispose();
@@ -791,6 +799,8 @@ export class Fighter {
     const sf = Math.max(0, st), sb = Math.max(0, -st);
     const fL = foot("L", -p.crouch * 1.2 - st, p.crouch * 2 + sf * 0.35 + sb * 0.6);
     const fR = foot("R", -p.crouch * 1.2 + st, p.crouch * 2 + sb * 0.35 + sf * 0.6);
+    // Tukiaskel: kun haara-asento aukeaa nopeasti (isku), etujalka nousee ja astuu eikä laahaa maata.
+    fL.y += THREE.MathUtils.clamp(this.strideVel * 0.03, 0, 0.13) * life;
     // Jos jalka ei yllä paikkaansa, lantio laskeutuu: tästä syntyy askelluksen pieni pystyliike.
     let drop = 0;
     // Ilmassa oleva jalka ei vedä lantiota alas.
@@ -834,10 +844,12 @@ export class Fighter {
       ? (BLOCK_POSES.has(target) ? SHIELD_BLOCK : SHIELD_ARM.has(target) ? SHIELD_GUARD : null)
       : this.look.loadout === "spear" ? SPEAR.get(target) ?? null : null;
     this.shieldHang += ((SHIELD_FRONT.has(target) ? 0 : 1) - this.shieldHang) * k;
+    const strideWas = this.pose.stride;
     for (const key of KEYS) {
       const goal = over && key in over ? over[key as keyof typeof over]! : target[key];
       this.pose[key] += (goal - this.pose[key]) * k;
     }
+    if (dt > 1e-6) this.strideVel += ((this.pose.stride - strideWas) / dt - this.strideVel) * (1 - Math.exp(-30 * dt));
     if (this.look.loadout === "spear") {
       const st = SPEAR_HOLD.get(target);
       this.spearW += ((st ? 1 : 0) - this.spearW) * k;
@@ -886,11 +898,40 @@ export class Fighter {
 
   setGlow(amount: number) {
     for (const m of this.bladeMats) m.emissive.setRGB(amount * 1.0, amount * 0.6, amount * 0.15);
+    if (amount > 0.02 && !this.glint && !this.disposed) {
+      this.glint = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: glintTexture(), color: 0xffc46a, blending: THREE.AdditiveBlending, transparent: true, depthTest: false, depthWrite: false,
+      }));
+      this.glint.renderOrder = 50;
+      this.bladeTip.add(this.glint);
+    }
+    if (this.glint) {
+      this.glint.visible = amount > 0.02;
+      this.glint.material.opacity = Math.min(1, amount);
+      this.glint.scale.setScalar(0.22 + 0.4 * amount);
+    }
   }
 }
 
 // Kilpikäden asennot (vasen käsi). Levossa kilpi roikkuu vasemmalla kyljellä pinta sivulle;
 // torjunnassa se nostetaan keskelle vartalon eteen, jolloin liike näkyy selvästi.
+let glintTex: THREE.Texture | null = null;
+/** Pehmeä välähdys; yksi yhteinen tekstuuri kaikille. */
+function glintTexture() {
+  if (glintTex) return glintTex;
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const g = c.getContext("2d")!;
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, "rgba(255,255,255,1)");
+  grad.addColorStop(0.18, "rgba(255,255,255,0.75)");
+  grad.addColorStop(0.5, "rgba(255,255,255,0.16)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  return (glintTex = new THREE.CanvasTexture(c));
+}
+
 const SHIELD_GUARD: Partial<Pose> = { lShX: 0.1, lShZ: 0.34, lEl: -0.3 };
 /** Roikkuvan kilven pinnan suunta: 90° = suoraan sivulle, pienempi = hieman eteen. */
 const SHIELD_HANG_YAW = 1.3;
@@ -912,8 +953,8 @@ const SHIELD_ARM = new Set<Pose>([
 const SPEAR_BLOCK: Partial<Pose> = { spineYaw: -0.2, rShX: -0.3, rShZ: -0.3, rEl: -1.5, rHandX: 0.6, rHandY: 1.2, lShX: -1.3, lShZ: 0.2, lEl: -0.9 };
 export const SPEAR = new Map<Pose, Partial<Pose>>([
   [POSES.guard, { spineYaw: -0.45, rShX: 0.35, rShZ: -0.15, rEl: -1.3, rHandX: 0.95, rHandY: 0, lShX: -0.85, lShZ: -0.3, lEl: -0.55 }],
-  [POSES.thrustWindup, { spineYaw: -0.8, rShX: 0.85, rShZ: -0.2, rEl: -1.7, rHandX: 0.85, rHandY: 0, lShX: -0.6, lShZ: -0.35, lEl: -0.9 }],
-  [POSES.thrustStrike, { stride: 0.55, crouch: 0.22, spineYaw: -0.55, spinePitch: 0.42, rShX: -1.15, rShZ: 0.1, rEl: -0.2, rHandX: 1.35, rHandY: 0, lShX: -1.2, lShZ: -0.2, lEl: -0.25 }],
+  [POSES.thrustWindup, { spineYaw: -1.05, spinePitch: -0.06, stride: -0.04, crouch: 0.22, rShX: 0.85, rShZ: -0.2, rEl: -1.7, rHandX: 0.85, rHandY: 0, lShX: -0.6, lShZ: -0.35, lEl: -0.9 }],
+  [POSES.thrustStrike, { stride: 0.78, crouch: 0.28, spineYaw: -0.5, spinePitch: 0.44, rShX: -1.15, rShZ: 0.1, rEl: -0.2, rHandX: 1.35, rHandY: 0, lShX: -1.2, lShZ: -0.2, lEl: -0.25 }],
   [POSES.block, SPEAR_BLOCK], [POSES.blockSide, SPEAR_BLOCK], [POSES.blockThrust, SPEAR_BLOCK],
 ]);
 
@@ -937,9 +978,10 @@ const SPEAR_HOLD_GUARD: SpearHoldDef = { grip: [-0.2, 1.0, 0.04], yaw: 0.1, pitc
 const SPEAR_HOLD_BLOCK: SpearHoldDef = { grip: [-0.16, 1.02, 0.22], yaw: 0.3, pitch: 0.95, front: 0.55, poleR: [-0.3, -1, -0.6], poleL: [0.6, -1, -0.2] };
 export const SPEAR_HOLD = new Map<Pose, SpearHoldDef>([
   [POSES.guard, SPEAR_HOLD_GUARD],
-  // Pisto: varsi vedetään taakse lonkalle ja työnnetään molemmin käsin eteen (tyviote liikkuu 0,5 m).
-  [POSES.thrustWindup, { grip: [-0.22, 1.02, -0.22], yaw: 0.08, pitch: 0.2, front: 0.5, poleR: [-0.3, -1, -0.6], poleL: [-0.3, -1, 0] }],
-  [POSES.thrustStrike, { grip: [-0.12, 1.15, 0.28], yaw: 0.05, pitch: 0.1, front: 0.45, poleR: [-0.8, -0.5, -0.6], poleL: [-0.3, -1, 0] }],
+  // Pisto: varsi vedetään kauas taakse lonkan ohi, kärki nousee, ja työnnetään molemmin käsin eteen
+  // (tyviote liikkuu noin 0,8 m).
+  [POSES.thrustWindup, { grip: [-0.3, 1.08, -0.44], yaw: 0.12, pitch: 0.32, front: 0.5, poleR: [-0.3, -1, -0.6], poleL: [-0.3, -1, 0] }],
+  [POSES.thrustStrike, { grip: [-0.12, 1.15, 0.34], yaw: 0.05, pitch: 0.1, front: 0.45, poleR: [-0.8, -0.5, -0.6], poleL: [-0.3, -1, 0] }],
   [POSES.block, SPEAR_HOLD_BLOCK], [POSES.blockSide, SPEAR_HOLD_BLOCK], [POSES.blockThrust, SPEAR_HOLD_BLOCK],
   // Horjahdus (myös kaatuminen) ja suohon juuttuminen: keihäs pysyy molemmissa käsissä.
   [POSES.stagger, { grip: [-0.22, 1.05, -0.08], yaw: 0.15, pitch: 0.55, front: 0.5, poleR: [-0.3, -1, -0.6], poleL: [0.6, -1, -0.2] }],

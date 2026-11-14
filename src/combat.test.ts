@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   turnToward,
+  lungeProgress,
+  strikeLands,
   BASH,
   SHIELDS,
   STRIKES,
@@ -171,6 +173,16 @@ describe("aseet ja iskut parametreina", () => {
     expect(spearThrust.range).toBeCloseTo(3.5);
     expect(resolveHit({ distance: 3.4, angleToDefender: 0 }, idle, 5, spearThrust)).toBe("hit");
     expect(spearThrust.lunge).toBeCloseTo(swordThrust.lunge + 0.3);
+  });
+  it("isku osuu vasta, kun tukiaskel on otettu", () => {
+    const r = swordThrust.timing.release;
+    expect(strikeLands(0, r)).toBe(false);
+    expect(lungeProgress(0, r)).toBe(0);
+    expect(strikeLands(r * COMBAT.strikePoint - 0.001, r)).toBe(false);
+    expect(lungeProgress(r * COMBAT.strikePoint - 0.001, r)).toBeLessThan(1);
+    expect(strikeLands(r * COMBAT.strikePoint, r)).toBe(true);
+    expect(lungeProgress(r * COMBAT.strikePoint, r)).toBeCloseTo(1);
+    expect(lungeProgress(r, r)).toBe(1);
   });
   it("piston kaari on kapea: sivuaskel riittää", () => {
     expect(resolveHit({ distance: 2.2, angleToDefender: 0.6 }, idle, 5, swordThrust)).toBe("miss");
