@@ -93,8 +93,10 @@ Päivitetty: 2026-11-14 (Claude, Windows)
   `RIG` kuin taistelijoilla) ja `sauva` (ote origossa, linnunpää -Y, nokka
   +Z). Viitta ja kanteleen kotelo on painotettu vartaloon: vasen käsi
   pidetään viitan alla sivulla, oikea on vapaa sauvalle.
-- **Naishahmot** (`assets/villagers_f.glb`): `char_jousineito` (27 900
-  kolmiota) ja `jousi` (ote origossa, lavat Z-suunnassa, jänne +Y).
+- **Naishahmot** (`assets/villagers_f.glb`, 3,2 Mt): `char_jousineito`
+  (27 900 kolmiota), `jousi` (ote origossa, lavat Z-suunnassa, jänne +Y)
+  ja `char_emanta` (26 600 kolmiota; pitkä helma seuraa reisiä ja sääriä,
+  kävelyä ei ole kokeiltu; viljalyhde on erikseen `household.glb`:ssä).
   Naisvartalo (Human Base Meshes, skaalattu miehen pituiseksi ×1,026,
   muotoilu `shape_body_f`) käyttää **omaa luurankoa**: Blenderissä `RIG_F`,
   tiedostossa `RIG`, samat 17 luun nimet mutta eri lepoasento. Siksi
@@ -108,7 +110,7 @@ Päivitetty: 2026-11-14 (Claude, Windows)
   eikä liikkeessä; materiaalit `M_HH_*` ja `F_Weave` pitää ottaa mukaan
   `prepareMaterials`iin.
 - **Rauhallisen pihakohtauksen suunnitelma** (omistaja hyväksyi 2026-11-14):
-  tehty 1 talousesineet, 3 tietäjä ja 4 jousineito. Jäljellä: 5 emäntä,
+  tehty 1 talousesineet, 3 tietäjä, 4 jousineito ja 5 emäntä. Jäljellä:
   6 eläimet (sika, koira, kanat: Poly Havenissa ei ole eläimiä, joten
   omistaja lataa CC-BY-mallit Sketchfabista agentin ehdokaslistan mukaan)
   ja 2 rauhan piha koodina (uusi paikka, esineet pihalle, pysyvien
