@@ -8,6 +8,7 @@ import mossDiffUrl from "../assets/ground/moss_diff.webp";
 import mossNorUrl from "../assets/ground/moss_nor.webp";
 import dirtDiffUrl from "../assets/ground/dirt_diff.webp";
 import dirtNorUrl from "../assets/ground/dirt_nor.webp";
+import { COLLISION, CollisionWorld } from "./collision";
 
 // Taistelualueet kangasmetsässä: maasto, männyt, kuuset, koivut, varvut ja kivet
 // sekä alueen oma keskus (nuotioaukion kota tai pihapiirin rakennukset). Mallit
@@ -100,6 +101,70 @@ const SITES: Record<ArenaId, Site> = {
 const SITE = SITES[ARENA];
 const FIRE = SITE.fire;
 
+/**
+ * Mallityypin törmäys määritellään kerran tässä. Kaikki put()-kutsulla koodista
+ * sijoitetut instanssit saavat saman muodon automaattisesti sijainnin, kierron ja
+ * mittakaavan mukaan. Uusi kohtaus ei siis tarvitse käsin merkittyjä törmäyksiä.
+ */
+export type PropColliderTemplate =
+  | { kind: "circle"; radius: number; blocksMelee?: boolean }
+  | { kind: "box"; halfX: number; halfZ: number; blocksMelee?: boolean };
+
+export const PROP_COLLIDERS: Record<string, PropColliderTemplate> = {
+  rock_1: { kind: "circle", radius: 0.7, blocksMelee: true },
+  rock_2: { kind: "circle", radius: 0.7, blocksMelee: true },
+  rock_3: { kind: "circle", radius: 0.8, blocksMelee: true },
+  rock_4: { kind: "circle", radius: 0.65, blocksMelee: true },
+  rock_5: { kind: "circle", radius: 0.75, blocksMelee: true },
+  rock_6: { kind: "circle", radius: 0.7, blocksMelee: true },
+  pine_a: { kind: "circle", radius: 0.3, blocksMelee: true },
+  pine_b: { kind: "circle", radius: 0.34, blocksMelee: true },
+  pine_c: { kind: "circle", radius: 0.3, blocksMelee: true },
+  spruce_a: { kind: "circle", radius: 0.3, blocksMelee: true },
+  spruce_b: { kind: "circle", radius: 0.28, blocksMelee: true },
+  spruce_young: { kind: "circle", radius: 0.22, blocksMelee: true },
+  birch_a: { kind: "circle", radius: 0.22, blocksMelee: true },
+  birch_b: { kind: "circle", radius: 0.24, blocksMelee: true },
+  kota: { kind: "circle", radius: 2.25, blocksMelee: true },
+  aita: { kind: "box", halfX: 1.02, halfZ: 0.12, blocksMelee: true },
+  portinpieli: { kind: "circle", radius: 0.13, blocksMelee: true },
+  pino: { kind: "box", halfX: 1.15, halfZ: 0.45, blocksMelee: true },
+  polkky: { kind: "circle", radius: 0.55, blocksMelee: true },
+  haasia: { kind: "box", halfX: 1.95, halfZ: 0.65, blocksMelee: true },
+  ruukku: { kind: "circle", radius: 0.2, blocksMelee: false },
+  // Clauden talousesineet eivät ole vielä kohtauksessa, mutta tuleva koodisijoittelu
+  // saa törmäykset ilman kohtauskohtaista käsityötä.
+  pukkipoyta: { kind: "box", halfX: 1.18, halfZ: 0.42, blocksMelee: true },
+  penkki: { kind: "box", halfX: 0.98, halfZ: 0.3, blocksMelee: true },
+};
+
+function addPropCollider(
+  collision: CollisionWorld,
+  id: string,
+  name: string,
+  x: number,
+  z: number,
+  scale: number,
+  yaw: number,
+) {
+  const def = PROP_COLLIDERS[name];
+  if (!def) return;
+  if (def.kind === "circle") {
+    collision.add({ id, kind: "circle", x, z, radius: def.radius * scale, blocksMovement: true, blocksMelee: !!def.blocksMelee });
+  } else {
+    collision.add({ id, kind: "box", x, z, yaw, halfX: def.halfX * scale, halfZ: def.halfZ * scale, blocksMovement: true, blocksMelee: !!def.blocksMelee });
+  }
+}
+
+function addFootprintCollider(collision: CollisionWorld, id: string, f: Footprint) {
+  const center = (f.front - f.back) / 2;
+  const [x, z] = fromLocal(f, 0, center);
+  collision.add({
+    id, kind: "box", x, z, yaw: f.yaw, halfX: f.hx, halfZ: (f.front + f.back) / 2,
+    blocksMovement: true, blocksMelee: true,
+  });
+}
+
 /** Pisteen paikka rakennuksen omassa koordinaatistossa: [sivulle, eteen]. */
 function toLocal(f: Footprint, x: number, z: number): [number, number] {
   const dx = x - f.x, dz = z - f.z, s = Math.sin(f.yaw), c = Math.cos(f.yaw);
@@ -165,6 +230,8 @@ export interface World {
   groundTex: GroundTex;
   /** Metsän malli nimellä (esim. "grass_d"); tyhjä, kunnes mallit on ladattu. */
   proto(name: string): { geometry: THREE.BufferGeometry; material: THREE.Material }[];
+  /** Yhteinen hahmojen, eläinten, maailmanesteiden ja vaara-alueiden 2,5D-rekisteri. */
+  collision: CollisionWorld;
   /** Siirtää kameran paikan pois rakennusten sisältä (pihapiirissä kehän sisäpuolelle). */
   clearCamera(pos: THREE.Vector3): void;
   update(t: number, dt: number, camera: THREE.Camera): void;
@@ -488,10 +555,11 @@ function prepareMaterials(protos: Map<string, Proto>, maxAniso: number) {
   }
 }
 
-function populate(scene: THREE.Scene, protos: Map<string, Proto>) {
+function populate(scene: THREE.Scene, protos: Map<string, Proto>, collision: CollisionWorld) {
   const r = rand(1849);
   const dummy = new THREE.Object3D();
   const batches = new Map<string, THREE.Matrix4[]>();
+  let colliderId = 0;
   const put = (key: string, x: number, z: number, scale: number, yaw: number, sink = 0, tilt = 0) => {
     dummy.position.set(x, groundHeight(x, z) - sink, z);
     dummy.rotation.set(tilt * (r() - 0.5), yaw, tilt * (r() - 0.5));
@@ -499,6 +567,8 @@ function populate(scene: THREE.Scene, protos: Map<string, Proto>) {
     dummy.updateMatrix();
     if (!batches.has(key)) batches.set(key, []);
     batches.get(key)!.push(dummy.matrix.clone());
+    const name = key.split("@")[0];
+    addPropCollider(collision, `prop:${name}:${colliderId++}`, name, x, z, scale, yaw);
   };
   /** Rakennus paikalleen pohjansa mukaan, etusivu keskipisteeseen päin. */
   const place = (key: string, f: Footprint, sink = 0.03) => put(key, f.x, f.z, 1, f.yaw, sink);
@@ -652,6 +722,16 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   const groundTex = buildGround(scene, maxAniso);
   const protos = new Map<string, Proto>();
   const fire = buildFire(scene);
+  const collision = new CollisionWorld();
+  collision.add({
+    id: "campfire", kind: "circle", x: FIRE.x, z: FIRE.z, radius: COLLISION.fireCoreRadius,
+    blocksMovement: true, blocksMelee: true,
+  });
+  collision.addHazard({
+    id: "campfire", kind: "circle", x: FIRE.x, z: FIRE.z, radius: COLLISION.fireHazardRadius,
+    damagePerSecond: COLLISION.fireDamagePerSecond,
+  });
+  SITE.footprints.forEach((f, i) => addFootprintCollider(collision, `building:${i}`, f));
 
   // Talon savu nousee päädyn savuaukosta (pihapiiri).
   let houseSmoke: ((dt: number) => void) | null = null;
@@ -677,8 +757,8 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
       }
     }
     prepareMaterials(protos, maxAniso);
-    const stats = populate(scene, protos);
-    (window as unknown as { __world: unknown }).__world = stats;
+    const stats = populate(scene, protos, collision);
+    (window as unknown as { __world: unknown }).__world = { ...stats, collision: collision.stats() };
   });
   ready.catch((e) => console.error("Maailman mallien lataus epäonnistui", e));
 
@@ -688,6 +768,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     ready,
     groundTex,
     proto: (name) => protos.get(name) ?? [],
+    collision,
     clearCamera(pos) {
       const r = Math.hypot(pos.x, pos.z);
       if (r > SITE.camMaxR) { pos.x *= SITE.camMaxR / r; pos.z *= SITE.camMaxR / r; }

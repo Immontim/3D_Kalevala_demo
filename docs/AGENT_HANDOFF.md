@@ -7,9 +7,10 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-14 (Codex, Windows)
 
-- **Versio v01.04.00**, branch `codex/pohja-shield-bash`, commit
+- **Versio v01.05.00**, branch `codex/collision-world`, commit
   `HEAD` (tämän muutoksen commit; tarkista merge-tila
-  `git merge-base --is-ancestor`). Mainissa on v01.03.00.
+  `git merge-base --is-ancestor`). Mainissa on v01.04.00 ja Clauden
+  talousesineet.
 - **Rakenne.** `src/engine/` on kohtaus- ja taistelumoottori, `src/ui/` sivun
   ikkunat (aloitus, tauko, säätö), `src/main.ts` vain käynnistys ja
   `src/debug.ts` savutestien `__game`. Säännöt ja luvut ovat yhä puhtaissa
@@ -87,9 +88,8 @@ Päivitetty: 2026-11-14 (Codex, Windows)
   `homestead.py`:n): `pukkipoyta`, `penkki`, `tuohikontti`, `pata`,
   `rieska`, `nauriit`, `kuivakalat`, `lyhde`, `kulho`, `kuppi`, `kauha`,
   `lautanen`, `kori` ja `poyta_kattaus` (pöydälle katetut esineet yhtenä
-  mallina, origo sama kuin pöydällä; pöytälevyn pinta 0,76 m). **Peli ei
-  vielä lataa tiedostoa** (branch `claude/household-props`, 2026-11-14;
-  tarkista merge-tila). Verteksivärit ovat lineaarisia: skriptin `HH`
+  mallina, origo sama kuin pöydällä; pöytälevyn pinta 0,76 m). Malli on
+  mainissa, mutta peli ei vielä lataa sitä. Verteksivärit ovat lineaarisia: skriptin `HH`
   muuntaa sRGB-arvot. Tarkistettu vain Blenderin EEVEE-kuvista, ei pelin
   valossa; materiaalit `M_HH_*` pitää ottaa mukaan `prepareMaterials`iin.
   Tulikivet ja tuhka ovat tasaisen harmaita ilman tekstuuria.
@@ -100,16 +100,6 @@ Päivitetty: 2026-11-14 (Codex, Windows)
   Poly Havenissa ei ole eläimiä, joten omistaja lataa CC-BY-mallit
   Sketchfabista agentin ehdokaslistan mukaan). Hahmot seisovat aluksi
   paikallaan. Dialogijärjestelmä tehdään erikseen myöhemmin.
-- **Laulut ja valinta** (`src/songLogic.ts`: `SONGS`, `SONG_SLOTS`; kulku
-  `engine/song.ts`): laulunappi täydellä voimalla → `openChoice()`:
-  `choosing` pysäyttää maailman (dt = 0), hiiri vapautetaan
-  (`g.choiceUnlock` estää automaattisen tauon) ja viisi laulupaikkaa
-  asetellaan hahmon ympärille. Valinta pikanäppäimellä (`song1`–`song5`,
-  oletus F1–F5) tai napsauttamalla → `startSong(id)`; laulunappi uudestaan
-  peruu ja voima säilyy. Vastustajaa tarvitseva laulu (`needsEnemy`) ei
-  valikoidu ilman sitä. **Uusi laulu:** `SongId`, rivi `SONGS`iin, paikka
-  `SONG_SLOTS`iin, väri `.slot.<id>` ja vaikutus `judge`/`endSong`iin.
-  Parannuslaulu antaa `SONG.healPerHit` (5) elämää heti osumasta.
 - **Askellus ja elävyys** (`src/fighter.ts`, taulukko `GAIT`): nopeus
   mitataan `root`in todellisesta siirtymästä, ja `apply` ratkaisee jalkojen
   kulmat jalan paikasta, joten maassa oleva jalka ei liu'u. `animate`n
@@ -143,21 +133,6 @@ Päivitetty: 2026-11-14 (Codex, Windows)
   `{ peli, versio, muutokset: { ...vain poikkeavat arvot puuna } }`.
   **Kun omistaja liittää JSONin keskusteluun, sen arvot kirjoitetaan
   taulukoiden oletuksiksi** ja omistaja palauttaa säätönsä oletuksiin.
-- **Laulun rytmipeli** (`src/songLogic.ts`, luvut taulukossa `SONG`; kulku
-  `engine/song.ts`): maailma hidastuu (`slowmo` 1/15), `intro` 0,6 s, sitten
-  riimu jokaista säettä kohti (8), kunkin alla osuma-alue (`zoneFirst`
-  0,24, seuraava aina `zoneShrink` 0,84 × edellinen). Vaikeutta säädetään
-  ensisijaisesti nauhan nopeudesta `speed` (1,5). Suolaulu laukeaa
-  `minHits` 4 osumalla; kesto on osumat × `rootTimePerHit` 0,75 s.
-  Vastustajan osuma katkaisee laulun (`interruptSong()`). Voima nollataan
-  laulun alussa. Tauko pysäyttää myös riimut.
-- **Suo** (`src/bog.ts`, malli `assets/bog.glb`, skripti
-  `assets-src/blender/bog.py`): mutapinta, sammalreunus ja kuplan malli
-  tulevat Blenderistä ilman tekstuureja; pinnat tehdään maaston
-  tekstuureista (`World.groundTex`) ja heinätupsut metsän malleista
-  (`World.proto`). Mudan vellonta, kuplat ja puhkeamisrenkaat lasketaan
-  koodissa joka ruutu (529 verteksiä). Luvut taulukossa `BOG`. Suohon
-  juuttunutta vastustajaa ei voi enää työntää paikaltaan.
 - **Taistelusäännöt ovat parametritaulukoita** tiedostossa `src/combat.ts`
   (puhdasta logiikkaa, testit vieressä):
   - `STRIKES`: iskusuunta (`overhead`, `slash`, `thrust`) × paino (`light`,
@@ -180,6 +155,22 @@ Päivitetty: 2026-11-14 (Codex, Windows)
   yrittää siirtää puolustajaa 0,65 m taakse nopeudella 2,6 m/s (areenaraja
   tai toinen hahmo voi lyhentää nettosiirtymää). Suohon juuttunut ottaa
   vahingon mutta ei siirry.
+- **2,5D-törmäykset** (`src/collision.ts`, rekisteri `World.collision`):
+  hahmot ovat XZ-tason ympyröitä (säde 0,5 m); sama `DiscBody`-rajapinta
+  sopii eläimille. Kävely liukuu staattista estettä pitkin, mutta väistö,
+  tukiaskel ja kilpityönnön horjahdus pysähtyvät. Dynaamiset vartalot
+  erotetaan yhdessä staattisten esteiden kanssa, joten vastustajan voi
+  sulkea seinää tai aitaa vasten. `world.ts`-tiedoston `PROP_COLLIDERS`
+  määrittää mallityypin muodon kerran; jokainen `put()`-instanssi rekisteröi
+  sen automaattisesti. Mukana ovat kivet, puunrungot, kota, rakennusten
+  pohjat, aita sekä pihan ja tulevan rauhallisen kohtauksen suuret tavarat
+  (`pukkipoyta`, `penkki`). Nuotiossa on kiinteä ydin ja lämpökehä (10
+  vahinkoa/s). Iskujen nykyinen etäisyys-/kulmamalli säilyy, mutta
+  `blocksMelee`-este ennen kohdetta pysäyttää iskun. Myös ilman vastustajaa
+  esteeseen lyöminen tuottaa `environment`-tapahtuman ja erilliset
+  kylmänväriset kipinät (`ImpactKind`); tämä on laajennuspiste eri
+  pintamateriaaleille. Debug: `__game.collision`, latauksen tilasto
+  `__world.collision`.
 - **Tekoäly** (`pickEnemyAttack`, `src/engine/ai.ts`): arpoo iskusuunnan ja
   painon varustuksen mukaan, lyö raskaasti kilven takana seisovaa pelaajaa,
   ja aseella torjuessaan arvaa suunnan oikein sitä useammin, mitä pidemmällä
@@ -194,17 +185,17 @@ Päivitetty: 2026-11-14 (Codex, Windows)
   samoista osoitteista käsin). `.blend`-tiedostot eivät ole Gitissä, eikä
   lähdemallien tuontia SRC-kokoelmaan ole skriptattu. `homestead.py`
   tarvitsee metsäputken tekemän `assets-src/textures/birch_bark_diff.png`n.
-- **Koodi valmis:** v01.04.00 branchissa `codex/pohja-shield-bash`.
+- **Koodi valmis:** v01.05.00 branchissa `codex/collision-world`.
   **Ei deployattu:** GitHub Pages julkaisee mainin mergen jälkeen
   (Actions-ajo "Julkaise GitHub Pagesiin"). **Omistaja testaa julkaistusta
   osoitteesta**, ei dev-serveriltä.
-- **Käsin testattu 2026-11-14** (in-app browser, oikea pelisyöte): pelaajan
-  kilpityöntö vähensi vastustajan elämää 90 → 85, käynnisti horjahdusasennon
-  ja siirsi vastustajaa taakse. 60 FPS, ei konsolivirheitä. AI:n rajaus
-  Pohjan soturiin ja 0,65 m liike varmennettu puhtailla testeillä.
-  **Ei testattu:** buildattu versio selaimessa, hitaampi kone, eri ikkunakoot.
-- **Komennot 2026-11-14:** `bun run test` 151/151 (mukana Clauden sisäinen
-  worktree), nykyinen checkout rajattuna 77/77; `bun run lint` ja `bun run build` ok. Build varoittaa ennestään yli 500 kt:n JS-palasta.
+- **Käsin testattu 2026-11-14** in-app browserissa: peli käynnistyi,
+  maailma ja hahmot piirtyivät, 60 FPS, ei konsolivirheitä. Puhtaat testit
+  varmentavat liukumisen, pitkän väistön pysähtymisen, seinää vasten
+  puristumisen, iskuesteen ja lämpökehän. **Ei testattu käsin:** kaikkien
+  mallikohtaisten törmäysmittojen istuvuus, buildattu preview, hitaampi kone.
+- **Komennot 2026-11-14:** `bun run test` 161/161, `bun run lint` ja
+  `bun run build` ok. Build varoittaa ennestään yli 500 kt:n JS-palasta.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Savutestien apuna `window.__game` (`src/debug.ts`, lue sieltä koko
   lista): `tick(n, dt)` ajaa peliä askelin ruudunpäivityksestä riippumatta,
@@ -241,17 +232,16 @@ Päivitetty: 2026-11-14 (Codex, Windows)
   `enemyAi.attackGap`ia, jos sen halutaan tuntuvan. Hajaantuminen on
   pehmeää, joten vastustajat voivat ajautua metrin päähän toisistaan.
   Sankarin isku osuu aina vain yhteen (myös leveä sivallus).
-- **Hahmo–maailma-törmäyksiä ei ole.** Liike, väistö, tukiaskel ja uusi
-  kilpityönnön horjahdus voivat viedä kiven, nuotion, kodan, puun tai
-  rakennuksen läpi. Vain areenan ympyräraja ja elävien hahmojen keskinäinen
-  erottelu ovat käytössä. `world.ts`-tiedoston `blocked()` ohjaa vain
-  maailman sommittelua; kamera rajataan pihapiirissä vain säteen mukaan.
-  Tässä loopissa hylättiin vain kilpityönnölle tehtävä kivitarkistus, koska
-  se jättäisi muun liikkeen epäjohdonmukaisesti läpikulkevaksi. Kunnollinen
-  korjaus on erillinen kaikkien liikkeiden yhteinen törmäysfeature.
-- **Pihapiirin avoimet viat:** rakennuksiin, aitaan ja tuleen ei voi
-  törmätä (taistelukehä pitää hahmot pihalla, mutta kaatuneen varusteet
-  voivat lentää aidan läpi); kamera on kehän reunalla lähellä pelaajaa;
+- **Törmäysten avoimet riskit:** proxy-muotojen mitat on arvioitu
+  Blender-skriptien mitoista eikä jokaista mallia ole käsin kokeiltu.
+  Pienet esineet, kasvillisuus, ruumiit ja lentävät varusteet eivät törmää.
+  Tekoäly osaa liukua esteen reunaa pitkin mutta ei vielä suunnitella reittiä
+  pöydän tai rakennuksen ympäri; eläinten liikkuessa tarvitaan mahdollisesti
+  harva navigointiruudukko. Kamera käyttää yhä pihapiirin säderajaa.
+  Ympäristöosuma on suora jana, ei terän tai keihään todellinen liikerata.
+  Nuotion 10 vahinkoa/s ja lämpökehän leveys ovat testaamattomia arvauksia.
+- **Pihapiirin avoimet viat:** kamera on kehän reunalla lähellä pelaajaa;
+  kaatuneen varusteet voivat lentää aidan läpi;
   punosaita on sileä levy, jonka punos on tekstuuria; sisätilat ovat
   mustia laatikoita; kuoppatalon kuilun reunassa maaston ja mallin raja
   on jyrkkä. Patsasaitta ja luukulliset valoaukot ovat uskottavia mutta
@@ -261,20 +251,10 @@ Päivitetty: 2026-11-14 (Codex, Windows)
 - **Asennot on viritetty silmämääräisesti** kuvakaappauksista. Raskaalla
   sivalluksella ja pistolla ei ole omaa asentoa (sama kuin kevyellä).
   Keihäsmiehen torjunta näyttää samalta kaikissa kolmessa asennossa.
-- **Hiiren lisänapit:** ajurin omaan toimintoon sidottu nappi ei näy
-  selaimelle; napit 4 ja 5 voivat joissain selaimissa selata historiaa.
 - **Kypärän tekstuuri** on sama metallilevy kuin muissa osissa, ja kupu on
   melko sileä; lentävä kypärä voi pudota puun tai kiven läpi (ei törmäyksiä).
-- **Laulun hidastus 1/15:** koko laulu (noin 5,7 s) on vastustajalle noin
-  0,4 s (`song.slowmo`).
-- **Parannuslaulun teho on arvaus:** 8 osumaa = 40 elämää, eikä laulu vaadi
-  vastustajaa, joten aaltojen välissä sen voi laulaa rauhassa.
-- **Kalevalan säkeet on kirjoitettu muistista** (9. runo, verensulkusanat);
-  sanamuoto kannattaa tarkistaa painetusta tekstistä.
 - **Suon reunus** on erillinen kumpu maan päällä: sen ulkoreunan ja
   tallatun maan raja näkyy läheltä. Muta ei heijasta hahmoja.
-- **Kilven lovi** leikkaa pinnan shaderilla, joten loven reunassa ei ole
-  paksuutta, ja kilven varjo pysyy ehjänä.
 - **Hahmojen avoimet viat:** kasvot ilman tekstuuria, rengaspanssari varjossa
   lähes musta, tukeva vartalo, hiukset sileä "verho", peukalo ei kierry
   kahvan ympäri, helma voi venyä haara-asennossa.
@@ -287,8 +267,8 @@ Päivitetty: 2026-11-14 (Codex, Windows)
 
 ## Seuraava tehtävä
 
-Omistaja tarkistaa v01.04.00:n julkaistusta osoitteesta, onko Pohjan soturin
-12 % kilpityöntövalinta sopivan harvinainen ja 0,65 m horjahdus sopivan pitkä.
+Omistaja kokeilee julkaistusta v01.05.00-versiosta kiven, nuotion, aidan ja
+seinää vasten ahdistamisen sekä arvioi lämpökehän ja 10 vahingon/s tuntuman.
 
 ## Ei vielä aloiteta
 

@@ -4,6 +4,7 @@ import { ActionState, BASH, COMBAT, StrikeStyle, StrikeWeight, angleBetween, bas
 import { FALLEN } from "../fighter";
 import { effectiveStats } from "../stats";
 import { ARENA_RADIUS, groundHeight } from "../world";
+import { separateDiscBodies } from "../collision";
 import { Actor, setState } from "./actor";
 import { emitBlood, emitSparks } from "./effects";
 import { STYLE_NAME, flash, showMsg } from "./hud";
@@ -11,7 +12,7 @@ import { onPlayerDeath } from "./loop";
 import { enemyDown, lockTarget } from "./enemies";
 import { interruptSong, songState } from "./song";
 import { fx, g, sfx } from "./state";
-import { scene } from "./view";
+import { scene, world } from "./view";
 
 export function startAttack(a: Actor, kind: StrikeStyle | "bash", weight: StrikeWeight = "light", charging = false) {
   setState(a, "windup");
@@ -41,8 +42,41 @@ export function lerpAngle(a: number, b: number, t: number) { return a + angleBet
 
 export function moveActor(a: Actor, dir: THREE.Vector3, speed: number, dt: number) {
   if (dir.lengthSq() > 1) dir.normalize();
-  a.pos.addScaledVector(dir, speed * dt);
-  a.moveSpeed = dir.length() * speed;
+  const ox = a.pos.x, oz = a.pos.z;
+  const moved = world.collision.moveDisc(ox, oz, dir.x * speed * dt, dir.z * speed * dt, a.radius, "slide");
+  a.pos.x = moved.x;
+  a.pos.z = moved.z;
+  a.moveSpeed = dt > 0 ? Math.hypot(moved.x - ox, moved.z - oz) / dt : 0;
+}
+
+/**
+ * Esityskerroksen ympäristöosuma. Kohteen ollessa oikeassa iskusektorissa este
+ * etsitään hänen suuntaansa; muulloin aseen omaan etusuuntaan. Näin myös tyhjässä
+ * rauhallisessa kohtauksessa kiveen tai pöytään lyöminen antaa palautteen.
+ */
+function resolveEnvironmentStrike(att: Actor, def: Actor | null) {
+  const atk = att.attack;
+  let x1 = att.pos.x + Math.sin(att.yaw) * atk.range;
+  let z1 = att.pos.z + Math.cos(att.yaw) * atk.range;
+  if (def) {
+    const toDef = def.pos.clone().sub(att.pos);
+    const geometry = {
+      distance: def.pos.distanceTo(att.stepFrom),
+      angleToDefender: angleBetween(att.yaw, Math.atan2(toDef.x, toDef.z)),
+    };
+    if (inStrikeZone(geometry, atk)) { x1 = def.pos.x; z1 = def.pos.z; }
+  }
+  const obstruction = world.collision.firstMeleeHit(att.pos.x, att.pos.z, x1, z1);
+  if (!obstruction) return false;
+  const contact = new THREE.Vector3(obstruction.x, groundHeight(obstruction.x, obstruction.z) + 1.05, obstruction.z);
+  const isPlayer = att === g.player;
+  g.events.push(`${isPlayer ? "pelaaja" : "vihollinen"}:${atk.kind}/${atk.weight}:environment:${obstruction.collider.id}`);
+  if (g.events.length > 30) g.events.shift();
+  emitSparks(contact, atk.weight === "heavy" ? 30 : 20, 3.5, "environment");
+  sfx.hit();
+  fx.hitstop = Math.max(fx.hitstop, 0.05);
+  fx.shake = Math.max(fx.shake, 0.05);
+  return true;
 }
 
 export function resolveStrike(att: Actor, def: Actor) {
@@ -53,11 +87,12 @@ export function resolveStrike(att: Actor, def: Actor) {
   const angleToAttacker = angleBetween(def.yaw, Math.atan2(-toDef.x, -toDef.z));
   const atk = att.attack;
   const defState = def.state;
+  const geometry = { distance: dist, angleToDefender };
   const defender = {
     state: defState, blockStart: def.blockStart, angleToAttacker,
     shield: def.shield, stance: def.stance, blockArc: def.weapon.blockArc,
   };
-  let res = resolveHit({ distance: dist, angleToDefender }, defender, g.gameTime, atk);
+  let res = resolveHit(geometry, defender, g.gameTime, atk);
   // Suoja-aika: juuri torjuttu isku pysäyttää hetken myös muiden lyöjien iskut edestä.
   const arc = def.shield ? def.shield.blockArc : def.weapon.blockArc;
   const graced = atk.kind !== "bash" && res === "hit" && defState !== "stagger" && defState !== "rooted"
@@ -88,12 +123,7 @@ export function resolveStrike(att: Actor, def: Actor) {
     def.bashPushLeft = Math.max(def.bashPushLeft, COMBAT.bashPushDistance);
   }
   if (def === g.player && songState && (res === "hit" || res === "guardbreak")) interruptSong();
-  if (died) {
-    setState(def, "dead");
-    fallDown(def, Math.abs(angleToAttacker) > Math.PI / 2);
-    if (def === g.player) onPlayerDeath();
-    else enemyDown(def);
-  }
+  if (died) killActor(def, Math.abs(angleToAttacker) > Math.PI / 2);
 
   if (res === "hit") {
     sfx.hit();
@@ -175,6 +205,15 @@ export function fallDown(a: Actor, fromBehind: boolean) {
   for (const d of a.fighter.dropGear()) { scene.add(d.group); g.debris.push(d); }
 }
 
+/** Yhteinen kaatuminen myös maailman vaaratekijöille (esim. nuotio). */
+export function killActor(a: Actor, fromBehind = false) {
+  if (a.state === "dead") return;
+  setState(a, "dead");
+  fallDown(a, fromBehind);
+  if (a === g.player) onPlayerDeath();
+  else enemyDown(a);
+}
+
 /** Kehen isku kohdistuu: vastustajan isku sankariin, sankarin isku lukittuun tai lähimpään ulottuvilla olevaan. */
 function strikeTarget(att: Actor): Actor | null {
   if (att !== g.player) return g.player.state === "dead" ? null : g.player;
@@ -202,9 +241,12 @@ export function updateCombatant(a: Actor, dt: number) {
     a.bashPushLeft = 0;
   } else if (a.bashPushLeft > 0) {
     const step = bashPushStep(a.bashPushLeft, dt);
-    a.pos.addScaledVector(a.bashPushDir, step);
+    const ox = a.pos.x, oz = a.pos.z;
+    const moved = world.collision.moveDisc(a.pos.x, a.pos.z, a.bashPushDir.x * step, a.bashPushDir.z * step, a.radius, "stop");
+    a.pos.x = moved.x;
+    a.pos.z = moved.z;
     a.bashPushLeft -= step;
-    if (dt > 0) a.moveSpeed = step / dt;
+    if (dt > 0) a.moveSpeed = Math.hypot(moved.x - ox, moved.z - oz) / dt;
   }
   const t = a.timing;
 
@@ -223,23 +265,28 @@ export function updateCombatant(a: Actor, dt: number) {
       const done = lungeProgress(inRelease, t.release);
       const step = (done - a.lunged) * a.attack.lunge;
       a.lunged = done;
-      a.pos.x += Math.sin(a.yaw) * step;
-      a.pos.z += Math.cos(a.yaw) * step;
+      const moved = world.collision.moveDisc(a.pos.x, a.pos.z, Math.sin(a.yaw) * step, Math.cos(a.yaw) * step, a.radius, "stop");
+      a.pos.x = moved.x;
+      a.pos.z = moved.z;
     }
     // Jos ruutu hyppäsi osumahetken yli suoraan palautumiseen, isku ratkeaa silti.
     const lands = phase === "release" ? strikeLands(inRelease, t.release) : phase !== "windup" && a.state === "release";
-    const target = lands && !a.struck ? strikeTarget(a) : null;
-    if (target) {
+    if (lands && !a.struck) {
+      const target = strikeTarget(a);
       a.struck = true;
-      resolveStrike(a, target);
-      if ((a.state as ActionState) === "stagger") return; // täydellinen torjunta keskeytti
+      if (!resolveEnvironmentStrike(a, target) && target) {
+        resolveStrike(a, target);
+        if ((a.state as ActionState) === "stagger") return; // täydellinen torjunta keskeytti
+      }
     }
     if (phase === "recovery") a.state = "recovery";
     if (phase === "done") setState(a, "idle");
   } else if (a.state === "stagger") {
     if (a.stateTime >= COMBAT.staggerTime) setState(a, "idle");
   } else if (a.state === "dodge") {
-    a.pos.addScaledVector(a.dodgeDir, COMBAT.dodgeSpeed * dt);
+    const moved = world.collision.moveDisc(a.pos.x, a.pos.z, a.dodgeDir.x * COMBAT.dodgeSpeed * dt, a.dodgeDir.z * COMBAT.dodgeSpeed * dt, a.radius, "stop");
+    a.pos.x = moved.x;
+    a.pos.z = moved.z;
     if (a.stateTime >= COMBAT.dodgeTime) setState(a, "idle");
   } else if (a.state === "rooted") {
     a.rootTime -= dt;
@@ -249,23 +296,29 @@ export function updateCombatant(a: Actor, dt: number) {
 
 /** Pitää taistelijat kehän sisällä ja erillään toisistaan. */
 export function keepApartAndInside(actors: Actor[]) {
-  for (const x of actors) {
-    const r = Math.hypot(x.pos.x, x.pos.z);
-    if (r > ARENA_RADIUS - 0.6) x.pos.multiplyScalar((ARENA_RADIUS - 0.6) / r);
-  }
-  for (let i = 0; i < actors.length; i++) {
-    for (let j = i + 1; j < actors.length; j++) {
-      const a = actors[i], b = actors[j];
-      if (a.state === "dead" || b.state === "dead") continue;
-      const d = b.pos.clone().sub(a.pos);
-      const len = d.length();
-      if (len >= 1.0 || len <= 0.0001) continue;
-      // Suohon juuttunutta ei voi työntää: vain toinen osapuoli väistyy.
-      const aStuck = a.state === "rooted", bStuck = b.state === "rooted";
-      if (aStuck && bStuck) continue;
-      const push = d.multiplyScalar((1.0 - len) / len / (aStuck || bStuck ? 1 : 2));
-      if (!aStuck) a.pos.sub(push);
-      if (!bStuck) b.pos.add(push);
+  const alive = actors.filter((a) => a.state !== "dead");
+  // Useampi kierros ratkaisee tilanteen, jossa toinen hahmo on puristettu seinää
+  // vasten: seinä ei anna periksi, joten liike palautuu lopulta toiseen hahmoon.
+  for (let pass = 0; pass < 5; pass++) {
+    for (const a of alive) {
+      const r = Math.hypot(a.pos.x, a.pos.z);
+      const max = ARENA_RADIUS - a.radius - 0.1;
+      if (r > max) { a.pos.x *= max / r; a.pos.z *= max / r; }
+    }
+    for (let i = 0; i < alive.length; i++) {
+      for (let j = i + 1; j < alive.length; j++) {
+        const a = alive[i], b = alive[j];
+        const ab = { x: a.pos.x, z: a.pos.z, radius: a.radius, immovable: a.state === "rooted" };
+        const bb = { x: b.pos.x, z: b.pos.z, radius: b.radius, immovable: b.state === "rooted" };
+        if (!separateDiscBodies(ab, bb)) continue;
+        a.pos.x = ab.x; a.pos.z = ab.z;
+        b.pos.x = bb.x; b.pos.z = bb.z;
+      }
+    }
+    for (const a of alive) {
+      const solved = world.collision.depenetrateDisc(a.pos.x, a.pos.z, a.radius);
+      a.pos.x = solved.x;
+      a.pos.z = solved.z;
     }
   }
 }

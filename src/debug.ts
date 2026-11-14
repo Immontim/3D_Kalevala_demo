@@ -11,7 +11,7 @@ import { setShowcase, showcase } from "./engine/showcase";
 import { ENEMIES, currentWave, skipToWave, skirmish } from "./engine/skirmish";
 import { choosing, slotEls, songState } from "./engine/song";
 import { aim, fx, g, inputs } from "./engine/state";
-import { scene } from "./engine/view";
+import { scene, world } from "./engine/view";
 import { FALLEN, POSES } from "./fighter";
 import { Modifier, withModifier } from "./stats";
 import { changedValues } from "./tuning";
@@ -33,6 +33,14 @@ export function initDebug() {
     setLock(on: boolean) { aim.lockOn = on; },
     /** Käytössä oleva taistelualue ("clearing" tai "homestead"). */
     get arena() { return ARENA; },
+    /** Törmäysrekisterin määrä ja pelaajaa juuri koskettavat vaara-alueet. */
+    get collision() {
+      return {
+        ...world.collision.stats(),
+        hazards: world.collision.hazardsAt(g.player.pos.x, g.player.pos.z, g.player.radius).map((h) => h.id),
+        radius: g.player.radius,
+      };
+    },
     get song() { return songState ? { results: [...songState.results], done: songState.endAt >= 0, realTime: g.realTime, playAt: songState.playAt, beats: songState.beats } : null; },
     fillSong() { g.songPower = COMBAT.songMax; },
     get meters() { return JSON.parse(JSON.stringify(meterOff)); },

@@ -4,12 +4,15 @@ import type { Ai } from "./ai";
 import { ActionState, AttackDef, AttackTiming, Loadout, SHIELDS, ShieldDef, StrikeStyle, WeaponDef, makeAttack, styleFor, weaponOf } from "../combat";
 import { CharacterId, Fighter, FighterLook, SwordTrail } from "../fighter";
 import { Modifier, Stats, baseStats, effectiveStats } from "../stats";
+import { COLLISION } from "../collision";
 import { scene } from "./view";
 
 export interface Actor {
   fighter: Fighter;
   trail: SwordTrail;
   pos: THREE.Vector3;
+  /** Vartalon säde XZ-tason törmäyksissä. Sama rajapinta sopii myöhemmin eläimille. */
+  radius: number;
   yaw: number;
   state: ActionState;
   stateTime: number;
@@ -71,7 +74,7 @@ export function makeActor(look: FighterLook, pos: THREE.Vector3, level: number, 
   return {
     base, mods: [], stats, stamina: stats.maxStamina,
     weapon, shield, shieldHp: shield ? shield.durability : 0, stance: "slash", charging: false,
-    fighter, trail, pos: pos.clone(), yaw: 0, state: "idle", stateTime: 0, timing: { windup: 0.3, release: 0.1, recovery: 0.3 },
+    fighter, trail, pos: pos.clone(), radius: COLLISION.actorRadius, yaw: 0, state: "idle", stateTime: 0, timing: { windup: 0.3, release: 0.1, recovery: 0.3 },
     attack: makeAttack(weapon, styleFor(weapon, "slash"), "light"), character: look.character, loadout: look.loadout, struck: false, hp: stats.maxHp,
     blockStart: -99, rootTime: 0, dodgeDir: new THREE.Vector3(), dodgeCd: 0,
     bashPushDir: new THREE.Vector3(), bashPushLeft: 0, moveSpeed: 0, extraRecovery: 0,
