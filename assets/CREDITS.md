@@ -61,6 +61,27 @@ rautakauden lopulla ja varhaisella keskiajalla* (Turun yliopisto 2009), luku 2
 
 Haku: `tools/fetch-homestead.ps1`. Ladattu mutta ei käytössä: `reed_roof_03`.
 
+## `household.glb`
+
+| Pelin malli | Lähde (Poly Haven -tunniste, CC0) | Käyttö |
+| --- | --- | --- |
+| `kulho` | `wooden_bowl_01` | Kevennetty (Decimate), tekstuuri 512 px |
+| `kuppi` | `wooden_bowl_02` | Kevennetty, tekstuuri 256 px |
+| `kauha` | `wooden_spoon` | Sama |
+| `lautanen` | `carved_wooden_plate` | Sama |
+| `kori` | `wicker_basket_01` | Kevennetty, tekstuuri 512 px |
+| Kuorelliset jalat ja kekäleet | `pine_bark` | |
+| Pata ja rieskat | `clay_plaster` | Sävytetty verteksiväreillä |
+| Viljalyhde | `thatch_roof_angled` | Sävytetty oljen väriseksi |
+
+Itse tehty Blenderissä (skripti `assets-src/blender/household.py`): pukkipöytä,
+penkki, tuohikontti ja sen punostekstuuri, keittopata tulikivineen, rieskat,
+nauriit, kuivakalat, viljalyhde ja pöydän kattaus (`poyta_kattaus`).
+
+Haku: `tools/fetch-household.ps1`. Ladattu mutta hylätty aikakauteen
+sopimattomina: `wooden_bucket_01`, `wooden_bucket_02` (rautavanteet),
+`wicker_basket_02`, `ceramic_pot` (lasitettu), `jug_01` (posliini).
+
 ## `bog.glb`
 
 Itse tehty Blenderissä (skripti `assets-src/blender/bog.py`): mutapinta,
