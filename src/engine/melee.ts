@@ -5,7 +5,7 @@ import { FALLEN } from "../fighter";
 import { effectiveStats } from "../stats";
 import { ARENA_RADIUS, groundHeight } from "../world";
 import { Actor, setState } from "./actor";
-import { emitSparks } from "./effects";
+import { emitBlood, emitSparks } from "./effects";
 import { STYLE_NAME, flash, showMsg } from "./hud";
 import { onPlayerDeath } from "./loop";
 import { enemyDown, lockTarget } from "./enemies";
@@ -92,7 +92,7 @@ export function resolveStrike(att: Actor, def: Actor) {
     sfx.hit();
     fx.hitstop = heavy ? 0.11 : 0.07;
     fx.shake = (isPlayer ? 0.12 : 0.22) * (heavy ? 1.5 : atk.kind === "bash" ? 0.7 : 1);
-    emitSparks(contact, heavy ? 18 : 10, 2);
+    emitBlood(contact, heavy ? 32 : 20, 2.8);
     if (isPlayer) g.songPower = Math.min(COMBAT.songMax, g.songPower + COMBAT.songGainHit);
     else flash("#b33a2e", heavy ? 0.45 : atk.kind === "bash" ? 0.15 : 0.35);
     // Tehoste: sivallus tai ylälyönti voi lennättää vastustajan kypärän päästä. Ei vaikuta peliin.
@@ -115,7 +115,7 @@ export function resolveStrike(att: Actor, def: Actor) {
   } else if (res === "guardbreak") {
     sfx.clang(false);
     sfx.hit();
-    emitSparks(contact, 26, 5);
+    emitSparks(contact, 36, 5);
     fx.hitstop = 0.08;
     fx.shake = 0.18;
     if (!died) {
@@ -129,14 +129,14 @@ export function resolveStrike(att: Actor, def: Actor) {
     else { showMsg("Suojasi murtui", "", 0.8); flash("#b33a2e", 0.2); }
   } else if (res === "blocked") {
     sfx.clang(false);
-    emitSparks(contact, 18, 4);
+    emitSparks(contact, 32, 4);
     att.extraRecovery = COMBAT.blockRecoil;
     fx.shake = 0.08;
     if (isPlayer) showMsg("Torjuttu", "", 0.6);
     else if (graced) showMsg("Suoja piti", "", 0.6);
   } else if (res === "parried") {
     sfx.clang(true);
-    emitSparks(contact, 40, 6);
+    emitSparks(contact, 56, 6);
     fx.hitstop = 0.14;
     fx.shake = 0.18;
     setState(att, "stagger");

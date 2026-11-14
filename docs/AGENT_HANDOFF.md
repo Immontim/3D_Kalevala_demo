@@ -5,10 +5,11 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
+Päivitetty: 2026-11-14 (Codex, Windows)
 
-- **Versio v01.02.00**, branch `claude/melee-hud` (tarkista merge-tila
-  `git merge-base --is-ancestor`). Mainissa on v01.01.00.
+- **Versio v01.03.00**, branch `codex/hit-blood-block-sparks`, commit
+  `HEAD` (tämän muutoksen commit; tarkista merge-tila
+  `git merge-base --is-ancestor`). Mainissa on v01.02.00.
 - **Rakenne.** `src/engine/` on kohtaus- ja taistelumoottori, `src/ui/` sivun
   ikkunat (aloitus, tauko, säätö), `src/main.ts` vain käynnistys ja
   `src/debug.ts` savutestien `__game`. Säännöt ja luvut ovat yhä puhtaissa
@@ -48,13 +49,10 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
   asettaa `Actor.graceUntil` ja `graceFrom`, ja sinä aikana muiden kuin
   torjutun lyöjän osuma sektorin sisältä muuttuu torjunnaksi (tapahtuma
   `…:blocked+suoja`). Ei koske horjuvaa eikä suohon juuttunutta.
-- **Paluu aloitusikkunaan** (`loop.ts` `toStartMenu`): Enter kaatumisen
-  jälkeen tai taukoikkunan nappi. R on uusi yritys samoilla valinnoilla.
 - **Tukiaskel ja osumahetki** (`COMBAT.strikePoint`, `melee.ts`
   `updateCombatant`): lyöjä astuu `lunge` metriä eteen, ja isku ratkeaa
   `strikePoint` (0,7) × release kohdalla. Kantama mitataan askeleen
   lähtöpaikasta (`Actor.stepFrom`).
-- **Sankarin varusteet** valitaan aloitusikkunassa (`hero.ts` `LOADOUTS`).
 - **Vapaa kääntyminen** (`aim.yaw`/`aim.pitch`, luvut `controls.ts`):
   hiiri kääntää katsetta, sankari kääntyy sitä kohti nopeudella
   `Stats.turnSpeed`, WASD liikkuu katseen suhteen. Lukitus (Tab /
@@ -88,8 +86,6 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
   --python`), koska Blender MCP:n taustatyökalu ei löydä Blenderiä
   (`BLENDER_PATH` puuttuu) ja avoimessa Blenderissä oli tallentamaton
   `characters.blend`.
-- **Mittarit** (`ui/pauseMenu.ts` `meterOff`, `placeMeters`): tauolla raahattavat,
-  siirtymä tallentuu avaimeen `laulun-miekka.meters.v1`.
 - **Laulut ja valinta** (`src/songLogic.ts`: `SONGS`, `SONG_SLOTS`; kulku
   `engine/song.ts`): laulunappi täydellä voimalla → `openChoice()`:
   `choosing` pysäyttää maailman (dt = 0), hiiri vapautetaan
@@ -100,17 +96,11 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
   valikoidu ilman sitä. **Uusi laulu:** `SongId`, rivi `SONGS`iin, paikka
   `SONG_SLOTS`iin, väri `.slot.<id>` ja vaikutus `judge`/`endSong`iin.
   Parannuslaulu antaa `SONG.healPerHit` (5) elämää heti osumasta.
-- **Kilven asento** (`src/fighter.ts`): `shieldHang` 0..1 kääntää kilven
-  torjunnasta (`SHIELD_FRONT`) roikkumaan kyljelle (`SHIELD_HANG_YAW`).
 - **Askellus ja elävyys** (`src/fighter.ts`, taulukko `GAIT`): nopeus
   mitataan `root`in todellisesta siirtymästä, ja `apply` ratkaisee jalkojen
   kulmat jalan paikasta, joten maassa oleva jalka ei liu'u. `animate`n
   `moveSpeed` kertoo, onko liike kävelyä: iskun työntö ja väistö eivät
   askella. Mittari: `__game.feet`.
-- **Kaatuminen** (`src/fighter.ts`, taulukko `FALLEN`, `Fighter.fall`,
-  `dropGear()`; valinta `engine/melee.ts` `fallDown()`). **Päätös:** kaatuneet
-  tehdään luurangolla, ei omina malleina. Savutestissä
-  `__game.fallShowcase(n)`.
 - **Kaikki pelin luvut ovat parametritaulukoissa**, eikä uusia lukuja
   kovakoodata moottoriin:
   - `src/combat.ts`: `CHARACTERS` (hahmon hp, stamina, staminaRegen, power,
@@ -147,9 +137,6 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
   `minHits` 4 osumalla; kesto on osumat × `rootTimePerHit` 0,75 s.
   Vastustajan osuma katkaisee laulun (`interruptSong()`). Voima nollataan
   laulun alussa. Tauko pysäyttää myös riimut.
-- **Keihäsote** (`src/fighter.ts`, `SPEAR_HOLD`, `holdShaft()` + `twoBone()`):
-  kädet viedään varrelle käänteiskinematiikalla; otekanava `grip_carve`
-  (`char_build.py`, koodissa `GRIP_CHANNEL`). Mittari `fighter.spearGripDebug()`.
 - **Suo** (`src/bog.ts`, malli `assets/bog.glb`, skripti
   `assets-src/blender/bog.py`): mutapinta, sammalreunus ja kuplan malli
   tulevat Blenderistä ilman tekstuureja; pinnat tehdään maaston
@@ -174,6 +161,12 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
 - **Kilven hajoaminen** (`src/fighter.ts`): lovi ja sirpaleet tehdään
   shaderilla kilven materiaaliin (`patchShield`, `ShieldDebris`), ei omilla
   malleilla. Pelaaja saa uuden kilven jokaiseen aaltoon.
+- **Osuma- ja torjuntaefektit** (`engine/effects.ts`, käyttö
+  `engine/melee.ts`): läpimennyt isku käyttää omaa tummanpunaista
+  partikkelipoolia, jonka pisarat lähtevät alaspäin. Tavallinen torjunta,
+  suojan murto ja täydellinen torjunta käyttävät ylöspäin lentäviä kultaisia
+  kipinöitä; määrät ovat 32 / 36 / 56. Efektit eivät muuta vahinkoa tai
+  taistelusääntöjä.
 - **Tekoäly** (`pickEnemyAttack`, `src/engine/ai.ts`): arpoo iskusuunnan ja
   painon varustuksen mukaan, lyö raskaasti kilven takana seisovaa pelaajaa,
   ja aseella torjuessaan arvaa suunnan oikein sitä useammin, mitä pidemmällä
@@ -188,19 +181,17 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
   samoista osoitteista käsin). `.blend`-tiedostot eivät ole Gitissä, eikä
   lähdemallien tuontia SRC-kokoelmaan ole skriptattu. `homestead.py`
   tarvitsee metsäputken tekemän `assets-src/textures/birch_bark_diff.png`n.
-- **Deployattu:** GitHub Pages julkaisee mainin heti mergen jälkeen
-  (Actions-ajo "Julkaise GitHub Pagesiin"); v00.10.00 ja v00.11.00 eivät
-  ole mainissa. **Omistaja testaa julkaistusta osoitteesta**, ei
-  dev-serveriltä.
-- **Käsin testattu 2026-11-14** (in-app browser, skriptattu syöte): aalto
-  6: kolme palkkia päiden päällä, lukitulla reunus, 60 FPS; nuoli syttyy
-  vain, kun lyöjä on ruudun ulkopuolella. Suoja-aika: oletusarvoilla 0
-  laukeamista 60 s:ssa (torjunta pohjassa), arvoilla 3 s ja iskuväli 0
-  neljä; mekanismi siis toimii, mutta oletuksilla iskuvuoro pitää iskut
-  yli sekunnin päässä toisistaan. **Ei testattu:** ihmisen pelaamana,
-  buildattu versio selaimessa, hitaampi kone, eri ikkunakoot.
+- **Koodi valmis:** v01.03.00 branchissa `codex/hit-blood-block-sparks`.
+  **Ei deployattu:** GitHub Pages julkaisee mainin mergen jälkeen
+  (Actions-ajo "Julkaise GitHub Pagesiin"). **Omistaja testaa julkaistusta
+  osoitteesta**, ei dev-serveriltä.
+- **Käsin testattu 2026-11-14** (in-app browser, oikea pelisyöte): osuma
+  vähensi vastustajan elämää 90 → 70 ja punaiset pisarat näkyivät osumakohdasta
+  alaspäin; onnistunut torjunta vähensi kestävyyttä 100 → 98 viemättä elämää,
+  ja tuotti kultaisen kontaktiefektin. 60 FPS, ei konsolivirheitä.
+  **Ei testattu:** buildattu versio selaimessa, hitaampi kone, eri ikkunakoot.
 - **Komennot 2026-11-14:** `bun run test` (74/74), `bun run lint`,
-  `bun run build` ok.
+  `bun run build` ok. Build varoittaa ennestään yli 500 kt:n JS-palasta.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Savutestien apuna `window.__game` (`src/debug.ts`, lue sieltä koko
   lista): `tick(n, dt)` ajaa peliä askelin ruudunpäivityksestä riippumatta,
@@ -275,11 +266,8 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
 
 ## Seuraava tehtävä
 
-Omistaja pelaa ryhmäaaltoja julkaistusta osoitteesta ja päättää: (1)
-suoja-ajan pituus tai iskuvälin lyhennys, jotta suoja-aika tuntuu, (2)
-osuuko leveä sivallus useaan vastustajaan, (3) aaltojen kokoonpano.
-Lisäksi yhä auki: kaatuneiden ulkonäkö ja
-Säätö-välilehden arvot (Kopioi arvot) oletuksiksi kirjattaviksi.
+Omistaja tarkistaa v01.03.00:n julkaistusta osoitteesta ja päättää, ovatko
+veren määrä ja torjuntakipinöiden määrä sopivat normaalissa pelaamisessa.
 
 ## Ei vielä aloiteta
 
