@@ -7,8 +7,8 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
 
-- **Versio v01.01.00**, branch `claude/melee-many` (tarkista merge-tila
-  `git merge-base --is-ancestor`). Mainissa on v01.00.00.
+- **Versio v01.02.00**, branch `claude/melee-hud` (tarkista merge-tila
+  `git merge-base --is-ancestor`). Mainissa on v01.01.00.
 - **Rakenne.** `src/engine/` on kohtaus- ja taistelumoottori, `src/ui/` sivun
   ikkunat (aloitus, tauko, säätö), `src/main.ts` vain käynnistys ja
   `src/debug.ts` savutestien `__game`. Säännöt ja luvut ovat yhä puhtaissa
@@ -39,6 +39,15 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
   `spread` (2,4 m) väliä ja kääntyvät takaisin, jos kulma pelaajan
   katseesta ylittää `flankMax` (115°). Lukituksen kohde vaihtuu hiiren
   rullalla (`cycleLock`, vasemmalta oikealle).
+- **Palkit ja varoitus** (`hud.ts` `updateFoeBars`, `updateRearWarn`):
+  elämäpalkki jokaisen vastustajan pään päällä (`#foeBars`, DOM-elementti
+  vastustajaa kohti), ja nuoli `#rearWarn` osoittaa lyöjään, joka ei näy
+  ruudulla (ehto on ruudulle projisoitu paikka, ei kulma).
+- **Suoja-aika** (`COMBAT.graceBlock` 0,6 s, `graceParry` 1,0 s, `graceArc`
+  75°; `graceAfter`, `graceCovers`; `melee.ts` `resolveStrike`): torjunta
+  asettaa `Actor.graceUntil` ja `graceFrom`, ja sinä aikana muiden kuin
+  torjutun lyöjän osuma sektorin sisältä muuttuu torjunnaksi (tapahtuma
+  `…:blocked+suoja`). Ei koske horjuvaa eikä suohon juuttunutta.
 - **Paluu aloitusikkunaan** (`loop.ts` `toStartMenu`): Enter kaatumisen
   jälkeen tai taukoikkunan nappi. R on uusi yritys samoilla valinnoilla.
 - **Tukiaskel ja osumahetki** (`COMBAT.strikePoint`, `melee.ts`
@@ -184,14 +193,13 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
   ole mainissa. **Omistaja testaa julkaistusta osoitteesta**, ei
   dev-serveriltä.
 - **Käsin testattu 2026-11-14** (in-app browser, skriptattu syöte): aalto
-  4 (kaksi, elämä × 0,6) läpi ja aalto 5 perään vasta molempien kaaduttua;
-  aalto 6 (kolme) 40 s: yhtä aikaa iskussa enintään yksi, 21 iskua,
-  selän takana 3 % ajasta, 60 FPS; rulla vaihtaa kohdetta; kaatuessa
-  palkki 0 %, Enter ja taukoikkunan nappi tuovat aloitusikkunan ja uusi
-  peli käynnistyy; ei konsolivirheitä. **Ei testattu:** ihmisen pelaamana
-  (tasapaino!), oikea hiiren rulla, buildattu versio selaimessa, hitaampi
-  kone, hiiren lukitus laulun valinnassa, kaatuneet kaltevalla maalla.
-- **Komennot 2026-11-14:** `bun run test` (72/72), `bun run lint`,
+  6: kolme palkkia päiden päällä, lukitulla reunus, 60 FPS; nuoli syttyy
+  vain, kun lyöjä on ruudun ulkopuolella. Suoja-aika: oletusarvoilla 0
+  laukeamista 60 s:ssa (torjunta pohjassa), arvoilla 3 s ja iskuväli 0
+  neljä; mekanismi siis toimii, mutta oletuksilla iskuvuoro pitää iskut
+  yli sekunnin päässä toisistaan. **Ei testattu:** ihmisen pelaamana,
+  buildattu versio selaimessa, hitaampi kone, eri ikkunakoot.
+- **Komennot 2026-11-14:** `bun run test` (74/74), `bun run lint`,
   `bun run build` ok.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Savutestien apuna `window.__game` (`src/debug.ts`, lue sieltä koko
@@ -206,23 +214,17 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
 - **Tasapainoa ei ole pelitestattu.** Kaikki luvut ovat arvauksia.
   Suuntatorjunta ilman kilpeä voi olla liian vaikea: iskun suunta pitää
   lukea vastustajan asennosta tai HUD-vihjeestä noin puolessa sekunnissa.
-- **Kestävyyden tasapaino on arvaus.** Palautuminen 1/s on hidas
-  suhteessa hintoihin: vastustaja lyö noin 2,5 s välein, joten sen kevyet
-  lyönnit lähes maksavat itsensä takaisin, ja kestävyys rajoittaa lähinnä
-  raskaita lyöntejä ja torjuntaa. Vastustajan täydellistä torjuntaa ei ole,
-  joten pelaaja ei voi kuluttaa sen kestävyyttä muuten kuin lyömällä
-  torjuntaan (2 per torjunta).
+- **Kestävyyden tasapaino on arvaus.** Palautuminen 1/s on hidas suhteessa
+  hintoihin, ja kestävyys rajoittaa lähinnä raskaita lyöntejä ja torjuntaa.
+  Vastustajalla ei ole täydellistä torjuntaa.
 - **Askellus:** paikallaan kääntyvä hahmo ei ota askelia (jalat kiertyvät
   vartalon mukana). Sivuttaisliike on pelin nopeudella (3,4 m/s) tiheää
   askellusta, koska nopeus on sivulle epärealistisen suuri. Ei
   lentovaihetta juoksussa. Kilpikäsi ja asekäsi eivät heilu askeleen
   tahdissa.
 - **Keihäällä on vain pisto**, joten sitä vastaan riittää pistotorjunta.
-  Keihään kantama (3,5 m kevyt, 3,6 m raskas) on mitoitettu mallista samalla
-  pelivaralla kuin miekan: kärki pistossa 1,9 m + syöksy 0,6 m + 0,95 m.
-  Pelivara on iso (osuma ratkeaa iskun alussa, ennen syöksyä), joten
-  kantaman reunalla osuma voi näyttää ilmaan osuvalta. Alle 1,3 m:n päässä
-  keihäs ei osu lainkaan: iholle juokseva pelaaja on turvassa.
+  Kantaman (3,5 m) reunalla osuma voi näyttää ilmaan osuvalta, ja alle
+  1,3 m:n päässä keihäs ei osu lainkaan.
 - **Keihäsotteen avoimet viat:** sormet ovat lähdemallissa erillään, joten
   ote harittaa läheltä (ei sormiluita); kämmenen kierto näkyy kyynärvarren
   hihassa; pistossa etukäsi on ulottuvuutensa rajalla, minkä vuoksi vartalo
@@ -230,11 +232,11 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
 - **Vapaan kääntymisen avoimet asiat:** tasapaino on arvaus. Kosketusnäytön
   napit ovat yhä koodissa, mutta niitä ei ylläpidetä. Hiiren pystyliike
   vaikuttaa vain kameraan.
-- **Usean vastustajan avoimet asiat:** tasapaino on arvaus. Hajaantuminen
-  on pehmeää ohjausta, joten vastustajat voivat silti ajautua metrin
-  päähän toisistaan. Sankarin isku osuu aina vain yhteen (myös leveä
-  sivallus). Selän takaa tulevasta iskusta ei varoiteta; iskuvihje
-  (`#cue`) näyttää sen, joka on nostossa.
+- **Usean vastustajan avoimet asiat:** tasapaino on arvaus. Suoja-aika ei
+  oletusarvoilla käytännössä laukea (ks. yllä): pidennä sitä tai lyhennä
+  `enemyAi.attackGap`ia, jos sen halutaan tuntuvan. Hajaantuminen on
+  pehmeää, joten vastustajat voivat ajautua metrin päähän toisistaan.
+  Sankarin isku osuu aina vain yhteen (myös leveä sivallus).
 - **Pihapiirin avoimet viat:** rakennuksiin, aitaan ja tuleen ei voi
   törmätä (taistelukehä pitää hahmot pihalla, mutta kaatuneen varusteet
   voivat lentää aidan läpi); kamera on kehän reunalla lähellä pelaajaa;
@@ -273,12 +275,9 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
 
 ## Seuraava tehtävä
 
-Omistaja pelaa aallot 4–6 julkaistusta osoitteesta ja kertoo, tuntuuko
-ryhmätaistelu reilulta (ryhmän koko, elämä, iskujen väli). Sitten
-**askel 3:** pienet palkit päiden päällä ja varoitus selän takaa
-tulevasta iskusta. **Askel 4:** suoja-aika onnistuneen torjunnan jälkeen
-(0,6 s, täydellisellä 1,0 s) torjuntasektorin sisällä; omistajan päätös
-2026-11-14: ei 180°:n sektoria. Päätettävä: osuuko leveä sivallus useaan.
+Omistaja pelaa ryhmäaaltoja julkaistusta osoitteesta ja päättää: (1)
+suoja-ajan pituus tai iskuvälin lyhennys, jotta suoja-aika tuntuu, (2)
+osuuko leveä sivallus useaan vastustajaan, (3) aaltojen kokoonpano.
 Lisäksi yhä auki: kaatuneiden ulkonäkö ja
 Säätö-välilehden arvot (Kopioi arvot) oletuksiksi kirjattaviksi.
 

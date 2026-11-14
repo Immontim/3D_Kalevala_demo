@@ -1,9 +1,9 @@
-import { AttackDef, COMBAT, StrikeStyle, canStrikeHeavy, chargeLevel, exhausted, makeAttack } from "../combat";
+import { AttackDef, COMBAT, StrikeStyle, angleBetween, canStrikeHeavy, chargeLevel, exhausted, makeAttack } from "../combat";
 import { Actor } from "./actor";
 import { focusEnemy, lockTarget } from "./enemies";
 import { paused } from "./loop";
 import { $ } from "./dom";
-import { g } from "./state";
+import { aim, g } from "./state";
 import { camera } from "./view";
 
 // ---------- HUD ----------
@@ -34,6 +34,50 @@ function shownEnemy(): Actor | null {
   return shown;
 }
 
+/** Pieni elämäpalkki jokaisen vastustajan pään päällä. Palkit kierrätetään: yksi elementti vastustajaa kohti. */
+const foeBars: HTMLElement[] = [];
+function updateFoeBars(locked: Actor | null) {
+  const box = $("foeBars");
+  while (foeBars.length < g.enemies.length) {
+    const el = document.createElement("div");
+    el.className = "foe";
+    el.appendChild(document.createElement("i"));
+    box.appendChild(el);
+    foeBars.push(el);
+  }
+  foeBars.forEach((el, i) => {
+    const e = g.enemies[i];
+    const p = e ? e.pos.clone().setY(e.pos.y + 1.92).project(camera) : null;
+    const show = !!e && !!p && p.z < 1 && Math.abs(p.x) < 1.1;
+    el.style.display = show ? "" : "none";
+    if (!show || !e || !p) return;
+    el.style.left = `${((p.x + 1) / 2) * innerWidth}px`;
+    el.style.top = `${((1 - p.y) / 2) * innerHeight}px`;
+    (el.firstChild as HTMLElement).style.width = `${(Math.max(0, e.hp) / e.stats.maxHp) * 100}%`;
+    el.classList.toggle("locked", e === locked);
+    el.classList.toggle("striking", e.state === "windup" || e.state === "release");
+  });
+}
+
+/**
+ * Varoitus iskusta, joka tulee näkökentän ulkopuolelta: nuoli ruudun keskustan ympärillä
+ * osoittaa lyöjän suuntaan (alas = suoraan takaa).
+ */
+function updateRearWarn() {
+  const el = $("rearWarn");
+  const p = g.player;
+  const e = p.state === "dead" ? null : g.enemies.find((x) => x.state === "windup" || x.state === "release");
+  // Varoitetaan vain lyöjästä, jota ei näy ruudulla (kamera on sankarin takana ja näkee sivuillekin).
+  const ndc = e ? e.pos.clone().setY(e.pos.y + 1.2).project(camera) : null;
+  const show = !!e && !!ndc && (ndc.z > 1 || Math.abs(ndc.x) > 0.96);
+  el.classList.toggle("hidden", !show);
+  if (!show || !e) return;
+  const rel = angleBetween(aim.yaw, Math.atan2(e.pos.x - p.pos.x, e.pos.z - p.pos.z));
+  // Positiivinen kulma on ruudulla vasemmalla.
+  const r = Math.min(innerWidth, innerHeight) * 0.3;
+  el.style.transform = `translate(${-Math.sin(rel) * r}px, ${-Math.cos(rel) * r}px) rotate(${-rel}rad)`;
+}
+
 export function updateHud() {
   const foe = shownEnemy();
   // Ilman vastustajaa mittari on piilossa; tauolla se näkyy, jotta sen voi raahata paikalleen.
@@ -54,6 +98,8 @@ export function updateHud() {
     if (show) { mark.style.left = `${((p.x + 1) / 2) * innerWidth}px`; mark.style.top = `${((1 - p.y) / 2) * innerHeight}px`; }
   } else mark.classList.add("hidden");
   $("ehpNum").textContent = foe ? num(foe.hp, foe.stats.maxHp, true) : "";
+  updateFoeBars(locked);
+  updateRearWarn();
   const staminaBar = (id: string, a: Actor | null) => {
     $(id + "Num").textContent = a ? num(a.stamina, a.stats.maxStamina, false) : "";
     $(id).style.width = a ? `${(a.stamina / a.stats.maxStamina) * 100}%` : "0%";

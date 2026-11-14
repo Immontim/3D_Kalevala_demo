@@ -4,6 +4,8 @@ import {
   WAVES,
   groupHpScale,
   groupSize,
+  graceAfter,
+  graceCovers,
   mayStartAttack,
   lungeProgress,
   strikeLands,
@@ -278,6 +280,25 @@ describe("usea vastustaja", () => {
     expect(groupHpScale(3)).toBeLessThan(groupHpScale(2));
     expect(2 * groupHpScale(2)).toBeGreaterThan(1);
     expect(3 * groupHpScale(3)).toBeGreaterThan(2 * groupHpScale(2));
+  });
+  it("torjunta antaa suoja-ajan, täydellinen torjunta pidemmän", () => {
+    expect(graceAfter("blocked")).toBe(COMBAT.graceBlock);
+    expect(graceAfter("parried")).toBe(COMBAT.graceParry);
+    expect(graceAfter("parried")).toBeGreaterThan(graceAfter("blocked"));
+    expect(graceAfter("hit")).toBe(0);
+    expect(graceAfter("guardbreak")).toBe(0);
+  });
+  it("suoja-aika pysäyttää muiden iskut edestä, ei saman lyöjän eikä takaa tulevia", () => {
+    const arc = Math.PI / 4;
+    const deg = Math.PI / 180;
+    expect(graceCovers(10, 10.5, false, 0, arc)).toBe(true);
+    expect(graceCovers(10, 10.5, false, -(COMBAT.graceArc - 1) * deg, arc)).toBe(true);
+    expect(graceCovers(10, 10.5, false, (COMBAT.graceArc + 1) * deg, arc)).toBe(false);
+    expect(graceCovers(10, 10.5, false, Math.PI, arc)).toBe(false);
+    expect(graceCovers(10, 10.5, true, 0, arc)).toBe(false);
+    expect(graceCovers(10.6, 10.5, false, 0, arc)).toBe(false);
+    // Suojasektori on aina vähintään torjunnan oma sektori.
+    expect(graceCovers(10, 10.5, false, 100 * deg, 110 * deg)).toBe(true);
   });
   it("vain yksi lyö kerrallaan, ja toinen odottaa välin", () => {
     expect(mayStartAttack(true, 10, 0, false)).toBe(false);

@@ -63,6 +63,15 @@ export const COMBAT = {
   songGainHit: 15,
   songGainParry: 30,
   songMax: 100,
+  /**
+   * Suoja-aika yhtä vastaan monta -taistelussa: onnistunut torjunta pysäyttää näin monta
+   * sekuntia myös muiden vastustajien iskut, jotka tulevat suojasektorin sisältä.
+   */
+  graceBlock: 0.6,
+  /** Suoja-aika täydellisen torjunnan jälkeen, sekunteja. */
+  graceParry: 1.0,
+  /** Suoja-ajan sektorin puolikas asteina; aina vähintään torjunnan oma sektori. */
+  graceArc: 75,
 };
 
 /** Hahmon perusarvot. Ajonaikaiset muutokset (ruoka, nälkä, loitsut) tehdään stats.ts:n muuntimilla. */
@@ -429,6 +438,20 @@ export function resolveHit(g: Geometry, d: Defender, now: number, a: AttackDef =
   if (now - d.blockStart <= COMBAT.parryWindow) return "parried";
   if (a.kind === "bash" && !d.shield) return "guardbreak";
   return "blocked";
+}
+
+/** Kuinka pitkän suoja-ajan torjunta antaa muita lyöjiä vastaan (0 = ei suoja-aikaa). */
+export function graceAfter(res: HitResult): number {
+  return res === "parried" ? COMBAT.graceParry : res === "blocked" ? COMBAT.graceBlock : 0;
+}
+
+/**
+ * Pysäyttääkö suoja-aika iskun, joka muuten osuisi. Suoja koskee vain muita kuin sitä
+ * lyöjää, jonka isku torjuttiin, ja vain suojasektorin sisältä tulevia iskuja.
+ */
+export function graceCovers(now: number, graceUntil: number, sameAttacker: boolean, angleToAttacker: number, blockArc: number): boolean {
+  if (sameAttacker || now > graceUntil) return false;
+  return Math.abs(angleToAttacker) <= Math.max(blockArc, (COMBAT.graceArc * Math.PI) / 180);
 }
 
 /** Kuinka paljon kilpi kuluu tästä iskusta. Täydellinen torjunta ei kuluta kilpeä. */

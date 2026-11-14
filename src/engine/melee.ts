@@ -1,6 +1,6 @@
 // Lähitaistelu: iskun kulku, osuman seuraukset ja törmäykset.
 import * as THREE from "three";
-import { ActionState, BASH, COMBAT, StrikeStyle, StrikeWeight, angleBetween, inStrikeZone, attackPhase, enemyAttackTiming, lungeProgress, makeAttack, resolveHit, shieldWear, staminaAfterBlock, staminaTick, strikeCost, strikeDamage, strikeLands, strikeTier, styleFor, weakened } from "../combat";
+import { ActionState, BASH, COMBAT, StrikeStyle, StrikeWeight, angleBetween, graceAfter, graceCovers, inStrikeZone, attackPhase, enemyAttackTiming, lungeProgress, makeAttack, resolveHit, shieldWear, staminaAfterBlock, staminaTick, strikeCost, strikeDamage, strikeLands, strikeTier, styleFor, weakened } from "../combat";
 import { FALLEN } from "../fighter";
 import { effectiveStats } from "../stats";
 import { ARENA_RADIUS, groundHeight } from "../world";
@@ -57,10 +57,16 @@ export function resolveStrike(att: Actor, def: Actor) {
     state: defState, blockStart: def.blockStart, angleToAttacker,
     shield: def.shield, stance: def.stance, blockArc: def.weapon.blockArc,
   };
-  const res = resolveHit({ distance: dist, angleToDefender }, defender, g.gameTime, atk);
+  let res = resolveHit({ distance: dist, angleToDefender }, defender, g.gameTime, atk);
+  // Suoja-aika: juuri torjuttu isku pysäyttää hetken myös muiden lyöjien iskut edestä.
+  const arc = def.shield ? def.shield.blockArc : def.weapon.blockArc;
+  const graced = res === "hit" && defState !== "stagger" && defState !== "rooted"
+    && graceCovers(g.gameTime, def.graceUntil, def.graceFrom === att, angleToAttacker, arc);
+  if (graced) res = "blocked";
+  else if (graceAfter(res) > 0) { def.graceUntil = g.gameTime + graceAfter(res); def.graceFrom = att; }
   const contact = att.pos.clone().lerp(def.pos, 0.55).setY(groundHeight(def.pos.x, def.pos.z) + 1.3);
   const isPlayer = att === g.player;
-  g.events.push(`${isPlayer ? "pelaaja" : "vihollinen"}:${atk.kind}/${atk.weight}:${res}`);
+  g.events.push(`${isPlayer ? "pelaaja" : "vihollinen"}:${atk.kind}/${atk.weight}:${res}${graced ? "+suoja" : ""}`);
   if (g.events.length > 30) g.events.shift();
 
   const heavy = atk.weight === "heavy";
@@ -127,6 +133,7 @@ export function resolveStrike(att: Actor, def: Actor) {
     att.extraRecovery = COMBAT.blockRecoil;
     fx.shake = 0.08;
     if (isPlayer) showMsg("Torjuttu", "", 0.6);
+    else if (graced) showMsg("Suoja piti", "", 0.6);
   } else if (res === "parried") {
     sfx.clang(true);
     emitSparks(contact, 40, 6);
