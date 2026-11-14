@@ -2,9 +2,9 @@ import { Bindings, DEFAULT_BINDINGS, SONG_SLOT_ACTIONS, actionFor, cloneBindings
 import { STYLES, StrikeStyle } from "../combat";
 import { CONTROLS } from "../controls";
 import { setState } from "./actor";
-import { lockTarget } from "./enemies";
+import { cycleLock, lockTarget } from "./enemies";
 import { $, isTouch } from "./dom";
-import { pause, paused, pausedAt, restart, resume } from "./loop";
+import { pause, paused, pausedAt, restart, resume, toStartMenu } from "./loop";
 import { choosing, songState } from "./song";
 import { DEG, aim, bindUi, g, inputs, keys } from "./state";
 import { canvas } from "./view";
@@ -89,6 +89,7 @@ export function initInput() {
     if (pressCode(e.code)) e.preventDefault();
     if (e.code === "Space") { inputs.beatQueued = true; e.preventDefault(); }
     if (e.code === "KeyR" && g.gameOver) restart();
+    if ((e.code === "Enter" || e.code === "NumpadEnter") && g.gameOver) toStartMenu();
   });
   window.addEventListener("keyup", (e) => {
     keys.delete(e.code);
@@ -112,6 +113,11 @@ export function initInput() {
   for (const type of ["mousedown", "mouseup", "auxclick"] as const) {
     window.addEventListener(type, (e) => { if (e.button >= 3) e.preventDefault(); });
   }
+  // Rulla vaihtaa lukituksen kohdetta, kun vastustajia on useita.
+  window.addEventListener("wheel", (e) => {
+    if (!g.running || paused || choosing || !aim.lockOn || e.deltaY === 0) return;
+    cycleLock(e.deltaY > 0 ? 1 : -1);
+  }, { passive: true });
   window.addEventListener("contextmenu", (e) => e.preventDefault());
 
   // Kosketusnapit

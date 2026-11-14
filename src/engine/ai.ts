@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { BASH, ENEMY_AI, STYLES, StrikeStyle, StrikeWeight, angleBetween, canStrikeHeavy, exhausted, makeAttack, styleFor, turnToward } from "../combat";
+import { BASH, ENEMY_AI, STYLES, StrikeStyle, StrikeWeight, angleBetween, canStrikeHeavy, exhausted, makeAttack, mayStartAttack, styleFor, turnToward } from "../combat";
 import { Actor, setState } from "./actor";
 import { bearing } from "./camera";
 import { moveActor, startAttack } from "./melee";
@@ -43,6 +43,21 @@ export function pickEnemyAttack(e: Actor, dist: number, quick = false): { kind: 
   // Ei lyödä, jos pelaaja on kiertänyt iskun kaaren ulkopuolelle: isku menisi ohi.
   const off = Math.abs(angleBetween(e.yaw, bearing(e.pos, g.player.pos)));
   return dist < a.range + 0.2 && dist > a.minRange + 0.1 && off < a.arc * 0.9 ? { kind, weight } : null;
+}
+
+// Hyökkäysvuoro: viimeksi iskun aloittanut vastustaja ja hetki, josta alkaen toinen saa aloittaa.
+let lastAttacker: Actor | null = null;
+let attackFreeAt = 0;
+
+function hasTurn(e: Actor) {
+  const others = g.enemies.some((o) => o !== e && (o.state === "windup" || o.state === "release"));
+  return mayStartAttack(others, g.gameTime, attackFreeAt, lastAttacker === e || !lastAttacker || !g.enemies.includes(lastAttacker));
+}
+
+function beginAttack(e: Actor, kind: StrikeStyle | "bash", weight: StrikeWeight) {
+  startAttack(e, kind, weight);
+  lastAttacker = e;
+  attackFreeAt = g.gameTime + e.timing.windup + e.timing.release + ENEMY_AI.attackGap;
 }
 
 export function updateAi(e: Actor, dt: number) {
@@ -89,29 +104,44 @@ export function updateAi(e: Actor, dt: number) {
     if (exhausted(e.stamina)) ai.resting = true;
     else if (e.stamina >= Math.min(ENEMY_AI.restUntil, e.stats.maxStamina)) ai.resting = false;
     const spear = e.loadout === "spear";
-    const want = ai.resting ? ENEMY_AI.restDistance : spear ? ENEMY_AI.distSpear : e.shield && !g.player.shield && playerTurtles() ? ENEMY_AI.distBash : ENEMY_AI.distSword;
+    // Vuoroaan odottava jää hieman kauemmas, jotta lyöjällä on tilaa.
+    const turn = hasTurn(e);
+    const want = (turn ? 0 : ENEMY_AI.waitBack) + (ai.resting ? ENEMY_AI.restDistance : spear ? ENEMY_AI.distSpear : e.shield && !g.player.shield && playerTurtles() ? ENEMY_AI.distBash : ENEMY_AI.distSword);
     const dir = toPlayer.clone().normalize();
+    if (g.enemies.length > 1) {
+      // Ryhmässä ei kierretä sankarin selän taakse: sieltä palataan kylkeä kohti.
+      const sideways = new THREE.Vector3(dir.z, 0, -dir.x);
+      const off = (s: number) => Math.abs(angleBetween(g.player.yaw, bearing(g.player.pos, e.pos.clone().addScaledVector(sideways, s * 0.3))));
+      if (off(0) > ENEMY_AI.flankMax * DEG) ai.strafeDir = off(1) < off(-1) ? 1 : -1;
+    }
     const side = new THREE.Vector3(dir.z, 0, -dir.x).multiplyScalar(ai.strafeDir);
     const move = new THREE.Vector3();
     if (dist > want + 0.3) move.add(dir);
     else if (dist < want - 0.4) move.sub(dir);
     move.addScaledVector(side, 0.45);
+    // Väli toisiin vastustajiin: ryhmä levittäytyy eikä seiso jonossa.
+    for (const o of g.enemies) {
+      if (o === e) continue;
+      const away = e.pos.clone().sub(o.pos).setY(0);
+      const d = away.length();
+      if (d < ENEMY_AI.spread && d > 0.001) move.addScaledVector(away, (1 - d / ENEMY_AI.spread) * 1.2 / d);
+    }
     // Kaukaa lähestytään juosten, ja keihäsmies perääntyy tavallista kävelyä nopeammin.
     const pace = dist > 4 ? ENEMY_AI.chaseScale : spear && dist < want - 0.4 ? ENEMY_AI.spearRetreatScale : 1;
     moveActor(e, move, e.stats.moveSpeed * pace, dt);
 
     ai.decide -= dt;
     // Lepäävä vastustaja ei hyökkää, ellei pelaaja tule iholle.
-    const mayAttack = !ai.resting || dist < ENEMY_AI.restCornered;
+    const mayAttack = turn && (!ai.resting || dist < ENEMY_AI.restCornered);
     const counter = ai.counter && mayAttack ? pickEnemyAttack(e, dist, true) : null;
     if (counter) {
       ai.counter = false;
-      startAttack(e, counter.kind, counter.weight);
+      beginAttack(e, counter.kind, counter.weight);
     } else if (ai.decide <= 0) {
       ai.decide = ENEMY_AI.decideMin + Math.random() * ENEMY_AI.decideRandom;
       if (Math.random() < 0.25) ai.strafeDir *= -1;
       const pick = mayAttack ? pickEnemyAttack(e, dist) : null;
-      if (pick && g.player.state !== "dead" && Math.random() < (pick.kind === "bash" ? ENEMY_AI.bashChance : ENEMY_AI.attackChance)) startAttack(e, pick.kind, pick.weight);
+      if (pick && g.player.state !== "dead" && Math.random() < (pick.kind === "bash" ? ENEMY_AI.bashChance : ENEMY_AI.attackChance)) beginAttack(e, pick.kind, pick.weight);
     }
   } else {
     e.moveSpeed = 0;

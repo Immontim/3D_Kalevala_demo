@@ -1,6 +1,6 @@
-// Aaltotaistelu: vastustajat saapuvat aalloittain, ja seuraava aalto tulee, kun edellinen on kaatunut.
+// Aaltotaistelu: vastustajat saapuvat aalloittain (myöhemmin kaksi tai kolme kerrallaan), ja seuraava aalto tulee, kun edellinen on kaatunut.
 import * as THREE from "three";
-import { WAVES } from "../combat";
+import { WAVES, groupHpScale, groupSize } from "../combat";
 import { FighterLook } from "../fighter";
 import { ARENA_RADIUS } from "../world";
 import { $ } from "./dom";
@@ -25,15 +25,21 @@ let nextWaveAt = -1;
 
 function nextWave() {
   wave++;
-  const def = ENEMIES[(wave - 1) % ENEMIES.length];
-  // Ilmestyy aukion reunalta noin kuuden metrin päähän pelaajasta.
-  const a = Math.atan2(-g.player.pos.x, -g.player.pos.z) + (Math.random() - 0.5);
-  const pos = g.player.pos.clone().add(new THREE.Vector3(Math.sin(a) * 6, 0, Math.cos(a) * 6));
-  const r = Math.hypot(pos.x, pos.z);
-  if (r > ARENA_RADIUS - 1) pos.multiplyScalar((ARENA_RADIUS - 1) / r);
-  addEnemy({ name: def.name, look: def.look, level: wave }, pos);
+  const size = groupSize(wave);
+  // Ryhmä ilmestyy aukion reunalta noin kuuden metrin päähän pelaajasta, vierekkäin.
+  const mid = Math.atan2(-g.player.pos.x, -g.player.pos.z) + (Math.random() - 0.5);
+  let first = "";
+  for (let i = 0; i < size; i++) {
+    const def = ENEMIES[(wave - 1 + i) % ENEMIES.length];
+    const a = mid + (i - (size - 1) / 2) * 0.45;
+    const pos = g.player.pos.clone().add(new THREE.Vector3(Math.sin(a) * 6, 0, Math.cos(a) * 6));
+    const r = Math.hypot(pos.x, pos.z);
+    if (r > ARENA_RADIUS - 1) pos.multiplyScalar((ARENA_RADIUS - 1) / r);
+    addEnemy({ name: def.name, look: def.look, level: wave, hpScale: groupHpScale(size) }, pos);
+    first ||= def.name;
+  }
   $("wave").textContent = `Aalto ${wave}`;
-  showMsg(`Aalto ${wave}`, def.name);
+  showMsg(`Aalto ${wave}`, size === 1 ? first : `${size} vastustajaa`);
 }
 
 export const skirmish: Encounter = {
@@ -53,7 +59,10 @@ export const skirmish: Encounter = {
     nextWave();
   },
   onEnemyDown() {
-    if (g.enemies.length > 0) return;
+    if (g.enemies.length > 0) {
+      showMsg("Vastustaja kaatui", `${g.enemies.length} jäljellä`, 1.4);
+      return;
+    }
     showMsg("Vastustaja kaatui", "Seuraava saapuu metsästä…", 2.4);
     nextWaveAt = g.gameTime + WAVES.nextWaveDelay;
   },
