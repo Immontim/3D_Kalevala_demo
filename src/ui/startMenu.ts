@@ -4,7 +4,7 @@ import { removeActor } from "../engine/actor";
 import { $ } from "../engine/dom";
 import { LOADOUTS, LOADOUT_STORE, PLAYER_LOOK, spawnHero } from "../engine/hero";
 import { lockPointer } from "../engine/input";
-import { spawnEnemy } from "../engine/skirmish";
+
 import { g, sfx } from "../engine/state";
 import { ARENA, ARENAS, ArenaId, saveArena } from "../world";
 
@@ -52,7 +52,7 @@ export function initStartMenu() {
     $("start").classList.add("hidden");
     sfx.start();
     g.running = true;
-    spawnEnemy();
+    g.encounter.start();
     lockPointer();
   });
 }

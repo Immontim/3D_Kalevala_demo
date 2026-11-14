@@ -6,7 +6,7 @@ import type { Action } from "../bindings";
 import type { Debris } from "../fighter";
 import { Sfx } from "../audio";
 import type { Actor } from "./actor";
-import type { Ai } from "./ai";
+import type { Encounter } from "./encounter";
 
 export const DEG = Math.PI / 180;
 export const sfx = new Sfx();
@@ -15,9 +15,10 @@ export const sfx = new Sfx();
 export const g = {
   /** Sankari. Luodaan käynnistyksessä (spawnHero) ennen kuin mikään muu käyttää tilaa. */
   player: null as unknown as Actor,
-  enemy: null as Actor | null,
-  ai: null as unknown as Ai,
-  wave: 0,
+  /** Elossa olevat vastustajat. Kaatunut siirtyy heti listaan corpses. */
+  enemies: [] as Actor[],
+  /** Käynnissä oleva kohtaus: se päättää, keitä kentälle tuodaan ja milloin. Oletus on tyhjä kohtaus. */
+  encounter: { start() {}, update() {}, onEnemyDown() {} } as Encounter,
   /** Laulun voima 0..COMBAT.songMax. */
   songPower: 0,
   /** Pelin aika (hidastuu laulussa, pysähtyy tauolla) ja reaaliaika sekunteina. */
@@ -26,7 +27,6 @@ export const g = {
   timeScale: 1,
   running: false,
   gameOver: false,
-  nextWaveAt: -1,
   corpses: [] as { actor: Actor; removeAt: number }[],
   /** Viimeisimmät iskujen tulokset tekstinä (savutestit). */
   events: [] as string[],
@@ -45,6 +45,8 @@ export const aim = {
   pitch: 0,
   /** Pelaaja on kytkenyt lukituksen päälle; se jää voimaan, ja seuraava vastustaja lukitaan heti. */
   lockOn: false,
+  /** Lukittu vastustaja. Jos se kaatuu tai poistuu, lukitus siirtyy lähimpään (lockTarget). */
+  target: null as Actor | null,
   /** Savutestien ja kuvakaappausten vapaa kamera, tai null. */
   override: null as { pos: number[]; look: number[] } | null,
 };

@@ -3,6 +3,7 @@ import { SONG_SLOT_ACTIONS, codeLabel } from "../bindings";
 import { SONG, SONGS, SONG_SLOTS, SongId, beatGap, healOnHit, inZone, slotPositions, songLead, songOutcome, zoneHalf } from "../songLogic";
 import { setState } from "./actor";
 import { $, isTouch } from "./dom";
+import { focusEnemy } from "./enemies";
 import { flash, showMsg } from "./hud";
 import { bindings, clearInputs, lockPointer } from "./input";
 import { paused } from "./loop";
@@ -49,7 +50,7 @@ export const slotEls: HTMLDivElement[] = SONG_SLOTS.map((id, i) => {
   return d;
 });
 export function songAvailable(id: SongId | null): id is SongId {
-  return id !== null && (!SONGS[id].needsEnemy || (g.enemy !== null && g.enemy.state !== "dead"));
+  return id !== null && (!SONGS[id].needsEnemy || focusEnemy() !== null);
 }
 export function openChoice() {
   choosing = true;
@@ -198,13 +199,15 @@ export function closeSong(instant = false) {
 export function endSong(id: SongId, success: boolean, rootTime: number, hits: number, healed: number) {
   closeSong();
   const total = SONGS[id].verses.length;
+  // Suo lauletaan lukitun tai lähimmän vastustajan alle.
+  const target = id === "heal" ? null : focusEnemy();
   if (id === "heal") {
     if (hits > 0) showMsg("Veri seisoi kuin seinä", `${hits}/${total} osumaa: ${Math.round(healed)} elämää takaisin`, 2.4);
     else showMsg("Laulu katkesi", "Tahti ei pitänyt", 1.6);
-  } else if (success && g.enemy && g.enemy.state !== "dead") {
-    g.enemy.state = "rooted";
-    g.enemy.stateTime = 0;
-    g.enemy.rootTime = rootTime;
+  } else if (success && target) {
+    target.state = "rooted";
+    target.stateTime = 0;
+    target.rootTime = rootTime;
     sfx.swamp();
     fx.shake = 0.25;
     showMsg("Suohon suonivyötäisistä!", `${hits}/${total} osumaa: vastustaja on kiinni ${rootTime.toFixed(1)} s ja ottaa tuplavahingon`, 2.4);

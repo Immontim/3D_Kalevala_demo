@@ -1,6 +1,6 @@
 // Lähitaistelu: iskun kulku, osuman seuraukset ja törmäykset.
 import * as THREE from "three";
-import { ActionState, BASH, COMBAT, StrikeStyle, StrikeWeight, angleBetween, attackPhase, enemyAttackTiming, lungeProgress, makeAttack, resolveHit, shieldWear, staminaAfterBlock, staminaTick, strikeCost, strikeDamage, strikeLands, strikeTier, styleFor, weakened } from "../combat";
+import { ActionState, BASH, COMBAT, StrikeStyle, StrikeWeight, angleBetween, inStrikeZone, attackPhase, enemyAttackTiming, lungeProgress, makeAttack, resolveHit, shieldWear, staminaAfterBlock, staminaTick, strikeCost, strikeDamage, strikeLands, strikeTier, styleFor, weakened } from "../combat";
 import { FALLEN } from "../fighter";
 import { effectiveStats } from "../stats";
 import { ARENA_RADIUS, groundHeight } from "../world";
@@ -8,7 +8,7 @@ import { Actor, setState } from "./actor";
 import { emitSparks } from "./effects";
 import { STYLE_NAME, flash, showMsg } from "./hud";
 import { onPlayerDeath } from "./loop";
-import { onEnemyDeath } from "./skirmish";
+import { enemyDown, lockTarget } from "./enemies";
 import { interruptSong, songState } from "./song";
 import { fx, g, sfx } from "./state";
 import { scene } from "./view";
@@ -16,7 +16,7 @@ import { scene } from "./view";
 export function startAttack(a: Actor, kind: StrikeStyle | "bash", weight: StrikeWeight = "light", charging = false) {
   setState(a, "windup");
   a.attack = kind === "bash" ? BASH : makeAttack(a.weapon, styleFor(a.weapon, kind), weight);
-  a.timing = { ...(a === g.player ? a.attack.timing : enemyAttackTiming(a.attack, g.wave)) };
+  a.timing = { ...(a === g.player ? a.attack.timing : enemyAttackTiming(a.attack, a.level)) };
   a.charging = charging;
   a.extraRecovery = 0;
   if (a === g.player) g.playerAttackId++;
@@ -79,7 +79,7 @@ export function resolveStrike(att: Actor, def: Actor) {
     setState(def, "dead");
     fallDown(def, Math.abs(angleToAttacker) > Math.PI / 2);
     if (def === g.player) onPlayerDeath();
-    else onEnemyDeath();
+    else enemyDown(def);
   }
 
   if (res === "hit") {
@@ -118,7 +118,7 @@ export function resolveStrike(att: Actor, def: Actor) {
     }
     // Murtaja toipuu nopeasti ja ehtii iskeä ennen kuin puolustaja saa suojan takaisin.
     att.extraRecovery = -COMBAT.guardbreakAdvantage;
-    if (!isPlayer) g.ai.counter = true;
+    if (att.ai) att.ai.counter = true;
     if (isPlayer) showMsg("Suoja murtui!", "Iske nyt", 0.9);
     else { showMsg("Suojasi murtui", "", 0.8); flash("#b33a2e", 0.2); }
   } else if (res === "blocked") {
@@ -161,7 +161,20 @@ export function fallDown(a: Actor, fromBehind: boolean) {
   for (const d of a.fighter.dropGear()) { scene.add(d.group); g.debris.push(d); }
 }
 
-export function updateCombatant(a: Actor, other: Actor | null, dt: number) {
+/** Kehen isku kohdistuu: vastustajan isku sankariin, sankarin isku lukittuun tai lähimpään ulottuvilla olevaan. */
+function strikeTarget(att: Actor): Actor | null {
+  if (att !== g.player) return g.player.state === "dead" ? null : g.player;
+  const inZone = (e: Actor) => {
+    const to = e.pos.clone().sub(att.pos);
+    return inStrikeZone({ distance: e.pos.distanceTo(att.stepFrom), angleToDefender: angleBetween(att.yaw, Math.atan2(to.x, to.z)) }, att.attack);
+  };
+  const locked = lockTarget();
+  if (locked && inZone(locked)) return locked;
+  const near = [...g.enemies].sort((a, b) => a.pos.distanceToSquared(att.pos) - b.pos.distanceToSquared(att.pos));
+  return near.find(inZone) ?? locked ?? near[0] ?? null;
+}
+
+export function updateCombatant(a: Actor, dt: number) {
   a.stateTime += dt;
   // Kyvyt lasketaan joka ruutu, jotta ajastetut vaikutukset (ruoka, loitsut) alkavat ja loppuvat itsestään.
   a.stats = effectiveStats(a.base, a.mods, g.gameTime);
@@ -192,9 +205,10 @@ export function updateCombatant(a: Actor, other: Actor | null, dt: number) {
     }
     // Jos ruutu hyppäsi osumahetken yli suoraan palautumiseen, isku ratkeaa silti.
     const lands = phase === "release" ? strikeLands(inRelease, t.release) : phase !== "windup" && a.state === "release";
-    if (lands && !a.struck && other) {
+    const target = lands && !a.struck ? strikeTarget(a) : null;
+    if (target) {
       a.struck = true;
-      resolveStrike(a, other);
+      resolveStrike(a, target);
       if ((a.state as ActionState) === "stagger") return; // täydellinen torjunta keskeytti
     }
     if (phase === "recovery") a.state = "recovery";
@@ -210,21 +224,25 @@ export function updateCombatant(a: Actor, other: Actor | null, dt: number) {
   }
 }
 
-export function keepApartAndInside(a: Actor, b: Actor | null) {
-  for (const x of [a, b]) {
-    if (!x) continue;
+/** Pitää taistelijat kehän sisällä ja erillään toisistaan. */
+export function keepApartAndInside(actors: Actor[]) {
+  for (const x of actors) {
     const r = Math.hypot(x.pos.x, x.pos.z);
     if (r > ARENA_RADIUS - 0.6) x.pos.multiplyScalar((ARENA_RADIUS - 0.6) / r);
   }
-  if (b && b.state !== "dead" && a.state !== "dead") {
-    const d = b.pos.clone().sub(a.pos);
-    const len = d.length();
-    if (len < 1.0 && len > 0.0001) {
+  for (let i = 0; i < actors.length; i++) {
+    for (let j = i + 1; j < actors.length; j++) {
+      const a = actors[i], b = actors[j];
+      if (a.state === "dead" || b.state === "dead") continue;
+      const d = b.pos.clone().sub(a.pos);
+      const len = d.length();
+      if (len >= 1.0 || len <= 0.0001) continue;
       // Suohon juuttunutta ei voi työntää: vain toinen osapuoli väistyy.
-      const stuck = b.state === "rooted";
-      const push = d.multiplyScalar((1.0 - len) / len / (stuck ? 1 : 2));
-      a.pos.sub(push);
-      if (!stuck) b.pos.add(push);
+      const aStuck = a.state === "rooted", bStuck = b.state === "rooted";
+      if (aStuck && bStuck) continue;
+      const push = d.multiplyScalar((1.0 - len) / len / (aStuck || bStuck ? 1 : 2));
+      if (!aStuck) a.pos.sub(push);
+      if (!bStuck) b.pos.add(push);
     }
   }
 }

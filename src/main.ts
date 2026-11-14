@@ -7,6 +7,8 @@ import { spawnHero } from "./engine/hero";
 import { initInput } from "./engine/input";
 import { frame, initLoop } from "./engine/loop";
 import { initPauseMenu, loadSavedTuning } from "./ui/pauseMenu";
+import { skirmish } from "./engine/skirmish";
+import { g } from "./engine/state";
 import { initStartMenu } from "./ui/startMenu";
 import { initDebug } from "./debug";
 
@@ -15,6 +17,7 @@ loadSavedTuning(); // ennen kuin yhtään hahmoa luodaan
 initView();
 initEffects();
 spawnHero();
+g.encounter = skirmish; // tämän sivun kohtaus on aaltotaistelu; se alkaa Aloita-napista
 initInput();
 initPauseMenu();
 initLoop();

@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { Actor } from "./actor";
 import { choosing, songState } from "./song";
+import { lockTarget } from "./enemies";
 import { aim, fx, g } from "./state";
 import { camera, world } from "./view";
 
@@ -8,10 +8,6 @@ import { camera, world } from "./view";
 // Hiiri kääntää katsetta (camYaw, camPitch), ja sankari kääntyy katseen suuntaan omalla
 // kääntymisnopeudellaan. WASD liikkuu katseen suhteen. Lukitus pitää katseen vastustajassa.
 
-/** Vastustaja, johon katse on lukittu, tai null. */
-export function lockTarget(): Actor | null {
-  return aim.lockOn && g.enemy && g.enemy.state !== "dead" ? g.enemy : null;
-}
 export function bearing(from: THREE.Vector3, to: THREE.Vector3) { return Math.atan2(to.x - from.x, to.z - from.z); }
 
 // ---------- Kamera ----------

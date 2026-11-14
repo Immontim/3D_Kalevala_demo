@@ -4,7 +4,8 @@ import { COMBAT, Loadout, SHIELDS, STYLES, canStrikeHeavy, exhausted, makeAttack
 import { CONTROLS } from "../controls";
 import { FighterLook } from "../fighter";
 import { makeActor, setState } from "./actor";
-import { bearing, lockTarget } from "./camera";
+import { bearing } from "./camera";
+import { lockTarget } from "./enemies";
 import { strikeHeld } from "./input";
 import { lerpAngle, moveActor, startAttack } from "./melee";
 import { openChoice, songState } from "./song";

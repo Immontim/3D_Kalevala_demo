@@ -1,14 +1,14 @@
 import * as THREE from "three";
 import { cloneBindings } from "./bindings";
 import { COMBAT } from "./combat";
-import { removeActor, setState } from "./engine/actor";
+import { setState } from "./engine/actor";
 import { tmpB } from "./engine/animate";
-import { lockTarget } from "./engine/camera";
-import { renewPlayerShield } from "./engine/hero";
+import { peace } from "./engine/encounter";
+import { addEnemy, focusEnemy, lockTarget, startEncounter } from "./engine/enemies";
 import { bindings } from "./engine/input";
 import { pause, paused, resume, simulate } from "./engine/loop";
 import { setShowcase, showcase } from "./engine/showcase";
-import { spawnEnemy } from "./engine/skirmish";
+import { ENEMIES, currentWave, skipToWave, skirmish } from "./engine/skirmish";
 import { choosing, slotEls, songState } from "./engine/song";
 import { aim, fx, g, inputs } from "./engine/state";
 import { scene } from "./engine/view";
@@ -20,13 +20,15 @@ import { ARENA, groundHeight } from "./world";
 
 export function initDebug() {
   // Kehityskäyttöön ja savutesteihin: tila näkyy konsolista.
+  // "enemy" tarkoittaa tässä vastustajaa, jota mittarit koskevat: lukittua tai lähintä.
+  const d = { get enemy() { return focusEnemy(); } };
   (window as unknown as { __game: unknown }).__game = {
     get state() {
-      return { pos: g.player.pos.toArray().map((v) => +v.toFixed(2)), yaw: +g.player.yaw.toFixed(2), dist: g.enemy ? +g.enemy.pos.distanceTo(g.player.pos).toFixed(2) : null, ai: { ...g.ai }, player: g.player.state, playerAttack: `${g.player.attack.kind}/${g.player.attack.weight}`, playerHp: g.player.hp, playerStamina: +g.player.stamina.toFixed(2), enemyStamina: g.enemy ? +g.enemy.stamina.toFixed(2) : null, playerShield: g.player.shieldHp, stance: g.player.stance, enemy: g.enemy?.state, enemyYaw: g.enemy ? +g.enemy.yaw.toFixed(2) : null, enemyPos: g.enemy ? [+g.enemy.pos.x.toFixed(2), +g.enemy.pos.z.toFixed(2)] : null, enemyAttack: g.enemy ? `${g.enemy.attack.kind}/${g.enemy.attack.weight}` : null, enemyShield: g.enemy?.shieldHp, enemyHp: g.enemy?.hp, song: g.songPower, wave: g.wave, timeScale: g.timeScale };
+      return { pos: g.player.pos.toArray().map((v) => +v.toFixed(2)), yaw: +g.player.yaw.toFixed(2), dist: d.enemy ? +d.enemy.pos.distanceTo(g.player.pos).toFixed(2) : null, ai: d.enemy?.ai ? { ...d.enemy.ai } : null, player: g.player.state, playerAttack: `${g.player.attack.kind}/${g.player.attack.weight}`, playerHp: g.player.hp, playerStamina: +g.player.stamina.toFixed(2), enemyStamina: d.enemy ? +d.enemy.stamina.toFixed(2) : null, playerShield: g.player.shieldHp, stance: g.player.stance, enemy: d.enemy?.state, enemyYaw: d.enemy ? +d.enemy.yaw.toFixed(2) : null, enemyPos: d.enemy ? [+d.enemy.pos.x.toFixed(2), +d.enemy.pos.z.toFixed(2)] : null, enemyAttack: d.enemy ? `${d.enemy.attack.kind}/${d.enemy.attack.weight}` : null, enemyShield: d.enemy?.shieldHp, enemyHp: d.enemy?.hp, song: g.songPower, wave: currentWave(), enemies: g.enemies.length, timeScale: g.timeScale };
     },
     get events() { return [...g.events]; },
     /** Katse ja lukitus (savutestit): yaw ja pitch radiaaneina. */
-    get look() { return { camYaw: +aim.yaw.toFixed(3), camPitch: +aim.pitch.toFixed(3), lockOn: aim.lockOn, locked: !!lockTarget(), playerYaw: +g.player.yaw.toFixed(3), enemyYaw: g.enemy ? +g.enemy.yaw.toFixed(3) : null }; },
+    get look() { return { camYaw: +aim.yaw.toFixed(3), camPitch: +aim.pitch.toFixed(3), lockOn: aim.lockOn, locked: !!lockTarget(), playerYaw: +g.player.yaw.toFixed(3), enemyYaw: d.enemy ? +d.enemy.yaw.toFixed(3) : null }; },
     setLook(yaw: number, pitch = aim.pitch) { aim.yaw = yaw; aim.pitch = pitch; },
     setLock(on: boolean) { aim.lockOn = on; },
     /** Käytössä oleva taistelualue ("clearing" tai "homestead"). */
@@ -40,22 +42,22 @@ export function initDebug() {
     pick(i: number) { inputs.pickQueued = i; },
     get slots() { return slotEls.map((e) => ({ cls: e.className, text: e.textContent, x: Math.round(parseFloat(e.style.left)), y: Math.round(parseFloat(e.style.top)), size: Math.round(parseFloat(e.style.width)) })); },
     /** Lisää ajonaikaisen vaikutuksen kykyihin (savutestit): who = "player" tai "enemy". */
-    addModifier(who: "player" | "enemy", mod: Modifier) { const a = who === "player" ? g.player : g.enemy; if (a) a.mods = withModifier(a.mods, mod); },
-    get stats() { return { player: { ...g.player.stats }, enemy: g.enemy ? { ...g.enemy.stats } : null }; },
+    addModifier(who: "player" | "enemy", mod: Modifier) { const a = who === "player" ? g.player : d.enemy; if (a) a.mods = withModifier(a.mods, mod); },
+    get stats() { return { player: { ...g.player.stats }, enemy: d.enemy ? { ...d.enemy.stats } : null }; },
     /** Säädetyt arvot polku → arvo. */
     get tuning() { return Object.fromEntries(changedValues()); },
     /** Asettaa kestävyydet (savutestit); null jättää ennalleen. */
     setHp(p: number) { g.player.hp = Math.min(g.player.stats.maxHp, p); },
-    setStamina(p: number | null, e: number | null = null) { if (p !== null) g.player.stamina = p; if (e !== null && g.enemy) g.enemy.stamina = e; },
+    setStamina(p: number | null, e: number | null = null) { if (p !== null) g.player.stamina = p; if (e !== null && d.enemy) d.enemy.stamina = e; },
     /** Laulaa vastustajan suoraan suohon t sekunniksi (savutestit). */
-    root(t = 3) { if (g.enemy && g.enemy.state !== "dead") { setState(g.enemy, "rooted"); g.enemy.rootTime = t; } },
+    root(t = 3) { if (d.enemy && d.enemy.state !== "dead") { setState(d.enemy, "rooted"); d.enemy.rootTime = t; } },
     /** Siirtää pelaajan annettuun kohtaan (savutestit). */
-    get feet() { return { player: g.player.fighter.feetDebug(), enemy: g.enemy?.fighter.feetDebug() ?? null }; },
+    get feet() { return { player: g.player.fighter.feetDebug(), enemy: d.enemy?.fighter.feetDebug() ?? null }; },
     placePlayer(x: number, z: number) { g.player.pos.set(x, groundHeight(x, z), z); },
     /** Lennättää vastustajan kypärän päästä (tehosteen kokeiluun). */
     knockHelmet() {
-      if (!g.enemy) return false;
-      const prop = g.enemy.fighter.knockHelmet(new THREE.Vector3(Math.sin(g.enemy.yaw + 2), 0, Math.cos(g.enemy.yaw + 2)));
+      if (!d.enemy) return false;
+      const prop = d.enemy.fighter.knockHelmet(new THREE.Vector3(Math.sin(d.enemy.yaw + 2), 0, Math.cos(d.enemy.yaw + 2)));
       if (prop) { scene.add(prop.group); g.debris.push(prop); }
       return !!prop;
     },
@@ -68,13 +70,17 @@ export function initDebug() {
     poses: POSES,
     /** Vaihtaa vastustajan suoraan annetun aallon vastustajaan (1 = urho ja miekka, 3 = keihäs, 4 = kilpi). */
     skipTo(n: number) {
-      if (g.enemy) removeActor(g.enemy);
-      g.enemy = null;
-      g.wave = Math.max(0, n - 1);
-      g.nextWaveAt = -1;
-      renewPlayerShield();
-      spawnEnemy();
+      skipToWave(n);
     },
+    /** Vaihtaa kohtauksen: "skirmish" = aaltotaistelu, "peace" = ei vastustajia. */
+    encounter(kind: "skirmish" | "peace") { startEncounter(kind === "peace" ? peace : skirmish); },
+    /** Tuo kentälle ylimääräisen vastustajan (i = rivi taulukossa ENEMIES) annettuun kohtaan. */
+    addEnemy(i: number, x: number, z: number, level = 1) {
+      const def = ENEMIES[i % ENEMIES.length];
+      addEnemy({ name: def.name, look: def.look, level }, new THREE.Vector3(x, groundHeight(x, z), z));
+    },
+    /** Elossa olevat vastustajat: nimi, tila, elämä ja paikka. */
+    get enemies() { return g.enemies.map((e) => ({ name: e.name, state: e.state, hp: e.hp, pos: [+e.pos.x.toFixed(2), +e.pos.z.toFixed(2)] })); },
     /** Hahmorivi: kaikki hahmot ja varustukset näkyviin aukion keskelle. */
     showcase(on = true, pose?: string) { setShowcase(on, pose); },
     /** Kaataa hahmorivin annettuun makuuasentoon (0..n-1) kuvakaappauksia varten; drop = pudota varusteet. */
@@ -111,7 +117,7 @@ export function initDebug() {
     bog(pos: number[] | null) { fx.bogDemo = pos ? new THREE.Vector3(pos[0], groundHeight(pos[0], pos[2]), pos[2]) : null; },
     /** Pelin sekunteja siihen, kun vihollisen isku laukeaa, tai null. */
     get enemyStrikeIn() {
-      return g.enemy && g.enemy.state === "windup" ? g.enemy.timing.windup - g.enemy.stateTime : null;
+      return d.enemy && d.enemy.state === "windup" ? d.enemy.timing.windup - d.enemy.stateTime : null;
     },
   };
 }

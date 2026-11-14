@@ -1,5 +1,6 @@
 // Taistelija pelitilanteessa: sankari tai vastustaja.
 import * as THREE from "three";
+import type { Ai } from "./ai";
 import { ActionState, AttackDef, AttackTiming, Loadout, SHIELDS, ShieldDef, StrikeStyle, WeaponDef, makeAttack, styleFor, weaponOf } from "../combat";
 import { Fighter, FighterLook, SwordTrail } from "../fighter";
 import { Modifier, Stats, baseStats, effectiveStats } from "../stats";
@@ -43,16 +44,22 @@ export interface Actor {
   /** Tukiaskeleesta otettu osuus 0..1 ja paikka, josta askel lähti (kantama lasketaan siitä). */
   lunged: number;
   stepFrom: THREE.Vector3;
+  /** Nimi mittarissa (vastustajilla). */
+  name: string;
+  /** Taso: 0 sankarilla; vastustajilla kasvattaa elämää, voimaa ja tekoälyn taitoa. */
+  level: number;
+  /** Tekoälyn tila; null sankarilla. */
+  ai: Ai | null;
 }
 
-/** wave = 0 pelaajalle; vastustajilla aalto kasvattaa elämää ja voimaa. */
-export function makeActor(look: FighterLook, pos: THREE.Vector3, wave: number, trailColor: number): Actor {
+/** level = 0 sankarille; vastustajilla taso kasvattaa elämää ja voimaa. */
+export function makeActor(look: FighterLook, pos: THREE.Vector3, level: number, trailColor: number): Actor {
   const fighter = new Fighter(look);
   const trail = new SwordTrail(trailColor);
   scene.add(fighter.root, trail.mesh);
   const weapon = weaponOf(look.loadout);
   const shield = look.loadout === "sword_shield" ? SHIELDS.round : null;
-  const base = baseStats(look.character, wave);
+  const base = baseStats(look.character, level);
   const stats = effectiveStats(base, [], 0);
   return {
     base, mods: [], stats, stamina: stats.maxStamina,
@@ -60,7 +67,7 @@ export function makeActor(look: FighterLook, pos: THREE.Vector3, wave: number, t
     fighter, trail, pos: pos.clone(), yaw: 0, state: "idle", stateTime: 0, timing: { windup: 0.3, release: 0.1, recovery: 0.3 },
     attack: makeAttack(weapon, styleFor(weapon, "slash"), "light"), loadout: look.loadout, struck: false, hp: stats.maxHp,
     blockStart: -99, rootTime: 0, dodgeDir: new THREE.Vector3(), dodgeCd: 0, moveSpeed: 0, extraRecovery: 0,
-    lunged: 0, stepFrom: pos.clone(),
+    lunged: 0, stepFrom: pos.clone(), name: "", level, ai: null,
   };
 }
 

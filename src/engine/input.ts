@@ -2,7 +2,7 @@ import { Bindings, DEFAULT_BINDINGS, SONG_SLOT_ACTIONS, actionFor, cloneBindings
 import { STYLES, StrikeStyle } from "../combat";
 import { CONTROLS } from "../controls";
 import { setState } from "./actor";
-import { lockTarget } from "./camera";
+import { lockTarget } from "./enemies";
 import { $, isTouch } from "./dom";
 import { pause, paused, pausedAt, restart, resume } from "./loop";
 import { choosing, songState } from "./song";
@@ -39,7 +39,7 @@ export function pressCode(code: string): boolean {
   if (a === "block") inputs.blockHeld = true;
   else if (a === "dodge") inputs.dodgeQueued = true;
   else if (a === "song") inputs.songQueued = true;
-  else if (a === "lock") aim.lockOn = !aim.lockOn;
+  else if (a === "lock") { aim.lockOn = !aim.lockOn; aim.target = null; }
   else if (a === "slash" || a === "overhead" || a === "thrust") pressStrike(a);
   else inputs.pickQueued = SONG_SLOT_ACTIONS.indexOf(a);
   return true;

@@ -1,5 +1,4 @@
 // Pääsilmukka, uusi peli ja tauko.
-import { WAVES } from "../combat";
 import { SONG } from "../songLogic";
 import { openTune, renderBinds } from "../ui/pauseMenu";
 import { groundHeight } from "../world";
@@ -9,12 +8,12 @@ import { syncVisual } from "./animate";
 import { updateCamera } from "./camera";
 import { $, isTouch } from "./dom";
 import { bog, updateRing, updateSparks } from "./effects";
-import { renewPlayerShield, spawnHero, updatePlayer } from "./hero";
+import { clearEnemies } from "./enemies";
+import { spawnHero, updatePlayer } from "./hero";
 import { showMsg, tickMsg, updateHud } from "./hud";
 import { clearInputs, lockPointer } from "./input";
 import { keepApartAndInside, updateCombatant } from "./melee";
 import { updateShowcase } from "./showcase";
-import { spawnEnemy } from "./skirmish";
 import { choosing, closeChoice, closeSong, songState, updateChoice, updateSong } from "./song";
 import { aim, bindUi, fx, g, inputs } from "./state";
 import { camera, canvas, composer, world } from "./view";
@@ -24,22 +23,19 @@ export function onPlayerDeath() {
   showMsg("Kaaduit", isTouch ? "Napauta aloittaaksesi alusta" : "Paina R aloittaaksesi alusta", 9999);
 }
 export function restart() {
-  for (const a of [g.player, g.enemy, ...g.corpses.map((c) => c.actor)]) {
-    if (a) removeActor(a);
-  }
+  clearEnemies();
+  for (const a of [g.player, ...g.corpses.map((c) => c.actor)]) removeActor(a);
   g.corpses.length = 0;
   for (const d of g.debris) d.dispose();
   g.debris.length = 0;
   spawnHero();
   aim.yaw = 0;
   aim.pitch = 0;
-  g.enemy = null;
-  g.wave = 0;
   g.songPower = 0;
   if (songState) closeSong(true);
   if (choosing) closeChoice();
   g.gameOver = false;
-  spawnEnemy();
+  g.encounter.start();
   lockPointer();
 }
 
@@ -75,20 +71,15 @@ export function simulate(realDt: number) {
     g.gameTime += dt;
     updateSong();
     updatePlayer(dt);
-    updateCombatant(g.player, g.enemy, dt);
-    if (g.enemy) {
-      if (g.enemy.state !== "dead") updateAi(g.enemy, dt);
-      updateCombatant(g.enemy, g.player, dt);
+    updateCombatant(g.player, dt);
+    // Kopio listasta: kesken kierroksen kaatunut vastustaja poistuu elävien listalta.
+    for (const e of [...g.enemies]) {
+      if (e.state === "dead") continue;
+      updateAi(e, dt);
+      updateCombatant(e, dt);
     }
-    keepApartAndInside(g.player, g.enemy);
-    if (g.nextWaveAt > 0 && g.gameTime >= g.nextWaveAt) {
-      g.nextWaveAt = -1;
-      if (g.enemy) g.corpses.push({ actor: g.enemy, removeAt: g.gameTime + WAVES.corpseTime });
-      g.player.hp = Math.min(g.player.stats.maxHp, g.player.hp + WAVES.restHp);
-      g.player.stamina = Math.min(g.player.stats.maxStamina, g.player.stamina + WAVES.restStamina);
-      renewPlayerShield();
-      spawnEnemy();
-    }
+    keepApartAndInside([g.player, ...g.enemies]);
+    g.encounter.update(dt);
     for (let i = g.corpses.length - 1; i >= 0; i--) {
       if (g.gameTime > g.corpses[i].removeAt) {
         removeActor(g.corpses[i].actor);
@@ -99,7 +90,7 @@ export function simulate(realDt: number) {
 
   // Laulaja liikkuu omassa ajassaan, vaikka maailma on hidastettu.
   syncVisual(g.player, (songState || choosing) && !paused ? realDt : dt);
-  if (g.enemy) syncVisual(g.enemy, dt);
+  for (const e of g.enemies) syncVisual(e, dt);
   for (const c of g.corpses) syncVisual(c.actor, dt);
   updateShowcase(realDt);
   for (let i = g.debris.length - 1; i >= 0; i--) {
@@ -107,7 +98,7 @@ export function simulate(realDt: number) {
   }
 
   // Suo
-  bog.update(fx.bogDemo ? realDt : dt, fx.bogDemo ?? (g.enemy && g.enemy.state === "rooted" ? g.enemy.pos : null));
+  bog.update(fx.bogDemo ? realDt : dt, fx.bogDemo ?? g.enemies.find((e) => e.state === "rooted")?.pos ?? null);
 
 
   updateRing(realDt);

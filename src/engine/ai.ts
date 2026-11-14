@@ -21,10 +21,10 @@ export function newAi(): Ai { return { decide: 1.2, strafeDir: Math.random() < 0
 /** Kilpi torjuu useammin, keihäsmies harvemmin. */
 export function blockChance(e: Actor) {
   const bonus = e.shield ? ENEMY_AI.blockShieldBonus : e.loadout === "spear" ? ENEMY_AI.blockSpearBonus : 0;
-  return Math.min(ENEMY_AI.blockMax, ENEMY_AI.blockBase + ENEMY_AI.blockPerWave * g.wave) + bonus;
+  return Math.min(ENEMY_AI.blockMax, ENEMY_AI.blockBase + ENEMY_AI.blockPerWave * e.level) + bonus;
 }
 /** Kuinka usein aseella torjuva vihollinen lukee iskun suunnan oikein. */
-export function readChance() { return Math.min(ENEMY_AI.readMax, ENEMY_AI.readBase + ENEMY_AI.readPerWave * g.wave); }
+export function readChance(e: Actor) { return Math.min(ENEMY_AI.readMax, ENEMY_AI.readBase + ENEMY_AI.readPerWave * e.level); }
 
 /** Pelaaja on seissyt torjunnassa niin pitkään, että suoja kannattaa murtaa. */
 export function playerTurtles() { return g.player.state === "block" && g.gameTime - g.player.blockStart > ENEMY_AI.turtleTime; }
@@ -46,50 +46,52 @@ export function pickEnemyAttack(e: Actor, dist: number, quick = false): { kind: 
 }
 
 export function updateAi(e: Actor, dt: number) {
+  const ai = e.ai;
+  if (!ai) return;
   const toPlayer = g.player.pos.clone().sub(e.pos);
   const dist = toPlayer.length();
   // Vastustaja kääntyy sinne, missä se näkee pelaajan: hidas reaktio jättää kiertäjän sivulle.
   const r = e.stats.reaction;
-  g.ai.seen.lerp(g.player.pos, r > 0 ? 1 - Math.exp(-dt / r) : 1);
-  const facing = bearing(e.pos, g.ai.seen);
+  ai.seen.lerp(g.player.pos, r > 0 ? 1 - Math.exp(-dt / r) : 1);
+  const facing = bearing(e.pos, ai.seen);
   if (e.state === "rooted") {
     // Suossa ei käännytä: pelaaja voi kiertää selän taakse.
-    g.ai.reorient = true;
-  } else if (g.ai.reorient) {
+    ai.reorient = true;
+  } else if (ai.reorient) {
     // Suosta päässyt kääntyy pelaajaa kohti tasaista vauhtia eikä tee sinä aikana muuta.
     const diff = angleBetween(e.yaw, facing);
     const step = ENEMY_AI.reorientTurn * dt;
     e.yaw += Math.max(-step, Math.min(step, diff));
-    if (Math.abs(diff) <= Math.max(step, ENEMY_AI.reorientDone)) g.ai.reorient = false;
+    if (Math.abs(diff) <= Math.max(step, ENEMY_AI.reorientDone)) ai.reorient = false;
   } else {
     const busy = e.state === "windup" || e.state === "release" || e.state === "recovery" || e.state === "stagger" || e.state === "dodge";
     e.yaw = turnToward(e.yaw, facing, e.stats.turnSpeed * DEG * (busy ? ENEMY_AI.attackTurnScale : 1) * dt);
   }
 
-  if (e.state === "idle" && g.ai.reorient) {
+  if (e.state === "idle" && ai.reorient) {
     e.moveSpeed = 0;
   } else if (e.state === "idle") {
     // Reagoi pelaajan nostoon: torju joskus.
-    if (g.player.state === "windup" && g.ai.reactedTo !== g.playerAttackId && dist < 3.2) {
-      g.ai.reactedTo = g.playerAttackId;
+    if (g.player.state === "windup" && ai.reactedTo !== g.playerAttackId && dist < 3.2) {
+      ai.reactedTo = g.playerAttackId;
       if (!exhausted(e.stamina) && Math.random() < blockChance(e)) {
         setState(e, "block");
         // Aseella torjuva arvaa iskun suunnan: myöhemmillä aalloilla useammin oikein.
         const real = g.player.attack.kind === "bash" ? "slash" : g.player.attack.kind;
         const wrong = STYLES.filter((st) => st !== real);
-        e.stance = Math.random() < readChance() ? real : wrong[Math.floor(Math.random() * wrong.length)];
+        e.stance = Math.random() < readChance(e) ? real : wrong[Math.floor(Math.random() * wrong.length)];
         e.blockStart = -99; // vihollinen ei tee täydellisiä torjuntoja
         return;
       }
     }
     // Liiku sopivalle etäisyydelle ja kierrä.
     // Keihäsmies pitää välimatkaa, kilpimies tulee iholle murtamaan pitkän torjunnan.
-    if (exhausted(e.stamina)) g.ai.resting = true;
-    else if (e.stamina >= Math.min(ENEMY_AI.restUntil, e.stats.maxStamina)) g.ai.resting = false;
+    if (exhausted(e.stamina)) ai.resting = true;
+    else if (e.stamina >= Math.min(ENEMY_AI.restUntil, e.stats.maxStamina)) ai.resting = false;
     const spear = e.loadout === "spear";
-    const want = g.ai.resting ? ENEMY_AI.restDistance : spear ? ENEMY_AI.distSpear : e.shield && !g.player.shield && playerTurtles() ? ENEMY_AI.distBash : ENEMY_AI.distSword;
+    const want = ai.resting ? ENEMY_AI.restDistance : spear ? ENEMY_AI.distSpear : e.shield && !g.player.shield && playerTurtles() ? ENEMY_AI.distBash : ENEMY_AI.distSword;
     const dir = toPlayer.clone().normalize();
-    const side = new THREE.Vector3(dir.z, 0, -dir.x).multiplyScalar(g.ai.strafeDir);
+    const side = new THREE.Vector3(dir.z, 0, -dir.x).multiplyScalar(ai.strafeDir);
     const move = new THREE.Vector3();
     if (dist > want + 0.3) move.add(dir);
     else if (dist < want - 0.4) move.sub(dir);
@@ -98,16 +100,16 @@ export function updateAi(e: Actor, dt: number) {
     const pace = dist > 4 ? ENEMY_AI.chaseScale : spear && dist < want - 0.4 ? ENEMY_AI.spearRetreatScale : 1;
     moveActor(e, move, e.stats.moveSpeed * pace, dt);
 
-    g.ai.decide -= dt;
+    ai.decide -= dt;
     // Lepäävä vastustaja ei hyökkää, ellei pelaaja tule iholle.
-    const mayAttack = !g.ai.resting || dist < ENEMY_AI.restCornered;
-    const counter = g.ai.counter && mayAttack ? pickEnemyAttack(e, dist, true) : null;
+    const mayAttack = !ai.resting || dist < ENEMY_AI.restCornered;
+    const counter = ai.counter && mayAttack ? pickEnemyAttack(e, dist, true) : null;
     if (counter) {
-      g.ai.counter = false;
+      ai.counter = false;
       startAttack(e, counter.kind, counter.weight);
-    } else if (g.ai.decide <= 0) {
-      g.ai.decide = ENEMY_AI.decideMin + Math.random() * ENEMY_AI.decideRandom;
-      if (Math.random() < 0.25) g.ai.strafeDir *= -1;
+    } else if (ai.decide <= 0) {
+      ai.decide = ENEMY_AI.decideMin + Math.random() * ENEMY_AI.decideRandom;
+      if (Math.random() < 0.25) ai.strafeDir *= -1;
       const pick = mayAttack ? pickEnemyAttack(e, dist) : null;
       if (pick && g.player.state !== "dead" && Math.random() < (pick.kind === "bash" ? ENEMY_AI.bashChance : ENEMY_AI.attackChance)) startAttack(e, pick.kind, pick.weight);
     }
@@ -119,7 +121,7 @@ export function updateAi(e: Actor, dt: number) {
     const playerBusy = g.player.state === "windup" || g.player.state === "release";
     if ((!playerBusy && e.stateTime > 0.25) || exhausted(e.stamina)) {
       setState(e, "idle");
-      g.ai.counter = Math.random() < ENEMY_AI.counterChance;
+      ai.counter = Math.random() < ENEMY_AI.counterChance;
     }
   }
 }

@@ -1,6 +1,7 @@
 import { AttackDef, COMBAT, StrikeStyle, canStrikeHeavy, chargeLevel, exhausted, makeAttack } from "../combat";
 import { Actor } from "./actor";
-import { lockTarget } from "./camera";
+import { focusEnemy, lockTarget } from "./enemies";
+import { paused } from "./loop";
 import { $ } from "./dom";
 import { g } from "./state";
 import { camera } from "./view";
@@ -24,9 +25,22 @@ export function flash(color: string, strength: number) {
     f.style.opacity = "0";
   });
 }
+/** Vastustaja, jonka mittarit näytetään: lukittu tai lähin. Kaatunut jää näkyviin, kunnes ruumis poistuu tai uusi saapuu. */
+let shown: Actor | null = null;
+function shownEnemy(): Actor | null {
+  const f = focusEnemy();
+  if (f) shown = f;
+  else if (shown && !g.corpses.some((c) => c.actor === shown)) shown = null;
+  return shown;
+}
+
 export function updateHud() {
+  const foe = shownEnemy();
+  // Ilman vastustajaa mittari on piilossa; tauolla se näkyy, jotta sen voi raahata paikalleen.
+  $("meterEnemy").style.visibility = foe || paused ? "" : "hidden";
+  $("ename").textContent = foe ? foe.name : "";
   $("php").style.width = `${(g.player.hp / g.player.stats.maxHp) * 100}%`;
-  $("ehp").style.width = g.enemy ? `${(Math.max(0, g.enemy.hp) / g.enemy.stats.maxHp) * 100}%` : "0%";
+  $("ehp").style.width = foe ? `${(Math.max(0, foe.hp) / foe.stats.maxHp) * 100}%` : "0%";
   // Lukuarvot: elämä pyöristetään ylöspäin (1 = vielä hengissä), kestävyys alaspäin (käytettävissä oleva).
   const num = (v: number, max: number, up: boolean) => `${up ? Math.ceil(Math.max(0, v)) : Math.floor(Math.max(0, v))} / ${Math.round(max)}`;
   $("phpNum").textContent = num(g.player.hp, g.player.stats.maxHp, true);
@@ -39,14 +53,14 @@ export function updateHud() {
     mark.classList.toggle("hidden", !show);
     if (show) { mark.style.left = `${((p.x + 1) / 2) * innerWidth}px`; mark.style.top = `${((1 - p.y) / 2) * innerHeight}px`; }
   } else mark.classList.add("hidden");
-  $("ehpNum").textContent = g.enemy ? num(g.enemy.hp, g.enemy.stats.maxHp, true) : "";
+  $("ehpNum").textContent = foe ? num(foe.hp, foe.stats.maxHp, true) : "";
   const staminaBar = (id: string, a: Actor | null) => {
     $(id + "Num").textContent = a ? num(a.stamina, a.stats.maxStamina, false) : "";
     $(id).style.width = a ? `${(a.stamina / a.stats.maxStamina) * 100}%` : "0%";
     $(id).parentElement!.classList.toggle("spent", !!a && a.state !== "dead" && exhausted(a.stamina));
   };
   staminaBar("psta", g.player);
-  staminaBar("esta", g.enemy);
+  staminaBar("esta", foe);
   const s = $("psong");
   s.style.width = `${(g.songPower / COMBAT.songMax) * 100}%`;
   s.classList.toggle("full", g.songPower >= COMBAT.songMax);
@@ -60,7 +74,7 @@ export function updateHud() {
     $(id).classList.toggle("worn", !!a && !!a.shield && a.shieldHp <= a.shield.durability * a.shield.notchAt);
   };
   shieldBar("pshield", g.player);
-  shieldBar("eshield", g.enemy);
+  shieldBar("eshield", foe);
 
   // Viritysmittari: täyttyy, kun iskunappi on pohjassa. Täysi = raskas isku viritetty.
   const p = g.player;
@@ -77,7 +91,7 @@ export function updateHud() {
   $("chargeLabel").textContent = charge >= 1 ? `${STYLE_NAME[p.attack.kind]} · raskas` : charge > 0 ? `${STYLE_NAME[p.attack.kind]}${tooTired ? " · voimat eivät riitä raskaaseen" : ""}` : "";
 
   // Vastustajan tuleva isku ja oma torjunta-asento tekstinä.
-  const e = g.enemy;
+  const e = foe;
   $("cue").textContent = e && e.state === "windup" ? `${STYLE_ICON[e.attack.kind]} ${STYLE_NAME[e.attack.kind]}${e.attack.weight === "heavy" ? " (raskas)" : ""}` : "";
   $("pstance").textContent = p.state !== "dead" && exhausted(p.stamina) ? "Uupunut: et voi torjua, ja lyöntisi ovat heikkoja"
     : p.state === "block" && !p.shield ? `Torjunta: ${BLOCK_NAME[p.stance]}` : "";
