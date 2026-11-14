@@ -82,6 +82,24 @@ Päivitetty: 2026-11-14 (Codex, Windows)
   --python`), koska Blender MCP:n taustatyökalu ei löydä Blenderiä
   (`BLENDER_PATH` puuttuu) ja avoimessa Blenderissä oli tallentamaton
   `characters.blend`.
+- **Talousesineet** (malli `assets/household.glb`, 1,4 Mt, 19 000 kolmiota;
+  skripti `assets-src/blender/household.py`, ajetaan taustalla, lukee ensin
+  `homestead.py`:n): `pukkipoyta`, `penkki`, `tuohikontti`, `pata`,
+  `rieska`, `nauriit`, `kuivakalat`, `lyhde`, `kulho`, `kuppi`, `kauha`,
+  `lautanen`, `kori` ja `poyta_kattaus` (pöydälle katetut esineet yhtenä
+  mallina, origo sama kuin pöydällä; pöytälevyn pinta 0,76 m). **Peli ei
+  vielä lataa tiedostoa** (branch `claude/household-props`, 2026-11-14;
+  tarkista merge-tila). Verteksivärit ovat lineaarisia: skriptin `HH`
+  muuntaa sRGB-arvot. Tarkistettu vain Blenderin EEVEE-kuvista, ei pelin
+  valossa; materiaalit `M_HH_*` pitää ottaa mukaan `prepareMaterials`iin.
+  Tulikivet ja tuhka ovat tasaisen harmaita ilman tekstuuria.
+- **Rauhallisen pihakohtauksen suunnitelma** (omistaja hyväksyi 2026-11-14):
+  1 talousesineet (tehty), 2 rauhan piha koodina (uusi paikka, esineet
+  pihalle, pysyvien hahmojen tyyppi, törmäys pöytään), 3 tietäjä, 4
+  naisvartalo ja jousineito, 5 emäntä, 6 eläimet (sika, koira, kanat;
+  Poly Havenissa ei ole eläimiä, joten omistaja lataa CC-BY-mallit
+  Sketchfabista agentin ehdokaslistan mukaan). Hahmot seisovat aluksi
+  paikallaan. Dialogijärjestelmä tehdään erikseen myöhemmin.
 - **Laulut ja valinta** (`src/songLogic.ts`: `SONGS`, `SONG_SLOTS`; kulku
   `engine/song.ts`): laulunappi täydellä voimalla → `openChoice()`:
   `choosing` pysäyttää maailman (dt = 0), hiiri vapautetaan
@@ -276,7 +294,8 @@ Omistaja tarkistaa v01.04.00:n julkaistusta osoitteesta, onko Pohjan soturin
 
 - Karttanäkymä ja siirtymät karttaan/3D-paikkoihin.
 - Git LFS (omistajan päätös 2026-11-10: ei vielä).
-- Muut referenssihahmot (tietäjä, emäntä, Louhi, jousineito, isäntä).
+- Muut referenssihahmot (Louhi, isäntä).
+- Dialogijärjestelmä (ensin assetit ja rauhallinen kohtaus pystyyn).
 - Isojen skannattujen puiden lataus ja kevennys.
 - Aseiden laatuerot ja vahingon hajonta: rakenne on valmiina, mutta sisältö
   odottaa omistajan päätöstä.
@@ -289,7 +308,8 @@ Omistaja tarkistaa v01.04.00:n julkaistusta osoitteesta, onko Pohjan soturin
   GitHub-synkkauksen kautta, mutta koodia ei kirjoiteta Lovablen tekoälyllä
   (kaksi tekoälyä samassa koodissa sotkisi).
 - Tyyli: pronssikautinen / varhaisen rautakauden Fennoskandia.
-- Ulkopuoliset assetit vain CC0 (Poly Haven); lähteet `assets/CREDITS.md`.
+- Ulkopuoliset assetit CC0 tai CC-BY (ei NC/ND/SA); CC-BY vaatii tekijän
+  nimen `assets/CREDITS.md`:hen ja pelissä näkyvän tekijäluettelon.
   Puut tehdään itse oksakorteista, koska skannatut puut ovat selaimelle
   liian raskaita (17 milj. polygonia).
 - `bun.lock` on muotoa `lockfileVersion: 2`, joten vaaditaan Bun 1.4 tai
