@@ -42,6 +42,9 @@ export const COMBAT = {
   guardbreakAdvantage: 0.25,
   /** Torjuttu lyöjä palautuu näin paljon hitaammin. */
   blockRecoil: 0.3,
+  /** Kilpityönnön peräännyttämä matka ja liikkeen nopeus. */
+  bashPushDistance: 0.65,
+  bashPushSpeed: 2.6,
   dodgeTime: 0.35,
   dodgeCooldown: 0.6,
   /** Väistön nopeus, m/s. */
@@ -173,7 +176,8 @@ export const ENEMY_AI = {
   spread: 2.4,
   /** Ryhmässä vastustaja ei kierrä sankarin selän taakse tätä kulmaa (astetta sankarin katseesta) pidemmälle. */
   flankMax: 115,
-  bashChance: 0.9,
+  /** Pohjan kilpisoturin satunnainen kilpityöntö lähietäisyydellä. */
+  bashChance: 0.12,
   /** Vastaisku torjunnan jälkeen. */
   counterChance: 0.55,
   /** Uupunut vetäytyy tälle etäisyydelle, kunnes kestävyyttä on taas restUntil; lyö silti, jos pelaaja tulee restCornered lähemmäs. */
@@ -316,11 +320,30 @@ export function makeAttack(w: WeaponDef, style: StrikeStyle, weight: StrikeWeigh
   };
 }
 
-/** Kilpityöntö: nopea ja lyhyt, lähes vahingoton, mutta murtaa aseella tehdyn torjunnan. */
+/** Kilpityöntö: nopea ja lyhyt, lähes vahingoton, mutta murtaa ase- ja kilpitorjunnan. */
 export const BASH: AttackDef = {
   kind: "bash", weight: "light", timing: { windup: 0.2, release: 0.1, recovery: 0.4 },
   range: 1.7, minRange: 0, arc: Math.PI / 3, damage: 0.25, lunge: 0.3, shieldDamage: 1,
 };
+
+/** Saako tämä tekoälyn päätös valita kilpityönnön. Vain Pohjan soturi osaa liikkeen. */
+export function shouldShieldBash(
+  isPohja: boolean,
+  hasShield: boolean,
+  distance: number,
+  angleToPlayer: number,
+  turtling: boolean,
+  quickCounter: boolean,
+  roll: number,
+): boolean {
+  if (!isPohja || !hasShield || quickCounter || distance >= BASH.range - 0.1 || Math.abs(angleToPlayer) >= BASH.arc * 0.9) return false;
+  return turtling || roll < ENEMY_AI.bashChance;
+}
+
+/** Yhden ruudun osuus jäljellä olevasta kilpityönnön taaksehorjahduksesta. */
+export function bashPushStep(remaining: number, dt: number, rooted = false): number {
+  return rooted ? 0 : Math.min(Math.max(0, remaining), COMBAT.bashPushSpeed * Math.max(0, dt));
+}
 
 /** Iskusuunta, jonka ase osaa: jos pyydetty puuttuu, käytetään aseen ensimmäistä. */
 export function styleFor(w: WeaponDef, wanted: StrikeStyle): StrikeStyle {
@@ -422,9 +445,9 @@ export function inStrikeZone(g: Geometry, a: AttackDef = DEFAULT_ATTACK): boolea
 
 /**
  * Ratkaisee iskun lopputuloksen sillä hetkellä, kun isku laukeaa.
- * - Kilpi torjuu kaikki iskut (ja kuluu, ks. shieldWear).
+ * - Kilpi torjuu aseiskut (ja kuluu, ks. shieldWear).
  * - Aseella torjunta onnistuu vain, jos torjunta-asento vastaa iskun suuntaa.
- * - Kilpityöntö murtaa aseella tehdyn torjunnan asennosta riippumatta.
+ * - Kilpityöntö murtaa aseella tai kilvellä tehdyn torjunnan asennosta riippumatta.
  */
 export function resolveHit(g: Geometry, d: Defender, now: number, a: AttackDef = DEFAULT_ATTACK): HitResult {
   if (!inStrikeZone(g, a)) return "miss";
@@ -435,8 +458,9 @@ export function resolveHit(g: Geometry, d: Defender, now: number, a: AttackDef =
   if (Math.abs(d.angleToAttacker) > arc) return "hit";
   const covers = !!d.shield || a.kind === "bash" || (d.stance ?? "slash") === a.kind;
   if (!covers) return "hit";
+  // Kilpityöntö murtaa torjunta-asennon myös kilpeä vastaan; kilpi ei silti hajoa tai kulu.
+  if (a.kind === "bash") return "guardbreak";
   if (now - d.blockStart <= COMBAT.parryWindow) return "parried";
-  if (a.kind === "bash" && !d.shield) return "guardbreak";
   return "blocked";
 }
 
@@ -463,9 +487,9 @@ export function damageFor(base: number, defenderState: ActionState): number {
   return defenderState === "rooted" ? base * COMBAT.rootedDamage : base;
 }
 
-/** Iskun vahinko: lyöjän voima × iskun ja aseen kerroin. Vain osuma tekee vahinkoa. */
+/** Iskun vahinko: lyöjän voima × iskun ja aseen kerroin. Kilpityöntö tekee pienen vahingon myös murtaessaan suojan. */
 export function strikeDamage(power: number, a: AttackDef, res: HitResult, defenderState: ActionState): number {
-  return res === "hit" ? damageFor(power * a.damage, defenderState) : 0;
+  return res === "hit" || (res === "guardbreak" && a.kind === "bash") ? damageFor(power * a.damage, defenderState) : 0;
 }
 
 /** Tukiaskeleen eteneminen 0..1, kun iskuvaihetta on kulunut `inRelease` sekuntia. Askel on valmis osumahetkellä. */

@@ -32,6 +32,8 @@ import {
   staminaTick,
   strikeCost,
   strikeTier,
+  shouldShieldBash,
+  bashPushStep,
   weakened,
 } from "./combat";
 
@@ -156,9 +158,10 @@ describe("iskusuunnat ja suuntatorjunta", () => {
       expect(resolveHit(inFront, { ...block("slash"), shield, angleToAttacker: (deg * Math.PI) / 180 }, 5)).toBe("hit");
     }
   });
-  it("kilpityöntö murtaa asetorjunnan asennosta riippumatta, mutta ei kilpeä", () => {
+  it("kilpityöntö murtaa torjunnan asennosta ja kilvestä riippumatta", () => {
     for (const stance of STYLES) expect(resolveHit(inFront, block(stance), 5, BASH)).toBe("guardbreak");
-    expect(resolveHit(inFront, { ...block("slash"), shield }, 5, BASH)).toBe("blocked");
+    expect(resolveHit(inFront, { ...block("slash"), shield }, 5, BASH)).toBe("guardbreak");
+    expect(resolveHit(inFront, { ...block("slash"), blockStart: 4.95 }, 5, BASH)).toBe("guardbreak");
   });
 });
 
@@ -206,13 +209,36 @@ describe("aseet ja iskut parametreina", () => {
     expect(strikeDamage(20, heavySlash, "hit", "idle")).toBeCloseTo(34);
     expect(strikeDamage(20, slash, "hit", "rooted")).toBeCloseTo(40);
     expect(strikeDamage(20, slash, "blocked", "block")).toBe(0);
-    expect(strikeDamage(20, BASH, "guardbreak", "block")).toBe(0);
+    expect(strikeDamage(20, BASH, "guardbreak", "block")).toBeCloseTo(5);
     const fine = makeAttack({ ...sword, damage: 1.5 }, "slash", "light");
     expect(strikeDamage(20, fine, "hit", "idle")).toBeCloseTo(30);
   });
   it("hitaampi ase nostaa ja palautuu hitaammin", () => {
     expect(spearThrust.timing.windup).toBeGreaterThan(swordThrust.timing.windup);
     expect(spearThrust.timing.recovery).toBeGreaterThan(swordThrust.timing.recovery);
+  });
+});
+
+describe("Pohjan soturin kilpityöntö", () => {
+  it("vain kilvellinen Pohjan soturi valitsee satunnaisen kilpityönnön", () => {
+    expect(shouldShieldBash(true, true, 1.2, 0, false, false, 0.11)).toBe(true);
+    expect(shouldShieldBash(true, true, 1.2, 0, false, false, 0.12)).toBe(false);
+    expect(shouldShieldBash(false, true, 1.2, 0, false, false, 0)).toBe(false);
+    expect(shouldShieldBash(true, false, 1.2, 0, false, false, 0)).toBe(false);
+  });
+
+  it("pitkä torjunta laukaisee liikkeen, mutta ei pikavastaiskuna, sivulle tai kantaman ulkopuolelle", () => {
+    expect(shouldShieldBash(true, true, 1.2, 0, true, false, 1)).toBe(true);
+    expect(shouldShieldBash(true, true, 1.2, 0, true, true, 0)).toBe(false);
+    expect(shouldShieldBash(true, true, BASH.range, 0, true, false, 0)).toBe(false);
+    expect(shouldShieldBash(true, true, 1.2, BASH.arc, true, false, 0)).toBe(false);
+  });
+
+  it("taaksehorjahdus etenee tasaisesti eikä ylitä jäljellä olevaa matkaa", () => {
+    expect(bashPushStep(0.65, 0.1)).toBeCloseTo(0.26);
+    expect(bashPushStep(0.1, 0.1)).toBeCloseTo(0.1);
+    expect(bashPushStep(0.65, 0)).toBe(0);
+    expect(bashPushStep(0.65, 0.1, true)).toBe(0);
   });
 });
 

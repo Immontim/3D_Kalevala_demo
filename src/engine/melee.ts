@@ -1,6 +1,6 @@
 // Lähitaistelu: iskun kulku, osuman seuraukset ja törmäykset.
 import * as THREE from "three";
-import { ActionState, BASH, COMBAT, StrikeStyle, StrikeWeight, angleBetween, graceAfter, graceCovers, inStrikeZone, attackPhase, enemyAttackTiming, lungeProgress, makeAttack, resolveHit, shieldWear, staminaAfterBlock, staminaTick, strikeCost, strikeDamage, strikeLands, strikeTier, styleFor, weakened } from "../combat";
+import { ActionState, BASH, COMBAT, StrikeStyle, StrikeWeight, angleBetween, bashPushStep, graceAfter, graceCovers, inStrikeZone, attackPhase, enemyAttackTiming, lungeProgress, makeAttack, resolveHit, shieldWear, staminaAfterBlock, staminaTick, strikeCost, strikeDamage, strikeLands, strikeTier, styleFor, weakened } from "../combat";
 import { FALLEN } from "../fighter";
 import { effectiveStats } from "../stats";
 import { ARENA_RADIUS, groundHeight } from "../world";
@@ -60,7 +60,7 @@ export function resolveStrike(att: Actor, def: Actor) {
   let res = resolveHit({ distance: dist, angleToDefender }, defender, g.gameTime, atk);
   // Suoja-aika: juuri torjuttu isku pysäyttää hetken myös muiden lyöjien iskut edestä.
   const arc = def.shield ? def.shield.blockArc : def.weapon.blockArc;
-  const graced = res === "hit" && defState !== "stagger" && defState !== "rooted"
+  const graced = atk.kind !== "bash" && res === "hit" && defState !== "stagger" && defState !== "rooted"
     && graceCovers(g.gameTime, def.graceUntil, def.graceFrom === att, angleToAttacker, arc);
   if (graced) res = "blocked";
   else if (graceAfter(res) > 0) { def.graceUntil = g.gameTime + graceAfter(res); def.graceFrom = att; }
@@ -80,6 +80,13 @@ export function resolveStrike(att: Actor, def: Actor) {
   }
   if (res === "blocked" || res === "parried") def.stamina = staminaAfterBlock(def.stamina);
   const died = def.hp <= 0;
+  const pushed = atk.kind === "bash" && (res === "hit" || res === "guardbreak") && defState !== "rooted";
+  if (pushed && !died) {
+    const away = def.pos.clone().sub(att.pos).setY(0);
+    if (away.lengthSq() < 0.0001) away.set(Math.sin(att.yaw), 0, Math.cos(att.yaw));
+    def.bashPushDir.copy(away.normalize());
+    def.bashPushLeft = Math.max(def.bashPushLeft, COMBAT.bashPushDistance);
+  }
   if (def === g.player && songState && (res === "hit" || res === "guardbreak")) interruptSong();
   if (died) {
     setState(def, "dead");
@@ -106,8 +113,8 @@ export function resolveStrike(att: Actor, def: Actor) {
       if (prop) { scene.add(prop.group); g.debris.push(prop); sfx.clang(false); }
     }
     if (!isPlayer && defState === "block" && !died) showMsg("Väärä torjunta", `${STYLE_NAME[atk.kind]} meni läpi`, 0.9);
-    // Lyhyt horjahdus keskeyttää noston. Kilpityöntö ei riitä pysäyttämään jo alkanutta iskua.
-    const interrupts = defState === "idle" || defState === "block" || (defState === "windup" && atk.kind !== "bash");
+    // Lyhyt horjahdus keskeyttää noston; kilpityöntö pysäyttää myös jo alkaneen iskun.
+    const interrupts = atk.kind === "bash" ? defState !== "rooted" : defState === "idle" || defState === "block" || defState === "windup";
     if (!died && interrupts) {
       setState(def, "stagger");
       def.stateTime = COMBAT.staggerTime - COMBAT.hitStagger;
@@ -190,6 +197,15 @@ export function updateCombatant(a: Actor, dt: number) {
     a.stamina = staminaTick(a.stamina, a.stats.maxStamina, a.stats.staminaRegen, a.state === "block", dt);
   }
   a.dodgeCd -= dt;
+  if (a.state === "rooted") {
+    // Suohon juuttuminen katkaisee myös jo alkaneen horjahduksen; liike ei jatku vapautuessa.
+    a.bashPushLeft = 0;
+  } else if (a.bashPushLeft > 0) {
+    const step = bashPushStep(a.bashPushLeft, dt);
+    a.pos.addScaledVector(a.bashPushDir, step);
+    a.bashPushLeft -= step;
+    if (dt > 0) a.moveSpeed = step / dt;
+  }
   const t = a.timing;
 
   if (a.state === "windup" || a.state === "release" || a.state === "recovery") {

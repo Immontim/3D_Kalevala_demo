@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { BASH, ENEMY_AI, STYLES, StrikeStyle, StrikeWeight, angleBetween, canStrikeHeavy, exhausted, makeAttack, mayStartAttack, styleFor, turnToward } from "../combat";
+import { ENEMY_AI, STYLES, StrikeStyle, StrikeWeight, angleBetween, canStrikeHeavy, exhausted, makeAttack, mayStartAttack, shouldShieldBash, styleFor, turnToward } from "../combat";
 import { Actor, setState } from "./actor";
 import { bearing } from "./camera";
 import { moveActor, startAttack } from "./melee";
@@ -31,8 +31,12 @@ export function playerTurtles() { return g.player.state === "block" && g.gameTim
 
 /** Minkä iskun vihollinen tältä etäisyydeltä aloittaisi, tai null jos mikään ei ylety. */
 export function pickEnemyAttack(e: Actor, dist: number, quick = false): { kind: StrikeStyle | "bash"; weight: StrikeWeight } | null {
-  // Kilpityöntö murtaa aseella torjuvan pelaajan suojan; kilpeä vastaan se ei auta.
-  if (e.shield && !g.player.shield && playerTurtles() && dist < BASH.range - 0.1) return { kind: "bash", weight: "light" };
+  // Vain Pohjan kilpisoturi käyttää kilpityöntöä: varmasti pitkään torjuvaa vastaan,
+  // muuten pienellä satunnaisella mahdollisuudella lähietäisyydellä.
+  const off = Math.abs(angleBetween(e.yaw, bearing(e.pos, g.player.pos)));
+  if (shouldShieldBash(e.character === "pohja", !!e.shield, dist, off, playerTurtles(), quick, Math.random())) {
+    return { kind: "bash", weight: "light" };
+  }
   const kind = styleFor(e.weapon, STYLES[Math.floor(Math.random() * STYLES.length)]);
   // Pelkällä miekalla taisteleva lyö usein raskaasti, kilpimies harvoin.
   // Kilven takana seisovaa pelaajaa vastaan kaikki lyövät raskaasti: kilpi kuluu nopeammin.
@@ -41,7 +45,6 @@ export function pickEnemyAttack(e: Actor, dist: number, quick = false): { kind: 
   const weight: StrikeWeight = !quick && canStrikeHeavy(e.stamina) && Math.random() < heavy ? "heavy" : "light";
   const a = makeAttack(e.weapon, kind, weight);
   // Ei lyödä, jos pelaaja on kiertänyt iskun kaaren ulkopuolelle: isku menisi ohi.
-  const off = Math.abs(angleBetween(e.yaw, bearing(e.pos, g.player.pos)));
   return dist < a.range + 0.2 && dist > a.minRange + 0.1 && off < a.arc * 0.9 ? { kind, weight } : null;
 }
 
@@ -106,7 +109,8 @@ export function updateAi(e: Actor, dt: number) {
     const spear = e.loadout === "spear";
     // Vuoroaan odottava jää hieman kauemmas, jotta lyöjällä on tilaa.
     const turn = hasTurn(e);
-    const want = (turn ? 0 : ENEMY_AI.waitBack) + (ai.resting ? ENEMY_AI.restDistance : spear ? ENEMY_AI.distSpear : e.shield && !g.player.shield && playerTurtles() ? ENEMY_AI.distBash : ENEMY_AI.distSword);
+    const wantsBashRange = e.character === "pohja" && !!e.shield && playerTurtles();
+    const want = (turn ? 0 : ENEMY_AI.waitBack) + (ai.resting ? ENEMY_AI.restDistance : spear ? ENEMY_AI.distSpear : wantsBashRange ? ENEMY_AI.distBash : ENEMY_AI.distSword);
     const dir = toPlayer.clone().normalize();
     if (g.enemies.length > 1) {
       // Ryhmässä ei kierretä sankarin selän taakse: sieltä palataan kylkeä kohti.
@@ -141,7 +145,7 @@ export function updateAi(e: Actor, dt: number) {
       ai.decide = ENEMY_AI.decideMin + Math.random() * ENEMY_AI.decideRandom;
       if (Math.random() < 0.25) ai.strafeDir *= -1;
       const pick = mayAttack ? pickEnemyAttack(e, dist) : null;
-      if (pick && g.player.state !== "dead" && Math.random() < (pick.kind === "bash" ? ENEMY_AI.bashChance : ENEMY_AI.attackChance)) beginAttack(e, pick.kind, pick.weight);
+      if (pick && g.player.state !== "dead" && Math.random() < ENEMY_AI.attackChance) beginAttack(e, pick.kind, pick.weight);
     }
   } else {
     e.moveSpeed = 0;

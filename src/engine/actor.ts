@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import type { Ai } from "./ai";
 import { ActionState, AttackDef, AttackTiming, Loadout, SHIELDS, ShieldDef, StrikeStyle, WeaponDef, makeAttack, styleFor, weaponOf } from "../combat";
-import { Fighter, FighterLook, SwordTrail } from "../fighter";
+import { CharacterId, Fighter, FighterLook, SwordTrail } from "../fighter";
 import { Modifier, Stats, baseStats, effectiveStats } from "../stats";
 import { scene } from "./view";
 
@@ -16,6 +16,7 @@ export interface Actor {
   timing: AttackTiming;
   /** Käynnissä oleva tai viimeisin isku. */
   attack: AttackDef;
+  character: CharacterId;
   loadout: Loadout;
   weapon: WeaponDef;
   /** Ehjä kilpi, tai null jos kilpeä ei ole tai se on hajonnut. */
@@ -39,6 +40,9 @@ export interface Actor {
   rootTime: number;
   dodgeDir: THREE.Vector3;
   dodgeCd: number;
+  /** Kilpityönnön aiheuttaman taaksehorjahduksen suunta ja jäljellä oleva matka. */
+  bashPushDir: THREE.Vector3;
+  bashPushLeft: number;
   moveSpeed: number;
   extraRecovery: number;
   /** Tukiaskeleesta otettu osuus 0..1 ja paikka, josta askel lähti (kantama lasketaan siitä). */
@@ -68,8 +72,9 @@ export function makeActor(look: FighterLook, pos: THREE.Vector3, level: number, 
     base, mods: [], stats, stamina: stats.maxStamina,
     weapon, shield, shieldHp: shield ? shield.durability : 0, stance: "slash", charging: false,
     fighter, trail, pos: pos.clone(), yaw: 0, state: "idle", stateTime: 0, timing: { windup: 0.3, release: 0.1, recovery: 0.3 },
-    attack: makeAttack(weapon, styleFor(weapon, "slash"), "light"), loadout: look.loadout, struck: false, hp: stats.maxHp,
-    blockStart: -99, rootTime: 0, dodgeDir: new THREE.Vector3(), dodgeCd: 0, moveSpeed: 0, extraRecovery: 0,
+    attack: makeAttack(weapon, styleFor(weapon, "slash"), "light"), character: look.character, loadout: look.loadout, struck: false, hp: stats.maxHp,
+    blockStart: -99, rootTime: 0, dodgeDir: new THREE.Vector3(), dodgeCd: 0,
+    bashPushDir: new THREE.Vector3(), bashPushLeft: 0, moveSpeed: 0, extraRecovery: 0,
     lunged: 0, stepFrom: pos.clone(), graceUntil: -1, graceFrom: null, name: "", level, ai: null,
   };
 }
