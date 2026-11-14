@@ -7,37 +7,49 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
 
-- **Versio v00.18.00**, branch `claude/strike-step` (tarkista merge-tila
-  `git merge-base --is-ancestor`). Mainissa on v00.17.00.
-- **Tukiaskel ja osumahetki** (`combat.ts` `COMBAT.strikePoint`,
-  `lungeProgress`, `strikeLands`; `main.ts` `updateCombatant`): iskuvaiheen
-  alussa lyöjä astuu `lunge` metriä eteen, ja isku ratkeaa vasta
-  `strikePoint` (0,7) × release kohdalla. Kantama mitataan askeleen
-  lähtöpaikasta (`Actor.stepFrom`), joten askeleen pituus ei muuta
-  ulottumaa. Sivalluksen ja piston release on 0,2 s (raskas sivallus
-  0,22 s) ja palautuminen vastaavasti lyhyempi. Asennot `slashWindup`,
-  `thrustWindup` ja keihään `SPEAR_HOLD` vetävät aseen selvästi taakse;
-  etujalka nousee askeleessa (`Fighter.strideVel`).
-  Vihollisen terän kärjen välähdys (`Fighter.setGlow`) näkyy hahmojen läpi.
-- **Sankarin varusteet** valitaan aloitusikkunassa (`main.ts` `LOADOUTS`,
-  `savedLoadout()`); vaihto rakentaa sankarin heti, sivua ei ladata.
-- **Vapaa kääntyminen** (`main.ts` kohta "Katse ja lukitus", luvut
-  `controls.ts` `CONTROLS`): hiiri muuttaa `camYaw`/`camPitch`, sankari
-  kääntyy kohti `camYaw`ta nopeudella `Stats.turnSpeed`, WASD liikkuu
-  `camYaw`n suhteen. Lukitus (`lock`, Tab / keskinappi) on kytkin `lockOn`:
-  `camYaw` seuraa vastustajaa (`lockTarget()`) ja jää päälle seuraavaan
-  aaltoon. Omistaja pelasi ja hyväksyi 2026-11-14.
+- **Versio v01.00.00**, branch `claude/engine-split` (tarkista merge-tila
+  `git merge-base --is-ancestor`). Mainissa on v00.18.00.
+- **Rakenne.** `src/engine/` on kohtaus- ja taistelumoottori, `src/ui/` sivun
+  ikkunat (aloitus, tauko, säätö), `src/main.ts` vain käynnistys ja
+  `src/debug.ts` savutestien `__game`. Säännöt ja luvut ovat yhä puhtaissa
+  moduuleissa (`combat.ts`, `stats.ts`, `songLogic.ts`, `tuning.ts`).
+  Moottorin osat: `state.ts` (yhteinen tila `g`, `aim`, `inputs`, `fx`),
+  `view.ts` (piirto), `actor.ts`, `hero.ts` (sankari ja ohjaus),
+  `enemies.ts`, `ai.ts`, `melee.ts`, `animate.ts`, `camera.ts`, `song.ts`,
+  `hud.ts`, `effects.ts`, `input.ts`, `loop.ts` (pääsilmukka, tauko).
+  Moduulit eivät tee mitään ladattaessa: `main.ts` kutsuu `init…`-funktiot
+  järjestyksessä. Tila on moduulitasolla, eli yksi moottori sivua kohti.
+- **Vastustajat ovat lista** `g.enemies` (vain elossa olevat; kaatunut
+  siirtyy heti `g.corpses`iin, `enemyDown`). Jokaisella on oma `Actor.ai`,
+  `level` ja `name`. `lockTarget()` pitää kohteen `aim.target` ja vaihtaa
+  kaatuneen tilalle lähimmän; `focusEnemy()` (lukittu tai lähin) on
+  mittarien ja laulun kohde. Sankarin isku osuu yhteen: lukittuun tai
+  lähimpään ulottuvilla olevaan (`melee.ts` `strikeTarget`).
+- **Kohtaus** (`engine/encounter.ts` `Encounter`: `start`, `update`,
+  `onEnemyDown`) päättää, keitä kentälle tuodaan (`addEnemy`). Moottori ei
+  tiedä aalloista: aaltotaistelu on `skirmish.ts`, tyhjä kohtaus `peace`.
+  Vaihto `startEncounter()`. Tuleva RPG-kerros kutsuu moottoria tätä kautta.
+- **Tukiaskel ja osumahetki** (`COMBAT.strikePoint`, `lungeProgress`,
+  `strikeLands`; `melee.ts` `updateCombatant`): lyöjä astuu `lunge` metriä
+  eteen, ja isku ratkeaa `strikePoint` (0,7) × release kohdalla. Kantama
+  mitataan askeleen lähtöpaikasta (`Actor.stepFrom`). Vihollisen terän
+  kärjen välähdys (`Fighter.setGlow`) näkyy hahmojen läpi.
+- **Sankarin varusteet** valitaan aloitusikkunassa (`hero.ts` `LOADOUTS`).
+- **Vapaa kääntyminen** (`aim.yaw`/`aim.pitch`, luvut `controls.ts`):
+  hiiri kääntää katsetta, sankari kääntyy sitä kohti nopeudella
+  `Stats.turnSpeed`, WASD liikkuu katseen suhteen. Lukitus (Tab /
+  keskinappi) on kytkin `aim.lockOn`.
 - **Vastustajan kääntyminen** (`updateAi`): kohti `ai.seen`ia, joka seuraa
-  pelaajaa `Stats.reaction` jäljessä; iskun, horjahduksen ja väistön aikana
-  kertoimella `ENEMY_AI.attackTurnScale`. `pickEnemyAttack` ei aloita
-  iskua, jos pelaaja on yli 0,9 × iskun kaaren sivussa.
+  pelaajaa `Stats.reaction` jäljessä; iskun aikana kertoimella
+  `ENEMY_AI.attackTurnScale`. `pickEnemyAttack` ei aloita iskua, jos
+  pelaaja on yli 0,9 × iskun kaaren sivussa.
 - **Torjuntasektorit** (`WEAPONS.*.blockArc` π/4 = ±45°,
   `SHIELDS.round.blockArc` π/3 = ±60°; omistajan päätös 2026-11-14).
 - **Kaksi taistelupaikkaa** (`src/world.ts`): `ARENA` on tällä latauksella
   käytössä oleva paikka (`"clearing"` = nuotioaukio, `"homestead"` =
   pihapiiri), luettu avaimesta `laulun-miekka.arena.v1`. Maailma
   rakennetaan kerran moduulin latautuessa, joten aloitusikkunan valinta
-  (`#arenaPick`, `main.ts`) kutsuu `saveArena()` ja lataa sivun uudelleen.
+  (`#arenaPick`, `ui/startMenu.ts`) kutsuu `saveArena()` ja lataa sivun uudelleen.
   Paikkojen erot ovat taulukossa `SITES` (tasaisen alueen säde, puiden
   ja varvikon raja, tallattu maa, nuotion paikka, rakennusten pohjat
   `footprints`, kameran raja `camMaxR`). Metsä, valo ja taistelukehä
@@ -59,39 +71,31 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
   --python`), koska Blender MCP:n taustatyökalu ei löydä Blenderiä
   (`BLENDER_PATH` puuttuu) ja avoimessa Blenderissä oli tallentamaton
   `characters.blend`.
-- **Mittarit** (`main.ts` `meterOff`, `placeMeters`): tauolla raahattavat,
+- **Mittarit** (`ui/pauseMenu.ts` `meterOff`, `placeMeters`): tauolla raahattavat,
   siirtymä tallentuu avaimeen `laulun-miekka.meters.v1`.
-- **Laulut ja valinta** (`src/songLogic.ts`: `SONGS`, `SONG_SLOTS`,
-  `HEAL_VERSES`, `healOnHit`, `slotPositions`; kulku `main.ts` kohdassa
-  "Laulun valinta"): laulunappi täydellä voimalla → `openChoice()`:
-  `choosing` pysäyttää maailman kokonaan (dt = 0), hiiren lukitus
-  vapautetaan (`choiceUnlock` estää automaattisen tauon) ja viisi
-  laulupaikkaa (`#choice .slot`, HTML) asetellaan joka ruutu kaarelle
-  hahmon ympärille. Valinta pikanäppäimellä (toiminnot `song1`–`song5`,
-  oletus F1–F5, `bindings.ts`) tai napsauttamalla → `startSong(id)`;
-  laulunappi uudestaan peruu ja voima säilyy. Laulu, joka tarvitsee elävän
-  vastustajan (`needsEnemy`), näkyy himmeänä eikä valikoidu ilman sitä.
-  **Uusi laulu:** lisää `SongId`, rivi `SONGS`iin, paikka `SONG_SLOTS`iin,
-  väri `.slot.<id>` (style.css) ja vaikutus `judge`/`endSong`iin.
-  Parannuslaulu antaa `SONG.healPerHit` (5) elämää heti osumasta, joten
-  katkennutkin laulu auttaa, eikä sillä ole osumarajaa.
+- **Laulut ja valinta** (`src/songLogic.ts`: `SONGS`, `SONG_SLOTS`; kulku
+  `engine/song.ts`): laulunappi täydellä voimalla → `openChoice()`:
+  `choosing` pysäyttää maailman (dt = 0), hiiri vapautetaan
+  (`g.choiceUnlock` estää automaattisen tauon) ja viisi laulupaikkaa
+  asetellaan hahmon ympärille. Valinta pikanäppäimellä (`song1`–`song5`,
+  oletus F1–F5) tai napsauttamalla → `startSong(id)`; laulunappi uudestaan
+  peruu ja voima säilyy. Vastustajaa tarvitseva laulu (`needsEnemy`) ei
+  valikoidu ilman sitä. **Uusi laulu:** `SongId`, rivi `SONGS`iin, paikka
+  `SONG_SLOTS`iin, väri `.slot.<id>` ja vaikutus `judge`/`endSong`iin.
+  Parannuslaulu antaa `SONG.healPerHit` (5) elämää heti osumasta.
 - **Kilven asento** (`src/fighter.ts`): `shieldHang` 0..1 kääntää kilven
   torjunnasta (`SHIELD_FRONT`) roikkumaan kyljelle (`SHIELD_HANG_YAW`).
-- **Askellus ja elävyys** (`src/fighter.ts`, taulukko `GAIT`): hahmon
-  nopeus mitataan `root`in todellisesta siirtymästä hahmon omassa
-  koordinaatistossa (`animate`), ja `apply` laskee kummallekin jalalle
-  paikan (asennon mukainen paikka + askel) ja ratkaisee siitä reiden ja
-  polven kulmat. Maassa olon aikana jalka kulkee vartaloon nähden hahmon
-  nopeudella taaksepäin, joten se ei liu'u. `animate`n `moveSpeed` kertoo
-  vain, onko liike kävelyä: iskun työntö ja väistö eivät askella.
-  Lantio, hartiat, painonsiirto ja hengitys lasketaan samassa kohdassa.
-  Mittari: `__game.feet`.
+- **Askellus ja elävyys** (`src/fighter.ts`, taulukko `GAIT`): nopeus
+  mitataan `root`in todellisesta siirtymästä, ja `apply` ratkaisee jalkojen
+  kulmat jalan paikasta, joten maassa oleva jalka ei liu'u. `animate`n
+  `moveSpeed` kertoo, onko liike kävelyä: iskun työntö ja väistö eivät
+  askella. Mittari: `__game.feet`.
 - **Kaatuminen** (`src/fighter.ts`, taulukko `FALLEN`, `Fighter.fall`,
-  `dropGear()`; valinta `main.ts` `fallDown()`). **Päätös:** kaatuneet
+  `dropGear()`; valinta `engine/melee.ts` `fallDown()`). **Päätös:** kaatuneet
   tehdään luurangolla, ei omina malleina. Savutestissä
   `__game.fallShowcase(n)`.
 - **Kaikki pelin luvut ovat parametritaulukoissa**, eikä uusia lukuja
-  kovakoodata `main.ts`:ään:
+  kovakoodata moottoriin:
   - `src/combat.ts`: `CHARACTERS` (hahmon hp, stamina, staminaRegen, power,
     moveSpeed; vastustajilla aallon 0 arvot), `WAVES` (kasvu per aalto,
     pelaajan lepo, aaltojen väli), `STAMINA` (hinnat), `COMBAT` (ajat ja
@@ -108,7 +112,7 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
   loitsut ja esineet tehdään lisäämällä muunnin** (`withModifier`), ei
   muuttamalla taistelukoodia. Pelissä ei vielä ole yhtään muunninta;
   savutestissä `__game.addModifier("player", {...})`.
-- **Säätö** (`src/tuning.ts`, käyttöliittymä `main.ts` kohdassa
+- **Säätö** (`src/tuning.ts`, käyttöliittymä `ui/pauseMenu.ts` kohdassa
   "Säätövälilehti"): jokainen taulukon luku on säädettävissä polulla
   (esim. `weapons.spear.reach`). `FIELDS` listaa taukoikkunan 31 kenttää
   rajoineen; muut polut voi muuttaa JSON-tekstin kautta. Malli: luonnos →
@@ -118,18 +122,14 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
   `{ peli, versio, muutokset: { ...vain poikkeavat arvot puuna } }`.
   **Kun omistaja liittää JSONin keskusteluun, sen arvot kirjoitetaan
   taulukoiden oletuksiksi** ja omistaja palauttaa säätönsä oletuksiin.
-- **Laulun rytmipeli** (`src/songLogic.ts` puhdas logiikka ja kaikki luvut
-  taulukossa `SONG`, kulku `src/main.ts`): valinnan jälkeen maailma
-  hidastuu (`slowmo` 1/15), `intro` 0,6 s (lauluasento `POSES.sing` on
-  otettu jo valinnan aikana), sitten riimuja yhtä monta kuin laulussa on
-  säkeitä (8), kunkin alla osuma-alue (`zoneFirst` 0,24, jokainen seuraava
-  `zoneShrink` 0,84 × edellinen). `speed` 1,5 on nauhan nopeus: riimujen
-  väli (0,53 s) ja alueiden kesto jaetaan sillä; vaikeutta säädetään
-  ensisijaisesti siitä. Painallus arvioidaan aina seuraavaa riimua
-  vastaan. Suolaulu laukeaa `minHits` 4 osumalla; kesto on osumat ×
-  `rootTimePerHit` 0,75 s. Vastustajan osuma kesken laulun kutsuu
-  `interruptSong()`. Voima nollataan laulun alussa. Tauko pysäyttää myös
-  riimut.
+- **Laulun rytmipeli** (`src/songLogic.ts`, luvut taulukossa `SONG`; kulku
+  `engine/song.ts`): maailma hidastuu (`slowmo` 1/15), `intro` 0,6 s, sitten
+  riimu jokaista säettä kohti (8), kunkin alla osuma-alue (`zoneFirst`
+  0,24, seuraava aina `zoneShrink` 0,84 × edellinen). Vaikeutta säädetään
+  ensisijaisesti nauhan nopeudesta `speed` (1,5). Suolaulu laukeaa
+  `minHits` 4 osumalla; kesto on osumat × `rootTimePerHit` 0,75 s.
+  Vastustajan osuma katkaisee laulun (`interruptSong()`). Voima nollataan
+  laulun alussa. Tauko pysäyttää myös riimut.
 - **Keihäsote** (`src/fighter.ts`, `SPEAR_HOLD`, `holdShaft()` + `twoBone()`):
   kädet viedään varrelle käänteiskinematiikalla; otekanava `grip_carve`
   (`char_build.py`, koodissa `GRIP_CHANNEL`). Mittari `fighter.spearGripDebug()`.
@@ -157,7 +157,7 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
 - **Kilven hajoaminen** (`src/fighter.ts`): lovi ja sirpaleet tehdään
   shaderilla kilven materiaaliin (`patchShield`, `ShieldDebris`), ei omilla
   malleilla. Pelaaja saa uuden kilven jokaiseen aaltoon.
-- **Tekoäly** (`pickEnemyAttack`, `src/main.ts`): arpoo iskusuunnan ja
+- **Tekoäly** (`pickEnemyAttack`, `src/engine/ai.ts`): arpoo iskusuunnan ja
   painon varustuksen mukaan, lyö raskaasti kilven takana seisovaa pelaajaa,
   ja aseella torjuessaan arvaa suunnan oikein sitä useammin, mitä pidemmällä
   aalloissa ollaan. Keihäällä voi vain pistää.
@@ -175,16 +175,14 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
   (Actions-ajo "Julkaise GitHub Pagesiin"); v00.10.00 ja v00.11.00 eivät
   ole mainissa. **Omistaja testaa julkaistusta osoitteesta**, ei
   dev-serveriltä.
-- **Käsin testattu 2026-11-14** (in-app browser, skriptattu syöte):
-  varusteen valinta, keihäspiston askel 0,8 m, osuma 0,14 s iskuvaiheen
-  alusta, asennot kuvista, välähdys; ei konsolivirheitä. **Ei testattu:**
-  uusien iskujen tuntuma ja tasapaino ihmisen pelaamana, sankari keihäällä
-  tai pelkällä miekalla koko aallon läpi. **2026-11-13:** pihapiiri, 60 FPS.
-  **Ei testattu:** ihmisen pelaamana; buildattu versio selaimessa;
-  hitaampi kone. Aiemmista yhä kokeilematta: mittarien
-  raahaus oikealla hiirellä, hiiren lukitus laulun valinnassa, F1–F5
-  oikeassa selaimessa, askellus ihmisen silmin, kaatuneet kaltevalla
-  maalla, suossa kuoleva vastustaja.
+- **Käsin testattu 2026-11-14** (in-app browser, skriptattu syöte): aallot
+  1–3 läpi, laulun valinta, tyhjä kohtaus (`__game.encounter("peace")`:
+  kävely, isku ilmaan, lukitus, suolaulu pois käytöstä), kaksi vastustajaa
+  (`__game.addEnemy`): molemmat hyökkäävät, lukitus siirtyy, seuraava aalto
+  vasta molempien kaaduttua; ei konsolivirheitä. **Ei testattu:** oikea
+  hiiri ja näppäimistö jaon jälkeen, tauko- ja säätöikkuna käsin.
+  Aiemmista yhä kokeilematta: buildattu versio, hitaampi kone, hiiren
+  lukitus laulun valinnassa, kaatuneet kaltevalla maalla.
 - **Komennot 2026-11-14:** `bun run test` (69/69), `bun run lint`,
   `bun run build` ok.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
@@ -227,11 +225,12 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
   ote harittaa läheltä (ei sormiluita); kämmenen kierto näkyy kyynärvarren
   hihassa; pistossa etukäsi on ulottuvuutensa rajalla, minkä vuoksi vartalo
   kiertyy nyt vasen olka edellä; iskun alussa ranne hypähtää noin 40°.
-- **Vapaan kääntymisen avoimet asiat:** tasapaino on arvaus (urho voi olla
-  liian helppo kiertää). Kosketusnäytön napit ovat yhä koodissa, mutta
-  niillä ei voi kääntyä; niitä ei ylläpidetä. Hiiren pystyliike ei vaikuta
-  iskuihin, vain kameraan. Lukitus kohdistuu ainoaan vastustajaan; usean
-  vastustajan kohteen valinta tehdään vaiheessa 2.
+- **Vapaan kääntymisen avoimet asiat:** tasapaino on arvaus. Kosketusnäytön
+  napit ovat yhä koodissa, mutta niitä ei ylläpidetä. Hiiren pystyliike
+  vaikuttaa vain kameraan.
+- **Usean vastustajan avoimet asiat:** hyökkäysvuoroa ei vielä ole, joten
+  kaksi vastustajaa lyö yhtä aikaa (vain `__game.addEnemy`lla kokeiltavissa).
+  Vastustajan iskuvihje (`#cue`) näyttää vain mittarin kohteen.
 - **Pihapiirin avoimet viat:** rakennuksiin, aitaan ja tuleen ei voi
   törmätä (taistelukehä pitää hahmot pihalla, mutta kaatuneen varusteet
   voivat lentää aidan läpi); kamera on kehän reunalla lähellä pelaajaa;
@@ -273,13 +272,16 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
 
 ## Seuraava tehtävä
 
-Omistaja pelaa uusilla iskuilla ja varustevalinnalla julkaistusta
-osoitteesta mergen jälkeen ja kertoo, näkyykö lataus ja ehtiikö siihen
-reagoida.
-Sen jälkeen vaihe 2: 2 vastustajaa aalloissa 4–5 ja 3 aallosta 6 alkaen,
-hyökkäysvuoro (vain yksi lyö kerrallaan), ryhmäkerroin elämälle
-(ehdotus 60 % / 45 %), lukituksen kohteen valinta ja pienet palkit pään
-päällä. Versio v01.00.00 (datamallin muutos: `enemy` → lista). Lisäksi yhä auki: kaatuneiden ulkonäkö ja
+Omistaja kokeilee julkaistusta osoitteesta, että peli toimii jaon jälkeen
+kuten ennen (aloitus, tauko, säätö, laulu, uusi peli). Sitten **askel 2**
+(v01.01.00): aaltojen kokoonpano taulukkoon (aallot 1–3 yksi, 4–5 kaksi,
+6+ kolme), elämän ryhmäkerroin (ehdotus 60 % / 45 %), hyökkäysvuoro (yksi
+lyö kerrallaan, seuraava aikaisintaan 0,5 s päästä), asemointi kyljille,
+vastustajat väistävät toisiaan. **Askel 3:** lukituksen kohteen vaihto,
+pienet palkit päiden päällä, varoitus selän takaa. **Askel 4:** suoja-aika
+onnistuneen torjunnan jälkeen (0,6 s, täydellisellä 1,0 s) torjuntasektorin
+sisällä; omistajan päätös 2026-11-14: ei 180°:n sektoria.
+Lisäksi yhä auki: kaatuneiden ulkonäkö ja
 Säätö-välilehden arvot (Kopioi arvot) oletuksiksi kirjattaviksi.
 
 ## Ei vielä aloiteta

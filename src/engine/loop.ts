@@ -1,0 +1,163 @@
+// Pääsilmukka, uusi peli ja tauko.
+import { SONG } from "../songLogic";
+import { openTune, renderBinds } from "../ui/pauseMenu";
+import { groundHeight } from "../world";
+import { removeActor } from "./actor";
+import { updateAi } from "./ai";
+import { syncVisual } from "./animate";
+import { updateCamera } from "./camera";
+import { $, isTouch } from "./dom";
+import { bog, updateRing, updateSparks } from "./effects";
+import { clearEnemies } from "./enemies";
+import { spawnHero, updatePlayer } from "./hero";
+import { showMsg, tickMsg, updateHud } from "./hud";
+import { clearInputs, lockPointer } from "./input";
+import { keepApartAndInside, updateCombatant } from "./melee";
+import { updateShowcase } from "./showcase";
+import { choosing, closeChoice, closeSong, songState, updateChoice, updateSong } from "./song";
+import { aim, bindUi, fx, g, inputs } from "./state";
+import { camera, canvas, composer, world } from "./view";
+
+export function onPlayerDeath() {
+  g.gameOver = true;
+  showMsg("Kaaduit", isTouch ? "Napauta aloittaaksesi alusta" : "Paina R aloittaaksesi alusta", 9999);
+}
+export function restart() {
+  clearEnemies();
+  for (const a of [g.player, ...g.corpses.map((c) => c.actor)]) removeActor(a);
+  g.corpses.length = 0;
+  for (const d of g.debris) d.dispose();
+  g.debris.length = 0;
+  spawnHero();
+  aim.yaw = 0;
+  aim.pitch = 0;
+  g.songPower = 0;
+  if (songState) closeSong(true);
+  if (choosing) closeChoice();
+  g.gameOver = false;
+  g.encounter.start();
+  lockPointer();
+}
+
+// ---------- Pääsilmukka ----------
+export let last = performance.now();
+export let fpsAcc = 0, fpsFrames = 0;
+export function frame(now: number) {
+  const realDt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  simulate(realDt);
+  composer.render();
+  requestAnimationFrame(frame);
+}
+
+/** Yksi pelin askel ilman piirtoa. Erillään, jotta savutesti voi ajaa peliä tasaisin askelin. */
+export function simulate(realDt: number) {
+  if (!paused) g.realTime += realDt; // tauko pysäyttää myös laulun riimut
+  fpsAcc += realDt; fpsFrames++;
+  if (fpsAcc > 0.5) { $("fps").textContent = String(Math.round(fpsFrames / fpsAcc)); fpsAcc = 0; fpsFrames = 0; }
+
+  if (g.gameOver && isTouch && inputs.beatQueued) restart();
+
+  // Laulu hidastaa maailman nopeasti; paluu normaaliin on pehmeämpi.
+  const targetScale = songState ? SONG.slowmo : 1;
+  g.timeScale += (targetScale - g.timeScale) * (1 - Math.exp(-(songState ? 16 : 6) * realDt));
+  let dt = realDt * g.timeScale;
+  if (fx.hitstop > 0) { fx.hitstop -= realDt; dt = 0; }
+
+  // Laulun valinta pysäyttää maailman kokonaan; vain laulaja ottaa asentonsa.
+  if (paused || choosing) dt = 0;
+  if (g.running && !paused && choosing) updateChoice();
+  else if (g.running && !paused) {
+    g.gameTime += dt;
+    updateSong();
+    updatePlayer(dt);
+    updateCombatant(g.player, dt);
+    // Kopio listasta: kesken kierroksen kaatunut vastustaja poistuu elävien listalta.
+    for (const e of [...g.enemies]) {
+      if (e.state === "dead") continue;
+      updateAi(e, dt);
+      updateCombatant(e, dt);
+    }
+    keepApartAndInside([g.player, ...g.enemies]);
+    g.encounter.update(dt);
+    for (let i = g.corpses.length - 1; i >= 0; i--) {
+      if (g.gameTime > g.corpses[i].removeAt) {
+        removeActor(g.corpses[i].actor);
+        g.corpses.splice(i, 1);
+      }
+    }
+  }
+
+  // Laulaja liikkuu omassa ajassaan, vaikka maailma on hidastettu.
+  syncVisual(g.player, (songState || choosing) && !paused ? realDt : dt);
+  for (const e of g.enemies) syncVisual(e, dt);
+  for (const c of g.corpses) syncVisual(c.actor, dt);
+  updateShowcase(realDt);
+  for (let i = g.debris.length - 1; i >= 0; i--) {
+    if (!g.debris[i].update(dt, groundHeight)) { g.debris[i].dispose(); g.debris.splice(i, 1); }
+  }
+
+  // Suo
+  bog.update(fx.bogDemo ? realDt : dt, fx.bogDemo ?? g.enemies.find((e) => e.state === "rooted")?.pos ?? null);
+
+
+  updateRing(realDt);
+
+
+  world.update(g.realTime, dt, camera);
+  updateSparks(dt);
+  fx.shake = Math.max(0, fx.shake - realDt * 1.2);
+  updateCamera(realDt);
+  updateHud();
+
+
+  tickMsg(realDt);
+
+  inputs.strikeQueued = null;
+  inputs.dodgeQueued = inputs.songQueued = inputs.beatQueued = false;
+  inputs.pickQueued = null;
+}
+
+// ---------- Hiiren lukitus ja tauko ----------
+// Hiiri lukitaan pelin ajaksi, jotta kursori ei karkaa pelialueelta ja vie
+// klikkauksia muualle. Jos lukitus ei ole saatavilla (esim. upotettu näkymä),
+// peli pysähtyy, kun hiiri tai fokus lähtee ikkunasta.
+export let paused = false;
+export let pausedAt = 0;
+export let pointerLockWorked = false;
+
+export function pause() {
+  if (!g.running || paused || g.gameOver) return;
+  paused = true;
+  pausedAt = performance.now();
+  clearInputs();
+  renderBinds();
+  openTune();
+  $("pause").classList.remove("hidden");
+  $("hud").classList.add("arrange");
+}
+
+export function resume() {
+  if (performance.now() - bindUi.endedAt < 350) return; // klikkaus, jolla juuri sidottiin hiiren nappi
+  bindUi.capture = null;
+  paused = false;
+  $("pause").classList.add("hidden");
+  $("hud").classList.remove("arrange");
+  last = performance.now();
+  if (!choosing) lockPointer();
+}
+
+export function autoPauseNow() { if (g.autoPause) pause(); }
+
+export function initLoop() {
+  document.addEventListener("pointerlockchange", () => {
+    if (document.pointerLockElement === canvas) pointerLockWorked = true;
+    else if (g.choiceUnlock) g.choiceUnlock = false;
+    else if (pointerLockWorked) autoPauseNow();
+  });
+
+  window.addEventListener("blur", () => { clearInputs(); autoPauseNow(); });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) autoPauseNow(); });
+  document.addEventListener("mouseleave", () => { if (!pointerLockWorked && !isTouch) autoPauseNow(); });
+  $("resumeBtn").addEventListener("click", resume);
+}

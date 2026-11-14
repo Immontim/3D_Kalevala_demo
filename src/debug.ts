@@ -1,0 +1,123 @@
+import * as THREE from "three";
+import { cloneBindings } from "./bindings";
+import { COMBAT } from "./combat";
+import { setState } from "./engine/actor";
+import { tmpB } from "./engine/animate";
+import { peace } from "./engine/encounter";
+import { addEnemy, focusEnemy, lockTarget, startEncounter } from "./engine/enemies";
+import { bindings } from "./engine/input";
+import { pause, paused, resume, simulate } from "./engine/loop";
+import { setShowcase, showcase } from "./engine/showcase";
+import { ENEMIES, currentWave, skipToWave, skirmish } from "./engine/skirmish";
+import { choosing, slotEls, songState } from "./engine/song";
+import { aim, fx, g, inputs } from "./engine/state";
+import { scene } from "./engine/view";
+import { FALLEN, POSES } from "./fighter";
+import { Modifier, withModifier } from "./stats";
+import { changedValues } from "./tuning";
+import { meterOff } from "./ui/pauseMenu";
+import { ARENA, groundHeight } from "./world";
+
+export function initDebug() {
+  // Kehityskäyttöön ja savutesteihin: tila näkyy konsolista.
+  // "enemy" tarkoittaa tässä vastustajaa, jota mittarit koskevat: lukittua tai lähintä.
+  const d = { get enemy() { return focusEnemy(); } };
+  (window as unknown as { __game: unknown }).__game = {
+    get state() {
+      return { pos: g.player.pos.toArray().map((v) => +v.toFixed(2)), yaw: +g.player.yaw.toFixed(2), dist: d.enemy ? +d.enemy.pos.distanceTo(g.player.pos).toFixed(2) : null, ai: d.enemy?.ai ? { ...d.enemy.ai } : null, player: g.player.state, playerAttack: `${g.player.attack.kind}/${g.player.attack.weight}`, playerHp: g.player.hp, playerStamina: +g.player.stamina.toFixed(2), enemyStamina: d.enemy ? +d.enemy.stamina.toFixed(2) : null, playerShield: g.player.shieldHp, stance: g.player.stance, enemy: d.enemy?.state, enemyYaw: d.enemy ? +d.enemy.yaw.toFixed(2) : null, enemyPos: d.enemy ? [+d.enemy.pos.x.toFixed(2), +d.enemy.pos.z.toFixed(2)] : null, enemyAttack: d.enemy ? `${d.enemy.attack.kind}/${d.enemy.attack.weight}` : null, enemyShield: d.enemy?.shieldHp, enemyHp: d.enemy?.hp, song: g.songPower, wave: currentWave(), enemies: g.enemies.length, timeScale: g.timeScale };
+    },
+    get events() { return [...g.events]; },
+    /** Katse ja lukitus (savutestit): yaw ja pitch radiaaneina. */
+    get look() { return { camYaw: +aim.yaw.toFixed(3), camPitch: +aim.pitch.toFixed(3), lockOn: aim.lockOn, locked: !!lockTarget(), playerYaw: +g.player.yaw.toFixed(3), enemyYaw: d.enemy ? +d.enemy.yaw.toFixed(3) : null }; },
+    setLook(yaw: number, pitch = aim.pitch) { aim.yaw = yaw; aim.pitch = pitch; },
+    setLock(on: boolean) { aim.lockOn = on; },
+    /** Käytössä oleva taistelualue ("clearing" tai "homestead"). */
+    get arena() { return ARENA; },
+    get song() { return songState ? { results: [...songState.results], done: songState.endAt >= 0, realTime: g.realTime, playAt: songState.playAt, beats: songState.beats } : null; },
+    fillSong() { g.songPower = COMBAT.songMax; },
+    get meters() { return JSON.parse(JSON.stringify(meterOff)); },
+    pause() { pause(); },
+    get choosing() { return choosing; },
+    /** Savutesti: valitsee laulupaikan kuin pikanäppäimellä. */
+    pick(i: number) { inputs.pickQueued = i; },
+    get slots() { return slotEls.map((e) => ({ cls: e.className, text: e.textContent, x: Math.round(parseFloat(e.style.left)), y: Math.round(parseFloat(e.style.top)), size: Math.round(parseFloat(e.style.width)) })); },
+    /** Lisää ajonaikaisen vaikutuksen kykyihin (savutestit): who = "player" tai "enemy". */
+    addModifier(who: "player" | "enemy", mod: Modifier) { const a = who === "player" ? g.player : d.enemy; if (a) a.mods = withModifier(a.mods, mod); },
+    get stats() { return { player: { ...g.player.stats }, enemy: d.enemy ? { ...d.enemy.stats } : null }; },
+    /** Säädetyt arvot polku → arvo. */
+    get tuning() { return Object.fromEntries(changedValues()); },
+    /** Asettaa kestävyydet (savutestit); null jättää ennalleen. */
+    setHp(p: number) { g.player.hp = Math.min(g.player.stats.maxHp, p); },
+    setStamina(p: number | null, e: number | null = null) { if (p !== null) g.player.stamina = p; if (e !== null && d.enemy) d.enemy.stamina = e; },
+    /** Laulaa vastustajan suoraan suohon t sekunniksi (savutestit). */
+    root(t = 3) { if (d.enemy && d.enemy.state !== "dead") { setState(d.enemy, "rooted"); d.enemy.rootTime = t; } },
+    /** Siirtää pelaajan annettuun kohtaan (savutestit). */
+    get feet() { return { player: g.player.fighter.feetDebug(), enemy: d.enemy?.fighter.feetDebug() ?? null }; },
+    placePlayer(x: number, z: number) { g.player.pos.set(x, groundHeight(x, z), z); },
+    /** Lennättää vastustajan kypärän päästä (tehosteen kokeiluun). */
+    knockHelmet() {
+      if (!d.enemy) return false;
+      const prop = d.enemy.fighter.knockHelmet(new THREE.Vector3(Math.sin(d.enemy.yaw + 2), 0, Math.cos(d.enemy.yaw + 2)));
+      if (prop) { scene.add(prop.group); g.debris.push(prop); }
+      return !!prop;
+    },
+    get bindings() { return cloneBindings(bindings); },
+    /** Irtokappaleiden (kypärät, kilven palat) korkeus maasta metreinä: leijuvan kappaleen tunnistaa tästä. */
+    get debrisHeights() { return g.debris.map((d) => +(d.group.position.y - groundHeight(d.group.position.x, d.group.position.z)).toFixed(2)); },
+    /** Ajaa peliä n askelta eteenpäin ruudunpäivityksestä riippumatta (savutestit). */
+    tick(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) simulate(dt); },
+    /** Asennot muokattavina: hahmorivin kanssa asentoja voi säätää lennossa konsolista. */
+    poses: POSES,
+    /** Vaihtaa vastustajan suoraan annetun aallon vastustajaan (1 = urho ja miekka, 3 = keihäs, 4 = kilpi). */
+    skipTo(n: number) {
+      skipToWave(n);
+    },
+    /** Vaihtaa kohtauksen: "skirmish" = aaltotaistelu, "peace" = ei vastustajia. */
+    encounter(kind: "skirmish" | "peace") { startEncounter(kind === "peace" ? peace : skirmish); },
+    /** Tuo kentälle ylimääräisen vastustajan (i = rivi taulukossa ENEMIES) annettuun kohtaan. */
+    addEnemy(i: number, x: number, z: number, level = 1) {
+      const def = ENEMIES[i % ENEMIES.length];
+      addEnemy({ name: def.name, look: def.look, level }, new THREE.Vector3(x, groundHeight(x, z), z));
+    },
+    /** Elossa olevat vastustajat: nimi, tila, elämä ja paikka. */
+    get enemies() { return g.enemies.map((e) => ({ name: e.name, state: e.state, hp: e.hp, pos: [+e.pos.x.toFixed(2), +e.pos.z.toFixed(2)] })); },
+    /** Hahmorivi: kaikki hahmot ja varustukset näkyviin aukion keskelle. */
+    showcase(on = true, pose?: string) { setShowcase(on, pose); },
+    /** Kaataa hahmorivin annettuun makuuasentoon (0..n-1) kuvakaappauksia varten; drop = pudota varusteet. */
+    fallShowcase(variant = 0, drop = true) {
+      for (const s of showcase) {
+        s.fighter.fallen = FALLEN[variant % FALLEN.length];
+        s.fighter.fall = 1;
+        if (drop) for (const d of s.fighter.dropGear()) { scene.add(d.group); g.debris.push(d); }
+      }
+      return FALLEN[variant % FALLEN.length].name;
+    },
+    /** Makuuasennot muokattavina konsolista. */
+    fallen: FALLEN,
+    /** Hahmorivin aseiden kärjen vaakaetäisyys hahmon keskipisteestä (m): kantaman vertailuun malliin. */
+    get showcaseReach() {
+      return showcase.map((s) => {
+        s.fighter.bladeTip.getWorldPosition(tmpB);
+        return { look: `${s.fighter.look.character}/${s.fighter.look.loadout}`, pose: s.pose, reach: +Math.hypot(tmpB.x - s.fighter.root.position.x, tmpB.z - s.fighter.root.position.z).toFixed(2) };
+      });
+    },
+    /** Vapaa kamera kuvakaappauksia varten; null palauttaa pelikameran. */
+    setCamera(pos: number[] | null, look: number[] = [0, 1, 0]) { aim.override = pos ? { pos, look } : null; },
+    /** Sekunteja (reaaliaikaa) seuraavaan laulun tahtiin, tai null. */
+    get nextBeatIn() {
+      if (!songState) return null;
+      const i = songState.results.findIndex((r) => r === null);
+      return i < 0 ? null : songState.beats[i] - g.realTime;
+    },
+    /** Automaattinen tauko fokuksen kadotessa päälle tai pois (savutestit). */
+    autoPause(on: boolean) { g.autoPause = on; if (!on && paused) resume(); },
+    /** Vie välilyönnin painalluksen laululle (savutestit). */
+    beat() { inputs.beatQueued = true; },
+    /** Suo näkyviin annettuun kohtaan tai pois (kuvakaappaukset). */
+    bog(pos: number[] | null) { fx.bogDemo = pos ? new THREE.Vector3(pos[0], groundHeight(pos[0], pos[2]), pos[2]) : null; },
+    /** Pelin sekunteja siihen, kun vihollisen isku laukeaa, tai null. */
+    get enemyStrikeIn() {
+      return d.enemy && d.enemy.state === "windup" ? d.enemy.timing.windup - d.enemy.stateTime : null;
+    },
+  };
+}
