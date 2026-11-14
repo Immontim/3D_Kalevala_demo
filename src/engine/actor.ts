@@ -44,6 +44,9 @@ export interface Actor {
   /** Tukiaskeleesta otettu osuus 0..1 ja paikka, josta askel lähti (kantama lasketaan siitä). */
   lunged: number;
   stepFrom: THREE.Vector3;
+  /** Suoja-aika muita lyöjiä vastaan: voimassa tähän pelin aikaan asti, ja kenen isku torjuttiin. */
+  graceUntil: number;
+  graceFrom: Actor | null;
   /** Nimi mittarissa (vastustajilla). */
   name: string;
   /** Taso: 0 sankarilla; vastustajilla kasvattaa elämää, voimaa ja tekoälyn taitoa. */
@@ -67,7 +70,7 @@ export function makeActor(look: FighterLook, pos: THREE.Vector3, level: number, 
     fighter, trail, pos: pos.clone(), yaw: 0, state: "idle", stateTime: 0, timing: { windup: 0.3, release: 0.1, recovery: 0.3 },
     attack: makeAttack(weapon, styleFor(weapon, "slash"), "light"), loadout: look.loadout, struck: false, hp: stats.maxHp,
     blockStart: -99, rootTime: 0, dodgeDir: new THREE.Vector3(), dodgeCd: 0, moveSpeed: 0, extraRecovery: 0,
-    lunged: 0, stepFrom: pos.clone(), name: "", level, ai: null,
+    lunged: 0, stepFrom: pos.clone(), graceUntil: -1, graceFrom: null, name: "", level, ai: null,
   };
 }
 
