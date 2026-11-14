@@ -5,10 +5,29 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
+Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
 
-- **Versio v00.16.00**, branch `claude/homestead` (tarkista merge-tila
-  `git merge-base --is-ancestor`). Mainissa on v00.15.00.
+- **Versio v00.17.00**, branch `claude/free-turn` (tarkista merge-tila
+  `git merge-base --is-ancestor`). Mainissa on v00.16.00.
+- **Vapaa kääntyminen** (`src/main.ts` kohta "Katse ja lukitus",
+  luvut `src/controls.ts` `CONTROLS`): hiiren liike (vain hiiren ollessa
+  lukittuna peliin) muuttaa `camYaw`/`camPitch`. Sankari kääntyy kohti
+  `camYaw`ta nopeudella `Stats.turnSpeed` (°/s), ja WASD liikkuu `camYaw`n
+  suhteen. Lukitus (toiminto `lock`, oletus Tab / hiiren keskinappi) on
+  kytkin `lockOn`: lukittuna `camYaw` seuraa vastustajaa (`lockTarget()`)
+  eikä hiiren sivuliike käännä; lukitus jää päälle seuraavaan aaltoon.
+  Kamera on `camYaw`n suunnassa sankarin takana; vapaana se katsoo eteen,
+  lukittuna kohti vastustajaa.
+- **Vastustajan kääntyminen** (`updateAi`): vastustaja kääntyy kohti
+  pelaajan paikkaa `ai.seen`, joka seuraa oikeaa paikkaa reaktioviiveen
+  (`Stats.reaction`) verran jäljessä, nopeudella `Stats.turnSpeed`, iskun,
+  horjahduksen ja väistön aikana kertoimella `ENEMY_AI.attackTurnScale`.
+  `pickEnemyAttack` ei aloita iskua, jos pelaaja on yli 0,9 × iskun kaaren
+  sivussa. Mitattu: täydellä nopeudella 2 m:n säteellä kiertävä pelaaja
+  jää nuoren urhon suunnasta noin 80° sivuun, torjunta-asennon nopeudella
+  noin 37°. Kiertäjän on siis juostava ja ajoitettava isku.
+- **Torjuntasektorit** (`WEAPONS.*.blockArc` π/4 = ±45°,
+  `SHIELDS.round.blockArc` π/3 = ±60°; omistajan päätös 2026-11-14).
 - **Kaksi taistelupaikkaa** (`src/world.ts`): `ARENA` on tällä latauksella
   käytössä oleva paikka (`"clearing"` = nuotioaukio, `"homestead"` =
   pihapiiri), luettu avaimesta `laulun-miekka.arena.v1`. Maailma
@@ -52,9 +71,7 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   Parannuslaulu antaa `SONG.healPerHit` (5) elämää heti osumasta, joten
   katkennutkin laulu auttaa, eikä sillä ole osumarajaa.
 - **Kilven asento** (`src/fighter.ts`): `shieldHang` 0..1 kääntää kilven
-  pidikkeen kyynärvarren edestä (torjunta, kilpi-isku: `SHIELD_FRONT`)
-  roikkumaan kahvastaan pystyssä kyljellä pinta ulospäin
-  (`SHIELD_HANG_YAW`); käden lepoasento `SHIELD_GUARD`.
+  torjunnasta (`SHIELD_FRONT`) roikkumaan kyljelle (`SHIELD_HANG_YAW`).
 - **Askellus ja elävyys** (`src/fighter.ts`, taulukko `GAIT`): hahmon
   nopeus mitataan `root`in todellisesta siirtymästä hahmon omassa
   koordinaatistossa (`animate`), ja `apply` laskee kummallekin jalalle
@@ -62,23 +79,12 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   polven kulmat. Maassa olon aikana jalka kulkee vartaloon nähden hahmon
   nopeudella taaksepäin, joten se ei liu'u. `animate`n `moveSpeed` kertoo
   vain, onko liike kävelyä: iskun työntö ja väistö eivät askella.
-  Lantion kierto, kallistus ja sivusiirtymä sekä paikallaan painon siirto
-  ja hengitys lasketaan samassa kohdassa; hartiat ja pää tekevät
-  vastaliikkeen. Kaikki sulautuu pois kaatuessa. `GAIT` on ulkonäköä, ei
-  pelisääntö, eikä se ole säätövälilehdellä. Mittari: `__game.feet`.
-- **Kaatuminen** (`src/fighter.ts`): taulukko `FALLEN` sisältää neljä
-  makuuasentoa (kolme selällään, yksi vatsallaan). Asennossa on tavalliset
-  asentokentät (kädet, selkä) sekä vain kaatuneella käytetyt jalkojen
-  kierrot, selän sivutaivutus, pään kääntö, vartalon korkeus maasta ja
-  kierto. `Fighter.fall` 0..1 sulauttaa ne; kesken kaatumisen polvet
-  pettävät (`buckle`). `main.ts`:n `fallDown()` valitsee asennon:
-  selkään lyöty kaatuu vatsalleen. `Fighter.dropGear()` irrottaa aseen ja
-  ehjän kilven (`DroppedProp`): ase lähtee oikealle ja kilpi vasemmalle ja
-  asettuu maahan lappeelleen. Ruumis säilyy `WAVES.corpseTime` 40 s.
-  **Päätös:** kaatuneet tehdään luurangolla, ei omina malleina, koska sama
-  ratkaisu toimii kaikilla hahmoilla ja varustuksilla. Taistelukentän
-  "maastoksi" kaatuneen saa luomalla `Fighter`in, asettamalla `fallen` ja
-  `fall = 1`; savutestissä `__game.fallShowcase(n)`.
+  Lantio, hartiat, painonsiirto ja hengitys lasketaan samassa kohdassa.
+  Mittari: `__game.feet`.
+- **Kaatuminen** (`src/fighter.ts`, taulukko `FALLEN`, `Fighter.fall`,
+  `dropGear()`; valinta `main.ts` `fallDown()`). **Päätös:** kaatuneet
+  tehdään luurangolla, ei omina malleina. Savutestissä
+  `__game.fallShowcase(n)`.
 - **Kaikki pelin luvut ovat parametritaulukoissa**, eikä uusia lukuja
   kovakoodata `main.ts`:ään:
   - `src/combat.ts`: `CHARACTERS` (hahmon hp, stamina, staminaRegen, power,
@@ -119,16 +125,9 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   `rootTimePerHit` 0,75 s. Vastustajan osuma kesken laulun kutsuu
   `interruptSong()`. Voima nollataan laulun alussa. Tauko pysäyttää myös
   riimut.
-- **Keihäsote** (`src/fighter.ts`; tehty Opus-ali-agentilla, orkestroija
-  arvioi kuvista): käsien verkkoon on Blenderissä kaiverrettu otekanava
-  (`grip_carve`, `GRIP_P`/`GRIP_D` tiedostossa `char_build.py`; sama
-  kanava koodissa `GRIP_CHANNEL`). Keihäs (2,14 m) kiinnitetään oikean
-  käden kanavaan, ja taulukko `SPEAR_HOLD` määrää asennoittain otteen
-  paikan, varren suunnan ja etukäden etäisyyden. `holdShaft()` +
-  `twoBone()` vievät molemmat kädet varrelle käänteiskinematiikalla.
-  Mittari: `fighter.spearGripDebug()` (käden etäisyys varresta, ranteen
-  kulmat). Vanha `reachShaft()` on poistettu. `SPEAR_SLIDE` 0,3 m siirtää
-  keihästä otteessa eteenpäin (takakäden taakse jää noin 0,3 m vartta).
+- **Keihäsote** (`src/fighter.ts`, `SPEAR_HOLD`, `holdShaft()` + `twoBone()`):
+  kädet viedään varrelle käänteiskinematiikalla; otekanava `grip_carve`
+  (`char_build.py`, koodissa `GRIP_CHANNEL`). Mittari `fighter.spearGripDebug()`.
 - **Suo** (`src/bog.ts`, malli `assets/bog.glb`, skripti
   `assets-src/blender/bog.py`): mutapinta, sammalreunus ja kuplan malli
   tulevat Blenderistä ilman tekstuureja; pinnat tehdään maaston
@@ -171,19 +170,20 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   (Actions-ajo "Julkaise GitHub Pagesiin"); v00.10.00 ja v00.11.00 eivät
   ole mainissa. **Omistaja testaa julkaistusta osoitteesta**, ei
   dev-serveriltä.
-- **Käsin testattu 2026-11-13** (Clauden in-app browser, dev-serveri,
-  skriptattu syöte): pihapiiri latautuu ilman konsolivirheitä, kaikki
-  rakennukset, aita, tuli ja savu näkyvät; paikan vaihto aloitusikkunasta
-  molempiin suuntiin lataa oikean maailman ja merkitsee valitun; aalto 1
-  alkaa pihapiirissä; pelaaja kehän reunalla selkä taloon päin: kamera
-  pysyy pihalla; 60 FPS / 800×600 / RTX 4080 (1,9 milj. kolmiota,
-  nuotioaukio 2,0 milj.). Nuotioaukio näyttää samalta kuin ennen.
+- **Käsin testattu 2026-11-14** (in-app browser, skriptattu syöte
+  `__game.setLook`, `setLock`, `look`): selän kääntäminen vastustajaan,
+  lukitus kääntää katseen ja sankarin kohti vastustajaa, lukitusmerkki,
+  kiertomittaus yllä; ei konsolivirheitä. **Ei testattu:** oikea hiiren
+  liike (selainpaneelin skripti ei saa hiirtä lukittua), herkkyyden
+  tuntuma, Tab-näppäin oikeassa selaimessa, nuotioaukio uudella
+  ohjauksella. **2026-11-13:** pihapiiri, paikan vaihto ja
+  kamera pihalla, 60 FPS / RTX 4080.
   **Ei testattu:** ihmisen pelaamana; buildattu versio selaimessa;
-  hitaampi kone; kosketusnäyttö. Aiemmista yhä kokeilematta: mittarien
+  hitaampi kone. Aiemmista yhä kokeilematta: mittarien
   raahaus oikealla hiirellä, hiiren lukitus laulun valinnassa, F1–F5
   oikeassa selaimessa, askellus ihmisen silmin, kaatuneet kaltevalla
   maalla, suossa kuoleva vastustaja.
-- **Komennot 2026-11-13:** `bun run test` (66/66), `bun run lint`,
+- **Komennot 2026-11-14:** `bun run test` (68/68), `bun run lint`,
   `bun run build` ok.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Savutestien apuna `window.__game`: `tick(n, dt)` ajaa peliä askelin
@@ -193,7 +193,8 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   (välilyönti laululle), `nextBeatIn`, `bog([x,0,z])` (suo näkyviin),
   `debrisHeights` (irtokappaleiden korkeus maasta), `root(t)` (vastustaja
   suohon), `setStamina(pelaaja, vastustaja)`, `addModifier(kuka, muunnin)`,
-  `stats`, `tuning`, `placePlayer(x, z)`, `showcaseReach` (aseen kärjen etäisyys). Selainpaneeli pysäyttää
+  `stats`, `tuning`, `placePlayer(x, z)`, `showcaseReach` (aseen kärjen etäisyys),
+  `look`, `setLook(yaw, pitch)`, `setLock(bool)`. Selainpaneeli pysäyttää
   pelin, kun se menettää fokuksen: kutsu `autoPause(false)` jokaisen
   latauksen jälkeen. `skipTo` rakentaa hahmon vasta seuraavalla
   kierroksella, joten `knockHelmet()` vaatii erillisen kutsun tai odotuksen.
@@ -224,8 +225,11 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
   ote harittaa läheltä (ei sormiluita); kämmenen kierto näkyy kyynärvarren
   hihassa; pistossa etukäsi on ulottuvuutensa rajalla, minkä vuoksi vartalo
   kiertyy nyt vasen olka edellä; iskun alussa ranne hypähtää noin 40°.
-- **Kosketusnäytöllä** on vain sivallus; ylälyönnille, pistolle ja
-  torjunta-asennon vaihdolle ei ole nappeja.
+- **Vapaan kääntymisen avoimet asiat:** tasapaino on arvaus (urho voi olla
+  liian helppo kiertää). Kosketusnäytön napit ovat yhä koodissa, mutta
+  niillä ei voi kääntyä; niitä ei ylläpidetä. Hiiren pystyliike ei vaikuta
+  iskuihin, vain kameraan. Lukitus kohdistuu ainoaan vastustajaan; usean
+  vastustajan kohteen valinta tehdään vaiheessa 2.
 - **Pihapiirin avoimet viat:** rakennuksiin, aitaan ja tuleen ei voi
   törmätä (taistelukehä pitää hahmot pihalla, mutta kaatuneen varusteet
   voivat lentää aidan läpi); kamera on kehän reunalla lähellä pelaajaa;
@@ -267,9 +271,12 @@ Päivitetty: 2026-11-13 (Claude, kotikone, Windows)
 
 ## Seuraava tehtävä
 
-Omistaja pelaa pihapiirissä julkaistusta osoitteesta mergen jälkeen ja
-kertoo, miltä rakennukset ja pihan mittasuhteet näyttävät ja haittaako
-kameran rajaus kehän reunalla. Lisäksi yhä auki: kaatuneiden ulkonäkö ja
+Omistaja pelaa vapaalla kääntymisellä julkaistusta osoitteesta mergen
+jälkeen ja kertoo hiiren herkkyyden, lukituksen ja kiertämisen tuntumasta.
+Sen jälkeen vaihe 2: 2 vastustajaa aalloissa 4–5 ja 3 aallosta 6 alkaen,
+hyökkäysvuoro (vain yksi lyö kerrallaan), ryhmäkerroin elämälle
+(ehdotus 60 % / 45 %), lukituksen kohteen valinta ja pienet palkit pään
+päällä. Versio v01.00.00 (datamallin muutos: `enemy` → lista). Lisäksi yhä auki: kaatuneiden ulkonäkö ja
 Säätö-välilehden arvot (Kopioi arvot) oletuksiksi kirjattaviksi.
 
 ## Ei vielä aloiteta

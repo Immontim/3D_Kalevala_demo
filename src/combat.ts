@@ -71,13 +71,18 @@ export interface CharacterDef {
   power: number;
   /** Kävelynopeus, m/s. */
   moveSpeed: number;
+  /** Suurin kääntymisnopeus, astetta sekunnissa. */
+  turnSpeed: number;
+  /** Vastustajan reaktioviive sekunteina: kuinka jäljessä se seuraa pelaajan liikettä (pelaajalla ei käytössä). */
+  reaction: number;
 }
 
 /** Vastustajien arvot ovat aallon 0 arvoja: aalto lisää niihin WAVES-taulukon verran. */
 export const CHARACTERS: Record<string, CharacterDef> = {
-  hero: { hp: 100, stamina: 100, staminaRegen: 1, power: 20, moveSpeed: 3.4 },
-  urho: { hp: 70, stamina: 60, staminaRegen: 1, power: 14, moveSpeed: 2.4 },
-  pohja: { hp: 80, stamina: 80, staminaRegen: 1, power: 14, moveSpeed: 2.4 },
+  // Nuori urho on kömpelö ja hidas kääntymään: ketterä sankari pääsee sen kylkeen.
+  hero: { hp: 100, stamina: 100, staminaRegen: 1, power: 20, moveSpeed: 3.4, turnSpeed: 600, reaction: 0 },
+  urho: { hp: 70, stamina: 60, staminaRegen: 1, power: 14, moveSpeed: 2.4, turnSpeed: 95, reaction: 0.5 },
+  pohja: { hp: 80, stamina: 80, staminaRegen: 1, power: 14, moveSpeed: 2.4, turnSpeed: 140, reaction: 0.3 },
 };
 
 /** Aaltojen vaikeutuminen ja pelaajan lepo aaltojen välissä. */
@@ -139,6 +144,8 @@ export const ENEMY_AI = {
   restCornered: 2.0,
   /** Suosta päässeen kääntymisnopeus (rad/s) ja kulma, jonka sisällä se on taas valmis. */
   reorientTurn: 3.2,
+  /** Kääntymisnopeuden kerroin iskun, horjahduksen ja väistön aikana: lyövä vastustaja ei seuraa kiertäjää. */
+  attackTurnScale: 0.35,
   reorientDone: 0.2,
 };
 
@@ -199,27 +206,27 @@ export interface WeaponDef {
   slowness: number;
   /** Mitä iskuja aseella voi tehdä ja kuinka hyvin (vahinkokerroin suunnittain). */
   styles: Partial<Record<StrikeStyle, number>>;
-  /** Puolikulma, jonka sisältä tuleva isku voidaan torjua aseella. */
+  /** Puolikulma, jonka sisältä tuleva isku voidaan torjua aseella (radiaaneina; PI / 4 = ±45° edestä). */
   blockArc: number;
 }
 
 export const WEAPONS: Record<WeaponId, WeaponDef> = {
   sword: {
     id: "sword", name: "Miekka", damage: 1, reach: 0, lunge: 0, minRange: 0, slowness: 1,
-    styles: { overhead: 1, slash: 1, thrust: 1 }, blockArc: Math.PI / 2.2,
+    styles: { overhead: 1, slash: 1, thrust: 1 }, blockArc: Math.PI / 4,
   },
   // Kantama on mitattu mallista: pistossa keihään kärki on 1,91 m hahmon keskeltä ja miekan
   // 1,25 m, ja syöksy on 0,3 m pidempi. Samalla pelivaralla kuin miekalla ero on 1,0 m.
   spear: {
     id: "spear", name: "Keihäs", damage: 1, reach: 1.0, lunge: 0.3, minRange: 1.3, slowness: 1.35,
-    styles: { thrust: 1.3 }, blockArc: Math.PI / 2.2,
+    styles: { thrust: 1.3 }, blockArc: Math.PI / 4,
   },
 };
 
 export interface ShieldDef {
   /** Kestopisteet: kevyt isku vie 1, raskas 2 (StrikeDef.shieldDamage). */
   durability: number;
-  /** Puolikulma, jonka sisältä tuleva isku osuu kilpeen. */
+  /** Puolikulma, jonka sisältä tuleva isku osuu kilpeen (radiaaneina; PI / 3 = ±60° edestä). */
   blockArc: number;
   /** Tämän osuuden alapuolella kilvessä näkyy lovi. */
   notchAt: number;
@@ -227,7 +234,7 @@ export interface ShieldDef {
 
 /** Kilpi kestää 10 kevyttä tai 5 raskasta iskua. */
 export const SHIELDS: Record<"round", ShieldDef> = {
-  round: { durability: 10, blockArc: Math.PI / 1.5, notchAt: 0.5 },
+  round: { durability: 10, blockArc: Math.PI / 3, notchAt: 0.5 },
 };
 
 export function weaponOf(loadout: Loadout): WeaponDef {
@@ -423,6 +430,12 @@ export function enemyAttackTiming(a: AttackDef, wave: number): AttackTiming {
   const t = a.timing;
   const windup = Math.max(t.windup - ENEMY_AI.windupEdge, t.windup + ENEMY_AI.windupHandicap - ENEMY_AI.windupPerWave * (wave - 1));
   return { windup, release: t.release, recovery: t.recovery + ENEMY_AI.extraRecovery };
+}
+
+/** Kääntää suuntaa current kohti suuntaa target enintään maxStep radiaania lyhyempää kautta. */
+export function turnToward(current: number, target: number, maxStep: number): number {
+  const d = angleBetween(current, target);
+  return Math.abs(d) <= maxStep ? current + d : current + Math.sign(d) * maxStep;
 }
 
 /** Kahden suunnan välinen etumerkillinen kulma välillä [-PI, PI]. */

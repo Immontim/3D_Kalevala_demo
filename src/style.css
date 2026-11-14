@@ -119,6 +119,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; col
 .bar-wrap.right .bar.shieldbar .fill { margin-left: auto; }
 .fill.shield { background: linear-gradient(#b9c6d2, #7d8c9a); height: 100%; transition: width 0.15s; }
 .fill.shield.worn { background: linear-gradient(#d9a441, #9a5a22); }
+#lockMark { position: fixed; transform: translate(-50%, -50%); color: var(--bronze); font-size: 18px; text-shadow: 0 0 6px #000, 0 0 2px #000; pointer-events: none; }
+#lockMark.hidden { display: none; }
 .label.cue { min-height: 1.4em; font-size: 18px; color: #ffd27a; text-shadow: 0 1px 4px #000; }
 #pstance { min-height: 1.2em; color: #cfd8e0; }
 #charge { position: absolute; left: 50%; bottom: 14%; width: min(260px, 50vw); transform: translateX(-50%); opacity: 0; transition: opacity 0.12s; text-align: center; }

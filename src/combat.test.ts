@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  turnToward,
   BASH,
   SHIELDS,
   STRIKES,
@@ -135,9 +136,17 @@ describe("iskusuunnat ja suuntatorjunta", () => {
     }
   });
   it("kilpi suojaa leveämmältä kuin miekka", () => {
-    const side = { ...block("slash"), angleToAttacker: sword.blockArc + 0.3 };
+    // 50° sivulta: miekan sektorin (±45°) ulkopuolella, kilven (±60°) sisällä.
+    const side = { ...block("slash"), angleToAttacker: (50 * Math.PI) / 180 };
     expect(resolveHit(inFront, side, 5)).toBe("hit");
     expect(resolveHit(inFront, { ...side, shield }, 5)).toBe("blocked");
+  });
+  it("torjunta suojaa vain edestä: kylkeen ja selkään isku osuu kilvestäkin huolimatta", () => {
+    expect(sword.blockArc).toBeCloseTo(Math.PI / 4);
+    expect(shield.blockArc).toBeCloseTo(Math.PI / 3);
+    for (const deg of [70, 90, 180]) {
+      expect(resolveHit(inFront, { ...block("slash"), shield, angleToAttacker: (deg * Math.PI) / 180 }, 5)).toBe("hit");
+    }
   });
   it("kilpityöntö murtaa asetorjunnan asennosta riippumatta, mutta ei kilpeä", () => {
     for (const stance of STYLES) expect(resolveHit(inFront, block(stance), 5, BASH)).toBe("guardbreak");
@@ -199,6 +208,16 @@ describe("kilven kesto", () => {
     expect(shieldWear(heavySlash, "parried", blocking)).toBe(0);
     expect(shieldWear(heavySlash, "miss", blocking)).toBe(0);
     expect(shieldWear(slash, "blocked", { ...blocking, shield: null })).toBe(0);
+  });
+});
+
+describe("kääntyminen", () => {
+  it("kääntyy enintään askeleen verran lyhyempää kautta", () => {
+    expect(turnToward(0, 1, 0.25)).toBeCloseTo(0.25);
+    expect(turnToward(0, -1, 0.25)).toBeCloseTo(-0.25);
+    expect(turnToward(0, 0.1, 0.25)).toBeCloseTo(0.1);
+    // 3,0 rad -> -3,0 rad: lyhin tie kulkee PI:n yli, ei nollan kautta.
+    expect(turnToward(3.0, -3.0, 0.1)).toBeCloseTo(3.1);
   });
 });
 
