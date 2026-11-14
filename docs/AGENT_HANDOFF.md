@@ -5,12 +5,12 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-14 (Codex, Windows)
+Päivitetty: 2026-11-14 (Claude, Windows)
 
-- **Versio v01.05.00**, branch `codex/collision-world`, commit
-  `HEAD` (tämän muutoksen commit; tarkista merge-tila
-  `git merge-base --is-ancestor`). Mainissa on v01.04.00 ja Clauden
-  talousesineet.
+- **Mainissa on v01.05.00** (yhteinen maailmantörmäys) sekä Clauden mallit:
+  talousesineet, tietäjä ja jousineito. Avoin branch
+  `claude/villager-emanta` (vain malleja ja dokumentteja, ei pelikoodia;
+  tarkista merge-tila `git merge-base --is-ancestor`).
 - **Rakenne.** `src/engine/` on kohtaus- ja taistelumoottori, `src/ui/` sivun
   ikkunat (aloitus, tauko, säätö), `src/main.ts` vain käynnistys ja
   `src/debug.ts` savutestien `__game`. Säännöt ja luvut ovat yhä puhtaissa
@@ -76,67 +76,44 @@ Päivitetty: 2026-11-14 (Codex, Windows)
   (`onRing(kulma, etäisyys, ...)`), etusivu keskelle. Kuoppatalon
   kulkukuilu leikataan maastoon shaderilla (`PIT_HOLE`, `uHole*`), ja
   kuilun pohja ja seinät ovat mallissa; luvut on pidettävä samoina
-  skriptissä ja `world.ts`:ssä. Rakennuksiin ei voi törmätä, joten
-  kamera pidetään säteen `camMaxR` 12,2 sisällä (`World.clearCamera`).
+  skriptissä ja `world.ts`:ssä. Kamera pidetään säteen `camMaxR` 12,2 sisällä (`World.clearCamera`).
   Materiaalien sävyt viritetään pelin valoon `prepareMaterials`issa.
-  Skripti ajettiin taustalla (`blender --background --factory-startup
-  --python`), koska Blender MCP:n taustatyökalu ei löydä Blenderiä
-  (`BLENDER_PATH` puuttuu) ja avoimessa Blenderissä oli tallentamaton
-  `characters.blend`.
-- **Talousesineet** (malli `assets/household.glb`, 1,4 Mt, 19 000 kolmiota;
-  skripti `assets-src/blender/household.py`, ajetaan taustalla, lukee ensin
-  `homestead.py`:n): `pukkipoyta`, `penkki`, `tuohikontti`, `pata`,
-  `rieska`, `nauriit`, `kuivakalat`, `lyhde`, `kulho`, `kuppi`, `kauha`,
-  `lautanen`, `kori` ja `poyta_kattaus` (pöydälle katetut esineet yhtenä
-  mallina, origo sama kuin pöydällä; pöytälevyn pinta 0,76 m). Malli on
-  mainissa, mutta peli ei vielä lataa sitä. Verteksivärit ovat lineaarisia: skriptin `HH`
-  muuntaa sRGB-arvot. Tarkistettu vain Blenderin EEVEE-kuvista, ei pelin
-  valossa; materiaalit `M_HH_*` pitää ottaa mukaan `prepareMaterials`iin.
-  Tulikivet ja tuhka ovat tasaisen harmaita ilman tekstuuria.
-- **Rauhallisen pihakohtauksen suunnitelma** (omistaja hyväksyi 2026-11-14):
-  1 talousesineet (tehty), 2 rauhan piha koodina (uusi paikka, esineet
-  pihalle, pysyvien hahmojen tyyppi, törmäys pöytään), 3 tietäjä, 4
-  naisvartalo ja jousineito, 5 emäntä, 6 eläimet (sika, koira, kanat;
-  Poly Havenissa ei ole eläimiä, joten omistaja lataa CC-BY-mallit
-  Sketchfabista agentin ehdokaslistan mukaan). Hahmot seisovat aluksi
-  paikallaan. Dialogijärjestelmä tehdään erikseen myöhemmin.
-- **Talousesineet** (`assets/household.glb`, 1,4 Mt; skripti
-  `household.py`, ajetaan taustalla): `pukkipoyta`, `penkki`,
-  `tuohikontti`, `pata`, `rieska`, `nauriit`, `kuivakalat`, `lyhde`,
-  `kulho`, `kuppi`, `kauha`, `lautanen`, `kori`, `poyta_kattaus`
-  (katetut esineet yhtenä mallina, origo sama kuin pöydällä; pöytälevyn
-  pinta 0,76 m). Verteksivärit lineaarisia (skriptin `HH` muuntaa).
-- **Kyläläiset** (`assets/villagers.glb`, 2,2 Mt; skripti `char_folk.py`
-  → `run_folk()` tiedostossa `characters.blend`): `char_tietaja`
-  (29 700 kolmiota, sama `RIG` ja luiden nimet kuin taistelijoilla) ja
-  `sauva` (ote origossa, linnunpää -Y, nokka +Z; ei luurankoa). Viitta ja
-  kanteleen kotelo on painotettu vartaloon, ei käsiin: vasen käsi pidetään
-  viitan alla sivulla, oikea on vapaa sauvalle. Lepoasennossa (kädet
-  levällään) vasen käsi tulee viitan läpi, mikä on tarkoituksellista.
-  Uusi hahmo: oma `build_…` ja rivi `run_folk`iin.
-- **Naishahmot** (`assets/villagers_f.glb`, 2,0 Mt): `char_jousineito`
-  (27 900 kolmiota) ja `jousi` (ote origossa, lavat Z-suunnassa, jänne +Y).
-  Naisvartalo (Human Base Meshes, skaalattu miehen pituiseksi ×1,026 ja
-  hieman muotoiltu, `shape_body_f`) käyttää **omaa luurankoa**: Blenderissä
-  `RIG_F`, tiedostossa nimellä `RIG`, samat 17 luun nimet mutta eri
-  lepoasento (pidemmät jalat, kädet jyrkemmin alas). Siksi naiset ovat
-  omassa tiedostossaan. Pelin pitää pienentää hahmoa sijoittaessaan (noin
-  0,95), ja `GRIP_CHANNEL` (keihäsote) on mitattu miehen kädestä eikä käy
-  naiselle. Olkaviitta on painotettu vartaloon: kädet alhaalla toimii,
-  jousen jännitys toisi käsivarret viitan läpi. Emäntä tehdään samalle
-  pohjalle (`Ctx(FEM…)`, `fitted_skirt`).
-- **Mitään näistä tiedostoista peli ei vielä lataa.** Tarkistettu vain
-  Blenderin kuvista (hahmot myös kädet alhaalla), ei pelin valossa eikä
-  liikkeessä; materiaalit `M_HH_*` ja `F_Weave` pitää ottaa mukaan
+  Skripti ajetaan taustalla (`blender --background --factory-startup
+  --python`).
+- **Talousesineet** (`assets/household.glb`, 1,4 Mt, 19 000 kolmiota;
+  skripti `household.py`, ajetaan taustalla, lukee ensin `homestead.py`:n):
+  `pukkipoyta`, `penkki`, `tuohikontti`, `pata`, `rieska`, `nauriit`,
+  `kuivakalat`, `lyhde`, `kulho`, `kuppi`, `kauha`, `lautanen`, `kori`,
+  `poyta_kattaus` (katetut esineet yhtenä mallina, origo sama kuin
+  pöydällä; pöytälevyn pinta 0,76 m). Verteksivärit lineaarisia (skriptin
+  `HH` muuntaa). Tulikivet ja tuhka ovat tasaisen harmaita.
+- **Kyläläiset** (skripti `char_folk.py` → `run_folk()` tiedostossa
+  `characters.blend`; uusi hahmo: oma `build_…` ja rivi `run_folk`iin).
+  `assets/villagers.glb` (2,2 Mt): `char_tietaja` (29 700 kolmiota, sama
+  `RIG` kuin taistelijoilla) ja `sauva` (ote origossa, linnunpää -Y, nokka
+  +Z). Viitta ja kanteleen kotelo on painotettu vartaloon: vasen käsi
+  pidetään viitan alla sivulla, oikea on vapaa sauvalle.
+- **Naishahmot** (`assets/villagers_f.glb`): `char_jousineito` (27 900
+  kolmiota) ja `jousi` (ote origossa, lavat Z-suunnassa, jänne +Y).
+  Naisvartalo (Human Base Meshes, skaalattu miehen pituiseksi ×1,026,
+  muotoilu `shape_body_f`) käyttää **omaa luurankoa**: Blenderissä `RIG_F`,
+  tiedostossa `RIG`, samat 17 luun nimet mutta eri lepoasento. Siksi
+  naiset ovat omassa tiedostossaan. Pelin pitää pienentää naista noin
+  0,95:een, eikä miehen kädestä mitattu `GRIP_CHANNEL` (keihäsote) käy
+  hänelle. Olkaviitta on painotettu vartaloon: jousen jännitys toisi
+  käsivarret viitan läpi.
+- **Peli ei vielä lataa talousesineitä eikä kyläläisiä.** Törmäysmuodot
+  pöydälle ja penkille ovat jo `PROP_COLLIDERS`issa. Mallit on tarkistettu
+  vain Blenderin kuvista (hahmot myös kädet alhaalla), ei pelin valossa
+  eikä liikkeessä; materiaalit `M_HH_*` ja `F_Weave` pitää ottaa mukaan
   `prepareMaterials`iin.
 - **Rauhallisen pihakohtauksen suunnitelma** (omistaja hyväksyi 2026-11-14):
-  tehty 1 talousesineet, 3 tietäjä ja 4 jousineito (branch
-  `claude/villager-jousineito`, sisältää tietäjän branchin; tarkista
-  merge-tila). Jäljellä: 2 rauhan piha koodina (uusi paikka, esineet
-  pihalle, pysyvien hahmojen tyyppi, törmäys pöytään), 5 emäntä, 6 eläimet
-  (sika, koira, kanat: omistaja lataa CC-BY-mallit Sketchfabista agentin
-  ehdokaslistan mukaan). Hahmot seisovat aluksi paikallaan.
-  Dialogijärjestelmä myöhemmin.
+  tehty 1 talousesineet, 3 tietäjä ja 4 jousineito. Jäljellä: 5 emäntä,
+  6 eläimet (sika, koira, kanat: Poly Havenissa ei ole eläimiä, joten
+  omistaja lataa CC-BY-mallit Sketchfabista agentin ehdokaslistan mukaan)
+  ja 2 rauhan piha koodina (uusi paikka, esineet pihalle, pysyvien
+  hahmojen tyyppi, tekijäluettelo peliin). Hahmot seisovat aluksi
+  paikallaan. Dialogijärjestelmä myöhemmin.
 - **Laulut ja valinta** (`src/songLogic.ts`: `SONGS`, `SONG_SLOTS`; kulku
   `engine/song.ts`): laulunappi täydellä voimalla → `openChoice()`:
   `choosing` pysäyttää maailman (dt = 0), hiiri vapautetaan
@@ -153,15 +130,10 @@ Päivitetty: 2026-11-14 (Codex, Windows)
   `moveSpeed` kertoo, onko liike kävelyä: iskun työntö ja väistö eivät
   askella. Mittari: `__game.feet`.
 - **Kaikki pelin luvut ovat parametritaulukoissa**, eikä uusia lukuja
-  kovakoodata moottoriin:
-  - `src/combat.ts`: `CHARACTERS` (hahmon hp, stamina, staminaRegen, power,
-    moveSpeed; vastustajilla aallon 0 arvot), `WAVES` (kasvu per aalto,
-    pelaajan lepo, aaltojen väli), `STAMINA` (hinnat), `COMBAT` (ajat ja
-    kertoimet, mm. `windupScale`, `recoveryScale`, `parryWindow`, laulun
-    voiman kertyminen), `ENEMY_AI` (torjunta- ja lukutodennäköisyydet,
-    etäisyydet, lepo, kääntyminen), `STRIKES`, `WEAPONS`, `SHIELDS`.
-  - `src/songLogic.ts`: `SONG` (nopeus, välit, alueet, vaaditut osumat,
-    suon kesto). Johdetut arvot funktioina `beatGap()`, `songLead()`.
+  kovakoodata moottoriin: `src/combat.ts` (`CHARACTERS`, `WAVES`,
+  `STAMINA`, `COMBAT`, `ENEMY_AI` sekä alla kuvatut `STRIKES`, `WEAPONS`,
+  `SHIELDS`, `BASH`) ja `src/songLogic.ts` (`SONG`; johdetut arvot
+  funktioina `beatGap()`, `songLead()`).
 - **Hahmon kyvyt** (`src/stats.ts`, testit `tuning.test.ts`):
   `baseStats(hahmo, aalto)` → `Stats` (maxHp, maxStamina, staminaRegen,
   power, moveSpeed, damageTaken). `Actor.mods` on lista vaikutuksia
@@ -224,16 +196,12 @@ Päivitetty: 2026-11-14 (Codex, Windows)
   aalloissa ollaan. Keihäällä voi vain pistää.
 - **Blender-putket:** metsä `assets-src/blender/build_all.py`, hahmot
   `char_all.py` → `run_chars()`, suo `bog.py` → `build_bog()`, pihapiiri
-  `homestead.py` → `build_homestead()` (kaksi viimeistä tyhjässä
-  tiedostossa; suon vienti samassa kutsussa tiedoston avauksen kanssa
-  kaatuu). Lähteet: `tools/fetch-polyhaven.ps1`,
-  `tools/fetch-characters.ps1` ja `tools/fetch-homestead.ps1`
-  (PowerShell-skriptien ajo on kotikoneella estetty: tiedostot haettiin
-  samoista osoitteista käsin). `.blend`-tiedostot eivät ole Gitissä, eikä
-  lähdemallien tuontia SRC-kokoelmaan ole skriptattu. `homestead.py`
-  tarvitsee metsäputken tekemän `assets-src/textures/birch_bark_diff.png`n.
-- **Koodi valmis:** v01.05.00 branchissa `codex/collision-world`.
-  **Ei deployattu:** GitHub Pages julkaisee mainin mergen jälkeen
+  `homestead.py` (tarvitsee metsäputken `birch_bark_diff.png`n). Lähteet
+  hakee `tools/fetch-*.ps1` (PowerShell-skriptien ajo on kotikoneella
+  estetty: tiedostot haettiin samoista osoitteista käsin).
+  `.blend`-tiedostot eivät ole Gitissä, eikä lähdemallien tuontia
+  SRC-kokoelmaan ole skriptattu.
+- **Koodi valmis ja mainissa:** v01.05.00. GitHub Pages julkaisee mainin
   (Actions-ajo "Julkaise GitHub Pagesiin"). **Omistaja testaa julkaistusta
   osoitteesta**, ei dev-serveriltä.
 - **Käsin testattu 2026-11-14** in-app browserissa: peli käynnistyi,
@@ -259,11 +227,9 @@ Päivitetty: 2026-11-14 (Codex, Windows)
 - **Kestävyyden tasapaino on arvaus.** Palautuminen 1/s on hidas suhteessa
   hintoihin, ja kestävyys rajoittaa lähinnä raskaita lyöntejä ja torjuntaa.
   Vastustajalla ei ole täydellistä torjuntaa.
-- **Askellus:** paikallaan kääntyvä hahmo ei ota askelia (jalat kiertyvät
-  vartalon mukana). Sivuttaisliike on pelin nopeudella (3,4 m/s) tiheää
-  askellusta, koska nopeus on sivulle epärealistisen suuri. Ei
-  lentovaihetta juoksussa. Kilpikäsi ja asekäsi eivät heilu askeleen
-  tahdissa.
+- **Askellus:** paikallaan kääntyvä hahmo ei ota askelia. Sivuttaisliike
+  on tiheää askellusta (3,4 m/s on sivulle epärealistisen nopea). Ei
+  lentovaihetta juoksussa, eivätkä kädet heilu askeleen tahdissa.
 - **Keihäällä on vain pisto**, joten sitä vastaan riittää pistotorjunta.
   Kantaman (3,5 m) reunalla osuma voi näyttää ilmaan osuvalta, ja alle
   1,3 m:n päässä keihäs ei osu lainkaan.
@@ -288,27 +254,23 @@ Päivitetty: 2026-11-14 (Codex, Windows)
   Ympäristöosuma on suora jana, ei terän tai keihään todellinen liikerata.
   Nuotion 10 vahinkoa/s ja lämpökehän leveys ovat testaamattomia arvauksia.
 - **Pihapiirin avoimet viat:** kamera on kehän reunalla lähellä pelaajaa;
-  kaatuneen varusteet voivat lentää aidan läpi;
-  punosaita on sileä levy, jonka punos on tekstuuria; sisätilat ovat
-  mustia laatikoita; kuoppatalon kuilun reunassa maaston ja mallin raja
-  on jyrkkä. Patsasaitta ja luukulliset valoaukot ovat uskottavia mutta
-  eivät Suomen varhaisrautakaudelta todistettuja; hirsisalvosta ja
-  savupiippua ei ole käytetty, koska ne ovat myöhempiä. Paikan vaihto
-  lataa sivun uudelleen eikä onnistu kesken pelin.
+  kaatuneen varusteet voivat lentää aidan läpi; punosaita on sileä levy;
+  sisätilat ovat mustia laatikoita; kuoppatalon kuilun reunassa maaston ja
+  mallin raja on jyrkkä. Patsasaitta ja luukulliset valoaukot ovat
+  uskottavia mutta eivät Suomen varhaisrautakaudelta todistettuja. Paikan
+  vaihto lataa sivun uudelleen.
 - **Asennot on viritetty silmämääräisesti** kuvakaappauksista. Raskaalla
   sivalluksella ja pistolla ei ole omaa asentoa (sama kuin kevyellä).
   Keihäsmiehen torjunta näyttää samalta kaikissa kolmessa asennossa.
-- **Kypärän tekstuuri** on sama metallilevy kuin muissa osissa, ja kupu on
-  melko sileä; lentävä kypärä voi pudota puun tai kiven läpi (ei törmäyksiä).
-- **Suon reunus** on erillinen kumpu maan päällä: sen ulkoreunan ja
-  tallatun maan raja näkyy läheltä. Muta ei heijasta hahmoja.
+- **Kypärä:** sama metallilevytekstuuri kuin muissa osissa, kupu sileä.
+- **Suon reunus** näkyy läheltä erillisenä kumpuna. Muta ei heijasta hahmoja.
 - **Hahmojen avoimet viat:** kasvot ilman tekstuuria, rengaspanssari varjossa
   lähes musta, tukeva vartalo, hiukset sileä "verho", peukalo ei kierry
   kahvan ympäri, helma voi venyä haara-asennossa.
 - Suorituskyky on mitattu vain tehokoneella; LOD-malleja tai
   laatuasetusta ei ole. Metsässä 2 milj. kolmiota, hahmoissa 28 000 / kpl.
 - Metsän avoimet viat: kodan oviaukko, ruskea uhrikivi, paperiset
-  latvukset vastavalossa, ei tuulta, puihin ei voi törmätä.
+  latvukset vastavalossa, ei tuulta.
 - Blender-skriptien polut on kovakoodattu (`C:\Data\3D Kalevala`).
 - Osumat ratkaistaan etäisyyden ja kulman perusteella, ei terän liikeradasta.
 
