@@ -82,24 +82,30 @@ Päivitetty: 2026-11-14 (Codex, Windows)
   --python`), koska Blender MCP:n taustatyökalu ei löydä Blenderiä
   (`BLENDER_PATH` puuttuu) ja avoimessa Blenderissä oli tallentamaton
   `characters.blend`.
-- **Talousesineet** (malli `assets/household.glb`, 1,4 Mt, 19 000 kolmiota;
-  skripti `assets-src/blender/household.py`, ajetaan taustalla, lukee ensin
-  `homestead.py`:n): `pukkipoyta`, `penkki`, `tuohikontti`, `pata`,
-  `rieska`, `nauriit`, `kuivakalat`, `lyhde`, `kulho`, `kuppi`, `kauha`,
-  `lautanen`, `kori` ja `poyta_kattaus` (pöydälle katetut esineet yhtenä
-  mallina, origo sama kuin pöydällä; pöytälevyn pinta 0,76 m). **Peli ei
-  vielä lataa tiedostoa** (branch `claude/household-props`, 2026-11-14;
-  tarkista merge-tila). Verteksivärit ovat lineaarisia: skriptin `HH`
-  muuntaa sRGB-arvot. Tarkistettu vain Blenderin EEVEE-kuvista, ei pelin
-  valossa; materiaalit `M_HH_*` pitää ottaa mukaan `prepareMaterials`iin.
-  Tulikivet ja tuhka ovat tasaisen harmaita ilman tekstuuria.
+- **Talousesineet** (`assets/household.glb`, 1,4 Mt; skripti
+  `household.py`, ajetaan taustalla): `pukkipoyta`, `penkki`,
+  `tuohikontti`, `pata`, `rieska`, `nauriit`, `kuivakalat`, `lyhde`,
+  `kulho`, `kuppi`, `kauha`, `lautanen`, `kori`, `poyta_kattaus`
+  (katetut esineet yhtenä mallina, origo sama kuin pöydällä; pöytälevyn
+  pinta 0,76 m). Verteksivärit lineaarisia (skriptin `HH` muuntaa).
+- **Kyläläiset** (`assets/villagers.glb`, 2,2 Mt; skripti `char_folk.py`
+  → `run_folk()` tiedostossa `characters.blend`): `char_tietaja`
+  (29 700 kolmiota, sama `RIG` ja luiden nimet kuin taistelijoilla) ja
+  `sauva` (ote origossa, linnunpää -Y, nokka +Z; ei luurankoa). Viitta ja
+  kanteleen kotelo on painotettu vartaloon, ei käsiin: vasen käsi pidetään
+  viitan alla sivulla, oikea on vapaa sauvalle. Lepoasennossa (kädet
+  levällään) vasen käsi tulee viitan läpi, mikä on tarkoituksellista.
+  Uusi hahmo: oma `build_…` ja rivi `run_folk`iin.
+- **Kumpaakaan tiedostoa peli ei vielä lataa.** Tarkistettu vain Blenderin
+  kuvista (tietäjä myös kädet alhaalla), ei pelin valossa; materiaalit
+  `M_HH_*` ja `F_Weave` pitää ottaa mukaan `prepareMaterials`iin.
 - **Rauhallisen pihakohtauksen suunnitelma** (omistaja hyväksyi 2026-11-14):
-  1 talousesineet (tehty), 2 rauhan piha koodina (uusi paikka, esineet
-  pihalle, pysyvien hahmojen tyyppi, törmäys pöytään), 3 tietäjä, 4
-  naisvartalo ja jousineito, 5 emäntä, 6 eläimet (sika, koira, kanat;
-  Poly Havenissa ei ole eläimiä, joten omistaja lataa CC-BY-mallit
-  Sketchfabista agentin ehdokaslistan mukaan). Hahmot seisovat aluksi
-  paikallaan. Dialogijärjestelmä tehdään erikseen myöhemmin.
+  tehty 1 talousesineet ja 3 tietäjä (branch `claude/villager-tietaja`,
+  tarkista merge-tila). Jäljellä: 2 rauhan piha koodina (uusi paikka,
+  esineet pihalle, pysyvien hahmojen tyyppi, törmäys pöytään), 4
+  naisvartalo ja jousineito, 5 emäntä, 6 eläimet (sika, koira, kanat:
+  omistaja lataa CC-BY-mallit Sketchfabista agentin ehdokaslistan mukaan).
+  Hahmot seisovat aluksi paikallaan. Dialogijärjestelmä myöhemmin.
 - **Laulut ja valinta** (`src/songLogic.ts`: `SONGS`, `SONG_SLOTS`; kulku
   `engine/song.ts`): laulunappi täydellä voimalla → `openChoice()`:
   `choosing` pysäyttää maailman (dt = 0), hiiri vapautetaan

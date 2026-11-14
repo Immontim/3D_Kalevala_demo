@@ -43,6 +43,14 @@ omistajan referenssikuviin (kansio `Reference Pictures/`, ei Gitissä).
 
 Haku: `tools/fetch-characters.ps1`. Ladattu mutta ei käytössä: `metal_plate_02`.
 
+## `villagers.glb`
+
+Sama pohja ja samat lähteet kuin tiedostossa `characters.glb`: Human Base
+Meshes -vartalo (CC0) ja Poly Havenin kankaat ja nahka (CC0). Itse tehty
+(skripti `assets-src/blender/char_folk.py`): tietäjän viitta, pitkä parta,
+kudottu vyö, kanteleen tuohikotelo ja sauva. Tuohipunos on sama laskettu
+tekstuuri kuin tiedostossa `household.glb`.
+
 ## `homestead.glb`
 
 | Osa | Lähde (Poly Haven -tunniste) | Käyttö |
