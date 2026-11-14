@@ -16,6 +16,10 @@ Blender MCP).
   -tyyppisesti hidastettuna aikana.
 - Visuaalinen maailma on pronssikautinen tai varhaisen rautakauden
   Fennoskandia, ei keskieurooppalainen ritarikeskiaika.
+- **PC-peli hiirelle ja näppäimistölle.** Kosketusnäyttöjä ei tueta eikä
+  niitä varten suunnitella ohjausta (omistajan päätös 2026-11-14).
+  Liikkuminen on vapaata, koska kaikki pelissä ei tule olemaan taistelua
+  (RPG-osuudet).
 - Tekninen pohja (suunniteltu): Three.js + TypeScript + Vite, paketinhallinta
   Bun, testit Vitest. Hostaus staattisena sivuna (GitHub Pages).
 

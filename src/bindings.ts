@@ -7,7 +7,7 @@
 // lähettäminä näppäinpainalluksina; molemmat kelpaavat sellaisinaan.
 
 export type SongSlotAction = "song1" | "song2" | "song3" | "song4" | "song5";
-export type Action = "slash" | "overhead" | "thrust" | "block" | "dodge" | "song" | SongSlotAction;
+export type Action = "slash" | "overhead" | "thrust" | "block" | "dodge" | "song" | "lock" | SongSlotAction;
 /** Laulun pikavalinnat valintaringin paikoille vasemmalta oikealle. */
 export const SONG_SLOT_ACTIONS: readonly SongSlotAction[] = ["song1", "song2", "song3", "song4", "song5"];
 
@@ -18,6 +18,7 @@ export const ACTIONS: { id: Action; label: string }[] = [
   { id: "block", label: "Torjunta" },
   { id: "dodge", label: "Väistö" },
   { id: "song", label: "Laulu" },
+  { id: "lock", label: "Lukitus vastustajaan" },
   { id: "song1", label: "Laulupaikka 1" },
   { id: "song2", label: "Laulupaikka 2" },
   { id: "song3", label: "Laulupaikka 3" },
@@ -36,6 +37,7 @@ export const DEFAULT_BINDINGS: Bindings = {
   block: ["Mouse2", "KeyK"],
   dodge: ["ShiftLeft", "ShiftRight"],
   song: ["KeyQ", ""],
+  lock: ["Tab", "Mouse1"],
   song1: ["F1", ""],
   song2: ["F2", ""],
   song3: ["F3", ""],

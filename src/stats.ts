@@ -18,6 +18,10 @@ export interface Stats {
   moveSpeed: number;
   /** Otetun vahingon kerroin (1 = normaali, alle 1 = suojaa). */
   damageTaken: number;
+  /** Suurin kääntymisnopeus, astetta sekunnissa. */
+  turnSpeed: number;
+  /** Reaktioviive sekunteina (vastustajan tekoäly). */
+  reaction: number;
 }
 export type StatName = keyof Stats;
 
@@ -44,6 +48,8 @@ export function baseStats(character: string, wave = 0): Stats {
     power: c.power + WAVES.powerPerWave * wave,
     moveSpeed: c.moveSpeed,
     damageTaken: 1,
+    turnSpeed: c.turnSpeed,
+    reaction: c.reaction,
   };
 }
 

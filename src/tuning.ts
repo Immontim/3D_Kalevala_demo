@@ -7,6 +7,7 @@
 
 import { CHARACTERS, COMBAT, ENEMY_AI, SHIELDS, STAMINA, STRIKES, WAVES, WEAPONS } from "./combat";
 import { SONG } from "./songLogic";
+import { CONTROLS } from "./controls";
 
 type Tree = { [key: string]: Tree | number | unknown };
 
@@ -21,6 +22,7 @@ export const ROOTS: Record<string, Tree> = {
   shields: SHIELDS as unknown as Tree,
   enemyAi: ENEMY_AI,
   song: SONG,
+  controls: CONTROLS,
 };
 
 function isTree(v: unknown): v is Tree {
@@ -71,13 +73,20 @@ const character = (group: string, id: string): Field[] => [
   { group, label: "Kestävyys", path: `characters.${id}.stamina`, min: 1, max: 1000, step: 5 },
   { group, label: "Kestävyyden palautuminen / s", path: `characters.${id}.staminaRegen`, min: 0, max: 50, step: 0.5 },
   { group, label: "Lyöjän voima", path: `characters.${id}.power`, min: 0, max: 200, step: 1 },
+  { group, label: "Kääntymisnopeus, °/s", path: `characters.${id}.turnSpeed`, min: 10, max: 1440, step: 5 },
 ];
+const reaction = (group: string, id: string): Field =>
+  ({ group, label: "Reaktioviive, s", path: `characters.${id}.reaction`, min: 0, max: 3, step: 0.05 });
 
 /** Säätövälilehden kentät ryhmittäin. Rajat koskevat myös JSON-tekstistä luettuja arvoja. */
 export const FIELDS: readonly Field[] = [
   ...character("Sankari (pelaaja)", "hero"),
   ...character("Nuori urho (aallon 0 arvot)", "urho"),
+  reaction("Nuori urho (aallon 0 arvot)", "urho"),
   ...character("Pohjan soturi (aallon 0 arvot)", "pohja"),
+  reaction("Pohjan soturi (aallon 0 arvot)", "pohja"),
+  { group: "Ohjaus", label: "Hiiren herkkyys, ° / pikseli", path: "controls.mouseSens", min: 0.01, max: 1, step: 0.01 },
+  { group: "Ohjaus", label: "Vastustajan kääntymiskerroin iskun aikana", path: "enemyAi.attackTurnScale", min: 0, max: 1, step: 0.05 },
   { group: "Aallot", label: "Vastustajan elämän lisäys / aalto", path: "waves.hpPerWave", min: 0, max: 200, step: 5 },
   { group: "Aallot", label: "Vastustajan voiman lisäys / aalto", path: "waves.powerPerWave", min: 0, max: 20, step: 0.5 },
   { group: "Aallot", label: "Pelaajan elämän palautus aaltojen välissä", path: "waves.restHp", min: 0, max: 1000, step: 5 },

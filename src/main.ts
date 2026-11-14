@@ -2,8 +2,9 @@ import * as THREE from "three";
 import {
   ActionState, AttackDef, AttackTiming, BASH, COMBAT, ENEMY_AI, Loadout, SHIELDS, STYLES, ShieldDef, WAVES, StrikeStyle, StrikeWeight, WeaponDef, angleBetween, attackPhase, chargeLevel,
   enemyAttackTiming, makeAttack, resolveHit, shieldWear, strikeDamage, styleFor, weaponOf,
-  canStrikeHeavy, exhausted, staminaAfterBlock, staminaTick, strikeCost, strikeTier, weakened,
+  canStrikeHeavy, exhausted, staminaAfterBlock, staminaTick, strikeCost, strikeTier, turnToward, weakened,
 } from "./combat";
+import { CONTROLS } from "./controls";
 import { Debris, FALLEN, Fighter, FighterLook, POSES, SwordTrail, setCharacterEnv } from "./fighter";
 import {
   ACTIONS, Action, Bindings, DEFAULT_BINDINGS, RESERVED, SLOTS, SONG_SLOT_ACTIONS, actionFor, assign, clearSlot, cloneBindings, codeLabel,
@@ -163,6 +164,20 @@ let nextWaveAt = -1;
 const corpses: { actor: Actor; removeAt: number }[] = [];
 const events: string[] = [];
 
+// ---------- Katse ja lukitus ----------
+// Hiiri kääntää katsetta (camYaw, camPitch), ja sankari kääntyy katseen suuntaan omalla
+// kääntymisnopeudellaan. WASD liikkuu katseen suhteen. Lukitus pitää katseen vastustajassa.
+const DEG = Math.PI / 180;
+let camYaw = 0;
+let camPitch = 0;
+/** Pelaaja on kytkenyt lukituksen päälle; se jää voimaan, ja seuraava vastustaja lukitaan heti. */
+let lockOn = false;
+/** Vastustaja, johon katse on lukittu, tai null. */
+function lockTarget(): Actor | null {
+  return lockOn && enemy && enemy.state !== "dead" ? enemy : null;
+}
+function bearing(from: THREE.Vector3, to: THREE.Vector3) { return Math.atan2(to.x - from.x, to.z - from.z); }
+
 /** Poistaa taistelijan näkymästä ja vapauttaa sen omat materiaalit. */
 function removeActor(a: Actor) {
   scene.remove(a.fighter.root, a.trail.mesh);
@@ -228,6 +243,7 @@ function pressCode(code: string): boolean {
   if (a === "block") blockHeld = true;
   else if (a === "dodge") dodgeQueued = true;
   else if (a === "song") songQueued = true;
+  else if (a === "lock") lockOn = !lockOn;
   else if (a === "slash" || a === "overhead" || a === "thrust") pressStrike(a);
   else pickQueued = SONG_SLOT_ACTIONS.indexOf(a);
   return true;
@@ -267,6 +283,13 @@ canvas.addEventListener("mousedown", (e) => {
   pressCode(mouseCode(e.button));
 });
 window.addEventListener("mouseup", (e) => releaseCode(mouseCode(e.button)));
+// Hiiren liike kääntää katsetta, kun hiiri on lukittu peliin. Lukittuna sivuttaisliike ei käännä.
+window.addEventListener("mousemove", (e) => {
+  if (!running || paused || choosing || songState || document.pointerLockElement !== canvas) return;
+  const k = CONTROLS.mouseSens * DEG;
+  if (!lockTarget()) camYaw -= e.movementX * k;
+  camPitch = Math.max(CONTROLS.pitchMin * DEG, Math.min(CONTROLS.pitchMax * DEG, camPitch + e.movementY * k));
+});
 // Hiiren lisänapit (4 ja 5) eivät saa selata sivuhistoriaa kesken pelin.
 for (const type of ["mousedown", "mouseup", "auxclick"] as const) {
   window.addEventListener(type, (e) => { if (e.button >= 3) e.preventDefault(); });
@@ -376,6 +399,15 @@ function updateHud() {
   // Lukuarvot: elämä pyöristetään ylöspäin (1 = vielä hengissä), kestävyys alaspäin (käytettävissä oleva).
   const num = (v: number, max: number, up: boolean) => `${up ? Math.ceil(Math.max(0, v)) : Math.floor(Math.max(0, v))} / ${Math.round(max)}`;
   $("phpNum").textContent = num(player.hp, player.stats.maxHp, true);
+  // Lukitusmerkki lukitun vastustajan pään yläpuolella.
+  const locked = lockTarget();
+  const mark = $("lockMark");
+  if (locked) {
+    const p = locked.pos.clone().setY(locked.pos.y + 2.0).project(camera);
+    const show = p.z < 1;
+    mark.classList.toggle("hidden", !show);
+    if (show) { mark.style.left = `${((p.x + 1) / 2) * innerWidth}px`; mark.style.top = `${((1 - p.y) / 2) * innerHeight}px`; }
+  } else mark.classList.add("hidden");
   $("ehpNum").textContent = enemy ? num(enemy.hp, enemy.stats.maxHp, true) : "";
   const staminaBar = (id: string, a: Actor | null) => {
     $(id + "Num").textContent = a ? num(a.stamina, a.stats.maxStamina, false) : "";
@@ -699,9 +731,15 @@ function interruptSong() {
 }
 
 // ---------- Tekoäly ----------
-interface Ai { decide: number; strafeDir: number; reactedTo: number; counter: boolean; /** Suosta päässyt kääntyy vielä pelaajaa kohti. */ reorient: boolean; /** Uupunut: vetäytyy keräämään voimia. */ resting: boolean; }
+interface Ai {
+  decide: number; strafeDir: number; reactedTo: number; counter: boolean;
+  /** Suosta päässyt kääntyy vielä pelaajaa kohti. */ reorient: boolean;
+  /** Uupunut: vetäytyy keräämään voimia. */ resting: boolean;
+  /** Pelaajan paikka sellaisena kuin vastustaja sen hahmottaa: seuraa oikeaa paikkaa reaktioviiveen verran jäljessä. */
+  seen: THREE.Vector3;
+}
 let ai: Ai = newAi();
-function newAi(): Ai { return { decide: 1.2, strafeDir: Math.random() < 0.5 ? 1 : -1, reactedTo: -1, counter: false, reorient: false, resting: false }; }
+function newAi(): Ai { return { decide: 1.2, strafeDir: Math.random() < 0.5 ? 1 : -1, reactedTo: -1, counter: false, reorient: false, resting: false, seen: player.pos.clone() }; }
 // Tekoälyn luvut ovat taulukossa ENEMY_AI (combat.ts).
 let playerAttackId = 0;
 
@@ -727,13 +765,18 @@ function pickEnemyAttack(e: Actor, dist: number, quick = false): { kind: StrikeS
   if (playerTurtles() && player.shield) heavy = ENEMY_AI.heavyVsTurtle;
   const weight: StrikeWeight = !quick && canStrikeHeavy(e.stamina) && Math.random() < heavy ? "heavy" : "light";
   const a = makeAttack(e.weapon, kind, weight);
-  return dist < a.range + 0.2 && dist > a.minRange + 0.1 ? { kind, weight } : null;
+  // Ei lyödä, jos pelaaja on kiertänyt iskun kaaren ulkopuolelle: isku menisi ohi.
+  const off = Math.abs(angleBetween(e.yaw, bearing(e.pos, player.pos)));
+  return dist < a.range + 0.2 && dist > a.minRange + 0.1 && off < a.arc * 0.9 ? { kind, weight } : null;
 }
 
 function updateAi(e: Actor, dt: number) {
   const toPlayer = player.pos.clone().sub(e.pos);
   const dist = toPlayer.length();
-  const facing = Math.atan2(toPlayer.x, toPlayer.z);
+  // Vastustaja kääntyy sinne, missä se näkee pelaajan: hidas reaktio jättää kiertäjän sivulle.
+  const r = e.stats.reaction;
+  ai.seen.lerp(player.pos, r > 0 ? 1 - Math.exp(-dt / r) : 1);
+  const facing = bearing(e.pos, ai.seen);
   if (e.state === "rooted") {
     // Suossa ei käännytä: pelaaja voi kiertää selän taakse.
     ai.reorient = true;
@@ -744,7 +787,8 @@ function updateAi(e: Actor, dt: number) {
     e.yaw += Math.max(-step, Math.min(step, diff));
     if (Math.abs(diff) <= Math.max(step, ENEMY_AI.reorientDone)) ai.reorient = false;
   } else {
-    e.yaw = lerpAngle(e.yaw, facing, 1 - Math.exp(-8 * dt));
+    const busy = e.state === "windup" || e.state === "release" || e.state === "recovery" || e.state === "stagger" || e.state === "dodge";
+    e.yaw = turnToward(e.yaw, facing, e.stats.turnSpeed * DEG * (busy ? ENEMY_AI.attackTurnScale : 1) * dt);
   }
 
   if (e.state === "idle" && ai.reorient) {
@@ -1004,12 +1048,12 @@ function updateCombatant(a: Actor, other: Actor | null, dt: number) {
 function updatePlayer(dt: number) {
   const p = player;
   if (p.state === "dead") return;
-  if (enemy) {
-    const to = enemy.pos.clone().sub(p.pos);
-    p.yaw = lerpAngle(p.yaw, Math.atan2(to.x, to.z), 1 - Math.exp(-12 * dt));
-  }
-  // Liike kameran suhteen: eteen = kohti vastustajaa.
-  const fwd = new THREE.Vector3(Math.sin(p.yaw), 0, Math.cos(p.yaw));
+  // Lukittuna katse seuraa vastustajaa; muuten sitä ohjaa hiiri. Sankari kääntyy katseen suuntaan.
+  const target = lockTarget();
+  if (target) camYaw = lerpAngle(camYaw, bearing(p.pos, target.pos), 1 - Math.exp(-CONTROLS.lockTurn * dt));
+  if (!songState) p.yaw = turnToward(p.yaw, camYaw, p.stats.turnSpeed * DEG * dt);
+  // Liike katseen suhteen: W eteen katseen suuntaan, A ja D sivulle.
+  const fwd = new THREE.Vector3(Math.sin(camYaw), 0, Math.cos(camYaw));
   const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
   const move = new THREE.Vector3();
   if (keys.has("KeyW")) move.add(fwd);
@@ -1138,18 +1182,20 @@ function updateCamera(dt: number) {
     camera.lookAt(camOverride.look[0], camOverride.look[1], camOverride.look[2]);
     return;
   }
-  const target = enemy && enemy.state !== "dead" ? enemy.pos : player.pos.clone().add(new THREE.Vector3(Math.sin(player.yaw), 0, Math.cos(player.yaw)).multiplyScalar(3));
-  const dir = target.clone().sub(player.pos).setY(0);
-  if (dir.lengthSq() < 0.01) dir.set(0, 0, 1);
-  dir.normalize();
+  // Kamera katseen suunnassa sankarin takana; pystykulma nostaa kameraa ja kallistaa katsetta.
+  const locked = lockTarget();
+  const dir = new THREE.Vector3(Math.sin(camYaw), 0, Math.cos(camYaw));
   const right = new THREE.Vector3(-dir.z, 0, dir.x);
   const singing = songState !== null || choosing;
   const back = singing ? 3.2 : 4.4;
   const height = singing ? 1.7 : 2.3;
-  const desired = player.pos.clone().addScaledVector(dir, -back).addScaledVector(right, singing ? -1.6 : -1.3).setY(player.pos.y + height);
+  const pitch = singing ? 0 : camPitch;
+  const desired = player.pos.clone().addScaledVector(dir, -back * Math.cos(pitch)).addScaledVector(right, singing ? -1.6 : -1.3)
+    .setY(player.pos.y + height + back * Math.sin(pitch));
   world.clearCamera(desired);
   camPos.lerp(desired, 1 - Math.exp(-5 * dt));
-  const look = player.pos.clone().lerp(target, 0.6).setY(player.pos.y + 1.2);
+  const ahead = locked ? locked.pos : player.pos.clone().addScaledVector(dir, 3);
+  const look = player.pos.clone().lerp(ahead, 0.6).setY(player.pos.y + 1.2);
   camLook.lerp(look, 1 - Math.exp(-8 * dt));
   camera.position.copy(camPos);
   if (shake > 0) {
@@ -1204,6 +1250,8 @@ function restart() {
   for (const d of debris) d.dispose();
   debris.length = 0;
   player = makeActor(PLAYER_LOOK, new THREE.Vector3(0, 0, -3), 0, 0xffd27a);
+  camYaw = 0;
+  camPitch = 0;
   enemy = null;
   wave = 0;
   song = 0;
@@ -1599,6 +1647,10 @@ $("startBtn").addEventListener("click", () => {
     return { pos: player.pos.toArray().map((v) => +v.toFixed(2)), yaw: +player.yaw.toFixed(2), dist: enemy ? +enemy.pos.distanceTo(player.pos).toFixed(2) : null, ai: { ...ai }, player: player.state, playerAttack: `${player.attack.kind}/${player.attack.weight}`, playerHp: player.hp, playerStamina: +player.stamina.toFixed(2), enemyStamina: enemy ? +enemy.stamina.toFixed(2) : null, playerShield: player.shieldHp, stance: player.stance, enemy: enemy?.state, enemyYaw: enemy ? +enemy.yaw.toFixed(2) : null, enemyPos: enemy ? [+enemy.pos.x.toFixed(2), +enemy.pos.z.toFixed(2)] : null, enemyAttack: enemy ? `${enemy.attack.kind}/${enemy.attack.weight}` : null, enemyShield: enemy?.shieldHp, enemyHp: enemy?.hp, song, wave, timeScale };
   },
   get events() { return [...events]; },
+  /** Katse ja lukitus (savutestit): yaw ja pitch radiaaneina. */
+  get look() { return { camYaw: +camYaw.toFixed(3), camPitch: +camPitch.toFixed(3), lockOn, locked: !!lockTarget(), playerYaw: +player.yaw.toFixed(3), enemyYaw: enemy ? +enemy.yaw.toFixed(3) : null }; },
+  setLook(yaw: number, pitch = camPitch) { camYaw = yaw; camPitch = pitch; },
+  setLock(on: boolean) { lockOn = on; },
   /** Käytössä oleva taistelualue ("clearing" tai "homestead"). */
   get arena() { return ARENA; },
   get song() { return songState ? { results: [...songState.results], done: songState.endAt >= 0, realTime, playAt: songState.playAt, beats: songState.beats } : null; },
