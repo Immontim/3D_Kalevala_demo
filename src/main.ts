@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import {
   ActionState, AttackDef, AttackTiming, BASH, COMBAT, ENEMY_AI, Loadout, SHIELDS, STYLES, ShieldDef, WAVES, StrikeStyle, StrikeWeight, WeaponDef, angleBetween, attackPhase, chargeLevel,
-  enemyAttackTiming, makeAttack, resolveHit, shieldWear, strikeDamage, styleFor, weaponOf,
+  enemyAttackTiming, lungeProgress, makeAttack, resolveHit, strikeLands, shieldWear, strikeDamage, styleFor, weaponOf,
   canStrikeHeavy, exhausted, staminaAfterBlock, staminaTick, strikeCost, strikeTier, turnToward, weakened,
 } from "./combat";
 import { CONTROLS } from "./controls";
@@ -121,6 +121,9 @@ interface Actor {
   dodgeCd: number;
   moveSpeed: number;
   extraRecovery: number;
+  /** Tukiaskeleesta otettu osuus 0..1 ja paikka, josta askel lähti (kantama lasketaan siitä). */
+  lunged: number;
+  stepFrom: THREE.Vector3;
 }
 
 /** wave = 0 pelaajalle; vastustajilla aalto kasvattaa elämää ja voimaa. */
@@ -138,11 +141,26 @@ function makeActor(look: FighterLook, pos: THREE.Vector3, wave: number, trailCol
     fighter, trail, pos: pos.clone(), yaw: 0, state: "idle", stateTime: 0, timing: { windup: 0.3, release: 0.1, recovery: 0.3 },
     attack: makeAttack(weapon, styleFor(weapon, "slash"), "light"), loadout: look.loadout, struck: false, hp: stats.maxHp,
     blockStart: -99, rootTime: 0, dodgeDir: new THREE.Vector3(), dodgeCd: 0, moveSpeed: 0, extraRecovery: 0,
+    lunged: 0, stepFrom: pos.clone(),
   };
 }
 
 const debris: Debris[] = [];
-const PLAYER_LOOK: FighterLook = { character: "hero", loadout: "sword_shield" };
+// Sankarin varusteet valitaan aloitusikkunassa, ja valinta tallentuu selaimeen.
+const LOADOUT_STORE = "laulun-miekka.loadout.v1";
+const LOADOUTS: Record<Loadout, { name: string; desc: string }> = {
+  sword_shield: { name: "Miekka ja kilpi", desc: "Kilpi suojaa leveältä ja sillä voi työntää, mutta se kuluu." },
+  sword: { name: "Miekka", desc: "Torjunta aseella: asennon on vastattava iskun suuntaa." },
+  spear: { name: "Keihäs", desc: "Pitkä ulottuma ja vain pisto. Ei osu aivan lähelle." },
+};
+function savedLoadout(): Loadout {
+  try {
+    const v = localStorage.getItem(LOADOUT_STORE);
+    if (v === "sword" || v === "sword_shield" || v === "spear") return v;
+  } catch { /* muisti ei käytössä */ }
+  return "sword_shield";
+}
+const PLAYER_LOOK: FighterLook = { character: "hero", loadout: savedLoadout() };
 // Vastustajat kiertävät: kaksi hahmoa, kummallakin miekka, miekka ja kilpi sekä keihäs.
 const ENEMIES: { name: string; look: FighterLook }[] = [
   { name: "Nuori urho", look: { character: "urho", loadout: "sword" } },
@@ -890,7 +908,8 @@ function moveActor(a: Actor, dir: THREE.Vector3, speed: number, dt: number) {
 
 function resolveStrike(att: Actor, def: Actor) {
   const toDef = def.pos.clone().sub(att.pos);
-  const dist = toDef.length();
+  // Kantama lasketaan paikasta, josta tukiaskel lähti: askel ei pidennä ulottumaa.
+  const dist = def.pos.distanceTo(att.stepFrom);
   const angleToDefender = angleBetween(att.yaw, Math.atan2(toDef.x, toDef.z));
   const angleToAttacker = angleBetween(def.yaw, Math.atan2(-toDef.x, -toDef.z));
   const atk = att.attack;
@@ -1018,16 +1037,23 @@ function updateCombatant(a: Actor, other: Actor | null, dt: number) {
     const phase = a.charging ? "windup" : attackPhase(a.stateTime, { ...t, recovery: t.recovery + a.extraRecovery });
     if (phase === "release" && a.state !== "release") {
       a.state = "release";
+      a.lunged = 0;
+      a.stepFrom.copy(a.pos);
       spendOnStrike(a);
       sfx.swing();
     }
+    const inRelease = a.stateTime - t.windup;
     if (phase === "release") {
-      // Askel iskun mukana: paino siirtyy eteen.
-      const step = (a.attack.lunge / t.release) * dt;
+      // Tukiaskel eteen iskuvaiheen alussa. Isku ratkeaa vasta, kun askel on otettu.
+      const done = lungeProgress(inRelease, t.release);
+      const step = (done - a.lunged) * a.attack.lunge;
+      a.lunged = done;
       a.pos.x += Math.sin(a.yaw) * step;
       a.pos.z += Math.cos(a.yaw) * step;
     }
-    if (phase === "release" && !a.struck && other) {
+    // Jos ruutu hyppäsi osumahetken yli suoraan palautumiseen, isku ratkeaa silti.
+    const lands = phase === "release" ? strikeLands(inRelease, t.release) : phase !== "windup" && a.state === "release";
+    if (lands && !a.struck && other) {
       a.struck = true;
       resolveStrike(a, other);
       if ((a.state as ActionState) === "stagger") return; // täydellinen torjunta keskeytti
@@ -1137,7 +1163,8 @@ function targetPose(a: Actor) {
     }
     case "release": {
       const pose = k === "bash" ? POSES.bashStrike : k === "slash" ? POSES.slashStrike : k === "thrust" ? POSES.thrustStrike : hv ? POSES.heavyStrike : POSES.strike;
-      return { pose, rate: 40 };
+      // Iskuasento valmistuu osumahetkeen, samaan aikaan tukiaskeleen kanssa.
+      return { pose, rate: 3.2 / (a.timing.release * COMBAT.strikePoint) };
     }
     case "recovery": return { pose: POSES.guard, rate: 5 };
     case "block": return { pose: a.stance === "slash" ? POSES.blockSide : a.stance === "thrust" ? POSES.blockThrust : POSES.block, rate: 22 };
@@ -1628,6 +1655,26 @@ $("resumeBtn").addEventListener("click", resume);
       if (!saveArena(id)) { $("arenaNote").textContent = "Valintaa ei voitu tallentaa tähän selaimeen, joten maastoa ei voi vaihtaa."; return; }
       $("arenaNote").textContent = `Ladataan: ${ARENAS[id].name}…`;
       location.reload();
+    });
+    box.appendChild(btn);
+  }
+}
+
+// Varusteiden valinta: sankari vaihdetaan heti, joten valinta näkyy taustalla.
+{
+  const box = $("gearPick");
+  for (const id of Object.keys(LOADOUTS) as Loadout[]) {
+    const btn = document.createElement("button");
+    btn.className = "arena" + (id === PLAYER_LOOK.loadout ? " on" : "");
+    btn.dataset.loadout = id;
+    btn.innerHTML = `<b>${LOADOUTS[id].name}</b><span>${LOADOUTS[id].desc}</span>`;
+    btn.addEventListener("click", () => {
+      if (id === PLAYER_LOOK.loadout || running) return;
+      PLAYER_LOOK.loadout = id;
+      try { localStorage.setItem(LOADOUT_STORE, id); } catch { /* valinta on voimassa tämän latauksen ajan */ }
+      removeActor(player);
+      player = makeActor(PLAYER_LOOK, new THREE.Vector3(0, 0, -3), 0, 0xffd27a);
+      for (const b of box.querySelectorAll("button")) b.classList.toggle("on", b === btn);
     });
     box.appendChild(btn);
   }

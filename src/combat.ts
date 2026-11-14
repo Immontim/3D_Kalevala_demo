@@ -46,6 +46,11 @@ export const COMBAT = {
   dodgeCooldown: 0.6,
   /** Väistön nopeus, m/s. */
   dodgeSpeed: 7,
+  /**
+   * Osuus iskuvaiheesta (release), jonka kohdalla isku osuu. Sitä ennen lyöjä ottaa
+   * tukiaskeleen eteen (lunge); isku ratkeaa vasta, kun askel on otettu.
+   */
+  strikePoint: 0.7,
   /** Kaikkien lyöntien noston kerroin (1 = taulukon ajat). */
   windupScale: 1,
   /** Kaikkien lyöntien palautumisajan kerroin (1 = taulukon ajat). */
@@ -165,7 +170,10 @@ export interface StrikeDef {
   arc: number;
   /** Vahinkokerroin. */
   damage: number;
-  /** Askel eteenpäin iskun aikana, metreinä. */
+  /**
+   * Tukiaskel eteenpäin iskuvaiheen alussa, metreinä. Kantama (range) lasketaan paikasta,
+   * josta askel lähti, joten askeleen pidentäminen ei pidennä iskun ulottumaa.
+   */
   lunge: number;
   /** Kuinka paljon torjuttu isku kuluttaa kilpeä. */
   shieldDamage: number;
@@ -181,12 +189,12 @@ export const STRIKES: Record<StrikeStyle, Record<StrikeWeight, StrikeDef>> = {
     heavy: { timing: { windup: 0.7, release: 0.16, recovery: 0.6 }, range: 2.3, arc: Math.PI / 5, damage: 2.0, lunge: 0.3, shieldDamage: 2 },
   },
   slash: {
-    light: { timing: { windup: 0.32, release: 0.14, recovery: 0.38 }, range: 2.3, arc: Math.PI / 3, damage: 1.0, lunge: 0.15, shieldDamage: 1 },
-    heavy: { timing: { windup: 0.62, release: 0.16, recovery: 0.55 }, range: 2.4, arc: Math.PI / 3, damage: 1.7, lunge: 0.3, shieldDamage: 2 },
+    light: { timing: { windup: 0.32, release: 0.2, recovery: 0.32 }, range: 2.3, arc: Math.PI / 3, damage: 1.0, lunge: 0.45, shieldDamage: 1 },
+    heavy: { timing: { windup: 0.62, release: 0.22, recovery: 0.49 }, range: 2.4, arc: Math.PI / 3, damage: 1.7, lunge: 0.6, shieldDamage: 2 },
   },
   thrust: {
-    light: { timing: { windup: 0.28, release: 0.12, recovery: 0.42 }, range: 2.5, arc: Math.PI / 7, damage: 0.85, lunge: 0.3, shieldDamage: 1 },
-    heavy: { timing: { windup: 0.58, release: 0.12, recovery: 0.55 }, range: 2.6, arc: Math.PI / 7, damage: 1.5, lunge: 0.45, shieldDamage: 2 },
+    light: { timing: { windup: 0.28, release: 0.2, recovery: 0.34 }, range: 2.5, arc: Math.PI / 7, damage: 0.85, lunge: 0.5, shieldDamage: 1 },
+    heavy: { timing: { windup: 0.58, release: 0.2, recovery: 0.47 }, range: 2.6, arc: Math.PI / 7, damage: 1.5, lunge: 0.65, shieldDamage: 2 },
   },
 };
 
@@ -411,6 +419,19 @@ export function damageFor(base: number, defenderState: ActionState): number {
 /** Iskun vahinko: lyöjän voima × iskun ja aseen kerroin. Vain osuma tekee vahinkoa. */
 export function strikeDamage(power: number, a: AttackDef, res: HitResult, defenderState: ActionState): number {
   return res === "hit" ? damageFor(power * a.damage, defenderState) : 0;
+}
+
+/** Tukiaskeleen eteneminen 0..1, kun iskuvaihetta on kulunut `inRelease` sekuntia. Askel on valmis osumahetkellä. */
+export function lungeProgress(inRelease: number, release: number): number {
+  const t = Math.max(0, inRelease) / Math.max(1e-6, release * COMBAT.strikePoint);
+  const u = Math.min(1, t);
+  // Nopea lähtö ja pehmeä pysähdys: jalka ehtii maahan ennen osumaa.
+  return 1 - (1 - u) * (1 - u);
+}
+
+/** Osuuko isku jo: tukiaskel on otettu, kun iskuvaiheesta on kulunut `strikePoint`-osuus. */
+export function strikeLands(inRelease: number, release: number): boolean {
+  return inRelease >= release * COMBAT.strikePoint;
 }
 
 export type AttackPhase = "windup" | "release" | "recovery" | "done";

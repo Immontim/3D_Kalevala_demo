@@ -7,25 +7,30 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
 
-- **Versio v00.17.00**, branch `claude/free-turn` (tarkista merge-tila
-  `git merge-base --is-ancestor`). Mainissa on v00.16.00.
-- **Vapaa kääntyminen** (`src/main.ts` kohta "Katse ja lukitus",
-  luvut `src/controls.ts` `CONTROLS`): hiiren liike (vain hiiren ollessa
-  lukittuna peliin) muuttaa `camYaw`/`camPitch`. Sankari kääntyy kohti
-  `camYaw`ta nopeudella `Stats.turnSpeed` (°/s), ja WASD liikkuu `camYaw`n
-  suhteen. Lukitus (toiminto `lock`, oletus Tab / hiiren keskinappi) on
-  kytkin `lockOn`: lukittuna `camYaw` seuraa vastustajaa (`lockTarget()`)
-  eikä hiiren sivuliike käännä; lukitus jää päälle seuraavaan aaltoon.
-  Kamera on `camYaw`n suunnassa sankarin takana; vapaana se katsoo eteen,
-  lukittuna kohti vastustajaa.
-- **Vastustajan kääntyminen** (`updateAi`): vastustaja kääntyy kohti
-  pelaajan paikkaa `ai.seen`, joka seuraa oikeaa paikkaa reaktioviiveen
-  (`Stats.reaction`) verran jäljessä, nopeudella `Stats.turnSpeed`, iskun,
-  horjahduksen ja väistön aikana kertoimella `ENEMY_AI.attackTurnScale`.
-  `pickEnemyAttack` ei aloita iskua, jos pelaaja on yli 0,9 × iskun kaaren
-  sivussa. Mitattu: täydellä nopeudella 2 m:n säteellä kiertävä pelaaja
-  jää nuoren urhon suunnasta noin 80° sivuun, torjunta-asennon nopeudella
-  noin 37°. Kiertäjän on siis juostava ja ajoitettava isku.
+- **Versio v00.18.00**, branch `claude/strike-step` (tarkista merge-tila
+  `git merge-base --is-ancestor`). Mainissa on v00.17.00.
+- **Tukiaskel ja osumahetki** (`combat.ts` `COMBAT.strikePoint`,
+  `lungeProgress`, `strikeLands`; `main.ts` `updateCombatant`): iskuvaiheen
+  alussa lyöjä astuu `lunge` metriä eteen, ja isku ratkeaa vasta
+  `strikePoint` (0,7) × release kohdalla. Kantama mitataan askeleen
+  lähtöpaikasta (`Actor.stepFrom`), joten askeleen pituus ei muuta
+  ulottumaa. Sivalluksen ja piston release on 0,2 s (raskas sivallus
+  0,22 s) ja palautuminen vastaavasti lyhyempi. Asennot `slashWindup`,
+  `thrustWindup` ja keihään `SPEAR_HOLD` vetävät aseen selvästi taakse;
+  etujalka nousee askeleessa (`Fighter.strideVel`).
+  Vihollisen terän kärjen välähdys (`Fighter.setGlow`) näkyy hahmojen läpi.
+- **Sankarin varusteet** valitaan aloitusikkunassa (`main.ts` `LOADOUTS`,
+  `savedLoadout()`); vaihto rakentaa sankarin heti, sivua ei ladata.
+- **Vapaa kääntyminen** (`main.ts` kohta "Katse ja lukitus", luvut
+  `controls.ts` `CONTROLS`): hiiri muuttaa `camYaw`/`camPitch`, sankari
+  kääntyy kohti `camYaw`ta nopeudella `Stats.turnSpeed`, WASD liikkuu
+  `camYaw`n suhteen. Lukitus (`lock`, Tab / keskinappi) on kytkin `lockOn`:
+  `camYaw` seuraa vastustajaa (`lockTarget()`) ja jää päälle seuraavaan
+  aaltoon. Omistaja pelasi ja hyväksyi 2026-11-14.
+- **Vastustajan kääntyminen** (`updateAi`): kohti `ai.seen`ia, joka seuraa
+  pelaajaa `Stats.reaction` jäljessä; iskun, horjahduksen ja väistön aikana
+  kertoimella `ENEMY_AI.attackTurnScale`. `pickEnemyAttack` ei aloita
+  iskua, jos pelaaja on yli 0,9 × iskun kaaren sivussa.
 - **Torjuntasektorit** (`WEAPONS.*.blockArc` π/4 = ±45°,
   `SHIELDS.round.blockArc` π/3 = ±60°; omistajan päätös 2026-11-14).
 - **Kaksi taistelupaikkaa** (`src/world.ts`): `ARENA` on tällä latauksella
@@ -170,20 +175,17 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
   (Actions-ajo "Julkaise GitHub Pagesiin"); v00.10.00 ja v00.11.00 eivät
   ole mainissa. **Omistaja testaa julkaistusta osoitteesta**, ei
   dev-serveriltä.
-- **Käsin testattu 2026-11-14** (in-app browser, skriptattu syöte
-  `__game.setLook`, `setLock`, `look`): selän kääntäminen vastustajaan,
-  lukitus kääntää katseen ja sankarin kohti vastustajaa, lukitusmerkki,
-  kiertomittaus yllä; ei konsolivirheitä. **Ei testattu:** oikea hiiren
-  liike (selainpaneelin skripti ei saa hiirtä lukittua), herkkyyden
-  tuntuma, Tab-näppäin oikeassa selaimessa, nuotioaukio uudella
-  ohjauksella. **2026-11-13:** pihapiiri, paikan vaihto ja
-  kamera pihalla, 60 FPS / RTX 4080.
+- **Käsin testattu 2026-11-14** (in-app browser, skriptattu syöte):
+  varusteen valinta, keihäspiston askel 0,8 m, osuma 0,14 s iskuvaiheen
+  alusta, asennot kuvista, välähdys; ei konsolivirheitä. **Ei testattu:**
+  uusien iskujen tuntuma ja tasapaino ihmisen pelaamana, sankari keihäällä
+  tai pelkällä miekalla koko aallon läpi. **2026-11-13:** pihapiiri, 60 FPS.
   **Ei testattu:** ihmisen pelaamana; buildattu versio selaimessa;
   hitaampi kone. Aiemmista yhä kokeilematta: mittarien
   raahaus oikealla hiirellä, hiiren lukitus laulun valinnassa, F1–F5
   oikeassa selaimessa, askellus ihmisen silmin, kaatuneet kaltevalla
   maalla, suossa kuoleva vastustaja.
-- **Komennot 2026-11-14:** `bun run test` (68/68), `bun run lint`,
+- **Komennot 2026-11-14:** `bun run test` (69/69), `bun run lint`,
   `bun run build` ok.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Savutestien apuna `window.__game`: `tick(n, dt)` ajaa peliä askelin
@@ -271,8 +273,9 @@ Päivitetty: 2026-11-14 (Claude, kotikone, Windows)
 
 ## Seuraava tehtävä
 
-Omistaja pelaa vapaalla kääntymisellä julkaistusta osoitteesta mergen
-jälkeen ja kertoo hiiren herkkyyden, lukituksen ja kiertämisen tuntumasta.
+Omistaja pelaa uusilla iskuilla ja varustevalinnalla julkaistusta
+osoitteesta mergen jälkeen ja kertoo, näkyykö lataus ja ehtiikö siihen
+reagoida.
 Sen jälkeen vaihe 2: 2 vastustajaa aalloissa 4–5 ja 3 aallosta 6 alkaen,
 hyökkäysvuoro (vain yksi lyö kerrallaan), ryhmäkerroin elämälle
 (ehdotus 60 % / 45 %), lukituksen kohteen valinta ja pienet palkit pään
