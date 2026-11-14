@@ -13,6 +13,7 @@ import { spawnHero, updatePlayer } from "./hero";
 import { showMsg, tickMsg, updateHud } from "./hud";
 import { clearInputs, lockPointer } from "./input";
 import { keepApartAndInside, updateCombatant } from "./melee";
+import { updateHazards } from "./hazards";
 import { updateShowcase } from "./showcase";
 import { choosing, closeChoice, closeSong, songState, updateChoice, updateSong } from "./song";
 import { aim, bindUi, fx, g, inputs } from "./state";
@@ -97,6 +98,7 @@ export function simulate(realDt: number) {
       updateCombatant(e, dt);
     }
     keepApartAndInside([g.player, ...g.enemies]);
+    updateHazards([g.player, ...g.enemies], dt);
     g.encounter.update(dt);
     for (let i = g.corpses.length - 1; i >= 0; i--) {
       if (g.gameTime > g.corpses[i].removeAt) {

@@ -30,13 +30,34 @@ export const sparks = new THREE.Points(
 );
 sparks.frustumCulled = false;
 
+// Ympäristöosumalla on oma hiukkasallas ja kylmä väri. ImpactKind-lippu pitää
+// pelilogiikan erossa esitystavasta ja sallii myöhemmin kivi-/puukohtaiset efektit.
+export type ImpactKind = "guard" | "environment";
+const environmentSparkCount = 80;
+const environmentSparkPos = new Float32Array(environmentSparkCount * 3);
+const environmentSparkVel = new Float32Array(environmentSparkCount * 3);
+const environmentSparkLife = new Float32Array(environmentSparkCount);
+const environmentSparkGeo = new THREE.BufferGeometry();
+environmentSparkGeo.setAttribute("position", new THREE.BufferAttribute(environmentSparkPos, 3));
+const environmentSparks = new THREE.Points(
+  environmentSparkGeo,
+  new THREE.PointsMaterial({ map: dotTex, color: 0x9fd8e6, size: 0.11, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }),
+);
+environmentSparks.frustumCulled = false;
+
 export let sparkIdx = 0;
-export function emitSparks(at: THREE.Vector3, n: number, speed: number) {
+let environmentSparkIdx = 0;
+export function emitSparks(at: THREE.Vector3, n: number, speed: number, kind: ImpactKind = "guard") {
+  const env = kind === "environment";
+  const count = env ? environmentSparkCount : sparkCount;
+  const pos = env ? environmentSparkPos : sparkPos;
+  const vel = env ? environmentSparkVel : sparkVel;
+  const life = env ? environmentSparkLife : sparkLife;
   for (let i = 0; i < n; i++) {
-    const k = sparkIdx++ % sparkCount;
-    sparkPos.set([at.x, at.y, at.z], k * 3);
-    sparkVel.set([(Math.random() - 0.5) * speed, (0.45 + Math.random() * 0.55) * speed, (Math.random() - 0.5) * speed], k * 3);
-    sparkLife[k] = 0.4 + Math.random() * 0.4;
+    const k = (env ? environmentSparkIdx++ : sparkIdx++) % count;
+    pos.set([at.x, at.y, at.z], k * 3);
+    vel.set([(Math.random() - 0.5) * speed, (0.45 + Math.random() * 0.55) * speed, (Math.random() - 0.5) * speed], k * 3);
+    life[k] = 0.3 + Math.random() * 0.35;
   }
 }
 
@@ -80,6 +101,8 @@ function updateParticles(
 export function updateSparks(dt: number) {
   updateParticles(sparkPos, sparkVel, sparkLife, sparkCount, dt);
   sparkGeo.attributes.position.needsUpdate = true;
+  updateParticles(environmentSparkPos, environmentSparkVel, environmentSparkLife, environmentSparkCount, dt);
+  environmentSparkGeo.attributes.position.needsUpdate = true;
   updateParticles(bloodPos, bloodVel, bloodLife, bloodCount, dt);
   bloodGeo.attributes.position.needsUpdate = true;
 }
@@ -114,6 +137,7 @@ export function updateRing(realDt: number) {
 
 export function initEffects() {
   scene.add(sparks);
+  scene.add(environmentSparks);
   scene.add(blood);
 
   scene.add(ring);
