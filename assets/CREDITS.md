@@ -62,6 +62,14 @@ nahka kuten tiedostossa `characters.glb` (Poly Haven, CC0). Itse tehty
 nuoliviini ja jousi sekä emännän mekko, esiliina, kupurasoljet ketjuineen,
 huivi, vyö, avain ja puukko.
 
+## `louhi.glb`
+
+Vartalo, pää, kädet ja silmät sekä kankaat ja nahka kuten `villagers_f.glb`
+(Human Base Meshes `GEO-body_female_realistic`, Poly Haven, CC0). Itse tehty
+Blenderissä (`char_louhi.py`): mekko, esiliina ja kirjontanauha, soljet,
+ketjut, helmet, vyö, silmämaalit sekä kallo, sarvet ja sulat. Ulkoista
+mallia ei ole käytetty; omistajan antama kuva oli vain väri- ja tyyliviite.
+
 ## `animals/` (CC-BY 4.0)
 
 Lisenssi: [Creative Commons Attribution 4.0](http://creativecommons.org/licenses/by/4.0/).
