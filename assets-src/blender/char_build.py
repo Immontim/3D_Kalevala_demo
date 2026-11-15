@@ -669,18 +669,25 @@ def legs_parts(C, trousers_mat, trousers_col, wrap_col, greaves=False, baggy=0.0
     return parts
 
 
+# Huotra vyöllä vasemmalla kupeella: suuaukon keskipiste ja suunta kärkeen (lepoasennon
+# maailmakoordinaatit). Huotra on painotettu vain lantioon, jotta siihen pantu miekka
+# (mount_huotra, build_mounts) pysyy sen sisällä hahmon liikkuessa.
+SHEATH_TOP = V((0.19, -0.03, 0.985))
+SHEATH_D = V((0.10, 0.35, -0.93)).normalized()
+SHEATH_LEN = 0.80          # miekan terä on 0,74 m
+
+
 def belt_parts(C, z=1.005, off=0.034, scabbard=False, knife=False):
     keep = lambda i, c: abs(c.x) < 0.2 and C.arm_frac[i] < 0.3
     parts = [band(C, V((0, 0.02, z)), V((0, 0, 1)), V((0, -1, 0)), 0.05, off, "leather", keep=keep, col=(1.0, 0.92, 0.85))]
     hw = {"hips": 0.7, "spine": 0.3}
     parts.append(box_part(V((0.0, -0.155, z)), (0.045, 0.012, 0.05), "metal", hw, (0.62, 0.42, 0.14)))        # pronssisolki
     if scabbard:
-        top = V((0.19, -0.03, z - 0.02))
-        d = V((0.10, 0.35, -0.93)).normalized()
+        top, d, n = SHEATH_TOP, SHEATH_D, SHEATH_LEN
         R = d.to_track_quat('Z', 'Y').to_matrix()
-        w = {"hips": 0.8, "thigh_L": 0.2}
-        parts.append(box_part(top + d * 0.29, (0.062, 0.02, 0.58), "leather", w, (0.95, 0.85, 0.75), R))
-        parts.append(box_part(top + d * 0.575, (0.066, 0.024, 0.05), "metal", w, (0.62, 0.42, 0.14), R))
+        w = {"hips": 1.0}
+        parts.append(box_part(top + d * (n / 2), (0.062, 0.02, n), "leather", w, (0.95, 0.85, 0.75), R))
+        parts.append(box_part(top + d * (n - 0.005), (0.066, 0.024, 0.05), "metal", w, (0.62, 0.42, 0.14), R))
         parts.append(box_part(top + d * 0.02, (0.068, 0.026, 0.04), "metal", w, (0.62, 0.42, 0.14), R))
     if knife:
         top = V((-0.10, -0.15, z - 0.02))
@@ -689,6 +696,39 @@ def belt_parts(C, z=1.005, off=0.034, scabbard=False, knife=False):
         parts.append(box_part(top + V((0, 0, -0.10)), (0.034, 0.018, 0.17), "leather", w, (0.95, 0.85, 0.75), R))
         parts.append(tube_part([top + V((0, 0, 0.0)), top + V((0.008, 0, 0.09))], [0.012, 0.014], 6, "wood", w, (1.0, 0.9, 0.7)))
     return parts
+
+
+def strap_parts(C, off=0.038, width=0.036):
+    """Kilven kantohihna: nahkavyö oikean olan yli vasemmalle kyljelle ja selän kautta takaisin."""
+    a, b = V((-0.125, 0.02, 1.475)), V((0.20, 0.02, 1.13))       # olan päältä vyötärön sivuun
+    along = (b - a).normalized()
+    axis = V((-along.z, 0, along.x)).normalized()                # silmukan tason normaali
+    keep = lambda i, c: C.arm_frac[i] < 0.3
+    return [band(C, (a + b) / 2, axis, V((0, -1, 0)), width, off, "leather", n=36, keep=keep, col=(0.8, 0.68, 0.58))]
+
+
+def build_mounts():
+    """Kiinnityspisteet rauhan varustukselle: tyhjät objektit luiden lapsina. Peli siirtää
+    miekan tai kilven pisteen lapseksi nolla-asentoon, jolloin se on huotrassa tai selässä."""
+    rig = bpy.data.objects["RIG"]
+    out = {}
+    def mount(name, bone, M):
+        remove_obj(name)
+        e = bpy.data.objects.new(name, None)
+        e.empty_display_size = 0.06
+        e.empty_display_type = 'ARROWS'
+        get_col("GAME").objects.link(e)
+        e.parent, e.parent_type, e.parent_bone = rig, 'BONE', bone
+        bpy.context.view_layer.update()
+        e.matrix_world = M
+        out[name] = [round(x, 3) for x in M.translation]
+    # Miekka huotrassa: terä (-Y) huotran suuntaan, lape kuvetta vasten, väistin suuaukon helalla.
+    R = SHEATH_D.to_track_quat('Z', 'Y').to_matrix() @ Matrix(((1, 0, 0), (0, 0, 1), (0, -1, 0)))
+    mount("mount_huotra", "hips", Matrix.Translation(SHEATH_TOP - SHEATH_D * 0.06) @ R.to_4x4())
+    # Kilpi selässä: etupinta taaksepäin, hieman kallellaan, kädensija selkää vasten.
+    mount("mount_kilpi_selka", "chest", Matrix.Translation(V((0.0, 0.148, 1.13)))
+          @ Matrix.Rotation(0.22, 4, 'Y') @ Matrix.Rotation(math.pi, 4, 'Z'))
+    return out
 
 
 def torso_parts(C, mat, col, sleeve_to, inflate=0.016, tile=0.25, smooth=3, sleeve_from=-9, torso=True, collar=None, baggy=0.0):
@@ -758,6 +798,9 @@ def build_characters():
     P += legs_parts(C, "linen", (0.22, 0.27, 0.46), (0.9, 0.86, 0.75), greaves=True)
     P += belt_parts(C, off=0.04, scabbard=True)
     _, stats["char_hero"] = assemble("char_hero", P)
+    # Kantohihna on oma kappaleensa samassa luurangossa. Nimi alkaa char_, joten peli piilottaa
+    # sen, kunnes rauhan varustus otetaan käyttöön (kilpi selässä).
+    _, stats["char_hero_hihna"] = assemble("char_hero_hihna", strap_parts(C))
     # Kypärät ovat omia kappaleitaan (ei luurankoa): peli kiinnittää ne pääluuhun ja voi irrottaa.
     _, stats["helmet_hero"] = assemble("helmet_hero", helmet_parts(C, 0.152), rig=False)
 
