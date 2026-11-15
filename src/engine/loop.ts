@@ -143,6 +143,7 @@ export function simulate(realDt: number) {
   tickMsg(realDt);
 
   inputs.strikeQueued = null;
+  inputs.useQueued = false;
   inputs.dodgeQueued = inputs.songQueued = inputs.beatQueued = false;
   inputs.pickQueued = null;
 }

@@ -7,7 +7,7 @@ import { makeActor, setState } from "./actor";
 import { bearing } from "./camera";
 import { lockTarget } from "./enemies";
 import { strikeHeld } from "./input";
-import { lerpAngle, moveActor, startAttack } from "./melee";
+import { lerpAngle, moveActor, startAttack, startGesture } from "./melee";
 import { openChoice, songState } from "./song";
 import { DEG, aim, g, inputs, keys, sfx } from "./state";
 import { t } from "../i18n";
@@ -73,6 +73,9 @@ export function updatePlayer(dt: number) {
 
   if (songState) { p.moveSpeed = 0; return; }
 
+  // Rauha päättyi kesken eleen: ele keskeytyy ja ase on taas esillä.
+  if (!calm && (p.state === "talk" || p.state === "use")) setState(p, "idle");
+
   // Viritys: niin kauan kuin iskunappi on pohjassa, isku ei laukea. Kun viritysaika täyttyy,
   // isku muuttuu raskaaksi. Napin vapautus laukaisee iskun.
   if (p.state === "windup" && p.charging && p.attack.kind !== "bash") {
@@ -101,6 +104,11 @@ export function updatePlayer(dt: number) {
       p.dodgeDir.copy(move.lengthSq() > 0 ? move.normalize() : right.clone().negate());
       return;
     }
+    // Rauhassa iskunappi puhuu ja torjuntanappi käyttää; kumpikin on lyhyt ele paikallaan seisten.
+    if (calm && p.state === "idle") {
+      if (inputs.strikeQueued) { startGesture(p, "talk"); return; }
+      if (inputs.useQueued) { startGesture(p, "use"); return; }
+    }
     if (inputs.strikeQueued && !calm) {
       if (p.state === "idle") { startAttack(p, inputs.strikeQueued, "light", true); return; }
       // Torjunnan aikana: kilven kanssa kilpityöntö, pelkällä aseella torjunta-asennon vaihto.
@@ -114,7 +122,8 @@ export function updatePlayer(dt: number) {
     if ((!inputs.blockHeld || tired || calm) && p.state === "block") setState(p, "idle");
   }
   const walk = p.stats.moveSpeed;
-  const speed = p.state === "idle" ? walk : p.state === "block" || p.state === "windup" || p.state === "recovery" ? walk * COMBAT.guardMoveScale : 0;
+  // Puhuessa voi kävellä hitaasti; tartuntaan pysähdytään.
+  const speed = p.state === "idle" ? walk : p.state === "talk" ? walk * 0.5 : p.state === "block" || p.state === "windup" || p.state === "recovery" ? walk * COMBAT.guardMoveScale : 0;
   if (speed > 0) moveActor(p, move, speed, dt);
   else p.moveSpeed = 0;
 }

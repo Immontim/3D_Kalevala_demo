@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import charactersUrl from "../assets/characters.glb?url";
+import villagersFUrl from "../assets/villagers_f.glb?url";
+import { loadGltf } from "./folk";
 import type { Loadout } from "./combat";
 
 // Blenderissä mallinnettu luurankohahmo, jota ohjataan koodilla: asennot (Pose) ovat
@@ -99,11 +101,33 @@ export const FALLEN: FallenPose[] = [
   },
 ];
 
+/** Tartunnan ojennus: kuinka kauas pystystä (rad) kädet nousevat eteen. 1,05 rad = 60°. */
+const REACH = 1.05;
+
 export const POSES: Record<string, Pose> = {
   // Rauhan lepoasento: kädet rennosti sivuilla, ase huotrassa (Fighter.setSheathed).
   rest: {
-    spineYaw: 0, spinePitch: 0.02, rShX: 0.04, rShZ: -0.1, rEl: -0.22, rHandX: 0, rHandY: 0,
-    lShX: 0.04, lShZ: 0.1, lEl: -0.22, crouch: 0, headPitch: 0, stride: 0.04,
+    spineYaw: 0, spinePitch: 0.02, rShX: 0.05, rShZ: -0.17, rEl: -0.32, rHandX: 0.1, rHandY: 0,
+    lShX: 0.05, lShZ: 0.17, lEl: -0.32, crouch: 0, headPitch: 0, stride: 0.04,
+  },
+  // Keihäsmiehen rauhan asento: keihäs kannetaan oikeassa kädessä (SPEAR_HOLD), vasen käsi on vapaa.
+  restSpear: {
+    spineYaw: 0.05, spinePitch: 0.02, rShX: 0.05, rShZ: -0.17, rEl: -0.32, rHandX: 0.1, rHandY: 0,
+    lShX: 0.05, lShZ: 0.17, lEl: -0.32, crouch: 0, headPitch: 0, stride: 0.04,
+  },
+  // Rauhan eleet. Puhe (vilkutus): oikea käsi nousee, kämmen hartiatasolle sivulle-eteen, kyynärpää
+  // alhaalla. Käytä (tartu): molemmat kädet ojentuvat eteen alaviistoon (REACH_DEG pystystä) ja vedetään vatsalle.
+  waveUp: {
+    spineYaw: -0.08, spinePitch: 0.0, rShX: -0.3, rShZ: -0.95, rEl: -1.95, rHandX: 0, rHandY: 0,
+    lShX: 0.05, lShZ: 0.17, lEl: -0.32, crouch: 0, headPitch: 0.04, stride: 0.04,
+  },
+  useReach: {
+    spineYaw: 0, spinePitch: 0.2, rShX: -REACH, rShZ: -0.14, rEl: -0.28, rHandX: 0.1, rHandY: 0,
+    lShX: -REACH, lShZ: 0.14, lEl: -0.28, crouch: 0.05, headPitch: 0.16, stride: 0.04,
+  },
+  usePull: {
+    spineYaw: 0, spinePitch: 0.1, rShX: -0.5, rShZ: -0.12, rEl: -1.45, rHandX: 0.1, rHandY: 0,
+    lShX: -0.5, lShZ: 0.12, lEl: -1.45, crouch: 0.05, headPitch: 0.08, stride: 0.04,
   },
   guard: {
     spineYaw: -0.15, spinePitch: 0.08, rShX: -0.55, rShZ: -0.15, rEl: -1.15, rHandX: 0.95, rHandY: 0,
@@ -185,12 +209,60 @@ export const POSES: Record<string, Pose> = {
   },
 };
 
+/** Rauhan eleet. Aika t alkaa eleen alusta (s). Palauttaa asennon, johon hahmo liukuu. */
+export type Gesture = "talk" | "use";
+export const GESTURE_TIME: Record<Gesture, { total: number; effectAt: number }> = {
+  // Nosto 0,28 s, yksi vilkutus 0,6 s, lasku 0,32 s. Puhe kuuluu, kun käsi on ylhäällä.
+  talk: { total: 1.2, effectAt: 0.3 },
+  // Ojennus 0,3 s, pito 0,1 s, veto 0,35 s, lasku 0,25 s. Tartunta tapahtuu ojennuksen lopussa.
+  use: { total: 1.0, effectAt: 0.3 },
+};
+const blend = (a: Pose, b: Pose, k: number, out: Pose) => {
+  for (const key of KEYS) out[key] = a[key] + (b[key] - a[key]) * k;
+  return out;
+};
+const ease = (x: number) => { const c = Math.min(1, Math.max(0, x)); return c * c * (3 - 2 * c); };
+const gestureOut: Pose = { ...POSES.rest };
+const gestureTmp: Pose = { ...POSES.rest };
+export function gesturePose(kind: Gesture, t: number, hand: "R" | "L" = "R"): Pose {
+  const rest = POSES.rest;
+  if (kind === "talk") {
+    const T = GESTURE_TIME.talk;
+    const raise = ease(t / 0.28), lower = ease((t - (T.total - 0.32)) / 0.32);
+    blend(rest, POSES.waveUp, raise * (1 - lower), gestureOut);
+    // Yksi vilkutus: käsi heilahtaa ulos ja takaisin kyynärvarren kääntyessä mukana.
+    const wt = (t - 0.28) / 0.6;
+    const wave = wt > 0 && wt < 1 ? Math.sin(wt * Math.PI * 2) : 0;
+    gestureOut.rShZ -= wave * 0.26;
+    gestureOut.rHandY += wave * 0.3;
+    gestureOut.rEl += wave * 0.1;
+    return hand === "R" ? gestureOut : mirrorArms(gestureOut);
+  }
+  const reach = ease(t / 0.3), pull = ease((t - 0.4) / 0.35), lower = ease((t - 0.75) / 0.25);
+  blend(rest, POSES.useReach, reach, gestureTmp);
+  blend(gestureTmp, POSES.usePull, pull, gestureOut);
+  return blend(gestureOut, rest, lower, gestureTmp);
+}
+/** Vasen käsi tekee eleen: oikean ja vasemman käden kentät vaihdetaan (kyynärpään taivutus ja loitonnus peilataan). */
+/** Onko asento jokin eleen jatkuvasti uusiutuva asento (gesturePose). */
+const isGesturePose = (p: Pose) => p === gestureOut || p === gestureTmp;
+function mirrorArms(p: Pose): Pose {
+  const o = gestureTmp;
+  Object.assign(o, p);
+  o.lShX = p.rShX; o.lShZ = -p.rShZ; o.lEl = p.rEl;
+  o.rShX = p.lShX; o.rShZ = -p.lShZ; o.rEl = p.lEl;
+  o.spineYaw = -p.spineYaw;
+  return o;
+}
+
 export type CharacterId = "hero" | "urho" | "pohja";
 export type { Loadout };
 
 export interface FighterLook {
   character: CharacterId;
   loadout: Loadout;
+  /** Naissankari: vartalo on jousineito (assets/villagers_f.glb) ilman jousta; aseet ja kypärä tulevat characters.glb:stä. */
+  female?: boolean;
 }
 
 // ---------- Blender-hahmot (assets/characters.glb) ----------
@@ -240,6 +312,9 @@ export const GAIT = {
   hipYaw: 0.11, hipRoll: 0.05, hipShift: 0.022, counter: 0.7, lean: 0.07,
   /** Paikallaan: painon siirto jalalta toiselle, lantion kallistus ja kierto, hengitys. */
   idleShift: 0.03, idleRoll: 0.045, idleYaw: 0.04, breath: 0.016,
+  /** Rauhan kävely: käsien heilahdus olalta (rad, kävelynopeudella ja täydellä nopeudella), kyynärpään lisätaivutus
+   *  eteen heilahtaessa ja käden vähäinen loitonnus. Käsi heilahtaa vastakkaisen jalan tahtiin. */
+  armSwing: 0.3, armSwingRun: 0.5, armElbow: 0.3, armSway: 0.035,
 };
 /** Vianetsintä: elossa olevat keihäshahmot (selaimessa `await import("/src/fighter.ts")`). */
 export const debugSpearFighters = new Set<Fighter>();
@@ -293,6 +368,8 @@ export class Fighter {
   /** Keihään nykyinen ote (liukuu kohti asennon otetta) ja kuinka paljon oikea käsi seuraa sitä. */
   private hold = spearHold(SPEAR_HOLD.get(POSES.guard)!);
   private spearW = 1;
+  /** Vasemman käden osuus keihäsotteessa: 0 kun käsi on vapaa (rauha, eleet). */
+  private spearLeftW = 1;
   /** Käden edellinen kierto varren ympäri (holdShaft), jotta ratkaisu pysyy jatkuvana. */
   private roll: { L: number | null; R: number | null } = { L: null, R: null };
   private walkPhase = Math.random();
@@ -307,6 +384,8 @@ export class Fighter {
   private lastPos: THREE.Vector3 | null = null;
   /** Haara-asennon muutosnopeus (rad/s): tukiaskeleessa etujalka nousee maasta. */
   private strideVel = 0;
+  /** 0..1: kädet ovat vapaat (rauhan lepoasento), jolloin ne heiluvat kävellessä. */
+  private relax = 0;
   /** Terän kärjen välähdys, joka näkyy myös toisen hahmon takaa (vihollisen iskuvihje). */
   private glint: THREE.Sprite | null = null;
   /** Oma kello ja vaihe, jotta kaksi hahmoa ei huoju samassa tahdissa. */
@@ -329,7 +408,9 @@ export class Fighter {
     this.bladeBase.position.z = spear ? 1.22 + SPEAR_SLIDE : 0.12;
     this.bladeTip.position.z = spear ? 1.52 + SPEAR_SLIDE : 0.8;
     this.weapon.add(this.bladeBase, this.bladeTip);
-    characterAssets.then((gltf) => { if (!this.disposed) this.build(gltf.scene); });
+    Promise.all([characterAssets, look.female ? loadGltf(villagersFUrl) : null])
+      .then(([male, female]) => { if (!this.disposed) this.build(male.scene, female?.scene); })
+      .catch((e) => console.error("Hahmomallin lataus epäonnistui", e));
     if (spear) debugSpearFighters.add(this);
   }
 
@@ -347,15 +428,30 @@ export class Fighter {
     });
   }
 
-  private build(source: THREE.Object3D) {
-    const clone = SkeletonUtils.clone(source);
+  private build(source: THREE.Object3D, femaleSource?: THREE.Object3D) {
+    // Naissankarilla vartalo tulee jousineidon tiedostosta, varusteet ja kiinnityspisteet miehen tiedostosta.
+    const female = !!(this.look.female && femaleSource);
+    const clone = SkeletonUtils.clone(female ? femaleSource! : source);
+    const gear = female ? SkeletonUtils.clone(source) : clone;
     const rig = clone.getObjectByName("RIG") ?? clone;
     // Kantohihna (char_<hahmo>_hihna) on oma kappaleensa samassa luurangossa; näkyy vain rauhan varustuksessa.
-    const strapName = `char_${this.look.character}_hihna`;
-    const keep = new Set<string>([`char_${this.look.character}`, strapName]);
+    const bodyName = female ? "char_jousineito" : `char_${this.look.character}`;
+    const strapName = `${bodyName}_hihna`;
+    const keep = new Set<string>([bodyName, strapName]);
     const equip: Record<string, THREE.Object3D> = {};
-    for (const child of [...clone.children, ...rig.children]) {
+    const gearRig = gear.getObjectByName("RIG") ?? gear;
+    let gearHelmet: THREE.Object3D | null = null;
+    for (const child of [...clone.children, ...rig.children, ...(female ? [...gear.children, ...gearRig.children] : [])]) {
       const n = child.name;
+      if (n === "jousi" || n === "RIG__tmp") child.removeFromParent();
+      if (female && (child.parent === gear || child.parent === gearRig)) {
+        // Miehen tiedostosta otetaan vain varusteet; miehen vartalo jätetään pois.
+        if (/^(sword|spear|shield_)/.test(n)) equip[n] = child;
+        if (n === "helmet_hero") gearHelmet = child;
+        // Luut ja kiinnityspisteet jäävät: niiden asennoista lasketaan siirtymä naisen luurankoon.
+        if (/^(sword|spear|shield_|helmet_|char_)/.test(n)) child.removeFromParent();
+        continue;
+      }
       if (n.startsWith("char_") && !keep.has(n)) child.removeFromParent();
       if (/^(sword|spear|shield_)/.test(n)) { equip[n] = child; child.removeFromParent(); }
       if (n.startsWith("helmet_") && n !== `helmet_${this.look.character}`) child.removeFromParent();
@@ -454,6 +550,7 @@ export class Fighter {
     }
     // Kypärä on oma kappaleensa: se kiinnitetään pääluuhun lepoasennossa, jolloin se istuu
     // kuten Blenderissä ja voidaan myöhemmin irrottaa lentämään.
+    if (female) this.attachFemaleGear(clone, gear, gearHelmet);
     const helmet = clone.getObjectByName(`helmet_${this.look.character}`);
     if (helmet) {
       this.root.updateMatrixWorld(true);
@@ -462,6 +559,53 @@ export class Fighter {
     }
     this.applySheath();
     this.apply();
+  }
+
+  /**
+   * Naissankarin varusteiden kiinnitys. Miehen tiedoston kypärä, huotran kiinnityspiste ja
+   * selkäkiinnike siirretään naisen luurangolle luiden lepoasentojen erotuksen verran.
+   * Naisen mallissa ei ole huotraa eikä kilven hihnaa, joten huotra tehdään tässä laatikoista
+   * samoin mitoin kuin Blenderin char_build.py (belt_parts); hihna puuttuu.
+   */
+  private attachFemaleGear(clone: THREE.Object3D, gear: THREE.Object3D, helmet: THREE.Object3D | null) {
+    clone.updateMatrixWorld(true);
+    gear.updateMatrixWorld(true);
+    const wp = (root: THREE.Object3D, name: string) => root.getObjectByName(name)!.getWorldPosition(new THREE.Vector3());
+    const off = (bone: string) => wp(clone, bone).sub(wp(gear, bone));
+    if (helmet) { helmet.position.add(off("head")); clone.add(helmet); }
+    const mount = (name: string, bone: string) => {
+      const src = gear.getObjectByName(name);
+      if (!src) return null;
+      const o = new THREE.Object3D();
+      o.name = name;
+      src.matrixWorld.decompose(o.position, o.quaternion, o.scale);
+      o.position.add(off(bone));
+      clone.add(o);
+      o.updateMatrixWorld(true);
+      clone.getObjectByName(bone)!.attach(o);
+      return o;
+    };
+    this.mountSheath = mount("mount_huotra", "hips");
+    this.mountBack = mount("mount_kilpi_selka", "chest");
+    // Huotra vasemmalle kupeelle (pelin koordinaatit: x, korkeus, -y Blenderin y:stä).
+    const top = new THREE.Vector3(0.19, 0.985, 0.03).add(off("hips"));
+    const d = new THREE.Vector3(0.1, -0.93, -0.35).normalize();
+    const len = 0.8;
+    const box = (w: number, th: number, l: number, at: number, color: number, metal: boolean) => {
+      const mat = new THREE.MeshStandardMaterial({ color, roughness: metal ? 0.45 : 0.8, metalness: metal ? 0.5 : 0 });
+      if (metal) { envTargets.add(mat); mat.envMapIntensity = 0.45; if (envMap) mat.envMap = envMap; }
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, l, th), mat);
+      m.position.copy(top).addScaledVector(d, at);
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d);
+      m.castShadow = true;
+      m.frustumCulled = false;
+      clone.add(m);
+      clone.updateMatrixWorld(true);
+      clone.getObjectByName("hips")!.attach(m);
+    };
+    box(0.062, 0.02, len, len / 2, 0x5b3a22, false);
+    box(0.066, 0.024, 0.05, len - 0.005, 0xa07a2a, true);
+    box(0.068, 0.026, 0.04, 0.02, 0xa07a2a, true);
   }
 
   /**
@@ -582,8 +726,9 @@ export class Fighter {
     for (const side of ["R", "L"] as const) {
       const s = side === "R" ? 1 : -1;
       const b = this.bones.get(`hand_${side}`)!;
-      const pW = clone.localToWorld(GRIP_CHANNEL.p.clone().setX(GRIP_CHANNEL.p.x * s));
-      const dW = GRIP_CHANNEL.d.clone().setX(GRIP_CHANNEL.d.x * s).transformDirection(clone.matrixWorld);
+      const ch = this.look.female ? GRIP_CHANNEL_F : GRIP_CHANNEL;
+      const pW = clone.localToWorld(ch.p.clone().setX(ch.p.x * s));
+      const dW = ch.d.clone().setX(ch.d.x * s).transformDirection(clone.matrixWorld);
       const rest = b.bone.getWorldQuaternion(new THREE.Quaternion()).premultiply(bodyInv);
       const wrist = this.body.worldToLocal(b.bone.getWorldPosition(new THREE.Vector3()));
       const pB = this.body.worldToLocal(pW.clone());
@@ -694,13 +839,16 @@ export class Fighter {
       });
       this.body.updateMatrixWorld(true);
     }
+    if (this.spearLeftW < 0.001) return;
     const P0 = this.body.worldToLocal(this.weapon.localToWorld(new THREE.Vector3(0, 0, 0)));
     const dir = this.body.worldToLocal(this.weapon.localToWorld(new THREE.Vector3(0, 0, 1))).sub(P0).normalize();
     const G = P0.addScaledVector(dir, this.hold.front);
-    const [l1, l2, l3] = this.holdShaft("L", G, dir, this.hold.poleL);
-    this.setBone("upper_arm_L", l1);
-    this.setBone("forearm_L", l2);
-    this.setBone("hand_L", l3);
+    const ik = this.holdShaft("L", G, dir, this.hold.poleL);
+    (["upper_arm_L", "forearm_L", "hand_L"] as const).forEach((n, i) => {
+      const b = this.bones.get(n)!;
+      const fk = b.world.clone().multiply(qA.copy(b.canon).invert());
+      this.setBone(n, this.spearLeftW >= 0.999 ? ik[i] : fk.slerp(ik[i], this.spearLeftW));
+    });
   }
 
   /** Mittari: jalkaterien paikka maailmassa (x, y, z) ja askelsyklin vaihe. Savutestiin. */
@@ -794,7 +942,14 @@ export class Fighter {
       this.setBone(`forearm_${side}`, fo);
       this.setBone(`hand_${side}`, hand ? fo.multiply(hand) : fo);
     };
-    arm("R", p.rShX, p.rShZ, p.rEl, qB.setFromEuler(eul.set(p.rHandX, p.rHandY, 0, "YXZ")).clone());
+    // Vapaat kädet kävellessä: vasen käsi taakse, kun vasen jalka on edessä, ja päinvastoin.
+    // Eteen heilahtava käsi taipuu kyynärpäästä enemmän; hengitys liikuttaa käsiä hiukan.
+    const swingAmp = THREE.MathUtils.lerp(G.armSwing, G.armSwingRun, THREE.MathUtils.smoothstep(speed, G.walkSpeed, G.runSpeed));
+    const aw = this.relax * life;
+    const swing = leftLead * swingAmp * dir.y * w * aw; // + = vasen käsi taakse, oikea eteen
+    const sway = idle * G.armSway * calm * aw;
+    const fwdR = Math.max(0, swing) / Math.max(swingAmp, 1e-3), fwdL = Math.max(0, -swing) / Math.max(swingAmp, 1e-3);
+    arm("R", p.rShX - swing + sway, p.rShZ - sway * 0.6, p.rEl - G.armElbow * fwdR * w * aw, qB.setFromEuler(eul.set(p.rHandX, p.rHandY, 0, "YXZ")).clone());
     // Yhden käden miekalla vapaa vasen käsi ei kanna kilpeä: se saa hengityksen ja
     // askelen mukana pienen oman vastaliikkeen sekä rennomman ranteen. Varsinaiset
     // lyöntikohtaiset vastapainoasennot tulevat SWORD_FREE_ARM-taulukosta.
@@ -809,7 +964,8 @@ export class Fighter {
         life,
       ).clone()
       : null;
-    arm("L", p.lShX + freeSwing, p.lShZ - freeSwing * 0.35, p.lEl - Math.abs(freeSwing) * 0.3, freeHand);
+    const ls = freeSwing * (1 - aw);
+    arm("L", p.lShX + ls + swing - sway, p.lShZ - ls * 0.35 + sway * 0.6, p.lEl - Math.abs(ls) * 0.3 - G.armElbow * fwdL * w * aw, freeHand);
     eul.order = "XYZ";
     if (this.shieldHolder) {
       // Levossa ranne antaa periksi ja kilpi roikkuu kahvastaan pystyssä kyljellä, pinta ulospäin
@@ -895,7 +1051,10 @@ export class Fighter {
   animate(target: Pose, rate: number, dt: number, moveSpeed: number) {
     const k = 1 - Math.exp(-rate * dt);
     if (this.fall > 0) target = this.fallen.pose;
-    else if (this.sheathed && this.look.loadout !== "spear" && target === POSES.guard) target = POSES.rest;
+    else if (this.sheathed && target === POSES.guard) target = this.look.loadout === "spear" ? POSES.restSpear : POSES.rest;
+    // Keihäsmiehen eleet tehdään vasemmalla kädellä keihäs oikeassa kädessä kantoasennossa.
+    const gesture = isGesturePose(target);
+    const spearTarget = this.look.loadout === "spear" && gesture ? POSES.restSpear : target;
     // Kilpikäsi: kilpi pysyy vartalon edessä ja nousee torjunnassa eteen, ei pään päälle.
     const over = this.hasShield
       ? (BLOCK_POSES.has(target) ? SHIELD_BLOCK : SHIELD_ARM.has(target) ? SHIELD_GUARD : null)
@@ -903,14 +1062,17 @@ export class Fighter {
         : this.look.loadout === "sword" ? SWORD_FREE_ARM.get(target) ?? null : null;
     this.shieldHang += ((SHIELD_FRONT.has(target) ? 0 : 1) - this.shieldHang) * k;
     const strideWas = this.pose.stride;
+    // Rauhan lepoasennossa kädet ovat vapaat ja heiluvat; eleet ja taisteluasennot hallitsevat käsiä itse.
+    this.relax += ((target === POSES.rest || target === POSES.restSpear ? 1 : 0) - this.relax) * k;
     for (const key of KEYS) {
       const goal = over && key in over ? over[key as keyof typeof over]! : target[key];
       this.pose[key] += (goal - this.pose[key]) * k;
     }
     if (dt > 1e-6) this.strideVel += ((this.pose.stride - strideWas) / dt - this.strideVel) * (1 - Math.exp(-30 * dt));
     if (this.look.loadout === "spear") {
-      const st = SPEAR_HOLD.get(target);
+      const st = SPEAR_HOLD.get(spearTarget);
       this.spearW += ((st ? 1 : 0) - this.spearW) * k;
+      this.spearLeftW += ((spearTarget === POSES.restSpear ? 0 : 1) - this.spearLeftW) * k;
       if (st) {
         const h = spearHold(st);
         this.hold.grip.lerp(h.grip, k);
@@ -1055,6 +1217,8 @@ const SPEAR_HOLD_GUARD: SpearHoldDef = { grip: [-0.2, 1.0, 0.04], yaw: 0.1, pitc
 const SPEAR_HOLD_BLOCK: SpearHoldDef = { grip: [-0.16, 1.02, 0.22], yaw: 0.3, pitch: 0.95, front: 0.55, poleR: [-0.3, -1, -0.6], poleL: [0.6, -1, -0.2] };
 export const SPEAR_HOLD = new Map<Pose, SpearHoldDef>([
   [POSES.guard, SPEAR_HOLD_GUARD],
+  // Rauha: keihäs nojaa vinosti ylös oikealla kyljellä, kärki ylhäällä ja hieman eteen.
+  [POSES.restSpear, { grip: [-0.24, 0.92, 0.1], yaw: 0.12, pitch: 1.2, front: 0.55, poleR: [-0.3, -1, -0.6], poleL: [-0.3, -1, 0] }],
   // Pisto: varsi vedetään kauas taakse lonkan ohi, kärki nousee, ja työnnetään molemmin käsin eteen
   // (tyviote liikkuu noin 0,8 m).
   [POSES.thrustWindup, { grip: [-0.3, 1.08, -0.44], yaw: 0.12, pitch: 0.32, front: 0.5, poleR: [-0.3, -1, -0.6], poleL: [-0.3, -1, 0] }],
@@ -1082,6 +1246,8 @@ const FOREARM_TWIST = 0.85;
 // sormet on muotoiltu varren ympärille. d osoittaa peukalon puolelle eli keihään kärkeen päin.
 /** Kuinka paljon keihästä on työnnetty otteessa eteenpäin (m): takakäden taakse jää noin 0,3 m vartta. */
 const SPEAR_SLIDE = 0.3;
+/** Naisen otekanava (oikea käsi): arvio, ks. BLENDER_HANDOFF "Otekanavat"; nyrkkiä ei ole koverrettu. */
+const GRIP_CHANNEL_F = { p: new THREE.Vector3(-0.385, 0.769, 0.058), d: new THREE.Vector3(0.283, -0.537, 0.795).normalize() };
 const GRIP_CHANNEL = { p: new THREE.Vector3(-0.383, 0.795, 0.112), d: new THREE.Vector3(0.31, -0.06, 0.95).normalize() };
 
 // Aseen paikka kädessä virtuaalisessa käsikehyksessä (käsi suorana alas: y alas rannetta pitkin).

@@ -74,6 +74,14 @@ export function initDebug() {
     get debrisHeights() { return g.debris.map((d) => +(d.group.position.y - groundHeight(d.group.position.x, d.group.position.z)).toFixed(2)); },
     /** Ajaa peliä n askelta eteenpäin ruudunpäivityksestä riippumatta (savutestit). */
     tick(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) simulate(dt); },
+    /** Pysäyttää pelin ajan (hitstop) niin, että vain `step` etenee: kuvakaappaukset tarkasta ajanhetkestä. */
+    freeze(on = true) { fx.hitstop = on ? 1e9 : 0; },
+    step(n = 1, dt = 1 / 60) {
+      const h = fx.hitstop;
+      fx.hitstop = 0;
+      for (let i = 0; i < n; i++) simulate(dt);
+      fx.hitstop = h;
+    },
     /** Asennot muokattavina: hahmorivin kanssa asentoja voi säätää lennossa konsolista. */
     poses: POSES,
     /** Vaihtaa vastustajan suoraan annetun aallon vastustajaan (1 = urho ja miekka, 3 = keihäs, 4 = kilpi). */
