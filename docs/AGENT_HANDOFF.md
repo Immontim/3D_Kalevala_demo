@@ -52,7 +52,10 @@ Päivitetty: 2026-11-15 (Codex, Windows)
   pöydän ja penkin törmäysmuodot ovat jo `PROP_COLLIDERS`issa.
   `prepareMaterials`iin pitää lisätä materiaalit `M_HH_*` ja `F_Weave`.
   Naishahmo skaalataan noin 0,95:een, eikä miehen kädestä mitattu
-  `GRIP_CHANNEL` käy hänelle. Mallien sisältö, nimet ja viat:
+  `GRIP_CHANNEL` käy hänelle. Eläimet (`assets/animals/*.glb`, branch
+  `claude/animals`) tuovat mukanaan animaatioleikkeet, joten ne tarvitsevat
+  `THREE.AnimationMixer`in (ks. Pysyvät päätökset). Mallien sisältö, nimet
+  ja viat:
   `docs/BLENDER_HANDOFF.md`.
 - **Laulut ja valinta** (`src/songLogic.ts`: `SONGS`, `SONG_SLOTS`; kulku
   `engine/song.ts`): laulunappi täydellä voimalla → `openChoice()`:
@@ -232,5 +235,6 @@ vasemman käden luonnollisuuden vartiossa, liikkeessä ja eri iskuissa.
   uudempi (1.3 ei osaa lukea sitä). Kotikoneella Bun 1.4.4.
 - Hahmojen pohja on Blender Studion Human Base Meshes (CC0); vaatteet
   johdetaan vartalon pinnasta skriptillä, ja animaatio tehdään koodilla
-  ilman valmiita animaatioleikkeitä.
+  ilman valmiita animaatioleikkeitä. Poikkeus (omistaja 2026-11-15):
+  eläimet käyttävät lähdemalliensa valmiita leikkeitä.
 - Laulun säkeet otetaan Kalevalasta (1849, vapaa käyttää).

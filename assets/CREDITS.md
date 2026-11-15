@@ -1,9 +1,11 @@
 # Assettien lähteet ja lisenssit
 
-Kaikki ulkopuoliset assetit ovat [Poly Havenista](https://polyhaven.com) ja
-lisenssiltään **CC0** (vapaa käyttää, ei nimeämisvelvoitetta). Lähdetiedostot
-haetaan skriptillä `tools/fetch-polyhaven.ps1` kansioon
-`assets-src/_downloads/` (ei Gitissä).
+Ulkopuoliset assetit ovat [Poly Havenista](https://polyhaven.com) ja Blender
+Studiolta, lisenssiltään **CC0** (vapaa käyttää, ei nimeämisvelvoitetta).
+Poikkeus ovat eläimet (`animals/`), jotka ovat **CC-BY 4.0** -lisenssillä ja
+vaativat tekijän nimeämisen myös pelissä. Lähdetiedostot ovat kansiossa
+`assets-src/_downloads/` (ei Gitissä); Poly Havenin tiedostot haetaan
+skripteillä `tools/fetch-*.ps1`.
 
 ## `forest.glb`
 
@@ -59,6 +61,20 @@ nahka kuten tiedostossa `characters.glb` (Poly Haven, CC0). Itse tehty
 (`char_folk.py`): luuranko ja painot, jousineidon vaatteet, letti, olkaviitta,
 nuoliviini ja jousi sekä emännän mekko, esiliina, kupurasoljet ketjuineen,
 huivi, vyö, avain ja puukko.
+
+## `animals/` (CC-BY 4.0)
+
+Lisenssi: [Creative Commons Attribution 4.0](http://creativecommons.org/licenses/by/4.0/).
+Kaikkia malleja on muokattu (skripti `assets-src/blender/animals.py`).
+
+| Tiedosto | Alkuperäinen teos | Tekijä | Muutokset |
+| --- | --- | --- | --- |
+| `koira.glb` | [Animated Dog, Shiba Inu](https://sketchfab.com/3d-models/animated-dog-shiba-inu-9abfce885a834399b2c3ccaed51cd474) | [quander](https://sketchfab.com/quander) | Kevennetty 33 400 → 8 000 kolmioon, tekstuuri 1024 px ja hieman himmennetty, mukana kolme viidestä animaatiosta |
+| `kana.glb` | [Halva the Chicken](https://sketchfab.com/3d-models/halva-the-chicken-ab37ae9021dc4aa29c4cee9778646470) | [Pia Heugel](https://sketchfab.com/piaheugel) | Vain värikartta, 1024 px, hieman himmennetty |
+| `possu.glb` | [Piglet](https://sketchfab.com/3d-models/piglet-8343f141936f4c799ed980a3c7c3ae27) | [grs](https://sketchfab.com/sgrosjean) | Kevennetty 17 600 → 7 000 kolmioon, väri tummennettu ruskeaksi, vain värikartta 1024 px |
+| `kukko_kana.glb` | [Handpainted rooster and hen](https://sketchfab.com/3d-models/handpainted-rooster-and-hen-34b79d3f8adb43c583d08babf3ef6dc0) | [Enkarra](https://sketchfab.com/Enkarra) | Jaettu kahdeksi malliksi (`kukko`, `kana_b`), värejä himmennetty, tekstuuri 1024 px |
+
+Kaikki on lisäksi skaalattu luonnolliseen kokoon ja käännetty nokka suuntaan -Y.
 
 ## `homestead.glb`
 
