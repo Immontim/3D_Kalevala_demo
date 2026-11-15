@@ -6,12 +6,11 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-15 (Codex, Windows)
+Päivitetty: 2026-11-15 (Claude, Windows)
 
-- **Branchin `codex/i18n` koodiversio on v01.06.00** (toteutuscommit
-  `faee963`, pohjana `origin/main` `1f82a59`). Mainin viimeisin pelikoodi
-  on v01.05.01; mainissa ovat lisäksi talousesine-, kyläläis- ja eläinassetit,
-  joita peli ei vielä lataa. Assetit eivät yksin nosta pelin versionumeroa.
+- **Branchin `claude/peaceful-yard` koodiversio on v01.07.00** (pohjana
+  `origin/main` `46ff4b9`, v01.06.00). Tarkista merge-tila
+  `git merge-base --is-ancestor claude/peaceful-yard origin/main`.
 - **Rakenne.** `src/engine/` on kohtaus- ja taistelumoottori, `src/ui/` sivun
   ikkunat (aloitus, tauko, säätö), `src/main.ts` vain käynnistys ja
   `src/debug.ts` savutestien `__game`. Säännöt ja luvut ovat yhä puhtaissa
@@ -40,11 +39,13 @@ Päivitetty: 2026-11-15 (Codex, Windows)
   lähimpään ulottuvilla olevaan (`melee.ts` `strikeTarget`).
 - **Kohtaus** (`engine/encounter.ts` `Encounter`: `start`, `update`,
   `onEnemyDown`) päättää, keitä kentälle tuodaan (`addEnemy`). Moottori ei
-  tiedä aalloista: aaltotaistelu on `skirmish.ts`, tyhjä kohtaus `peace`.
+  tiedä aalloista: aaltotaistelu on `skirmish.ts`, tyhjä kohtaus `peace`
+  ja rauhallisen pihan `visit` (kuin `peace`, mutta kertoo alussa paikan).
+  `main.ts` valitsee kohtauksen: `ARENA_PEACEFUL ? visit : skirmish`.
   Vaihto `startEncounter()`. Tuleva RPG-kerros kutsuu moottoria tätä kautta.
-- **Kaksi taistelupaikkaa** (`src/world.ts`): `ARENA` on tällä latauksella
+- **Kolme paikkaa** (`src/world.ts`): `ARENA` on tällä latauksella
   käytössä oleva paikka (`"clearing"` = nuotioaukio, `"homestead"` =
-  pihapiiri), luettu avaimesta `laulun-miekka.arena.v1`. Maailma
+  pihapiiri, `"yard"` = rauhallinen piha), luettu avaimesta `laulun-miekka.arena.v1`. Maailma
   rakennetaan kerran moduulin latautuessa, joten aloitusikkunan valinta
   (`#arenaPick`, `ui/startMenu.ts`) kutsuu `saveArena()` ja lataa sivun uudelleen.
   Paikkojen erot ovat taulukossa `SITES` (tasaisen alueen säde, puiden
@@ -53,19 +54,37 @@ Päivitetty: 2026-11-15 (Codex, Windows)
   (`ARENA_RADIUS` 11) ovat yhteiset, ja nuotioaukio on ennallaan.
   **Uusi paikka:** lisää `ArenaId`, rivi `ARENAS`iin ja `SITES`iin sekä
   sijoittelu `populate`n loppuun.
-- **Rauhallinen pihakohtaus** (omistaja hyväksyi 2026-11-14) on seuraava
-  integraatiotyö: uusi paikka, talousesineiden ja pysyvien hahmojen
-  sijoittelu, pysyvien hahmojen tyyppi (seisovat aluksi paikallaan) ja
-  tekijäluettelo peliin. Peli ei vielä lataa talousesineitä
-  (`household.glb`) eikä kyläläisiä (`villagers.glb`, `villagers_f.glb`);
-  pöydän ja penkin törmäysmuodot ovat jo `PROP_COLLIDERS`issa.
-  `prepareMaterials`iin pitää lisätä materiaalit `M_HH_*` ja `F_Weave`.
-  Naishahmo skaalataan noin 0,95:een, eikä miehen kädestä mitattu
-  `GRIP_CHANNEL` käy hänelle. Eläimet (`assets/animals/*.glb`, mainissa)
-  tuovat mukanaan animaatioleikkeet, joten ne tarvitsevat
-  `THREE.AnimationMixer`in (ks. Pysyvät päätökset). Mallien sisältö, nimet
-  ja viat:
-  `docs/BLENDER_HANDOFF.md`.
+- **Rauhallinen piha** (`ARENA === "yard"`, `ARENA_PEACEFUL`). Sama talo,
+  aitta, katos, haasia, aita ja portti kuin pihapiirissä (`HAS_YARD`), mutta
+  kuoppatalon paikalla on sikolätti (`STY`, pohja `footprints`issa, koko
+  aitaus on törmäyslaatikko), länsilaidalla kanakoppi (`COOP`) ja talon
+  edessä katettu pöytä (`TABLE`). Peli lataa lisäksi `household.glb`n ja
+  `yard.glb`n; sijoittelu on `populate`n lopussa ja törmäysmuodot
+  `PROP_COLLIDERS`issa. Väki tulee funktiosta `populateYardLife`
+  (`world.ts`), joka käyttää moduulia `src/folk.ts`:
+  - `spawnVillager`: kevyt paikallaan seisova hahmo, ei `Fighter` eikä
+    `Actor`. Klooni tiedostosta `villagers*.glb`, kädet käännetään
+    lepoasennosta annettuihin suuntiin (`ArmPose`, `aimBone`), pää kääntyy
+    alle 7 metrin päässä edessä olevan kulkijan perään ja rintakehä
+    hengittää. Naiset skaalataan 0,95:een. Esine (`sauva`, `jousi`) seisoo
+    maassa käden kohdalla.
+  - `spawnAnimal`: `AnimationMixer` ja käytös `idle` (yksi leike), `dog`
+    (`seisoo` ja `istuu` vuorotellen 9–18 s välein) tai `circle` (possu
+    kiertää ympyrää). Kukko ja `kana_b` ovat liikkumattomia.
+  - `world.update(t, dt, camera, focus)` päivittää väen; `focus` on sankarin
+    paikka. Kyläläiset, koira ja kanat ovat pyöreitä esteitä
+    (`folk:*`, `blocksMelee: false`).
+  **Vihamieliseksi muuttuminen ei vaatinut refaktorointia:** vastustajat
+  tuo kohtaus, ei paikka. `startEncounter(skirmish)` tai yksittäinen
+  `addEnemy` toimii rauhallisella pihalla, ja vastustajan mittarit, lukitus
+  ja aaltonumero tulevat näkyviin itsestään (savutestattu:
+  `__game.addEnemy(0, 0, 5)`, `__game.encounter("skirmish")` ja takaisin
+  `"peace"`). Tekemättä: väen reaktio taisteluun ja kyläläisen muuttuminen
+  vastustajaksi. Jälkimmäinen vaatisi, että `Fighter` osaa ladata hahmon
+  myös tiedostoista `villagers*.glb` (sama luuranko ja luiden nimet;
+  naisilla eri lepoasento ja oma otekanava). Tekijäluettelo on
+  aloitusikkunan `#credits` (`credits.*`-tekstit); uusi CC BY -asset
+  lisätään sinne ja `assets/CREDITS.md`:hen.
 - **Laulut ja valinta** (`src/songLogic.ts`: `SONGS`, `SONG_SLOTS`; kulku
   `engine/song.ts`): laulunappi täydellä voimalla → `openChoice()`:
   `choosing` pysäyttää maailman (dt = 0), hiiri vapautetaan
@@ -147,17 +166,26 @@ Päivitetty: 2026-11-15 (Codex, Windows)
   painon varustuksen mukaan, lyö raskaasti kilven takana seisovaa pelaajaa,
   ja aseella torjuessaan arvaa suunnan oikein sitä useammin, mitä pidemmällä
   aalloissa ollaan. Keihäällä voi vain pistää.
-- **Koodi valmis:** v01.06.00 branchissa `codex/i18n`, commit `faee963`.
-  Ei deployattu; tarkista ennen jatkamista merge-tila ohjeen mukaisella
-  `git merge-base --is-ancestor codex/i18n origin/main` -komennolla.
-- **Käsin testattu 2026-11-15** in-app browserissa: FI/EN-valinta ja sen
-  säilyminen uudelleenlatauksessa, molemmat aloitusnäkymät, englanninkielinen
-  aalto ja vastustaja sekä tauon näppäin- ja säätövälilehdet. CSS-liput
-  piirtyivät oikein, peli pysyi 58–60 FPS:ssä eikä konsolissa ollut virheitä.
-- **Komennot 2026-11-15:** `bun run test` 172/172, `bunx tsc --noEmit`,
-  `bun run lint`, `bun run build` ja `git diff --check` ok. Build varoittaa
-  ennestään yli 500 kt:n JS-palasta.
+- **Koodi valmis:** v01.07.00 branchissa `claude/peaceful-yard`. Ei
+  deployattu.
+- **Savutestattu 2026-11-15** in-app browserissa (`localhost:5174`,
+  työpuun dev-palvelin): rauhallinen piha latautuu, kaikki kolme
+  kyläläistä, koira, kanat, kukko ja possu näkyvät oikeilla paikoillaan,
+  aloitusviesti näkyy, aaltonumero ja vastustajan mittari ovat poissa,
+  ja ne palaavat, kun pihalle tuodaan vastustaja. Kolme paikkaa ja
+  tekijäluettelo näkyvät aloitusikkunassa. Konsolissa ei virheitä.
+  **FPS:ää ei saatu mitattua:** selainpaneeli oli piilossa, jolloin selain
+  kuristaa ruudunpäivityksen. Pakotettu piirto vei rauhallisella pihalla
+  noin 2,6 ms ja taistelupihalla noin 1–2 ms ruutua kohti tehokoneella.
+  Omistaja ei ole vielä kävellyt pihalla itse.
+- **Komennot 2026-11-15:** `bun run test` 88/88, `bunx tsc --noEmit`,
+  `bun run lint` ja `bun run build` ok. Build varoittaa ennestään yli
+  500 kt:n JS-palasta.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
+- **Esikatselutyökalu ja työpuut:** Clauden `preview_start` lukee
+  `.claude/launch.json`in pääkansiosta ja käynnistää palvelimen siellä, ei
+  työpuussa. Työpuun savutesti: `bun run dev --port 5174 --strictPort`
+  työpuusta ja selain osoitteeseen `localhost:5174`; sulje palvelin lopuksi.
 - Savutestien apuna on `window.__game`; koko lista ja käyttö ovat
   `src/debug.ts`:ssä. Selainpaneelin fokus voi pysäyttää pelin.
 
@@ -205,6 +233,17 @@ Päivitetty: 2026-11-15 (Codex, Windows)
   mallin raja on jyrkkä. Patsasaitta ja luukulliset valoaukot ovat
   uskottavia mutta eivät Suomen varhaisrautakaudelta todistettuja. Paikan
   vaihto lataa sivun uudelleen.
+- **Rauhallisen pihan avoimet asiat:** kyläläisten käsien asennot ja
+  esineiden paikat on katsottu vain kuvakaappauksista. Jousi ja sauva
+  seisovat maassa käden kohdalla, eivät ole kiinni kädessä, joten ne eivät
+  seuraa, jos hahmo joskus liikkuu. Possun kävelynopeutta (0,3 m/s) ei ole
+  sovitettu leikkeen askeleeseen, joten sorkat voivat liukua; lepoleikettä
+  ei ole, joten possu kävelee tauotta. Koiran `tassu`-leike ei ole
+  käytössä. Kanakopin lautaseinän syykuvio on aaltoileva ja varjossa tumma.
+  Väki on este mutta ei reagoi taisteluun: jos pihalle tuodaan vastustaja,
+  kyläläiset ja eläimet jatkavat kuin mitään ei tapahtuisi, eivätkä iskut
+  osu heihin (`blocksMelee: false`). Kolme kyläläistä tuo noin 84 000
+  kolmiota ja koira 191 luuta; FPS on mittaamatta (ks. Nykytila).
 - **Asennot on viritetty silmämääräisesti** kuvakaappauksista. Kilvettömän
   miekkamiehen vapaa käsi on nyt dynaamisempi, mutta kaikkien iskujen
   luonnollisuus pitää vielä arvioida tavallisessa pelissä. Raskaalla
@@ -221,16 +260,20 @@ Päivitetty: 2026-11-15 (Codex, Windows)
 
 ## Seuraava tehtävä
 
-Rauhallisen pihakohtauksen integraatio jatkuu. Sen kaikki uudet näkyvät
-tekstit lisätään `src/i18n.ts`:n FI- ja EN-sanakirjoihin; mahdolliset
-alkuperäiskielisiksi jätettävät runo- tai dialogikatkelmat merkitään
-`verbatim()`-rakenteella.
+Omistaja kävelee rauhallisella pihalla julkaistussa pelissä ja antaa
+palautteen (sijoittelu, asennot, eläimet, FPS). Sen perusteella korjataan
+näkyvät viat. Uudet näkyvät tekstit lisätään `src/i18n.ts`:n FI- ja
+EN-sanakirjoihin; alkuperäiskielisiksi jätettävät runo- tai
+dialogikatkelmat merkitään `verbatim()`-rakenteella.
 
 ## Ei vielä aloiteta
 
 - Karttanäkymä ja siirtymät karttaan/3D-paikkoihin.
 - Git LFS (omistajan päätös 2026-11-10: ei vielä).
-- Dialogijärjestelmä (ensin assetit ja rauhallinen kohtaus pystyyn).
+- Dialogijärjestelmä ja kyläläisten liikkuminen (ensin omistajan palaute
+  rauhallisesta pihasta).
+- Kyläläisen muuttuminen vastustajaksi (suunnitellaan erikseen; ks.
+  Rauhallinen piha).
 - Isojen skannattujen puiden lataus ja kevennys.
 - Aseiden laatuerot ja vahingon hajonta: rakenne on valmiina, mutta sisältö
   odottaa omistajan päätöstä.

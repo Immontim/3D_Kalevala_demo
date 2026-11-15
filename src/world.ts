@@ -2,6 +2,14 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import forestUrl from "../assets/forest.glb?url";
 import homesteadUrl from "../assets/homestead.glb?url";
+import householdUrl from "../assets/household.glb?url";
+import yardUrl from "../assets/yard.glb?url";
+import villagersUrl from "../assets/villagers.glb?url";
+import villagersFUrl from "../assets/villagers_f.glb?url";
+import dogUrl from "../assets/animals/koira.glb?url";
+import henUrl from "../assets/animals/kana.glb?url";
+import pigUrl from "../assets/animals/possu.glb?url";
+import fowlUrl from "../assets/animals/kukko_kana.glb?url";
 import needlesDiffUrl from "../assets/ground/needles_diff.webp";
 import needlesNorUrl from "../assets/ground/needles_nor.webp";
 import mossDiffUrl from "../assets/ground/moss_diff.webp";
@@ -9,6 +17,7 @@ import mossNorUrl from "../assets/ground/moss_nor.webp";
 import dirtDiffUrl from "../assets/ground/dirt_diff.webp";
 import dirtNorUrl from "../assets/ground/dirt_nor.webp";
 import { COLLISION, CollisionWorld } from "./collision";
+import { spawnAnimal, spawnVillager, updateFolk } from "./folk";
 import { t } from "./i18n";
 
 // Taistelualueet kangasmetsässä: maasto, männyt, kuuset, koivut, varvut ja kivet
@@ -19,17 +28,18 @@ import { t } from "./i18n";
 /** Taistelukehän säde; sama molemmilla alueilla. */
 export const ARENA_RADIUS = 11;
 
-export type ArenaId = "clearing" | "homestead";
+export type ArenaId = "clearing" | "homestead" | "yard";
 export const ARENAS: Record<ArenaId, { name: string; desc: string }> = {
   clearing: { name: t("arena.clearing.name"), desc: t("arena.clearing.desc") },
   homestead: { name: t("arena.homestead.name"), desc: t("arena.homestead.desc") },
+  yard: { name: t("arena.yard.name"), desc: t("arena.yard.desc") },
 };
 const ARENA_STORE = "laulun-miekka.arena.v1";
 
 function savedArena(): ArenaId {
   try {
     const v = localStorage.getItem(ARENA_STORE);
-    if (v === "clearing" || v === "homestead") return v;
+    if (v === "clearing" || v === "homestead" || v === "yard") return v;
   } catch { /* muisti ei käytössä */ }
   return "clearing";
 }
@@ -41,6 +51,11 @@ export function saveArena(id: ArenaId): boolean {
 
 /** Tällä latauksella käytössä oleva alue. */
 export const ARENA: ArenaId = savedArena();
+/** Rauhallinen paikka: kohtaus alkaa ilman vastustajia. Paikka voi silti muuttua vihamieliseksi,
+ *  koska vastustajat tuo kohtaus (Encounter), ei paikka. */
+export const ARENA_PEACEFUL = ARENA === "yard";
+/** Pihan rakennukset, aita ja portti ovat yhteiset taistelupihalle ja rauhalliselle pihalle. */
+const HAS_YARD = ARENA !== "clearing";
 
 /** Rakennuksen pohja maassa: suorakaide, jonka etusivu (ovi) osoittaa suuntaan yaw. */
 interface Footprint { x: number; z: number; yaw: number; hx: number; front: number; back: number; }
@@ -79,6 +94,11 @@ const PITHOUSE = onRing(72, 16.9, 2.5, 4.3, 2.8);
 const STOREHOUSE = onRing(-104, 15.6, 2.0, 3.0, 2.1);
 const SHED = onRing(-52, 14.6, 2.5, 1.9, 1.9);
 const RACK = onRing(126, 15.4, 2.0, 0.8, 0.8);
+// Rauhallisen pihan omat rakennelmat: sikolätti kuoppatalon paikalla (aitaus kehän reunalla
+// niin, että possu näkyy kulkijalle), kanakoppi pihan länsilaidalla ja ruokapöytä talon edessä.
+const STY = onRing(74, 13.7, 1.85, 2.15, 2.2);
+const COOP = onRing(-80, 9.7, 0.8, 0.65, 0.65);
+const TABLE = { x: -4.4, z: -6.6, yaw: 0.22 };
 const FENCE_R = 12.9;
 const GATE_HALF = 0.11;       // portin puolileveys radiaaneina (etelässä, +z)
 /** Kuoppatalon kulkukuilu, joka leikataan maastoon: puolileveys sekä alku ja loppu etusuuntaan
@@ -97,6 +117,12 @@ const SITES: Record<ArenaId, Site> = {
     treeMin: 25, shrub0: 17, shrub1: 24, dirtR: 15, camMaxR: 12.2,
     footprints: [HOUSE, PITHOUSE, STOREHOUSE, SHED, RACK],
     circles: [{ x: 5.6, z: -6.4, r: 2.0 }],
+  },
+  yard: {
+    fire: { x: 3.6, z: -4.6 }, flat0: 20, flat1: 34, rough: 0.03,
+    treeMin: 25, shrub0: 17, shrub1: 24, dirtR: 15, camMaxR: 12.2,
+    footprints: [HOUSE, STY, STOREHOUSE, SHED, RACK],
+    circles: [{ x: 3.6, z: -4.6, r: 2.0 }, { x: COOP.x, z: COOP.z, r: 1.6 }, { x: TABLE.x, z: TABLE.z, r: 2.0 }],
   },
 };
 const SITE = SITES[ARENA];
@@ -137,6 +163,10 @@ export const PROP_COLLIDERS: Record<string, PropColliderTemplate> = {
   // saa törmäykset ilman kohtauskohtaista käsityötä.
   pukkipoyta: { kind: "box", halfX: 1.18, halfZ: 0.42, blocksMelee: true },
   penkki: { kind: "box", halfX: 0.98, halfZ: 0.3, blocksMelee: true },
+  kanakoppi: { kind: "box", halfX: 0.8, halfZ: 0.65, blocksMelee: true },
+  pata: { kind: "circle", radius: 0.5, blocksMelee: false },
+  tuohikontti: { kind: "circle", radius: 0.2, blocksMelee: false },
+  lyhde: { kind: "circle", radius: 0.25, blocksMelee: false },
 };
 
 function addPropCollider(
@@ -235,7 +265,8 @@ export interface World {
   collision: CollisionWorld;
   /** Siirtää kameran paikan pois rakennusten sisältä (pihapiirissä kehän sisäpuolelle). */
   clearCamera(pos: THREE.Vector3): void;
-  update(t: number, dt: number, camera: THREE.Camera): void;
+  /** focus = kulkija (sankari), jota pihan väki katsoo. */
+  update(t: number, dt: number, camera: THREE.Camera, focus?: THREE.Vector3): void;
 }
 
 export interface GroundTex { mossDiff: THREE.Texture; mossNor: THREE.Texture; dirtDiff: THREE.Texture; dirtNor: THREE.Texture; }
@@ -538,6 +569,12 @@ function prepareMaterials(protos: Map<string, Proto>, maxAniso: number) {
         else if (/Daub/.test(m.name)) m.color.setRGB(0.95, 1.0, 1.04);
         else if (/Turf/.test(m.name)) m.color.setRGB(0.8, 0.8, 0.8);
       }
+      if (/^M_HH_/.test(m.name)) {
+        // Talousesineet: mattapintaisia; punokset, oljet ja tuohi ovat ohuita pintoja.
+        m.metalness = 0;
+        m.roughness = Math.max(m.roughness, 0.85);
+        if (/Weave|Straw|Kori|Bark|Birch/.test(m.name)) { m.side = THREE.DoubleSide; m.shadowSide = THREE.DoubleSide; }
+      }
       if (/Foliage|Grass|Fern/.test(m.name)) {
         // Alfaleikatut oksakortit: ei läpinäkyvyyslajittelua, pehmeät reunat MSAA:lla.
         m.transparent = false;
@@ -654,7 +691,8 @@ function populate(scene: THREE.Scene, protos: Map<string, Proto>, collision: Col
     put("kota@near", KOTA.x, KOTA.z, 1, 2.45, 0.05);     // oviaukko aukiolle päin
   } else {
     place("talo@near", HOUSE);
-    place("kuoppatalo@near", PITHOUSE, 0);
+    if (ARENA === "homestead") place("kuoppatalo@near", PITHOUSE, 0);
+    else place("sikolatti@near", STY, 0.02);
     place("aitta@near", STOREHOUSE);
     place("katos@near", SHED);
     place("haasia@near", RACK);
@@ -670,7 +708,32 @@ function populate(scene: THREE.Scene, protos: Map<string, Proto>, collision: Col
     // Pihan tavarat: ruukut keittotulella, hakkuupölkky katoksen edessä, halkopino talon päädyssä.
     put("ruukku@near", FIRE.x + 0.95, FIRE.z - 0.5, 1, 0.3, 0.01);
     put("ruukku@near", FIRE.x - 0.7, FIRE.z - 1.0, 0.8, 2.1, 0.01);
-    put("ruukku@near", FIRE.x - 1.05, FIRE.z - 0.55, 1.15, 4.0, 0.01);
+    if (ARENA === "homestead") put("ruukku@near", FIRE.x - 1.05, FIRE.z - 0.55, 1.15, 4.0, 0.01);
+    if (ARENA === "yard") {
+      // Katettu pöytä penkkeineen talon edessä, keittopata sen päädyssä, eväät ja lyhteet seinustoilla.
+      const tb = { ...TABLE, hx: 0, front: 0, back: 0 };
+      put("pukkipoyta@near", TABLE.x, TABLE.z, 1, TABLE.yaw, 0.01);
+      put("poyta_kattaus@near", TABLE.x, TABLE.z, 1, TABLE.yaw, 0.01);
+      for (const s of [-1, 1]) {
+        const [x, z] = fromLocal(tb, 0, s * 0.8);
+        put("penkki@near", x, z, 1, TABLE.yaw, 0.01);
+      }
+      const at = (key: string, lx: number, lz: number, scale = 1, yaw = 0) => {
+        const [x, z] = fromLocal(tb, lx, lz);
+        put(key + "@near", x, z, scale, TABLE.yaw + yaw, 0.005);
+      };
+      at("pata", 2.5, -0.5, 1, 0.6);
+      at("tuohikontti", -1.6, 0.5, 1, 2.6);
+      at("kori", -1.75, -0.25, 1, 0.9);
+      at("nauriit", -1.45, -0.15, 1, 0.3);
+      at("ruukku", 2.0, 0.55, 0.9, 1.0);
+      const [sx, sz] = fromLocal(STOREHOUSE, 1.2, 3.35);
+      put("lyhde@near", sx, sz, 1, 0.4, 0.01, 0.12);
+      put("lyhde@near", sx + 0.1, sz + 0.55, 0.92, 2.2, 0.01, 0.12);
+      const [lx, lz] = fromLocal(STOREHOUSE, 1.75, 3.2);
+      put("lyhde@near", lx, lz, 1.05, 4.1, 0.01, 0.12);
+      put("kanakoppi@near", COOP.x, COOP.z, 1, COOP.yaw, 0.02);
+    }
     const [bx, bz] = fromLocal(SHED, 2.2, 2.6);
     put("polkky@near", bx, bz, 1, 0.8, 0.02);
     const [px, pz] = fromLocal(HOUSE, 7.2, 1.2);
@@ -693,6 +756,60 @@ function populate(scene: THREE.Scene, protos: Map<string, Proto>, collision: Col
     }
   }
   return { trees: trees.length, tris: Math.round(tris) };
+}
+
+/** Rauhallisen pihan väki: emäntä pöydän luona, tietäjä tulella, jousineito portilla, koira ja siipikarja pihalla, possu lätissä. */
+function populateYardLife(scene: THREE.Scene, collision: CollisionWorld) {
+  const tb = { ...TABLE, hx: 0, front: 0, back: 0 };
+  const facing = (x: number, z: number, tx: number, tz: number) => Math.atan2(tx - x, tz - z);
+  const solid = (id: string, x: number, z: number, radius: number) =>
+    collision.add({ id: `folk:${id}`, kind: "circle", x, z, radius, blocksMovement: true, blocksMelee: false });
+  const jobs: Promise<void>[] = [];
+
+  // Naiset on mallinnettu miehen pituisiksi; pelissä heidät skaalataan hieman pienemmiksi.
+  const [ex, ez] = fromLocal(tb, 1.85, 0.75);
+  const [potX, potZ] = fromLocal(tb, 2.5, -0.5);
+  jobs.push(spawnVillager(scene, {
+    url: villagersFUrl, character: "emanta", x: ex, y: groundHeight(ex, ez), z: ez, yaw: facing(ex, ez, potX + 0.6, potZ + 3), scale: 0.95,
+    armL: { upper: [0.1, -1, 0.1], fore: [-0.25, -0.75, 0.6] }, armR: { upper: [0.1, -1, 0.1], fore: [-0.25, -0.75, 0.6] },
+  }));
+  solid("emanta", ex, ez, 0.35);
+
+  const tx = FIRE.x + 2.5, tz = FIRE.z - 1.5;
+  jobs.push(spawnVillager(scene, {
+    url: villagersUrl, character: "tietaja", x: tx, y: groundHeight(tx, tz), z: tz, yaw: facing(tx, tz, FIRE.x - 2, FIRE.z + 4),
+    armR: { upper: [0.2, -1, 0.3], fore: [0.05, -0.1, 1] },
+    prop: { name: "sauva", hand: "R", kind: "staff" },
+  }));
+  solid("tietaja", tx, tz, 0.4);
+
+  const jx = 2.3, jz = 8.9;
+  jobs.push(spawnVillager(scene, {
+    url: villagersFUrl, character: "jousineito", x: jx, y: groundHeight(jx, jz), z: jz, yaw: facing(jx, jz, -1, 0), scale: 0.95,
+    armL: { upper: [0.22, -1, 0.1], fore: [0.2, -1, 0.3] },
+    prop: { name: "jousi", hand: "L", kind: "bow" },
+  }));
+  solid("jousineito", jx, jz, 0.38);
+
+  const dx = -1.7, dz = -3.9;
+  jobs.push(spawnAnimal(scene, { url: dogUrl, x: dx, y: groundHeight(dx, dz), z: dz, yaw: facing(dx, dz, 1, 3), behavior: "dog" }));
+  solid("koira", dx, dz, 0.3);
+
+  // Kukko orrella kopin kyljessä, kanat maassa kulkulaudan edessä.
+  const [rx, rz] = fromLocal(COOP, 1.15, 0);
+  jobs.push(spawnAnimal(scene, { url: fowlUrl, node: "kukko", x: rx, y: groundHeight(rx, rz) + 0.6, z: rz, yaw: COOP.yaw + 0.5 }));
+  const [hx, hz] = fromLocal(COOP, -0.55, 1.9);
+  jobs.push(spawnAnimal(scene, { url: fowlUrl, node: "kana_b", x: hx, y: groundHeight(hx, hz), z: hz, yaw: COOP.yaw + 2.2 }));
+  solid("kana_b", hx, hz, 0.15);
+  const [kx, kz] = fromLocal(COOP, 0.75, 2.5);
+  jobs.push(spawnAnimal(scene, { url: henUrl, x: kx, y: groundHeight(kx, kz), z: kz, yaw: COOP.yaw - 0.7, behavior: "idle", clip: "olo" }));
+  solid("kana", kx, kz, 0.18);
+
+  // Possu kiertää aitauksen avointa puolta; kaukalo jää ympyrän ulkopuolelle.
+  const [px, pz] = fromLocal(STY, -0.4, 0.5);
+  jobs.push(spawnAnimal(scene, { url: pigUrl, x: px, y: groundHeight(px, pz), z: pz, yaw: 0, behavior: "circle", radius: 0.62, speed: 0.3, ground: groundHeight }));
+
+  return Promise.all(jobs).then(() => undefined);
 }
 
 export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): World {
@@ -736,7 +853,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
 
   // Talon savu nousee päädyn savuaukosta (pihapiiri).
   let houseSmoke: ((dt: number) => void) | null = null;
-  if (ARENA === "homestead") {
+  if (HAS_YARD) {
     const [sx, sz] = fromLocal(HOUSE, 5.0, 0);
     const g = new THREE.Group();
     g.position.set(sx, groundHeight(sx, sz), sz);
@@ -745,7 +862,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   }
 
   const loader = new GLTFLoader();
-  const files = ARENA === "homestead" ? [forestUrl, homesteadUrl] : [forestUrl];
+  const files = ARENA === "yard" ? [forestUrl, homesteadUrl, householdUrl, yardUrl] : HAS_YARD ? [forestUrl, homesteadUrl] : [forestUrl];
   const ready = Promise.all(files.map((u) => loader.loadAsync(u))).then((gltfs) => {
     for (const gltf of gltfs) {
       for (const child of gltf.scene.children) {
@@ -760,6 +877,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     prepareMaterials(protos, maxAniso);
     const stats = populate(scene, protos, collision);
     (window as unknown as { __world: unknown }).__world = { ...stats, collision: collision.stats() };
+    if (ARENA === "yard") return populateYardLife(scene, collision);
   });
   ready.catch((e) => console.error("Maailman mallien lataus epäonnistui", e));
 
@@ -774,9 +892,10 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
       const r = Math.hypot(pos.x, pos.z);
       if (r > SITE.camMaxR) { pos.x *= SITE.camMaxR / r; pos.z *= SITE.camMaxR / r; }
     },
-    update(_t, dt, camera) {
+    update(_t, dt, camera, focus) {
       fire.update(dt, camera);
       houseSmoke?.(dt);
+      updateFolk(dt, focus ?? null);
     },
   };
 }

@@ -125,7 +125,7 @@ export function simulate(realDt: number) {
   updateRing(realDt);
 
 
-  world.update(g.realTime, dt, camera);
+  world.update(g.realTime, dt, camera, g.player.pos);
   updateSparks(dt);
   fx.shake = Math.max(0, fx.shake - realDt * 1.2);
   updateCamera(realDt);

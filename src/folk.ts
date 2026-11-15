@@ -1,0 +1,250 @@
+// Pihan väki: paikallaan seisovat kyläläiset ja eläimet. Nämä eivät ole taistelijoita
+// (Fighter/Actor), vaan kevyitä hahmoja, joilla ei ole elämää, tekoälyä eikä osumia.
+// Kyläläiset asetetaan koodilla lepoasentoon ja he kääntävät päätään kulkijan perään;
+// eläimet toistavat lähdemalliensa valmiita animaatioleikkeitä (AnimationMixer).
+// Sijoittelu (kuka seisoo missä) on world.ts:ssä.
+import * as THREE from "three";
+import { GLTF, GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
+
+const loader = new GLTFLoader();
+const cache = new Map<string, Promise<GLTF>>();
+function load(url: string): Promise<GLTF> {
+  if (!cache.has(url)) cache.set(url, loader.loadAsync(url));
+  return cache.get(url)!;
+}
+
+function prepareMeshes(root: THREE.Object3D) {
+  root.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    m.castShadow = true;
+    m.receiveShadow = true;
+    m.frustumCulled = false;   // luurangon liikuttama verkko: rajauslaatikko ei seuraa asentoa
+    const mat = m.material as THREE.MeshStandardMaterial;
+    if (/^M_AN_/.test(mat.name)) { mat.metalness = 0; mat.roughness = Math.max(mat.roughness, 0.85); }
+  });
+}
+
+/** Käsivarren suunta hahmon omassa koordinaatistossa: [ulos sivulle, ylös, eteen]. */
+type Dir = [number, number, number];
+export interface ArmPose { upper: Dir; fore: Dir; }
+const ARM_DOWN: ArmPose = { upper: [0.14, -1, 0.02], fore: [0.08, -1, 0.16] };
+
+export interface VillagerDef {
+  url: string;
+  /** Hahmon nimi tiedostossa ilman etuliitettä `char_`. */
+  character: string;
+  x: number; y: number; z: number; yaw: number;
+  scale?: number;
+  armL?: ArmPose; armR?: ArmPose;
+  /** Kädessä pidettävä esine: pystyssä maata vasten käden kohdalla. */
+  prop?: { name: string; hand: "L" | "R"; kind: "staff" | "bow" };
+}
+
+const q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion(), q3 = new THREE.Quaternion();
+const v1 = new THREE.Vector3(), v2 = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
+
+/** Kääntää luun osoittamaan annettuun suuntaan (maailman koordinaatistossa); lapsiluut seuraavat. */
+function aimBone(bone: THREE.Object3D, dir: THREE.Vector3) {
+  const pw = bone.parent!.getWorldQuaternion(q1);
+  const w = bone.getWorldQuaternion(q2);
+  const cur = v1.set(0, 1, 0).applyQuaternion(w);
+  w.premultiply(q3.setFromUnitVectors(cur, v2.copy(dir).normalize()));
+  bone.quaternion.copy(pw.invert().multiply(w));
+  bone.updateMatrixWorld(true);
+}
+
+interface Living { update(dt: number, focus: THREE.Vector3 | null): void; }
+const living: Living[] = [];
+
+/** Päivittää kaikki kyläläiset ja eläimet. focus = kulkija, jota kyläläiset katsovat. */
+export function updateFolk(dt: number, focus: THREE.Vector3 | null) {
+  for (const l of living) l.update(dt, focus);
+}
+
+class Villager implements Living {
+  readonly root = new THREE.Group();
+  private head: THREE.Object3D | null = null;
+  private headRest = new THREE.Quaternion();
+  private headParent = new THREE.Quaternion();
+  private spine: THREE.Object3D | null = null;
+  private spineRest = new THREE.Quaternion();
+  private look = 0;
+  private t = Math.random() * 50;
+
+  constructor(private def: VillagerDef, source: THREE.Object3D) {
+    const clone = SkeletonUtils.clone(source);
+    const rig = clone.getObjectByName("RIG") ?? clone;
+    let prop: THREE.Object3D | null = null;
+    for (const child of [...clone.children, ...rig.children]) {
+      if (child.name.startsWith("char_") && child.name !== `char_${def.character}`) child.removeFromParent();
+      else if (child !== rig && !(child as THREE.Bone).isBone && !child.name.startsWith("char_")) {
+        if (def.prop && child.name === def.prop.name) prop = child;
+        child.removeFromParent();
+      }
+    }
+    prepareMeshes(clone);
+    this.root.add(clone);
+    this.root.updateMatrixWorld(true);
+
+    // Kädet levällään olevasta lepoasennosta alas tai esineen pitoon. Juuri on vielä origossa
+    // kääntämättä, joten maailman suunnat ovat hahmon omia suuntia.
+    for (const side of ["L", "R"] as const) {
+      const upper = rig.getObjectByName(`upper_arm_${side}`);
+      const fore = rig.getObjectByName(`forearm_${side}`);
+      if (!upper || !fore) continue;
+      const out = Math.sign(upper.getWorldPosition(v1).x) || 1;
+      const pose = (side === "L" ? def.armL : def.armR) ?? ARM_DOWN;
+      aimBone(upper, new THREE.Vector3(pose.upper[0] * out, pose.upper[1], pose.upper[2]));
+      aimBone(fore, new THREE.Vector3(pose.fore[0] * out, pose.fore[1], pose.fore[2]));
+    }
+
+    if (prop && def.prop) {
+      const hand = rig.getObjectByName(`hand_${def.prop.hand}`);
+      const h = hand ? hand.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3();
+      const out = Math.sign(h.x) || 1;
+      prop.position.set(0, 0, 0);
+      prop.scale.setScalar(1);
+      if (def.prop.kind === "staff") {
+        // Sauvan varsi on mallissa +z-suuntaan ja linnun nokka +y: pystyyn, nokka eteen.
+        prop.quaternion.setFromAxisAngle(UP, Math.PI).multiply(q1.setFromAxisAngle(v1.set(1, 0, 0), -Math.PI / 2));
+      } else {
+        // Jousen lavat ovat pystyssä ja jänne -z: jänne käännetään vartaloon päin.
+        prop.quaternion.setFromAxisAngle(UP, out > 0 ? Math.PI / 2 : -Math.PI / 2);
+      }
+      prop.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(prop);
+      // Esine seisoo maassa käden kohdalla; käsi on varrella siinä, mihin se osuu.
+      prop.position.set(h.x + out * 0.035, -box.min.y + 0.01, h.z + 0.03);
+      prepareMeshes(prop);
+      this.root.add(prop);
+    }
+
+    this.head = rig.getObjectByName("head") ?? null;
+    if (this.head) {
+      this.headRest.copy(this.head.quaternion);
+      this.head.parent!.getWorldQuaternion(this.headParent);
+    }
+    this.spine = rig.getObjectByName("chest") ?? null;
+    if (this.spine) this.spineRest.copy(this.spine.quaternion);
+
+    this.root.position.set(def.x, def.y, def.z);
+    this.root.rotation.y = def.yaw;
+    this.root.scale.setScalar(def.scale ?? 1);
+  }
+
+  update(dt: number, focus: THREE.Vector3 | null) {
+    this.t += dt;
+    // Katse seuraa kulkijaa, kun tämä on lähellä ja edessä; muuten pää palaa hitaasti eteen.
+    let want = 0;
+    if (focus) {
+      const dx = focus.x - this.def.x, dz = focus.z - this.def.z;
+      const d = Math.hypot(dx, dz);
+      let a = Math.atan2(dx, dz) - this.def.yaw;
+      a = Math.atan2(Math.sin(a), Math.cos(a));
+      if (d < 7 && d > 0.6 && Math.abs(a) < 1.9) want = THREE.MathUtils.clamp(a, -1.0, 1.0);
+    }
+    this.look += (want - this.look) * Math.min(1, dt * 2.2);
+    if (this.head) {
+      const sway = Math.sin(this.t * 0.37) * 0.05;
+      q1.setFromAxisAngle(UP, this.look * 0.85 + sway);
+      // Kierto hahmon pystyakselin ympäri, muunnettuna pään emoluun koordinaatistoon.
+      this.head.quaternion.copy(q2.copy(this.headParent).invert()).multiply(q1).multiply(this.headParent).multiply(this.headRest);
+    }
+    if (this.spine) {
+      // Hengitys: rintakehä kallistuu hieman.
+      q1.setFromAxisAngle(v1.set(1, 0, 0), Math.sin(this.t * 1.25) * 0.012);
+      this.spine.quaternion.copy(this.spineRest).multiply(q1);
+    }
+  }
+}
+
+/** Tuo kyläläisen näkymään, kun malli on ladattu. */
+export function spawnVillager(scene: THREE.Scene, def: VillagerDef): Promise<void> {
+  return load(def.url).then((gltf) => {
+    const v = new Villager(def, gltf.scene);
+    scene.add(v.root);
+    living.push(v);
+  });
+}
+
+export interface AnimalDef {
+  url: string;
+  /** Solmun nimi, jos tiedostossa on useita eläimiä (kukko ja kana); muuten koko tiedosto. */
+  node?: string;
+  x: number; y: number; z: number; yaw: number;
+  scale?: number;
+  /** idle = toistaa leikettä `clip` paikallaan; dog = seisoo ja istuu vuorotellen;
+   *  circle = kävelee ympyrää (keskipiste x, z; säde radius). */
+  behavior?: "idle" | "dog" | "circle";
+  clip?: string;
+  radius?: number;
+  speed?: number;
+  /** Maan korkeus liikkuvalle eläimelle. */
+  ground?: (x: number, z: number) => number;
+}
+
+class Animal implements Living {
+  readonly root = new THREE.Group();
+  private mixer: THREE.AnimationMixer | null = null;
+  private actions = new Map<string, THREE.AnimationAction>();
+  private current = "";
+  private nextSwitch = 6 + Math.random() * 8;
+  private angle = Math.random() * Math.PI * 2;
+
+  constructor(private def: AnimalDef, gltf: GLTF) {
+    const model = def.node ? gltf.scene.getObjectByName(def.node) : gltf.scene;
+    if (!model) { console.warn("Eläin puuttuu:", def.node); return; }
+    model.removeFromParent();
+    prepareMeshes(model);
+    this.root.add(model);
+    this.root.position.set(def.x, def.y, def.z);
+    this.root.rotation.y = def.yaw;
+    this.root.scale.setScalar(def.scale ?? 1);
+    if (gltf.animations.length && !def.node) {
+      this.mixer = new THREE.AnimationMixer(model);
+      for (const clip of gltf.animations) this.actions.set(clip.name, this.mixer.clipAction(clip));
+      const first = def.behavior === "dog" ? "seisoo" : def.clip ?? gltf.animations[0].name;
+      const a = this.actions.get(first);
+      if (a) { a.play(); a.time = Math.random() * a.getClip().duration; this.current = first; }
+    }
+    if (def.behavior === "circle") this.walk(0);
+  }
+
+  private walk(dt: number) {
+    const d = this.def, r = d.radius ?? 0.7;
+    this.angle += ((d.speed ?? 0.3) / r) * dt;
+    const x = d.x + Math.sin(this.angle) * r, z = d.z + Math.cos(this.angle) * r;
+    this.root.position.set(x, d.ground ? d.ground(x, z) : d.y, z);
+    this.root.rotation.y = this.angle + Math.PI / 2;   // kulkusuunta on ympyrän tangentti
+  }
+
+  update(dt: number) {
+    this.mixer?.update(dt);
+    if (this.def.behavior === "circle") this.walk(dt);
+    if (this.def.behavior === "dog") {
+      this.nextSwitch -= dt;
+      if (this.nextSwitch <= 0) {
+        const next = this.current === "seisoo" ? "istuu" : "seisoo";
+        const from = this.actions.get(this.current), to = this.actions.get(next);
+        if (from && to) {
+          to.reset().play();
+          from.crossFadeTo(to, 0.6, false);
+          this.current = next;
+        }
+        this.nextSwitch = 9 + Math.random() * 9;
+      }
+    }
+  }
+}
+
+/** Tuo eläimen näkymään, kun malli on ladattu. */
+export function spawnAnimal(scene: THREE.Scene, def: AnimalDef): Promise<void> {
+  return load(def.url).then((gltf) => {
+    const a = new Animal(def, gltf);
+    scene.add(a.root);
+    living.push(a);
+  });
+}
