@@ -81,16 +81,42 @@ pelissä):
 Päivitä versionumero koodiin ja rivi `docs/VERSION.md`-taulukkoon. Pelkät
 dokumenttimuutokset eivät nosta versiota.
 
+### Versionumero otetaan työn lopussa
+
+Rinnakkaiset branchit muokkaavat samaa riviä `src/version.ts`:ssä ja
+`docs/VERSION.md`:ssä, joten numeroa ei varata etukäteen eikä kirjoiteta
+branchin nimeen. Koodia muuttavan työn viimeistely:
+
+1. `git fetch origin` ja `git merge origin/main` omaan branchiin (ei
+   rebasea julkaistuun historiaan). Ratkaise konfliktit.
+2. Lue versio tiedostosta `src/version.ts` mergen jälkeen ja nosta sitä
+   muutoksen laajuuden mukaan. Lisää rivi `docs/VERSION.md`:hen.
+3. Aja tarkistukset, commitoi ja pushaa.
+
+Jos main ehtii muuttua ennen kuin omistaja mergeää ja PR näyttää
+konfliktin, toista vaiheet. Handoffissa ja `src/version.ts`:ssä näkyy vain
+branchissa oikeasti oleva koodiversio. Pelkkä dokumentti- tai
+assettimuutos ei nosta pelin versionumeroa.
+
 ## Handoff: kontekstiin mahtuva, ei hautausmaa
 
-`docs/AGENT_HANDOFF.md` on kanoninen **nykytila**. Lue se ennen suunnittelua.
-Se siirtää työn koneiden (kotikone, läppäri), Clauden ja Codexin välillä.
+`docs/AGENT_HANDOFF.md` on kanoninen **pelikoodin ja integraation nykytila**.
+`docs/BLENDER_HANDOFF.md` on Blender-mallien ja asset-putkien nykytila. Lue
+aina ensimmäinen ja Blender-/assettyössä myös jälkimmäinen ennen suunnittelua.
+Tiedostot siirtävät työn koneiden (kotikone, läppäri), Clauden ja Codexin
+välillä.
 
 **Handoffin pitää mahtua agentin kontekstiin ja sisältää vain olennaiset,
 ajankohtaiset asiat.** Se ei ole versiohistoria.
 
-- Kokoraja: **noin 300 riviä / 20 kt**. Jos raja ylittyy, karsi ennen kuin
-  lisäät uutta.
+- `AGENT_HANDOFF.md`:n kokoraja: **noin 400 riviä / 30 kt**.
+  `BLENDER_HANDOFF.md`:n kokoraja: **noin 250 riviä / 20 kt**. Jos raja
+  ylittyy, karsi ennen kuin lisäät uutta.
+- **Yksi asia kirjataan vain yhteen handoffiin**, ja toinen viittaa siihen.
+  Mallien sisältö, mitat, Blender-putket ja mallien viat kuuluvat
+  `BLENDER_HANDOFF.md`:hen. Se, mitä peli lataa, sijoittelu, törmäykset,
+  materiaalien käsittely pelissä ja kohtausten suunnitelma kuuluvat
+  `AGENT_HANDOFF.md`:hen.
 - Osio "Nykytila" **kirjoitetaan uudelleen** jokaisessa päivityksessä, eikä
   sen perään lisätä uutta osiota.
 - Versiokohtaiset muutoskuvaukset menevät `docs/VERSION.md`:hen, ei
@@ -101,10 +127,12 @@ ajankohtaiset asiat.** Se ei ole versiohistoria.
   Vanhentunut päätös poistetaan, ei yliviivata.
 
 Jokainen agentti, joka saa valmiiksi olennaisen toteutustyön, päivittää
-handoffin samassa muutoksessa: päivämäärä, branch ja commit; erikseen
-"koodi valmis", "deployattu" ja "käsin testattu"; ajetut komennot ja
-tulokset; avoimet riskit; **yksi seuraava tehtävä** ja lista asioista, joita
-ei vielä saa aloittaa.
+samassa muutoksessa vain työhön liittyvän handoffin tai molemmat, jos työ
+yhdistää pelikoodia ja Blender-assetteja: päivämäärä ja pohjana käytetty
+main-commit; branch ja commit vain, jos handoff kuvaa vielä mainiin
+mergeämätöntä työtä; erikseen "koodi valmis", "deployattu" ja "käsin
+testattu"; ajetut komennot ja tulokset; avoimet riskit; **yksi seuraava
+tehtävä** ja lista asioista, joita ei vielä saa aloittaa.
 
 ## Uudella koneella
 
