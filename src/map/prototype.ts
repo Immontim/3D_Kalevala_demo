@@ -4,6 +4,8 @@ export const PROTOTYPE_MAP_ID = "kalevala-prototype";
 export const PROTOTYPE_START = { x: 10, y: 14 } as const;
 export const YARD_POSITION = { x: 10, y: 11 } as const;
 export const CAMPFIRE_POSITION = { x: 13, y: 14 } as const;
+/** Niityn ja järven rajalla: tietäjän mökki rannalla (rauhallinen 3D-kohtaus). */
+export const LAKESIDE_POSITION = { x: 9, y: 6 } as const;
 
 const LEGEND: Record<string, TerrainId> = {
   w: "water",
@@ -46,6 +48,7 @@ const cells: MapCell[] = ROWS.flatMap((row, y) => [...row].map((symbol, x) => ({
   terrainId: LEGEND[symbol],
   ...(x === YARD_POSITION.x && y === YARD_POSITION.y ? { siteId: "yard" } : {}),
   ...(x === CAMPFIRE_POSITION.x && y === CAMPFIRE_POSITION.y ? { siteId: "campfire" } : {}),
+  ...(x === LAKESIDE_POSITION.x && y === LAKESIDE_POSITION.y ? { siteId: "lakeside" } : {}),
 })));
 
 export const PROTOTYPE_MAP = createWorldMap(cells);

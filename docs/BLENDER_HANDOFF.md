@@ -6,7 +6,7 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-15 (Claude, Windows; pohja main 609c1e3)
+Päivitetty: 2026-11-15 (Claude, Windows; pohja main 850e4cc)
 
 - **Mainissa** (pohja `3191123`) ovat `assets/forest.glb`,
   `characters.glb`, `bog.glb`, `homestead.glb`, `household.glb`,
@@ -26,8 +26,10 @@ Päivitetty: 2026-11-15 (Claude, Windows; pohja main 609c1e3)
   `vene` (tukkivene) ja `mela`, `ruoko_a`, `ruoko_b` ja `kaisla` (tupaat).
   Tietäjä (`villagers.glb`), koira (`animals/koira.glb`), kuuset, kivet ja
   kelo (`forest.glb`) käytetään sellaisenaan. Ei vettä, rantaviivaa eikä
-  liekkiä: ne ovat pelikoodin asia. Katsottu vain Blenderin
-  esikatselukuvista (EEVEE, maa ja vesitaso), ei pelissä.
+  liekkiä: ne ovat pelikoodin asia. Peli käyttää tiedostoa
+  paikassa `lakeside` (AGENT_HANDOFF); mallit on katsottu myös pelissä
+  (mökki, tuli, pata, tietäjä, laituri, vene ja ruoko toimivat). Koiralle
+  puuttuu kävelyleike, jotta se voisi käyskennellä.
 - **Sankarin rauhan varustus** (`characters.glb`, `char_build.py`; peli
   käyttää sitä rauhallisella pihalla, ks. AGENT_HANDOFF):
   - Huotra vyöllä (sankari ja Pohjan soturi) on nyt 0,80 m (oli 0,58 m,
@@ -179,8 +181,8 @@ Päivitetty: 2026-11-15 (Claude, Windows; pohja main 609c1e3)
 
 ## Seuraava Blender-tehtävä
 
-Ei avointa Blender-tehtävää. Järvenranta odottaa pelikoodia (Codex):
-kohtauksen asettelu, vesi ja ranta, liekki/valo `mount_tuli`-pisteeseen.
+Ei avointa Blender-tehtävää. Mahdollinen: koiran kävelyleike
+(`animals.py`, 191 luuta) ranta- ja pihakoiran käyskentelyyn.
 Tietäjällä on vain lepoasento, joten istuva tietäjä vaatisi uuden
 istumaleikkeen. Jos omistaja pitää jousineidon otetta
 huonona, koverretaan hänen nyrkkinsä (`skin_parts(carve=…)` omalla

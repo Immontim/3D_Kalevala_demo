@@ -16,7 +16,7 @@ const TILE = 48;
 const VIEW_COLS = 17;
 const VIEW_ROWS = 13;
 const MOON_PHASE_MINUTES = 180;
-const SCENE_SHORTCUTS = ["yard", "clearing", "homestead"] as const satisfies readonly SceneId[];
+const SCENE_SHORTCUTS = ["yard", "lakeside", "clearing", "homestead"] as const satisfies readonly SceneId[];
 
 const TERRAIN_FRAME: Record<TerrainId, [number, number]> = {
   water: [0, 0],
@@ -156,8 +156,9 @@ function move(direction: MapDirection) {
     player: { ...campaign.player, satiety: result.state.satiety },
   };
   setMessage(result.siteId === "yard" ? t("map.yardFound")
-    : result.siteId === "campfire" ? t("map.campfireFound")
-      : t("map.travelTime", { minutes: result.minutesSpent }));
+    : result.siteId === "lakeside" ? t("map.lakesideFound")
+      : result.siteId === "campfire" ? t("map.campfireFound")
+        : t("map.travelTime", { minutes: result.minutesSpent }));
   persistAndRender();
 }
 
@@ -351,6 +352,7 @@ function renderMap() {
       }
       sprite(ctx, TERRAIN_FRAME[cell.terrainId], vx * TILE, vy * TILE);
       if (cell.siteId === "yard") sprite(ctx, [2, 1], vx * TILE, vy * TILE);
+      if (cell.siteId === "lakeside") sprite(ctx, [3, 1], vx * TILE, vy * TILE);
       if (cell.siteId === "campfire") drawRedHand(ctx, vx * TILE, vy * TILE);
     }
   }
@@ -378,6 +380,7 @@ function onKeyDown(event: KeyboardEvent) {
 function currentSiteMessage() {
   const siteId = mapCell(PROTOTYPE_MAP, campaign.world.x, campaign.world.y)?.siteId;
   if (siteId === "yard") return t("map.yardFound");
+  if (siteId === "lakeside") return t("map.lakesideFound");
   if (siteId === "campfire") return t("map.campfireFound");
   return t("map.welcome");
 }

@@ -11,7 +11,7 @@ import { lerpAngle, moveActor, startAttack } from "./melee";
 import { openChoice, songState } from "./song";
 import { DEG, aim, g, inputs, keys, sfx } from "./state";
 import { t } from "../i18n";
-import { ARENA_PEACEFUL } from "../world";
+import { ARENA_PEACEFUL, SPAWN, groundHeight } from "../world";
 import { applyActiveMapTransition } from "../map/transition";
 
 // Sankarin varusteet valitaan aloitusikkunassa, ja valinta tallentuu selaimeen.
@@ -41,7 +41,9 @@ export function renewPlayerShield() {
 
 /** Luo sankarin aloituspaikalleen. Vanha sankari on poistettava ensin (removeActor). */
 export function spawnHero() {
-  g.player = makeActor(PLAYER_LOOK, new THREE.Vector3(0, 0, -3), 0, 0xffd27a);
+  g.player = makeActor(PLAYER_LOOK, new THREE.Vector3(SPAWN.x, groundHeight(SPAWN.x, SPAWN.z), SPAWN.z), 0, 0xffd27a);
+  g.player.yaw = SPAWN.yaw;
+  aim.yaw = SPAWN.yaw;
   applyActiveMapTransition(g.player, g.gameTime);
   // Rauhallisessa paikassa sankari näkyy jo aloitusikkunan taustalla ase huotrassa.
   g.player.fighter.setSheathed(ARENA_PEACEFUL);

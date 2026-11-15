@@ -31,6 +31,11 @@ describe("2D- ja 3D-kohtauksen siirtymä", () => {
       maxHpPenalty: 0,
       maxStaminaPenalty: 0,
     });
+    expect(createMapToSceneTransition("lakeside", "friendly", 0)).toMatchObject({
+      scene: "lakeside",
+      maxHpPenalty: 0,
+      maxStaminaPenalty: 0,
+    });
   });
 
   it("käyttää taistelun rajatapauksissa arvoja 50, 49 ja 0 oikein", () => {

@@ -22,6 +22,7 @@ describe("karttapaikan 3D-kohde", () => {
   it("kytkee pihan rauhalliseen pihaan ja punaisen käden nuotioaukioon", () => {
     expect(sceneForMapSite("yard")).toBe("yard");
     expect(sceneForMapSite("campfire")).toBe("clearing");
+    expect(sceneForMapSite("lakeside")).toBe("lakeside");
     expect(sceneForMapSite(undefined)).toBeNull();
     expect(sceneForMapSite("unknown")).toBeNull();
   });

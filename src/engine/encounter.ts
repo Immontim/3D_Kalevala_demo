@@ -2,7 +2,7 @@
 // seuraa, kun vastustaja kaatuu. Moottori itse ei tiedä aalloista mitään. Aaltotaistelu
 // (skirmish.ts) on yksi kohtaus; rauhallinen kohtaus ilman vastustajia on toinen.
 import type { Actor } from "./actor";
-import { t } from "../i18n";
+import { t, type TextKey } from "../i18n";
 import { $ } from "./dom";
 import { showMsg } from "./hud";
 
@@ -28,9 +28,14 @@ export const peace: Encounter = {
 /** Vierailu rauhallisella pihalla: kuin peace, mutta kertoo alussa, missä ollaan. Paikan voi
  *  muuttaa vihamieliseksi vaihtamalla kohtauksen (startEncounter) tai tuomalla yksittäisen
  *  vastustajan (addEnemy); vastustajan mittarit tulevat näkyviin itsestään. */
-export const visit: Encounter = {
-  peaceful: true,
-  start() { peace.start(); showMsg(t("yard.title"), t("yard.sub"), 3); },
-  update() {},
-  onEnemyDown() {},
-};
+function makeVisit(title: TextKey, sub: TextKey): Encounter {
+  return {
+    peaceful: true,
+    start() { peace.start(); showMsg(t(title), t(sub), 3); },
+    update() {},
+    onEnemyDown() {},
+  };
+}
+export const visit: Encounter = makeVisit("yard.title", "yard.sub");
+/** Vierailu järven rannalla: sama rauhallinen kohtaus, oma otsikko. */
+export const lakesideVisit: Encounter = makeVisit("lakeside.title", "lakeside.sub");
