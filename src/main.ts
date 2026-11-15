@@ -11,7 +11,9 @@ import { skirmish } from "./engine/skirmish";
 import { g } from "./engine/state";
 import { initStartMenu } from "./ui/startMenu";
 import { initDebug } from "./debug";
+import { translateDocument } from "./i18n";
 
+translateDocument();
 $("ver").textContent = VERSION;
 loadSavedTuning(); // ennen kuin yhtään hahmoa luodaan
 initView();

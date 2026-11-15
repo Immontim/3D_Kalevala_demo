@@ -1,4 +1,5 @@
 import { AttackDef, COMBAT, StrikeStyle, angleBetween, canStrikeHeavy, chargeLevel, exhausted, makeAttack } from "../combat";
+import { t } from "../i18n";
 import { Actor } from "./actor";
 import { focusEnemy, lockTarget } from "./enemies";
 import { paused } from "./loop";
@@ -110,7 +111,7 @@ export function updateHud() {
   const s = $("psong");
   s.style.width = `${(g.songPower / COMBAT.songMax) * 100}%`;
   s.classList.toggle("full", g.songPower >= COMBAT.songMax);
-  $("songReady").textContent = g.songPower >= COMBAT.songMax ? "· paina Q" : "";
+  $("songReady").textContent = g.songPower >= COMBAT.songMax ? t("hud.ready") : "";
 
   // Kilpien kesto.
   const shieldBar = (id: string, a: Actor | null) => {
@@ -134,18 +135,18 @@ export function updateHud() {
   $("charge").classList.toggle("on", charge > 0.12);
   $("charge").classList.toggle("full", charge >= 1);
   $("chargeFill").style.width = `${charge * 100}%`;
-  $("chargeLabel").textContent = charge >= 1 ? `${STYLE_NAME[p.attack.kind]} · raskas` : charge > 0 ? `${STYLE_NAME[p.attack.kind]}${tooTired ? " · voimat eivät riitä raskaaseen" : ""}` : "";
+  $("chargeLabel").textContent = charge >= 1 ? `${STYLE_NAME[p.attack.kind]} · ${t("hud.heavy")}` : charge > 0 ? `${STYLE_NAME[p.attack.kind]}${tooTired ? ` · ${t("hud.tooTired")}` : ""}` : "";
 
   // Vastustajan tuleva isku ja oma torjunta-asento tekstinä.
   // Vihje näytetään siitä vastustajasta, joka on lyömässä (vain yksi lyö kerrallaan).
   const e = g.enemies.find((x) => x.state === "windup") ?? null;
-  $("cue").textContent = e && e.state === "windup" ? `${STYLE_ICON[e.attack.kind]} ${STYLE_NAME[e.attack.kind]}${e.attack.weight === "heavy" ? " (raskas)" : ""}` : "";
-  $("pstance").textContent = p.state !== "dead" && exhausted(p.stamina) ? "Uupunut: et voi torjua, ja lyöntisi ovat heikkoja"
-    : p.state === "block" && !p.shield ? `Torjunta: ${BLOCK_NAME[p.stance]}` : "";
+  $("cue").textContent = e && e.state === "windup" ? `${STYLE_ICON[e.attack.kind]} ${STYLE_NAME[e.attack.kind]}${e.attack.weight === "heavy" ? ` (${t("hud.heavy")})` : ""}` : "";
+  $("pstance").textContent = p.state !== "dead" && exhausted(p.stamina) ? t("hud.exhausted")
+    : p.state === "block" && !p.shield ? t("hud.blockStance", { stance: BLOCK_NAME[p.stance] }) : "";
 }
-export const STYLE_NAME: Record<AttackDef["kind"], string> = { overhead: "Ylälyönti", slash: "Sivallus", thrust: "Pisto", bash: "Kilpityöntö" };
+export const STYLE_NAME: Record<AttackDef["kind"], string> = { overhead: t("strike.overhead"), slash: t("strike.slash"), thrust: t("strike.thrust"), bash: t("strike.bash") };
 export const STYLE_ICON: Record<AttackDef["kind"], string> = { overhead: "↓", slash: "→", thrust: "•", bash: "◐" };
-export const BLOCK_NAME: Record<StrikeStyle, string> = { overhead: "ylä", slash: "sivu", thrust: "pisto" };
+export const BLOCK_NAME: Record<StrikeStyle, string> = { overhead: t("block.overhead"), slash: t("block.slash"), thrust: t("block.thrust") };
 export function heavyOf(a: Actor) { return makeAttack(a.weapon, a.attack.kind === "bash" ? "slash" : a.attack.kind, "heavy"); }
 
 /** Viesti häipyy, kun sen aika on kulunut. */

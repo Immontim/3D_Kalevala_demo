@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { SONG_SLOT_ACTIONS, codeLabel } from "../bindings";
+import { renderVerbatim, t } from "../i18n";
 import { SONG, SONGS, SONG_SLOTS, SongId, beatGap, healOnHit, inZone, slotPositions, songLead, songOutcome, zoneHalf } from "../songLogic";
 import { setState } from "./actor";
 import { $, isTouch } from "./dom";
@@ -60,9 +61,9 @@ export function openChoice() {
     const key = codeLabel(bindings[SONG_SLOT_ACTIONS[i]].find((c) => c) ?? "");
     slotEls[i].classList.toggle("off", id !== null && !songAvailable(id));
     (slotEls[i].lastChild as HTMLElement).innerHTML = "";
-    (slotEls[i].lastChild as HTMLElement).append(key === "–" ? "" : key, document.createElement("br"), id ? SONGS[id].name : "tyhjä");
+    (slotEls[i].lastChild as HTMLElement).append(key === "–" ? "" : key, document.createElement("br"), id ? SONGS[id].name : t("song.empty"));
   });
-  $("choiceHint").textContent = isTouch ? "Valitse laulu napauttamalla" : `Valitse laulu: napsauta tai paina pikanäppäintä. ${codeLabel(bindings.song.find((c) => c) ?? "")} peruu.`;
+  $("choiceHint").textContent = isTouch ? t("song.chooseTouch") : t("song.choose", { key: codeLabel(bindings.song.find((c) => c) ?? "") });
   $("choice").classList.remove("hidden");
   canvas.classList.add("singing");
   $("vignette").classList.add("on");
@@ -176,7 +177,8 @@ export function judge(i: number, hit: boolean) {
   s.runes[i].classList.add(hit ? "hit" : "miss");
   s.zones[i].classList.add(hit ? "hit" : "miss");
   sfx.pluck(i + 1, hit);
-  $("verse").textContent = hit ? SONGS[s.id].verses[i] : "…";
+  if (hit) renderVerbatim($("verse"), SONGS[s.id].verses[i]);
+  else $("verse").textContent = "…";
   if (hit && s.id === "heal") {
     // Parannus tulee heti jokaisesta osumasta, joten katkennutkin laulu ehtii auttaa.
     const before = g.player.hp;
@@ -202,22 +204,22 @@ export function endSong(id: SongId, success: boolean, rootTime: number, hits: nu
   // Suo lauletaan lukitun tai lähimmän vastustajan alle.
   const target = id === "heal" ? null : focusEnemy();
   if (id === "heal") {
-    if (hits > 0) showMsg("Veri seisoi kuin seinä", `${hits}/${total} osumaa: ${Math.round(healed)} elämää takaisin`, 2.4);
-    else showMsg("Laulu katkesi", "Tahti ei pitänyt", 1.6);
+    if (hits > 0) showMsg(t("song.healSuccess"), t("song.healed", { hits, total, healed: Math.round(healed) }), 2.4);
+    else showMsg(t("song.failed"), t("song.rhythmFailed"), 1.6);
   } else if (success && target) {
     target.state = "rooted";
     target.stateTime = 0;
     target.rootTime = rootTime;
     sfx.swamp();
     fx.shake = 0.25;
-    showMsg("Suohon suonivyötäisistä!", `${hits}/${total} osumaa: vastustaja on kiinni ${rootTime.toFixed(1)} s ja ottaa tuplavahingon`, 2.4);
+    showMsg(t("song.bogSuccess"), t("song.rooted", { hits, total, seconds: rootTime.toFixed(1) }), 2.4);
   } else {
-    showMsg("Laulu katkesi", "Tahti ei pitänyt", 1.6);
+    showMsg(t("song.failed"), t("song.rhythmFailed"), 1.6);
   }
 }
 
 /** Vastustajan isku osui kesken laulun: loitsu raukeaa ja aika palaa heti normaaliksi. */
 export function interruptSong() {
   closeSong(true);
-  showMsg("Laulu katkesi", "Isku osui kesken laulun", 1.6);
+  showMsg(t("song.failed"), t("song.interrupted"), 1.6);
 }

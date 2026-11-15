@@ -9,6 +9,7 @@ import mossNorUrl from "../assets/ground/moss_nor.webp";
 import dirtDiffUrl from "../assets/ground/dirt_diff.webp";
 import dirtNorUrl from "../assets/ground/dirt_nor.webp";
 import { COLLISION, CollisionWorld } from "./collision";
+import { t } from "./i18n";
 
 // Taistelualueet kangasmetsässä: maasto, männyt, kuuset, koivut, varvut ja kivet
 // sekä alueen oma keskus (nuotioaukion kota tai pihapiirin rakennukset). Mallit
@@ -20,8 +21,8 @@ export const ARENA_RADIUS = 11;
 
 export type ArenaId = "clearing" | "homestead";
 export const ARENAS: Record<ArenaId, { name: string; desc: string }> = {
-  clearing: { name: "Nuotioaukio", desc: "Metsäaukio mäntykankaalla: kota, nuotio ja uhrikivi." },
-  homestead: { name: "Pihapiiri", desc: "Rautakautinen talo ulkorakennuksineen punosaidan sisällä." },
+  clearing: { name: t("arena.clearing.name"), desc: t("arena.clearing.desc") },
+  homestead: { name: t("arena.homestead.name"), desc: t("arena.homestead.desc") },
 };
 const ARENA_STORE = "laulun-miekka.arena.v1";
 

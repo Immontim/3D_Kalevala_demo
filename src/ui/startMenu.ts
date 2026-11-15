@@ -7,8 +7,20 @@ import { lockPointer } from "../engine/input";
 
 import { g, sfx } from "../engine/state";
 import { ARENA, ARENAS, ArenaId, saveArena } from "../world";
+import { Language, getLanguage, setLanguage, t } from "../i18n";
 
 export function initStartMenu() {
+  for (const btn of document.querySelectorAll<HTMLButtonElement>("#languagePick button[data-language]")) {
+    const language = btn.dataset.language as Language;
+    btn.classList.toggle("on", language === getLanguage());
+    btn.setAttribute("aria-pressed", String(language === getLanguage()));
+    btn.setAttribute("aria-label", t(language === "fi" ? "language.fi" : "language.en"));
+    btn.addEventListener("click", () => {
+      if (language === getLanguage()) return;
+      setLanguage(language);
+      location.reload();
+    });
+  }
   // Maaston valinta: maailma rakennetaan kerran latauksen alussa, joten toisen maaston valinta
   // tallentaa valinnan ja lataa sivun uudelleen. Aloitusikkuna on silloin yhä auki.
   {
@@ -20,8 +32,8 @@ export function initStartMenu() {
       btn.innerHTML = `<b>${ARENAS[id].name}</b><span>${ARENAS[id].desc}</span>`;
       btn.addEventListener("click", () => {
         if (id === ARENA) return;
-        if (!saveArena(id)) { $("arenaNote").textContent = "Valintaa ei voitu tallentaa tähän selaimeen, joten maastoa ei voi vaihtaa."; return; }
-        $("arenaNote").textContent = `Ladataan: ${ARENAS[id].name}…`;
+        if (!saveArena(id)) { $("arenaNote").textContent = t("start.arenaSaveFailed"); return; }
+        $("arenaNote").textContent = t("start.loading", { name: ARENAS[id].name });
         location.reload();
       });
       box.appendChild(btn);

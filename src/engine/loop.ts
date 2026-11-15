@@ -1,5 +1,6 @@
 // Pääsilmukka, uusi peli ja tauko.
 import { SONG } from "../songLogic";
+import { t } from "../i18n";
 import { openTune, renderBinds } from "../ui/pauseMenu";
 import { groundHeight } from "../world";
 import { removeActor } from "./actor";
@@ -21,7 +22,7 @@ import { camera, canvas, composer, world } from "./view";
 
 export function onPlayerDeath() {
   g.gameOver = true;
-  showMsg("Kaaduit", isTouch ? "Napauta aloittaaksesi alusta" : "R: uusi yritys · Enter: alkuvalikko", 9999);
+  showMsg(t("death.title"), isTouch ? t("death.touch") : t("death.keyboard"), 9999);
 }
 /** Tyhjentää kentän ja luo sankarin uudelleen aloituspaikalleen. */
 function resetField() {

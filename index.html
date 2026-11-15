@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Laulun miekka</title>
+    <title></title>
     <link rel="stylesheet" href="./src/style.css" />
   </head>
   <body>
@@ -14,20 +14,20 @@
     <div id="hud">
       <div class="bars">
         <div class="bar-wrap" id="meterPlayer">
-          <div class="label">Sinä</div>
+          <div class="label" data-i18n="hud.you"></div>
           <div class="bar"><div id="php" class="fill hp"></div><span class="num" id="phpNum"></span></div>
           <div class="bar stamina"><div id="psta" class="fill stamina"></div><span class="num" id="pstaNum"></span></div>
           <div class="bar thin shieldbar"><div id="pshield" class="fill shield"></div></div>
-          <div class="label small">Laulun voima <span id="songReady"></span></div>
+          <div class="label small"><span data-i18n="hud.songPower"></span> <span id="songReady"></span></div>
           <div class="bar thin"><div id="psong" class="fill song"></div></div>
           <div class="label small" id="pstance"></div>
         </div>
         <div class="bar-wrap right" id="meterEnemy">
-          <div class="label" id="ename">Pohjolan soturi</div>
+          <div class="label" id="ename"></div>
           <div class="bar"><div id="ehp" class="fill hp enemy"></div><span class="num" id="ehpNum"></span></div>
           <div class="bar stamina"><div id="esta" class="fill stamina"></div><span class="num" id="estaNum"></span></div>
           <div class="bar thin shieldbar"><div id="eshield" class="fill shield"></div></div>
-          <div class="label small" id="wave">Aalto 1</div>
+          <div class="label small" id="wave"></div>
           <div class="label cue" id="cue"></div>
         </div>
       </div>
@@ -37,7 +37,7 @@
       <div id="rearWarn" class="hidden"><span>▲</span></div>
       <div id="msg"></div>
       <div id="sub"></div>
-      <div id="corner"><span id="tuned"></span><span id="ver"></span> · <span id="fps"></span> FPS</div>
+      <div id="corner"><span id="tuned"></span><span id="ver"></span> · <span id="fps"></span> <span data-i18n="hud.fps"></span></div>
     </div>
 
     <div id="choice" class="hidden">
@@ -45,79 +45,84 @@
     </div>
 
     <div id="song" class="hidden">
-      <div id="verse"></div>
+      <div id="verse" lang="fi" translate="no" class="notranslate"></div>
       <div id="track"><div id="marker"></div></div>
-      <div id="songHint">Paina välilyöntiä (tai napauta), kun merkki on sinisen alueen kohdalla. Alueet lyhenevät.</div>
+      <div id="songHint" data-i18n="song.rhythmHint"></div>
     </div>
 
     <div id="touch" class="hidden">
-      <button data-act="dodge">Väistä</button>
-      <button data-act="song">Laula</button>
-      <button data-act="block">Torju</button>
-      <button data-act="attack" class="big">Isku</button>
+      <button data-act="dodge" data-i18n="touch.dodge"></button>
+      <button data-act="song" data-i18n="touch.song"></button>
+      <button data-act="block" data-i18n="touch.block"></button>
+      <button data-act="attack" class="big" data-i18n="touch.attack"></button>
     </div>
 
     <div id="pause" class="overlay hidden">
       <div class="panel">
-        <h1>Tauko</h1>
-        <p class="tag">Peli on pysähdyksissä. Näppäimet voi vaihtaa tästä. Ikkunan voi raahata sivuun; Esc jatkaa peliä.</p>
+        <h1 data-i18n="pause.title"></h1>
+        <p class="tag" data-i18n="pause.subtitle"></p>
         <div class="tabs">
-          <button id="tabBinds" class="tab on">Näppäimet</button>
-          <button id="tabTune" class="tab">Säätö</button>
+          <button id="tabBinds" class="tab on" data-i18n="pause.bindings"></button>
+          <button id="tabTune" class="tab" data-i18n="pause.tuning"></button>
         </div>
         <div id="paneBinds" class="pane">
           <div id="binds"></div>
           <p class="small" id="bindNote"></p>
-          <p class="small">Liike (WASD), laulun tahti (välilyönti), uusi peli (R) ja tauko (Esc) ovat kiinteitä. Asetus tallentuu tähän selaimeen.</p>
-          <button id="resetBinds" class="secondary first">Palauta oletusnäppäimet</button>
-          <p class="small">Elämä- ja kestävyysmittarit voi tauon aikana raahata haluamaansa kohtaan ruudulla. Paikat tallentuvat tähän selaimeen.</p>
-          <button id="resetMeters" class="secondary first">Palauta mittarien paikat</button>
+          <p class="small" data-i18n="pause.fixedBindings"></p>
+          <button id="resetBinds" class="secondary first" data-i18n="pause.resetBindings"></button>
+          <p class="small" data-i18n="pause.meters"></p>
+          <button id="resetMeters" class="secondary first" data-i18n="pause.resetMeters"></button>
         </div>
         <div id="paneTune" class="pane hidden">
-          <p class="small">Muutokset tulevat voimaan vasta, kun otat ne käyttöön: peli alkaa silloin alusta. Muutettu arvo näkyy korostettuna, ja oletus näkyy, kun viet hiiren kentän päälle.</p>
+          <p class="small" data-i18n="pause.tuningIntro"></p>
           <div id="tuneFields"></div>
-          <h2>Arvot tekstinä</h2>
-          <p class="small">Vain oletuksista poikkeavat arvot. Tekstiä voi myös muokata tai liittää tähän aiemmin kopioidun.</p>
+          <h2 data-i18n="pause.valuesAsText"></h2>
+          <p class="small" data-i18n="pause.valuesHelp"></p>
           <textarea id="tuneJson" spellcheck="false"></textarea>
           <p class="small" id="tuneNote"></p>
           <div class="tunebtns">
-            <button id="tuneApply">Ota käyttöön ja aloita alusta</button>
-            <button id="tuneCopy" class="secondary">Kopioi arvot</button>
-            <button id="tuneReset" class="secondary">Palauta oletusarvot</button>
+            <button id="tuneApply" data-i18n="pause.apply"></button>
+            <button id="tuneCopy" class="secondary" data-i18n="pause.copy"></button>
+            <button id="tuneReset" class="secondary" data-i18n="pause.reset"></button>
           </div>
         </div>
-        <button id="resumeBtn">Jatka</button>
-        <button id="menuBtn" class="secondary">Alkuvalikko</button>
+        <button id="resumeBtn" data-i18n="pause.resume"></button>
+        <button id="menuBtn" class="secondary" data-i18n="pause.menu"></button>
       </div>
     </div>
 
     <div id="start" class="overlay">
       <div class="panel">
-        <h1>Laulun miekka</h1>
-        <p class="tag">Kalevala-taisteluprototyyppi</p>
-        <h2>Taistelupaikka</h2>
+        <div id="languagePick" class="language-pick" role="group" aria-labelledby="languageLabel">
+          <span id="languageLabel" class="language-label" data-i18n="language.label"></span>
+          <button type="button" data-language="fi"><span class="flag-icon flag-fi" aria-hidden="true"></span><span>FI</span></button>
+          <button type="button" data-language="en"><span class="flag-icon flag-en" aria-hidden="true"><span class="flag-uk"></span><span class="flag-us"><i></i></span></span><span>EN</span></button>
+        </div>
+        <h1 data-i18n="meta.title"></h1>
+        <p class="tag" data-i18n="start.subtitle"></p>
+        <h2 data-i18n="start.arena"></h2>
         <div id="arenaPick"></div>
-        <p class="small" id="arenaNote">Valittu paikka näkyy taustalla. Toisen paikan valinta lataa sivun uudelleen, ja valinta tallentuu tähän selaimeen.</p>
-        <h2>Sankarin varusteet</h2>
+        <p class="small" id="arenaNote" data-i18n="start.arenaNote"></p>
+        <h2 data-i18n="start.loadout"></h2>
         <div id="gearPick"></div>
-        <h2>Ohjaus</h2>
+        <h2 data-i18n="start.controls"></h2>
         <ul>
-          <li><b>Hiiri</b>: käänny ja katso. <b>WASD</b>: liiku katseen suuntaan.</li>
-          <li><b>Tab</b> tai <b>hiiren keskinappi</b>: lukitse katse vastustajaan, uudestaan vapauttaa. <b>Hiiren rulla</b> vaihtaa kohdetta.</li>
-          <li>Torjunta suojaa vain edestä (aseella ±45°, kilvellä ±60°). Kierrä vastustajan kylkeen tai selän taakse ja lyö ohi suojan; nuori urho kääntyy hitaasti.</li>
-          <li><b>Hiiren vasen</b> tai <b>J</b>: sivallus sivulta</li>
-          <li><b>F</b> tai <b>I</b>: ylälyönti · <b>E</b> tai <b>L</b>: pisto</li>
-          <li>Pidä iskunappia <b>pohjassa</b>, kunnes mittari on täysi: raskas isku. Vapauta, niin isku laukeaa.</li>
-          <li><b>Hiiren oikea</b> tai <b>K</b> pohjassa: torjunta. Torju juuri ennen osumaa, niin vastustaja horjuu.</li>
-          <li><b>Kilpi</b> torjuu aseiskut, mutta kuluu ja lopulta hajoaa. Kilpityöntö murtaa myös kilpitorjunnan. Iskunappi torjunnan aikana: kilpityöntö.</li>
-          <li><b>Ilman kilpeä</b> torjunnan pitää vastata iskua: torjunnan aikana iskunappi valitsee sivu-, ylä- tai pistotorjunnan.</li>
-          <li><b>Sininen palkki</b> on kestävyys: lyönnit ja torjunnat kuluttavat sitä, ja se palautuu hitaasti. Uupuneena et voi torjua, ja lyöntisi ovat heikkoja.</li>
-          <li><b>Shift</b>: väistö</li>
-          <li><b>Q</b>: kun laulun voima on täynnä, peli pysähtyy ja valitset laulun napsauttamalla tai pikanäppäimellä (<b>F1</b> Suolaulu, <b>F2</b> Parannuslaulu). Sitten aika hidastuu ja laulat: paina <b>välilyöntiä</b>, kun merkki on riimun sinisellä alueella. Mitä useampi osuma, sitä vahvempi loitsu. Vastustajan osuma katkaisee laulun.</li>
-          <li><b>Esc</b>: tauko. Taukoikkunassa voit vaihtaa iskujen, torjunnan, väistön ja laulun näppäimet, myös hiiren lisänapeille.</li>
+          <li data-i18n-html="start.help.look"></li>
+          <li data-i18n-html="start.help.lock"></li>
+          <li data-i18n-html="start.help.arc"></li>
+          <li data-i18n-html="start.help.slash"></li>
+          <li data-i18n-html="start.help.strikes"></li>
+          <li data-i18n-html="start.help.heavy"></li>
+          <li data-i18n-html="start.help.block"></li>
+          <li data-i18n-html="start.help.shield"></li>
+          <li data-i18n-html="start.help.weaponBlock"></li>
+          <li data-i18n-html="start.help.stamina"></li>
+          <li data-i18n-html="start.help.dodge"></li>
+          <li data-i18n-html="start.help.song"></li>
+          <li data-i18n-html="start.help.pause"></li>
         </ul>
-        <p class="small">Vastustajan terä hehkuu, kun isku on tulossa, ja iskun suunta näkyy hänen nimensä alla. Laulun voima kasvaa osumista ja täydellisistä torjunnoista.</p>
-        <button id="startBtn">Aloita</button>
+        <p class="small" data-i18n="start.help.footer"></p>
+        <button id="startBtn" data-i18n="start.begin"></button>
       </div>
     </div>
     <script type="module" src="./src/main.ts"></script>

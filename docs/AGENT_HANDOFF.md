@@ -8,11 +8,10 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-15 (Codex, Windows)
 
-- **Pelin koodiversio mainissa on v01.05.01** (`src/version.ts`, mainin
-  lähtöcommit `c48b27e`). Mainissa ovat yhteinen maailmantörmäys,
-  kilvettömän miekkamiehen vapaan käden animaatio sekä assetteina
-  talousesineet, tietäjä, jousineito ja emäntä. Assetit eivät yksin nosta
-  pelin versionumeroa, eikä talousesineitä tai kyläläisiä vielä ladata peliin.
+- **Branchin `codex/i18n` koodiversio on v01.06.00** (toteutuscommit
+  `faee963`, pohjana `origin/main` `1f82a59`). Mainin viimeisin pelikoodi
+  on v01.05.01; mainissa ovat lisäksi talousesine-, kyläläis- ja eläinassetit,
+  joita peli ei vielä lataa. Assetit eivät yksin nosta pelin versionumeroa.
 - **Rakenne.** `src/engine/` on kohtaus- ja taistelumoottori, `src/ui/` sivun
   ikkunat (aloitus, tauko, säätö), `src/main.ts` vain käynnistys ja
   `src/debug.ts` savutestien `__game`. Säännöt ja luvut ovat yhä puhtaissa
@@ -23,6 +22,16 @@ Päivitetty: 2026-11-15 (Codex, Windows)
   `hud.ts`, `effects.ts`, `input.ts`, `loop.ts` (pääsilmukka, tauko).
   Moduulit eivät tee mitään ladattaessa: `main.ts` kutsuu `init…`-funktiot
   järjestyksessä. Tila on moduulitasolla, eli yksi moottori sivua kohti.
+- **Kielituki** (`src/i18n.ts`): suomi ja englanti ovat tyypitettyjä
+  sanakirjoja, ja suomen avaimet määrittävät `TextKey`-tyypin, joten puuttuva
+  EN-käännö pysäyttää tyyppitarkistuksen. Aloitusikkunan FI/EN-valinta
+  tallentuu avaimeen `laulun-miekka.language.v1` ja vaihtaa kielen sivun
+  uudelleenlatauksella; oletus on suomi. `data-i18n` kääntää staattisen
+  HTML:n ja `t()` dynaamiset tekstit. **Uusi näkyvä teksti lisätään aina
+  sanakirjaan.** Kalevalan säkeet ovat `VerbatimText`-olioita (`verbatim()`),
+  ja `renderVerbatim()` asettaa `lang="fi"`, `translate="no"` sekä
+  `notranslate`-luokan. Samaa merkintää käytetään tulevissa dialogeissa
+  teksteille, joita ei tarkoiteta käännettäviksi.
 - **Vastustajat ovat lista** `g.enemies` (vain elossa olevat; kaatunut
   siirtyy heti `g.corpses`iin, `enemyDown`). Jokaisella on oma `Actor.ai`,
   `level` ja `name`. `lockTarget()` pitää kohteen `aim.target` ja vaihtaa
@@ -52,8 +61,8 @@ Päivitetty: 2026-11-15 (Codex, Windows)
   pöydän ja penkin törmäysmuodot ovat jo `PROP_COLLIDERS`issa.
   `prepareMaterials`iin pitää lisätä materiaalit `M_HH_*` ja `F_Weave`.
   Naishahmo skaalataan noin 0,95:een, eikä miehen kädestä mitattu
-  `GRIP_CHANNEL` käy hänelle. Eläimet (`assets/animals/*.glb`, branch
-  `claude/animals`) tuovat mukanaan animaatioleikkeet, joten ne tarvitsevat
+  `GRIP_CHANNEL` käy hänelle. Eläimet (`assets/animals/*.glb`, mainissa)
+  tuovat mukanaan animaatioleikkeet, joten ne tarvitsevat
   `THREE.AnimationMixer`in (ks. Pysyvät päätökset). Mallien sisältö, nimet
   ja viat:
   `docs/BLENDER_HANDOFF.md`.
@@ -138,15 +147,16 @@ Päivitetty: 2026-11-15 (Codex, Windows)
   painon varustuksen mukaan, lyö raskaasti kilven takana seisovaa pelaajaa,
   ja aseella torjuessaan arvaa suunnan oikein sitä useammin, mitä pidemmällä
   aalloissa ollaan. Keihäällä voi vain pistää.
-- **Koodi valmis ja mainissa:** v01.05.01. GitHub Pagesin deploy-tilaa ei
-  tarkistettu tässä dokumenttisiivouksessa; omistajan pelitesti tehdään
-  julkaistusta osoitteesta.
-- **Käsin testattu 2026-11-14** in-app browserissa: kilvettömän miekkamiehen
-  vartioasento, ylälyönnin vastapainoliike ja palautuminen; maailma ja hahmot
-  piirtyivät, 60 FPS, ei konsolivirheitä. Kilpi- ja keihäsasentoja ei muutettu.
-- **Komennot 2026-11-14:** `bun run test` 168/168, `bun run lint`,
-  `bun run build` ja `git diff --check` ok. Build varoittaa ennestään yli
-  500 kt:n JS-palasta.
+- **Koodi valmis:** v01.06.00 branchissa `codex/i18n`, commit `faee963`.
+  Ei deployattu; tarkista ennen jatkamista merge-tila ohjeen mukaisella
+  `git merge-base --is-ancestor codex/i18n origin/main` -komennolla.
+- **Käsin testattu 2026-11-15** in-app browserissa: FI/EN-valinta ja sen
+  säilyminen uudelleenlatauksessa, molemmat aloitusnäkymät, englanninkielinen
+  aalto ja vastustaja sekä tauon näppäin- ja säätövälilehdet. CSS-liput
+  piirtyivät oikein, peli pysyi 58–60 FPS:ssä eikä konsolissa ollut virheitä.
+- **Komennot 2026-11-15:** `bun run test` 172/172, `bunx tsc --noEmit`,
+  `bun run lint`, `bun run build` ja `git diff --check` ok. Build varoittaa
+  ennestään yli 500 kt:n JS-palasta.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Savutestien apuna on `window.__game`; koko lista ja käyttö ovat
   `src/debug.ts`:ssä. Selainpaneelin fokus voi pysäyttää pelin.
@@ -156,6 +166,10 @@ Päivitetty: 2026-11-15 (Codex, Windows)
 - **Tasapainoa ei ole pelitestattu.** Kaikki luvut ovat arvauksia.
   Suuntatorjunta ilman kilpeä voi olla liian vaikea: iskun suunta pitää
   lukea vastustajan asennosta tai HUD-vihjeestä noin puolessa sekunnissa.
+- **Englanninkielinen sanasto on agentin kääntämä**, ei äidinkielisen
+  tarkistama. Tekninen kattavuus on testattu, mutta sävyä ja termejä voi
+  vielä hioa pelitestissä. Uusi kieli vaatii sanakirjan lisäksi uuden
+  `Language`-arvon ja valintapainikkeen lipputyyleineen.
 - **Kestävyyden tasapaino on arvaus.** Palautuminen 1/s on hidas suhteessa
   hintoihin, ja kestävyys rajoittaa lähinnä raskaita lyöntejä ja torjuntaa.
   Vastustajalla ei ole täydellistä torjuntaa.
@@ -207,8 +221,10 @@ Päivitetty: 2026-11-15 (Codex, Windows)
 
 ## Seuraava tehtävä
 
-Omistaja kokeilee julkaistusta v01.05.01-versiosta kilvettömän miekkamiehen
-vasemman käden luonnollisuuden vartiossa, liikkeessä ja eri iskuissa.
+Rauhallisen pihakohtauksen integraatio jatkuu. Sen kaikki uudet näkyvät
+tekstit lisätään `src/i18n.ts`:n FI- ja EN-sanakirjoihin; mahdolliset
+alkuperäiskielisiksi jätettävät runo- tai dialogikatkelmat merkitään
+`verbatim()`-rakenteella.
 
 ## Ei vielä aloiteta
 
