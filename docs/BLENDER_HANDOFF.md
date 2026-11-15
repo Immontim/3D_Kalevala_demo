@@ -6,7 +6,7 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-15 (Claude, Windows; pohja main e27a495)
+Päivitetty: 2026-11-15 (Claude, Windows; pohja main 609c1e3)
 
 - **Mainissa** (pohja `3191123`) ovat `assets/forest.glb`,
   `characters.glb`, `bog.glb`, `homestead.glb`, `household.glb`,
@@ -78,6 +78,19 @@ Päivitetty: 2026-11-15 (Claude, Windows; pohja main e27a495)
   origossa, linnunpää -Y, nokka +Z). Viitta ja kanteleen kotelo on
   painotettu vartaloon. Vasen käsi pidetään viitan alla sivulla ja oikea
   on vapaa sauvalle.
+- **Louhi** (`assets/louhi.glb`, noin 1,7 Mt; `char_louhi.py` →
+  `run_louhi()`, lukee ensin `char_folk.py`:n; ajetaan avoimessa
+  `characters.blend`issa kuten kyläläiset, kokoelma LOUHI): `char_louhi`
+  (noin 27 500 kolmiota, sama `RIG`, naisvartalo ja lepoasento kuin
+  emännällä, 17 luuta). Musta pitkä mekko, sininen esiliina
+  kirjontanauhalla, kultaiset olkasoljet ja ketjut, helmikaulakoru,
+  rengasvyö ja puukko, mustat silmämaalit sekä peuran kallo, sarvet ja
+  mustat sulat päässä. Päähine on samaa verkkoa kuin hahmo ja painotettu
+  pään luuhun (ei irrotettava). Viittaa ei ole tarkoituksella. Jalat
+  ovat mekon alla paljain jaloin. Kuvalähde oli omistajan antama
+  Sketchfab-referenssi (ei käytetty mallina eikä kopioitu); kaikki
+  geometria on tehty itse. Katsottu vain Blenderin kuvista lepoasennossa
+  ja kädet alhaalla; ei ajettu pelissä, kävelyä ei kokeiltu.
 - **Naishahmot** (`assets/villagers_f.glb`, noin 3,2 Mt):
   `char_jousineito` (noin 27 900 kolmiota), `jousi` (ote origossa, lavat
   Z-suunnassa, jänne +Y) ja `char_emanta` (noin 26 600 kolmiota).
@@ -176,5 +189,5 @@ palautetta pelissä näkyvistä virheistä.
 
 ## Ei vielä aloiteta
 
-- Louhen ja isännän mallit.
+- Isännän malli.
 - Dialogianimaatiot ennen omistajan palautetta rauhallisesta pihasta.
