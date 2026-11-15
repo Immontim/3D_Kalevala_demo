@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CAMPAIGN_STORE,
+  EARLIEST_CAMPAIGN_STORE,
   LEGACY_CAMPAIGN_STORE,
   clearCampaign,
   loadCampaign,
@@ -33,7 +34,7 @@ describe("kampanjan selainvarasto", () => {
 
   it("korvaa rikkinäisen tallennuksen turvallisella uudella kampanjalla", () => {
     const state = loadCampaign(memoryStorage("{not-json"));
-    expect(state.schemaVersion).toBe(2);
+    expect(state.schemaVersion).toBe(3);
     expect(state.world).toMatchObject({ mapId: "kalevala-prototype", width: 20, height: 20 });
   });
 
@@ -46,11 +47,29 @@ describe("kampanjan selainvarasto", () => {
     legacy.schemaVersion = 1;
     delete legacy.player.satiety;
     legacy.player.hunger = 65;
-    storage.data.set(LEGACY_CAMPAIGN_STORE, JSON.stringify(legacy));
+    storage.data.set(EARLIEST_CAMPAIGN_STORE, JSON.stringify(legacy));
 
     const migrated = loadCampaign(storage);
     expect(migrated.world).toEqual(current.world);
     expect(migrated.player.satiety).toBe(35);
+    expect(migrated.player.gender).toBe("male");
+    expect(storage.data.has(CAMPAIGN_STORE)).toBe(true);
+    expect(storage.data.has(EARLIEST_CAMPAIGN_STORE)).toBe(false);
+  });
+
+  it("migroi v2-avaimen miesoletuksella v3-avaimeen", () => {
+    const storage = memoryStorage();
+    const legacy = JSON.parse(JSON.stringify(loadCampaign(storage)));
+    legacy.schemaVersion = 2;
+    delete legacy.player.gender;
+    legacy.world.worldMinutes = 360;
+    storage.data.delete(CAMPAIGN_STORE);
+    storage.data.set(LEGACY_CAMPAIGN_STORE, JSON.stringify(legacy));
+
+    const migrated = loadCampaign(storage);
+    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.player.gender).toBe("male");
+    expect(migrated.world.worldMinutes).toBe(360);
     expect(storage.data.has(CAMPAIGN_STORE)).toBe(true);
     expect(storage.data.has(LEGACY_CAMPAIGN_STORE)).toBe(false);
   });
@@ -64,7 +83,7 @@ describe("kampanjan selainvarasto", () => {
     legacy.player.hunger = 25;
     const serialized = JSON.stringify(legacy);
     const blocked: CampaignStorage = {
-      getItem: (key) => key === LEGACY_CAMPAIGN_STORE ? serialized : null,
+      getItem: (key) => key === EARLIEST_CAMPAIGN_STORE ? serialized : null,
       setItem: () => { throw new DOMException("blocked", "SecurityError"); },
       removeItem: () => { throw new DOMException("blocked", "SecurityError"); },
     };
@@ -89,10 +108,12 @@ describe("kampanjan selainvarasto", () => {
   it("poistaa vain kampanjan oman avaimen", () => {
     const storage = memoryStorage("saved");
     storage.data.set(LEGACY_CAMPAIGN_STORE, "old");
+    storage.data.set(EARLIEST_CAMPAIGN_STORE, "oldest");
     storage.data.set("other", "keep");
     expect(clearCampaign(storage)).toBe(true);
     expect(storage.data.get(CAMPAIGN_STORE)).toBeUndefined();
     expect(storage.data.get(LEGACY_CAMPAIGN_STORE)).toBeUndefined();
+    expect(storage.data.get(EARLIEST_CAMPAIGN_STORE)).toBeUndefined();
     expect(storage.data.get("other")).toBe("keep");
   });
 });

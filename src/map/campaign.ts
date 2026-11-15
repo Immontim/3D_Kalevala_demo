@@ -3,10 +3,11 @@
 import type { Loadout } from "../combat";
 import type { TextKey } from "../i18n";
 
-export const CAMPAIGN_SCHEMA_VERSION = 2 as const;
+export const CAMPAIGN_SCHEMA_VERSION = 3 as const;
 export const INVENTORY_CAPACITY = 8;
 export const SATIETY_MAX = 100;
 
+export type PlayerGender = "male" | "female";
 export type FoodId = "barley_flatbread" | "dried_fish";
 export type EquipmentItemId = "sword" | "spear" | "round_shield";
 export type ItemId = FoodId | EquipmentItemId;
@@ -63,6 +64,7 @@ export interface CampaignWorld {
 }
 
 export interface CampaignPlayer {
+  gender: PlayerGender;
   /** 100 = kylläinen, 0 = nääntynyt. Kylläisyys ei itsessään tapa. */
   satiety: number;
   inventory: Inventory;
@@ -97,6 +99,7 @@ export function createCampaign(start: CampaignStart = {}): CampaignState {
     schemaVersion: CAMPAIGN_SCHEMA_VERSION,
     world: { mapId: start.mapId ?? "prototype", width, height, x, y, discovered, worldMinutes: 0 },
     player: {
+      gender: "male",
       satiety: SATIETY_MAX,
       inventory: {
         capacity: INVENTORY_CAPACITY,
@@ -108,6 +111,12 @@ export function createCampaign(start: CampaignStart = {}): CampaignState {
       equipment: { mainHand: "sword", offHand: "round_shield" },
     },
   };
+}
+
+/** Vaihtaa karttasankarin ulkoasun muuttamatta matkan muuta tilaa. */
+export function setPlayerGender(state: CampaignState, gender: PlayerGender): CampaignState {
+  if (state.player.gender === gender) return state;
+  return { ...state, player: { ...state.player, gender } };
 }
 
 /** Syö yhden ruuan. Palauttaa uuden tilan; epäkelpo tai loppunut ruoka ei muuta tilaa. */
@@ -166,11 +175,19 @@ export function parseCampaign(value: unknown): CampaignState | null {
   if (data.schemaVersion === CAMPAIGN_SCHEMA_VERSION && validPlayer(data.player)) {
     return cloneCampaign(data as unknown as CampaignState);
   }
+  if (data.schemaVersion === 2 && validVersion2Player(data.player)) {
+    return cloneCampaign({
+      schemaVersion: CAMPAIGN_SCHEMA_VERSION,
+      world: data.world,
+      player: { ...data.player, gender: "male" },
+    });
+  }
   if (data.schemaVersion === 1 && validLegacyPlayer(data.player)) {
     return cloneCampaign({
       schemaVersion: CAMPAIGN_SCHEMA_VERSION,
       world: data.world,
       player: {
+        gender: "male",
         satiety: SATIETY_MAX - data.player.hunger,
         inventory: data.player.inventory,
         equipment: data.player.equipment,
@@ -192,10 +209,23 @@ function validWorld(value: unknown): value is CampaignWorld {
 }
 
 function validPlayer(value: unknown): value is CampaignPlayer {
-  if (!isRecord(value) || typeof value.satiety !== "number" || !Number.isFinite(value.satiety)
+  if (!isRecord(value) || !isPlayerGender(value.gender)
+    || typeof value.satiety !== "number" || !Number.isFinite(value.satiety)
     || value.satiety < 0 || value.satiety > SATIETY_MAX) return false;
   if (!validInventory(value.inventory) || !validEquipment(value.equipment)) return false;
   return true;
+}
+
+interface Version2CampaignPlayer {
+  satiety: number;
+  inventory: Inventory;
+  equipment: Equipment;
+}
+
+function validVersion2Player(value: unknown): value is Version2CampaignPlayer {
+  if (!isRecord(value) || typeof value.satiety !== "number" || !Number.isFinite(value.satiety)
+    || value.satiety < 0 || value.satiety > SATIETY_MAX) return false;
+  return validInventory(value.inventory) && validEquipment(value.equipment);
 }
 
 interface LegacyCampaignPlayer {
@@ -237,6 +267,7 @@ function cloneCampaign(state: CampaignState): CampaignState {
     schemaVersion: CAMPAIGN_SCHEMA_VERSION,
     world: { ...state.world, discovered: [...state.world.discovered] },
     player: {
+      gender: state.player.gender,
       satiety: state.player.satiety,
       inventory: { capacity: INVENTORY_CAPACITY, stacks: state.player.inventory.stacks.map((stack) => ({ ...stack })) },
       equipment: { ...state.player.equipment },
@@ -250,6 +281,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isItemId(value: unknown): value is ItemId {
   return typeof value === "string" && Object.prototype.hasOwnProperty.call(ITEMS, value);
+}
+
+function isPlayerGender(value: unknown): value is PlayerGender {
+  return value === "male" || value === "female";
 }
 
 function integerBetween(value: unknown, min: number, max: number): value is number {

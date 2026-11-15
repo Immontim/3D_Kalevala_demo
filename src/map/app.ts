@@ -1,11 +1,23 @@
 import atlasUrl from "../../assets/map/kalevala-map-atlas.png?url";
-import paperDollUrl from "../../assets/map/paper-doll-hero.png?url";
+import femaleMapHeroUrl from "../../assets/map/map-hero-female.png?url";
+import femalePaperDollUrl from "../../assets/map/paper-doll-hero.png?url";
+import malePaperDollUrl from "../../assets/map/paper-doll-hero-male.png?url";
 import redHandUrl from "../../assets/map/red-hand-site.png?url";
-import satietyFacesUrl from "../../assets/map/satiety-faces.png?url";
+import femaleSatietyFacesUrl from "../../assets/map/satiety-faces.png?url";
+import maleSatietyFacesUrl from "../../assets/map/satiety-faces-male.png?url";
 import { VERSION } from "../version";
 import { getLanguage, setLanguage, t } from "../i18n";
 import { mapUrl, sceneKind, sceneUrl, type SceneId } from "../app/route";
-import { combatLoadout, consumeFood, ITEMS, setEquipped, type CampaignState, type FoodId } from "./campaign";
+import {
+  combatLoadout,
+  consumeFood,
+  ITEMS,
+  setEquipped,
+  setPlayerGender,
+  type CampaignState,
+  type FoodId,
+  type PlayerGender,
+} from "./campaign";
 import { createWorldMapState, mapCell, moveOnMap, type MapDirection, type TerrainId } from "./domain";
 import { PROTOTYPE_MAP } from "./prototype";
 import { clearCampaign, loadCampaign, newCampaign, saveCampaign } from "./storage";
@@ -29,6 +41,9 @@ const TERRAIN_FRAME: Record<TerrainId, [number, number]> = {
 const HERO_FRAME: Record<MapDirection, [number, number]> = {
   up: [0, 2], right: [1, 2], down: [2, 2], left: [3, 2],
 };
+const FEMALE_HERO_FRAME: Record<MapDirection, number> = {
+  up: 0, right: 1, down: 2, left: 3,
+};
 
 let campaign: CampaignState;
 let facing: MapDirection = "down";
@@ -47,14 +62,6 @@ function buildUi(root: HTMLElement) {
   root.innerHTML = "";
   const header = h("header", "map-header");
   header.innerHTML = `<span class="map-ornament" aria-hidden="true">◆ ❖ ◆</span><h1>${t("map.title")}</h1><span class="map-ornament" aria-hidden="true">◆ ❖ ◆</span>`;
-  const languages = h("div", "map-languages");
-  for (const language of ["fi", "en"] as const) {
-    const button = h("button", language === getLanguage() ? "on" : "", language.toUpperCase());
-    button.type = "button";
-    button.addEventListener("click", () => { if (language !== getLanguage()) { setLanguage(language); location.reload(); } });
-    languages.append(button);
-  }
-  header.append(languages);
 
   const layout = h("div", "map-layout");
   const status = h("aside", "map-panel map-status");
@@ -89,11 +96,25 @@ function buildUi(root: HTMLElement) {
     const kind = sceneKind(scene);
     return `<button type="button" data-scene="${scene}"><span>${t(`arena.${scene}.name`)}</span><b class="scene-kind ${kind}">${t(kind === "friendly" ? "map.sceneFriendly" : "map.sceneBattle")}</b></button>`;
   }).join("");
-  settings.innerHTML = `<div class="map-modal-card map-settings-card"><button id="closeSettings" class="map-close" type="button" aria-label="${t("map.close")}">×</button><h2 id="mapSettingsTitle">${t("map.settings")}</h2><p>${t("map.settingsHelp")}</p><p id="mapSettingsError" class="map-settings-error" role="status" aria-live="polite"></p><button id="newJourney" class="map-danger" type="button">${t("map.newJourney")}</button><section class="scene-shortcuts"><h3>${t("map.sceneShortcuts")}</h3>${sceneButtons}</section></div>`;
+  const languageButtons = (["fi", "en"] as const).map((language) => `<button type="button" class="map-choice${language === getLanguage() ? " on" : ""}" data-language="${language}" aria-pressed="${language === getLanguage()}"><span class="language-flag flag-${language}" aria-hidden="true"></span><span>${t(`language.${language}`)}</span></button>`).join("");
+  const genderButtons = (["male", "female"] as const).map((gender) => `<button type="button" class="map-choice gender-choice${gender === campaign.player.gender ? " on" : ""}" data-gender="${gender}" aria-pressed="${gender === campaign.player.gender}"><span class="gender-face gender-face-${gender}" aria-hidden="true"></span><span>${t(`map.gender.${gender}`)}</span></button>`).join("");
+  settings.innerHTML = `<div class="map-modal-card map-settings-card"><button id="closeSettings" class="map-close" type="button" aria-label="${t("map.close")}">×</button><h2 id="mapSettingsTitle">${t("map.settings")}</h2><p>${t("map.settingsHelp")}</p><div class="map-setting-grid"><section class="map-setting-group" aria-labelledby="mapLanguageTitle"><h3 id="mapLanguageTitle">${t("language.label")}</h3><div class="map-choice-row">${languageButtons}</div></section><section class="map-setting-group" aria-labelledby="mapGenderTitle"><h3 id="mapGenderTitle">${t("map.gender")}</h3><div class="map-choice-row">${genderButtons}</div></section></div><p id="mapSettingsError" class="map-settings-error" role="status" aria-live="polite"></p><button id="newJourney" class="map-danger" type="button">${t("map.newJourney")}</button><section class="scene-shortcuts"><h3>${t("map.sceneShortcuts")}</h3>${sceneButtons}</section></div>`;
 
   root.append(header, layout, footer, settings);
   root.querySelector("#closeSettings")!.addEventListener("click", () => toggleSettings(false));
   root.querySelector("#newJourney")!.addEventListener("click", restartJourney);
+  root.querySelectorAll<HTMLButtonElement>("[data-language]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const language = button.dataset.language as "fi" | "en";
+      if (language !== getLanguage()) {
+        setLanguage(language);
+        location.reload();
+      }
+    });
+  });
+  root.querySelectorAll<HTMLButtonElement>("[data-gender]").forEach((button) => {
+    button.addEventListener("click", () => selectGender(button.dataset.gender as PlayerGender));
+  });
   root.querySelectorAll<HTMLButtonElement>("[data-scene]").forEach((button) => {
     button.addEventListener("click", () => openScene(button.dataset.scene as SceneId));
   });
@@ -207,6 +228,20 @@ function restartJourney() {
   renderUi();
 }
 
+function selectGender(gender: PlayerGender) {
+  if (gender === campaign.player.gender) return;
+  const previous = campaign;
+  campaign = setPlayerGender(campaign, gender);
+  if (!saveCampaign(campaign)) {
+    campaign = previous;
+    document.getElementById("mapSettingsError")!.textContent = t("map.saveFailed");
+    return;
+  }
+  document.getElementById("mapSettingsError")!.textContent = "";
+  renderMap();
+  renderUi();
+}
+
 function useFood(itemId: FoodId) {
   const result = consumeFood(campaign, itemId);
   if (!result.consumed) return;
@@ -248,6 +283,16 @@ function drawMoon() {
 }
 
 function renderUi() {
+  const root = document.getElementById("mapRoot")!;
+  const female = campaign.player.gender === "female";
+  root.dataset.gender = campaign.player.gender;
+  root.style.setProperty("--paper-doll", `url(${JSON.stringify(female ? femalePaperDollUrl : malePaperDollUrl)})`);
+  root.style.setProperty("--satiety-faces", `url(${JSON.stringify(female ? femaleSatietyFacesUrl : maleSatietyFacesUrl)})`);
+  root.querySelectorAll<HTMLButtonElement>("[data-gender]").forEach((button) => {
+    const selected = button.dataset.gender === campaign.player.gender;
+    button.classList.toggle("on", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  });
   const band = satietyBand(campaign.player.satiety);
   const satietyLabel = t(`map.satiety.${band}`);
   const face = document.getElementById("satietyFace")!;
@@ -296,9 +341,20 @@ atlas.addEventListener("load", renderMap);
 const redHand = new Image();
 redHand.src = redHandUrl;
 redHand.addEventListener("load", renderMap);
+const femaleMapHero = new Image();
+femaleMapHero.src = femaleMapHeroUrl;
+femaleMapHero.addEventListener("load", renderMap);
 
 function sprite(ctx: CanvasRenderingContext2D, frame: [number, number], x: number, y: number) {
   ctx.drawImage(atlas, frame[0] * TILE, frame[1] * TILE, TILE, TILE, x, y, TILE, TILE);
+}
+
+function drawHero(ctx: CanvasRenderingContext2D, x: number, y: number) {
+  if (campaign.player.gender === "female" && femaleMapHero.complete && femaleMapHero.naturalWidth > 0) {
+    ctx.drawImage(femaleMapHero, FEMALE_HERO_FRAME[facing] * TILE, 0, TILE, TILE, x, y, TILE, TILE);
+    return;
+  }
+  sprite(ctx, HERO_FRAME[facing], x, y);
 }
 
 function drawRedHand(ctx: CanvasRenderingContext2D, x: number, y: number) {
@@ -356,7 +412,7 @@ function renderMap() {
       if (cell.siteId === "campfire") drawRedHand(ctx, vx * TILE, vy * TILE);
     }
   }
-  sprite(ctx, HERO_FRAME[facing], (campaign.world.x - originX) * TILE, (campaign.world.y - originY) * TILE);
+  drawHero(ctx, (campaign.world.x - originX) * TILE, (campaign.world.y - originY) * TILE);
 }
 
 function onKeyDown(event: KeyboardEvent) {
@@ -390,8 +446,8 @@ export function initMap() {
   document.body.classList.remove("mode-scene");
   const root = document.getElementById("mapRoot")!;
   root.style.setProperty("--map-atlas", `url(${JSON.stringify(atlasUrl)})`);
-  root.style.setProperty("--paper-doll", `url(${JSON.stringify(paperDollUrl)})`);
-  root.style.setProperty("--satiety-faces", `url(${JSON.stringify(satietyFacesUrl)})`);
+  root.style.setProperty("--satiety-faces-male", `url(${JSON.stringify(maleSatietyFacesUrl)})`);
+  root.style.setProperty("--satiety-faces-female", `url(${JSON.stringify(femaleSatietyFacesUrl)})`);
   root.classList.add("has-satiety-art");
   root.classList.remove("hidden");
   // 3D-puoli kirjoittaa toistaiseksi tyhjän paluukuorman. Kulutuskohta on

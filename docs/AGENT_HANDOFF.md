@@ -6,12 +6,12 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-15 (Claude, Windows)
+Päivitetty: 2026-11-15 (Codex, Windows)
 
-- **Branchin `claude/lakeside-scene` koodiversio on v03.01.00** (pohjana
-  `origin/main` `850e4cc`). Koodi on valmis, ei deployattu, käsin testattu
-  dev-palvelimella selaimessa. Tarkista merge-tila ennen jatkamista:
-  `git merge-base --is-ancestor claude/lakeside-scene origin/main`.
+- **Branchin `codex/hero-gender-settings` koodiversio on v03.02.00**
+  (pohjana `origin/main` `7463d61`). Koodi on valmis, ei deployattu, käsin
+  testattu. Tarkista merge-tila ennen jatkamista:
+  `git merge-base --is-ancestor codex/hero-gender-settings origin/main`.
 - **Uusi paikka `lakeside` (Järven ranta)**, rauhallinen kohtaus
   (`SCENE_KINDS`: friendly). Kartalla ruutu (9,6) niityn ja järven rajalla,
   Esc-dialogin oikotie ja `?scene=lakeside`. `world.ts` rakentaa sen samalla
@@ -68,15 +68,19 @@ Päivitetty: 2026-11-15 (Claude, Windows)
   kylläisyyttä eivätkä kulu arvossa 100. Keihäs tyhjentää sivukäden.
   Vain 3D-moottorin tukemat `sword_shield`-, `sword`- ja `spear`-yhdistelmät
   hyväksytään.
-- **Kampanjatallennus** (`campaign.ts`, `storage.ts`) käyttää skeemaa 2 ja
-  avainta `laulun-miekka.campaign.v2`. Se säilyttää karttaruudun, ajan,
-  kylläisyyden, paljastukset, ruuat ja varusteet. Skeeman 1 `hunger`
-  migroidaan kaavalla `satiety = 100 - hunger`; kelvollinen vanha tallennus
-  palautetaan myös silloin, kun migraation kirjoitus estetään.
-- **Matkan asetukset.** Esc avaa saavutettavan dialogin. Siellä ovat
-  vahvistettava "Aloita matka uudelleen" sekä oikotiet kaikkiin 3D-paikkoihin:
-  rauhallinen piha on ystävällinen, nuotioaukio ja pihapiiri taisteluita.
-  Paperinuken selectit ja tavaranapit eivät vuoda kartan näppäinohjaukseen.
+- **Kampanjatallennus** (`campaign.ts`, `storage.ts`) käyttää skeemaa 3 ja
+  avainta `laulun-miekka.campaign.v3`. Se säilyttää karttaruudun, ajan,
+  kylläisyyden, paljastukset, ruuat, varusteet ja sankarin sukupuolen.
+  Skeeman 1 `hunger` muunnetaan kylläisyydeksi ja v1/v2-tallennukset saavat
+  miesoletuksen; kelvollinen vanha tallennus palautetaan myös silloin, kun
+  migraation kirjoitus estetään.
+- **Matkan asetukset.** Esc avaa saavutettavan dialogin. Siellä valitaan
+  kieli fontista riippumattomilla FI/GB-lipuilla ja karttasankarin sukupuoli
+  kylläisimmistä kasvokuvista. Mies on uuden ja migroidun kampanjan oletus.
+  Lisäksi dialogissa ovat vahvistettava "Aloita matka uudelleen" sekä
+  oikotiet kaikkiin 3D-paikkoihin; rauhallinen piha ja järven ranta ovat
+  ystävällisiä, nuotioaukio ja pihapiiri taisteluita. Paperinuken selectit ja
+  tavaranapit eivät vuoda kartan näppäinohjaukseen.
 - **Paikat.** Pihapiirin ihmisikoni vie `yard`-kohtaukseen. Erillinen 48 × 48
   px:n rautapunainen kädenjälki vie `clearing`-nuotioaukiolle. Enter tai
   välilyönti aktivoi ruudun paikan. 3D:n kartalta avattu aloitusikkuna näyttää
@@ -92,11 +96,12 @@ Päivitetty: 2026-11-15 (Claude, Windows)
   tyypitetyn `SceneToMapTransition`-kuorman; kartta kuluttaa sen kerran.
   `rewards` on nyt aina tyhjä, mutta rakenne varaa paikan tuleville ruoka- ja
   esinepalkinnoille.
-- **Karttagrafiikka.** `kalevala-map-atlas.png` on 4 × 4 atlas. Uudet
-  projektin omat ImageGen-assetit ovat `paper-doll-hero.png` (256 × 384),
-  `satiety-faces.png` (480 × 96, viisi 96 px:n kasvoa) ja
-  `red-hand-site.png` (48 × 48). Tyyli seuraa omistajan pellava-, rautapuna-,
-  järvensininen- ja kansankirjontareferenssejä.
+- **Karttagrafiikka ja sankari.** `kalevala-map-atlas.png` on 4 × 4 atlas.
+  Naisella ovat `paper-doll-hero.png`, `satiety-faces.png` ja nelisuuntainen
+  `map-hero-female.png`; sininen viitta erottaa hänet kartalla. Miehellä ovat
+  `paper-doll-hero-male.png`, `satiety-faces-male.png` ja atlaksen nykyiset
+  neljä sankariruutua. Paperinuket ovat 256 × 384, kasvot 480 × 96 ja
+  karttaspritet 48 px. Valinta vaihtaa kaikki kolme 2D-esitystä heti.
 - **3D-moottori.** `src/engine/` hoitaa taistelun ja kohtausten elinkaaren.
   Rauhallisella pihalla sankarin miekka on huotrassa, kilpi selässä ja
   kypärä poissa; vihollisen lisääminen palauttaa taisteluvarustuksen.
@@ -107,6 +112,12 @@ Päivitetty: 2026-11-15 (Claude, Windows)
   kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
   tyypitetyissä FI/EN-sanakirjoissa.
 - **Käsin testattu 2026-11-15 Codexin in-app browserissa:**
+  - mies oli uuden kampanjan oletus;
+  - Esc näytti oikeat FI/GB-liput ja miehen/naisen täydet kasvot;
+  - naisen valinta vaihtoi paperinuken, kylläisyyskasvot ja siniviittaisen
+    karttaspriten sekä säilyi sivulatauksen yli;
+  - FI/EN-kielenvaihto latasi kartan oikealla kielellä;
+  - Järven ranta säilyi ystävällisenä 3D-oikotienä;
   - 1135 px leveässä näkymässä kartta pysyi noin 798 px leveänä;
   - paperinuken selectin nuoli ei liikuttanut karttaa tai kuluttanut aikaa;
   - Esc-dialogin fokus siirtyi sulkunappiin ja palasi lähtöelementtiin;
@@ -116,14 +127,14 @@ Päivitetty: 2026-11-15 (Claude, Windows)
   - kylläisyys 0 rauhallisella pihalla jätti molemmat arvoon 100/100;
   - paluu 3D:stä säilytti saman karttaruudun ja kampanjatilan;
   - uusi puhdas selainlataus: ei konsolivirheitä tai -varoituksia, 60 FPS.
-- **Tarkistukset 2026-11-15:** `bun run test` 147/147 (13 tiedostoa) Clauden
-  työpuussa, `bunx tsc --noEmit`, `bun run lint` ja `bun run build` läpäisty
-  (Codexin raportoima 382 testiä ei vastaa tätä lukua, syy selvittämättä).
+- **Tarkistukset 2026-11-15:** `bun run test` 416/416 (37 tiedostoa),
+  `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja
+  `git diff --check` läpäisty.
   Selaimessa: `?scene=lakeside` ja kartalta (9,6) → "Astu rannalle" toimivat,
   konsolissa ei virheitä, 56–60 FPS pienessä in-app-ikkunassa (suuremmalla
   näytöllä FPS mittaamatta); kävelytesti: laiturin päähän asti, rannalla pysähtyy
   nilkkaan, laiturin sivuille ei pääse; pihan ja nuotioaukion lataus ennallaan.
-  Build varoittaa edelleen 3D-chunkin ylittävän 500 kt.
+  Build varoittaa edelleen 3D-chunkin ylittävän 500 kt (noin 792 kt).
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
   3D:ssä `window.__game`. Selainpaneelin fokus voi pysäyttää 3D-pelin.
@@ -140,6 +151,9 @@ Päivitetty: 2026-11-15 (Claude, Windows)
 - Tutkimussumu on kaksitilainen: löydetty terrain jää täysin näkyviin.
 - Paperinuken viisi vaatepaikkaa ovat vasta visuaalisia varauksia. Vain
   pää- ja sivukäsi ovat toimivia; alkuvarusteet eivät vie tavarapaikkoja.
+- Sukupuolivalinta vaihtaa tässä vaiheessa vain 2D-kartan spriten,
+  paperinuken ja kylläisyyskasvot. Molemmat valinnat käyttävät 3D-kohtauksissa
+  vielä samaa nykyistä sankarimallia.
 - Paluusillan kuljetus toimii, mutta 3D ei vielä myönnä palkintoja eikä kartta
   lisää `rewards`-kentän esineitä inventaarioon.
 - Kartta–3D-siirtymä lataa sivun uudelleen. Samassa ajossa mount/dispose

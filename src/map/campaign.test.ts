@@ -9,6 +9,7 @@ import {
   parseCampaign,
   serializeCampaign,
   setEquipped,
+  setPlayerGender,
 } from "./campaign";
 
 describe("kampanjatila", () => {
@@ -23,6 +24,7 @@ describe("kampanjatila", () => {
       { itemId: "dried_fish", quantity: 2 },
     ]);
     expect(state.player.satiety).toBe(SATIETY_MAX);
+    expect(state.player.gender).toBe("male");
     expect(ITEMS.barley_flatbread.satietyGain).toBeGreaterThan(0);
     expect(ITEMS.dried_fish.satietyGain).toBeGreaterThan(ITEMS.barley_flatbread.satietyGain!);
   });
@@ -64,6 +66,15 @@ describe("kampanjatila", () => {
     expect(spear.player.equipment).toEqual({ mainHand: "spear", offHand: null });
     expect(setEquipped(spear, "offHand", "sword")).toBe(spear);
   });
+
+  it("vaihtaa sankarin sukupuolen muuttamatta muuta kampanjatilaa", () => {
+    const state = createCampaign();
+    const female = setPlayerGender(state, "female");
+    expect(female.player.gender).toBe("female");
+    expect(female.world).toBe(state.world);
+    expect(female.player.inventory).toBe(state.player.inventory);
+    expect(setPlayerGender(female, "female")).toBe(female);
+  });
 });
 
 describe("kampanjatallennus", () => {
@@ -100,6 +111,21 @@ describe("kampanjatallennus", () => {
     expect(migrated!.world).toEqual(current.world);
     expect(migrated!.player.inventory).toEqual(current.player.inventory);
     expect(migrated!.player.equipment).toEqual(current.player.equipment);
+    expect(migrated!.player.gender).toBe("male");
+  });
+
+  it("migroi version 2 tallennuksen miesoletukseen", () => {
+    const current = createCampaign({ x: 6, y: 8 });
+    current.player.satiety = 42;
+    const legacy = JSON.parse(serializeCampaign(current));
+    legacy.schemaVersion = 2;
+    legacy.player.gender = "female";
+    const migrated = parseCampaign(legacy);
+    expect(migrated).not.toBeNull();
+    expect(migrated!.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
+    expect(migrated!.player.gender).toBe("male");
+    expect(migrated!.player.satiety).toBe(42);
+    expect(migrated!.world).toEqual(current.world);
   });
 
   it("hylkää kylläisyyden ja vanhan nälän sallitun alueen ulkopuolelta", () => {
@@ -112,6 +138,12 @@ describe("kampanjatallennus", () => {
     delete legacy.player.satiety;
     legacy.player.hunger = -1;
     expect(parseCampaign(legacy)).toBeNull();
+  });
+
+  it("hylkää tuntemattoman sankarin sukupuolen", () => {
+    const invalid = JSON.parse(serializeCampaign(createCampaign()));
+    invalid.player.gender = "unknown";
+    expect(parseCampaign(invalid)).toBeNull();
   });
 
   it("hylkää tuntemattomat ja liian suuret esinepinot", () => {

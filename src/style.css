@@ -184,9 +184,6 @@ body.mode-scene > #mapRoot { display: none !important; }
   min-height: 52px; color: #8f2f18; border-top: 5px double #a33c20; border-bottom: 5px double #a33c20; }
 .map-header h1 { margin: 0; font-size: clamp(24px, 3vw, 38px); font-weight: normal; letter-spacing: 0.08em; }
 .map-ornament { letter-spacing: 0.28em; color: #a33c20; }
-.map-languages { position: absolute; right: 7px; display: flex; gap: 4px; }
-.map-languages button { border: 1px solid #8d6040; background: #eee2c5; color: #5b3827; padding: 4px 7px; cursor: pointer; }
-.map-languages button.on { color: #f2e5c6; background: #9c351c; }
 .map-layout { width: min(100%, 1480px); margin: auto; display: grid; grid-template-columns: minmax(170px, 200px) minmax(0, 816px) minmax(280px, 340px); justify-content: center; align-items: start; gap: 12px; }
 .map-panel { min-height: 260px; padding: 14px; background: rgba(240, 226, 194, 0.92); border: 4px double #9c351c;
   box-shadow: inset 0 0 0 3px rgba(112, 71, 39, 0.16), 0 3px 9px rgba(46, 32, 20, 0.25); }
@@ -244,13 +241,34 @@ body.mode-scene > #mapRoot { display: none !important; }
 .paper-hint { margin: 9px 0 0; color: #6d4b35; text-align: center; font-size: 12px; }
 .map-danger { width: 100%; margin: 5px 0 20px; }
 .map-settings-error { min-height: 1.3em; margin: 6px 0; color: #8f2f18; font-weight: bold; text-align: center; }
+.map-setting-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 15px 0; }
+.map-setting-group { min-width: 0; padding: 10px; border: 2px solid #a16a45; background: rgba(239, 224, 189, 0.48); }
+.map-setting-group h3 { margin: 0 0 9px; color: #8f2f18; text-align: center; font-weight: normal; }
+.map-choice-row { display: flex; justify-content: center; gap: 8px; }
+.map-modal-card .map-choice { min-width: 96px; display: grid; place-items: center; gap: 5px; color: #4b3022; background: #e9d9b7; border-color: #8b5a38; }
+.map-modal-card .map-choice.on { color: #fff1cd; background: #8f2f18; border-color: #582719; box-shadow: inset 0 0 0 2px #d9b971; }
+.language-flag { width: 42px; height: 28px; display: block; border: 1px solid #5b3827; box-shadow: 0 1px 2px rgba(45, 29, 18, 0.25); }
+.flag-fi { background:
+  linear-gradient(to bottom, transparent 39%, #23589b 39% 61%, transparent 61%),
+  linear-gradient(to right, #fff 29%, #23589b 29% 43%, #fff 43%); }
+.flag-en { background:
+  linear-gradient(to right, transparent 43%, #fff 43% 57%, transparent 57%),
+  linear-gradient(to bottom, transparent 34%, #fff 34% 66%, transparent 66%),
+  linear-gradient(to right, transparent 47%, #c8102e 47% 53%, transparent 53%),
+  linear-gradient(to bottom, transparent 42%, #c8102e 42% 58%, transparent 58%),
+  linear-gradient(34deg, transparent 42%, #fff 42% 47%, #c8102e 47% 53%, #fff 53% 58%, transparent 58%),
+  linear-gradient(-34deg, transparent 42%, #fff 42% 47%, #c8102e 47% 53%, #fff 53% 58%, transparent 58%),
+  #21468b; }
+.gender-face { width: 64px; height: 64px; display: block; border: 2px solid #5b3827; border-radius: 50%; background-color: #caa66a; background-position: 0 0; background-size: 500% 100%; }
+.gender-face-male { background-image: var(--satiety-faces-male); }
+.gender-face-female { background-image: var(--satiety-faces-female); }
 .scene-shortcuts { padding-top: 15px; border-top: 2px solid #a16a45; }
 .scene-shortcuts h3 { margin: 0 0 10px; color: #8f2f18; font-weight: normal; }
 .scene-shortcuts button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 7px 0; text-align: left; }
 .scene-kind { flex: 0 0 auto; padding: 3px 7px; border: 1px solid currentColor; border-radius: 2px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.06em; }
 .scene-kind.friendly { color: #d5d29a; }
 .scene-kind.battle { color: #ffd0b9; }
-.map-settings-card { width: min(620px, 92vw); }
+.map-settings-card { width: min(620px, 92vw); max-height: calc(100vh - 40px); overflow: auto; }
 body.from-map #start h2,
 body.from-map #arenaPick,
 body.from-map #arenaNote,
@@ -279,9 +297,9 @@ body.from-map #start .panel { max-width: 500px; }
   .map-status { grid-column: 1; grid-row: 2; }
   .map-paper { grid-column: 1; grid-row: 3; }
   .map-ornament { display: none; }
-  .map-languages { position: static; }
 }
 @media (max-width: 560px) {
   .inventory-slots { grid-template-columns: repeat(4, 52px); }
   .inventory-slot { width: 52px; height: 52px; }
+  .map-setting-grid { grid-template-columns: 1fr; }
 }
