@@ -38,19 +38,22 @@ export interface VillagerDef {
   x: number; y: number; z: number; yaw: number;
   scale?: number;
   armL?: ArmPose; armR?: ArmPose;
-  /** Kädessä pidettävä esine: pystyssä maata vasten käden kohdalla. */
-  prop?: { name: string; hand: "L" | "R"; kind: "staff" | "bow" };
+  /** Kädessä pidettävä esine. Varsi kulkee pystyssä nyrkin otekanavan läpi: sauva nojaa maahan,
+   *  jousi on kädessä kahvastaan. grip = kanavan piste ja suunta lepoasennossa (mallin
+   *  koordinaatit, ks. docs/BLENDER_HANDOFF.md "Otekanavat"). */
+  prop?: { name: string; hand: "L" | "R"; kind: "staff" | "bow"; grip: { p: Dir; d: Dir } };
 }
 
 const q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion(), q3 = new THREE.Quaternion();
 const v1 = new THREE.Vector3(), v2 = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
 
-/** Kääntää luun osoittamaan annettuun suuntaan (maailman koordinaatistossa); lapsiluut seuraavat. */
-function aimBone(bone: THREE.Object3D, dir: THREE.Vector3) {
+/** Kääntää luun niin, että sen oma akseli (oletus: luun pituussuunta) osoittaa annettuun
+ *  suuntaan maailman koordinaatistossa; lapsiluut seuraavat. */
+function aimBone(bone: THREE.Object3D, dir: THREE.Vector3, axis?: THREE.Vector3) {
   const pw = bone.parent!.getWorldQuaternion(q1);
   const w = bone.getWorldQuaternion(q2);
-  const cur = v1.set(0, 1, 0).applyQuaternion(w);
+  const cur = (axis ? v1.copy(axis) : v1.set(0, 1, 0)).applyQuaternion(w).normalize();
   w.premultiply(q3.setFromUnitVectors(cur, v2.copy(dir).normalize()));
   bone.quaternion.copy(pw.invert().multiply(w));
   bone.updateMatrixWorld(true);
@@ -89,6 +92,14 @@ class Villager implements Living {
     this.root.add(clone);
     this.root.updateMatrixWorld(true);
 
+    // Otekanava käden luun omassa koordinaatistossa, mitattuna ennen kuin käsiä käännetään.
+    const hand = def.prop ? rig.getObjectByName(`hand_${def.prop.hand}`) ?? null : null;
+    const gripP = new THREE.Vector3(), gripD = new THREE.Vector3();
+    if (hand && def.prop) {
+      hand.worldToLocal(gripP.set(...def.prop.grip.p));
+      gripD.set(...def.prop.grip.d).normalize().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion()).invert());
+    }
+
     // Kädet levällään olevasta lepoasennosta alas tai esineen pitoon. Juuri on vielä origossa
     // kääntämättä, joten maailman suunnat ovat hahmon omia suuntia.
     for (const side of ["L", "R"] as const) {
@@ -101,9 +112,12 @@ class Villager implements Living {
       aimBone(fore, new THREE.Vector3(pose.fore[0] * out, pose.fore[1], pose.fore[2]));
     }
 
-    if (prop && def.prop) {
-      const hand = rig.getObjectByName(`hand_${def.prop.hand}`);
-      const h = hand ? hand.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3();
+    if (prop && def.prop && hand) {
+      // Ranne käännetään niin, että nyrkin kanava on pystyssä (lähempään pystysuuntaan, ettei
+      // ranne kierry ympäri); varsi asetetaan kanavan kohdalle.
+      const up = gripD.clone().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion())).y >= 0 ? 1 : -1;
+      aimBone(hand, new THREE.Vector3(0, up, 0), gripD);
+      const h = hand.localToWorld(gripP.clone());
       const out = Math.sign(h.x) || 1;
       prop.position.set(0, 0, 0);
       prop.scale.setScalar(1);
@@ -116,10 +130,12 @@ class Villager implements Living {
       }
       prop.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(prop);
-      // Esine seisoo maassa käden kohdalla; käsi on varrella siinä, mihin se osuu.
-      prop.position.set(h.x + out * 0.035, -box.min.y + 0.01, h.z + 0.03);
+      // Sauva seisoo maassa ja käsi on varrella siinä, mihin se osuu; jousi on kädessä kahvastaan.
+      prop.position.set(h.x, def.prop.kind === "staff" ? -box.min.y + 0.01 : h.y, h.z);
       prepareMeshes(prop);
       this.root.add(prop);
+      this.root.updateMatrixWorld(true);
+      hand.attach(prop);      // seuraa kättä (hengitys)
     }
 
     this.head = rig.getObjectByName("head") ?? null;

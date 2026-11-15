@@ -765,6 +765,11 @@ function populate(scene: THREE.Scene, protos: Map<string, Proto>, collision: Col
   return { trees: trees.length, tris: Math.round(tris) };
 }
 
+// Nyrkin otekanavat lepoasennossa (piste ja suunta mallin koordinaateissa). Miehen oikea käsi
+// on sama kuin taistelijoiden GRIP_CHANNEL (fighter.ts); naisen vasen on arvio (BLENDER_HANDOFF).
+const GRIP_MALE_R = { p: [-0.383, 0.795, 0.112] as [number, number, number], d: [0.31, -0.06, 0.95] as [number, number, number] };
+const GRIP_FEMALE_L = { p: [0.385, 0.769, 0.058] as [number, number, number], d: [-0.283, -0.537, 0.795] as [number, number, number] };
+
 /** Rauhallisen pihan väki: emäntä pöydän luona, tietäjä tulella, jousineito portilla, koira ja siipikarja pihalla, possu lätissä. */
 function populateYardLife(scene: THREE.Scene, collision: CollisionWorld) {
   const tb = { ...TABLE, hx: 0, front: 0, back: 0 };
@@ -786,15 +791,15 @@ function populateYardLife(scene: THREE.Scene, collision: CollisionWorld) {
   jobs.push(spawnVillager(scene, {
     url: villagersUrl, character: "tietaja", x: tx, y: groundHeight(tx, tz), z: tz, yaw: facing(tx, tz, FIRE.x - 2, FIRE.z + 4),
     armR: { upper: [0.2, -1, 0.3], fore: [0.05, -0.1, 1] },
-    prop: { name: "sauva", hand: "R", kind: "staff" },
+    prop: { name: "sauva", hand: "R", kind: "staff", grip: GRIP_MALE_R },
   }));
   solid("tietaja", tx, tz, 0.4);
 
   const jx = 2.3, jz = 8.9;
   jobs.push(spawnVillager(scene, {
     url: villagersFUrl, character: "jousineito", x: jx, y: groundHeight(jx, jz), z: jz, yaw: facing(jx, jz, -1, 0), scale: 0.95,
-    armL: { upper: [0.22, -1, 0.1], fore: [0.2, -1, 0.3] },
-    prop: { name: "jousi", hand: "L", kind: "bow" },
+    armL: { upper: [0.16, -1, 0.06], fore: [0.12, -0.25, 1] },
+    prop: { name: "jousi", hand: "L", kind: "bow", grip: GRIP_FEMALE_L },
   }));
   solid("jousineito", jx, jz, 0.38);
 
