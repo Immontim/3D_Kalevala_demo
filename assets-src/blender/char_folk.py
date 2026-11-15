@@ -9,7 +9,8 @@ Aja Blenderissä tiedostossa characters.blend (SRC-kokoelmassa Human Base Meshes
     result = run_folk(preview_dir=r"...", out_dir=r"...\\assets")
 
 Tulos: kokoelma FOLK (char_tietaja, sauva) ja tiedosto assets/villagers.glb, jossa
-on myös luuranko RIG. Punostekstuuri (hh_weave_*) syntyy household.py:n ajosta.
+on myös luuranko RIG, sekä naisvartalon hahmot kokoelmassa FOLK_F (char_jousineito,
+jousi, char_emanta) ja tiedosto assets/villagers_f.glb. Punostekstuuri (hh_weave_*) syntyy household.py:n ajosta.
 """
 import os, io, contextlib, traceback, math, random
 
@@ -452,6 +453,306 @@ def build_bow():
     return assemble("jousi", [p], col_name="FOLK_F", rig=False)[1]
 
 
+# ---------- emännän osat ----------
+def _interp(rad, a):
+    """Säde kulmassa a renkaasta, jonka lokerot ovat ring_profilen mukaiset (keskikohdat (k+0,5)/n)."""
+    n = len(rad)
+    x = (a % (2 * math.pi)) / (2 * math.pi) * n - 0.5
+    i = math.floor(x)
+    t = x - i
+    return rad[i % n] * (1 - t) + rad[(i + 1) % n] * t
+
+
+class Drape:
+    """Pitkän mekon pinta: säde kulman ja korkeuden funktiona. Vyötärön yläpuolella pinta seuraa
+    vartaloa, alapuolella se levenee helman ellipsiin kuten fitted_skirt. Samaa pintaa käyttävät
+    helma, esiliina, ketjut ja vyöltä riippuvat esineet, jotta ne pysyvät toistensa päällä."""
+    def __init__(self, C, z_top, z_bot, off, hem, n=32, fit=0.03, z_max=1.335):
+        self.C, self.z_top, self.z_bot, self.n = C, z_top, z_bot, n
+        keep = lambda i, c: abs(c.x) < 0.26 and C.arm_frac[i] < 0.3
+        ax, ref = V((0, 0, 1)), V((0, -1, 0))
+        rad0, self.e1, self.e2 = ring_profile(C, V((0, 0.02, z_top)), ax, ref, n, keep=lambda i, c: abs(c.x) < 0.2 and C.arm_frac[i] < 0.3)
+        up = [z_max - (z_max - z_top) * j / 5 for j in range(5)]
+        self.zs = up + [z_top + (z_bot - z_top) * j / 12 for j in range(13)]
+        self.rows = []
+        prev = None
+        for z in self.zs:
+            body, _, _ = ring_profile(C, V((0, 0.02, z)), ax, ref, n, slab=0.03, keep=keep)
+            cur = []
+            for k in range(n):
+                a = (k + 0.5) / n * 2 * math.pi
+                if z > z_top:
+                    r = body[k] + off
+                else:
+                    s = min(1.0, (z_top - z) / (z_top - z_bot)) ** 0.8
+                    r_h = 1.0 / math.sqrt((math.cos(a) / hem[1]) ** 2 + (math.sin(a) / hem[0]) ** 2)
+                    r = max((rad0[k] + off) * (1 - s) + r_h * s, body[k] + fit if z > 0.78 else 0.0)
+                    if prev and z < 0.86:
+                        r = max(r, prev[k])
+                cur.append(r)
+            prev = cur
+            self.rows.append(cur)
+
+    def r(self, a, z):
+        zs = self.zs
+        if z >= zs[0]:
+            return _interp(self.rows[0], a)
+        for j in range(len(zs) - 1):
+            if zs[j] >= z >= zs[j + 1]:
+                t = (zs[j] - z) / (zs[j] - zs[j + 1])
+                return _interp(self.rows[j], a) * (1 - t) + _interp(self.rows[j + 1], a) * t
+        return _interp(self.rows[-1], a)
+
+    def at(self, a, z, extra=0.0):
+        return V((0, 0.02, z)) + (self.e1 * math.cos(a) + self.e2 * math.sin(a)) * (self.r(a, z) + extra)
+
+    def surf(self, x, z, extra=0.0, back=False):
+        """Piste pinnalla sivuttaisetäisyydellä x keskilinjasta (edessä tai takana)."""
+        a = 0.0
+        for _ in range(4):
+            a = math.asin(max(-1.0, min(1.0, x / (self.r(math.pi - a if back else a, z) + extra))))
+        return self.at(math.pi - a if back else a, z, extra)
+
+    def weight(self, pt):
+        if pt.z >= self.z_top:
+            w = {k: v for k, v in self.C.near_w(pt).items() if k.rsplit("_", 1)[0] not in ARM}
+            return w or {"chest": 1.0}
+        return self.C.near_w(V((pt.x * 0.6, pt.y * 0.6 + 0.01, pt.z)), 4, blend=("hips", 0.45))
+
+
+def drape_skirt(D, mat, col, tile=0.14):
+    p = Part()
+    j0 = D.zs.index(D.z_top)
+    n = D.n
+    rings = []
+    for j in range(j0, len(D.zs)):
+        z = D.zs[j]
+        s = (D.z_top - z) / (D.z_top - D.z_bot)
+        ring = []
+        for k in range(n):
+            a = (k + 0.5) / n * 2 * math.pi
+            pt = D.at(a, z, D.rows[j][k] * 0.035 * math.sin(a * 9) * s)
+            ring.append(p.v(pt, D.weight(pt)))
+        rings.append(ring)
+    circ = 2 * math.pi * 0.25
+    for j in range(len(rings) - 1):
+        za, zb = D.zs[j0 + j], D.zs[j0 + j + 1]
+        for k in range(n):
+            k2 = (k + 1) % n
+            u0, u1 = k / n * circ / tile, (k + 1) / n * circ / tile
+            p.f([rings[j][k], rings[j][k2], rings[j + 1][k2], rings[j + 1][k]], mat, [(u0, za / tile), (u1, za / tile), (u1, zb / tile), (u0, zb / tile)], col)
+    return p
+
+
+def apron_parts(D, col, edge, z_top=1.335, z_bot=0.40, extra=0.024, trim_h=0.055):
+    """Esiliina: punainen villapaneeli edessä ja takana, alareunassa kudottu nauha."""
+    zs = [z_top, 1.28, 1.22, 1.16, 1.10, D.z_top + 0.03, D.z_top, 0.95, 0.86, 0.77, 0.68, 0.59, 0.50, z_bot, z_bot - trim_h]
+    us = [-1, -0.93, -0.6, -0.3, 0, 0.3, 0.6, 0.93, 1]
+    def hw(z):
+        if z >= D.z_top:
+            return 0.10 + 0.03 * (z_top - z) / (z_top - D.z_top)
+        return 0.13 + 0.08 * (D.z_top - z) / (D.z_top - z_bot)
+    parts = []
+    for back in (False, True):
+        p = Part()
+        grid = []
+        if back:                                             # takana paneeli alkaa vyöltä; ylempänä vain olkaimet
+            zs = [z for z in zs if z <= D.z_top + 0.03]
+        for z in zs:
+            row = []
+            for u in us:
+                pt = D.surf(u * hw(max(z, z_bot)), z, extra, back)
+                row.append(p.v(pt, D.weight(pt)))
+            grid.append(row)
+        for j in range(len(zs) - 1):
+            is_trim = j == len(zs) - 2
+            for k in range(len(us) - 1):
+                q = [grid[j][k], grid[j][k + 1], grid[j + 1][k + 1], grid[j + 1][k]]
+                if is_trim:
+                    u0, u1 = (us[k] + 1) * 2.5, (us[k + 1] + 1) * 2.5
+                    uv = [(u0, 1), (u1, 1), (u1, 0), (u0, 0)]
+                else:
+                    uv = [(us[k] * 1.2, zs[j] / 0.14), (us[k + 1] * 1.2, zs[j] / 0.14), (us[k + 1] * 1.2, zs[j + 1] / 0.14), (us[k] * 1.2, zs[j + 1] / 0.14)]
+                if back:
+                    q.reverse()
+                    uv.reverse()
+                if is_trim:
+                    p.f(q, "trim_diamond", uv)
+                else:
+                    is_edge = k in (0, len(us) - 2)
+                    p.f(q, "plain" if is_edge else "wool", uv, edge if is_edge else col)
+        parts.append(p)
+    return parts
+
+
+def strap_brooch_parts(C, D, col, xs=0.082):
+    """Esiliinan olkaimet olan yli, soikeat pronssisoljet rinnalla ja kaksi ketjua niiden välissä."""
+    parts = []
+    bronze, gold = (0.55, 0.36, 0.12), (0.7, 0.5, 0.16)
+    ends = {}
+    for s in (1, -1):
+        ctr = V((xs * s, 0.02, 1.30))
+        rad, e1, e2 = ring_profile(C, ctr, V((1, 0, 0)), V((0, -1, 0)), 24, slab=0.02, keep=lambda i, c: C.arm_frac[i] < 0.3 and 1.2 < c.z < 1.5 and C.w[i].get('head', 0) + C.w[i].get('neck', 0) < 0.3)
+        p = Part()
+        rows = []
+        for i in range(15):
+            a = -math.radians(6 + 200 * i / 14)
+            d = e1 * math.cos(a) + e2 * math.sin(a)
+            pt = ctr + d * (_interp(rad, a) + 0.036)
+            rows.append((p.v(pt + V((-0.019, 0, 0)), {"chest": 1.0}), p.v(pt + V((0.019, 0, 0)), {"chest": 1.0})))
+            if i == 1:
+                ends[s] = (pt, d)
+        for (a0, a1), (b0, b1) in zip(rows, rows[1:]):
+            p.f([a0, a1, b1, b0], "wool", [(0, 0), (0.3, 0), (0.3, 0.3), (0, 0.3)], col)
+            p.f([b0, b1, a1, a0], "wool", [(0, 0.3), (0.3, 0.3), (0.3, 0), (0, 0)], col)
+        bz = [1.29, 1.24, 1.18, 1.12, 1.06]                 # olkain jatkuu selässä vyölle asti
+        bk = [(p.v(D.surf(xs * s - 0.019, z, 0.02, True), {"chest": 1.0} if z > 1.2 else {"spine": 1.0}),
+               p.v(D.surf(xs * s + 0.019, z, 0.02, True), {"chest": 1.0} if z > 1.2 else {"spine": 1.0})) for z in bz]
+        for (a0, a1), (b0, b1) in zip(bk, bk[1:]):
+            p.f([a0, a1, b1, b0], "wool", [(0, 0), (0.3, 0), (0.3, 0.3), (0, 0.3)], col)
+            p.f([b0, b1, a1, a0], "wool", [(0, 0.3), (0.3, 0.3), (0.3, 0), (0, 0)], col)
+        parts.append(p)
+        # soikea kupurasolki
+        c0, out = ends[s]
+        X = V((1, 0, 0))
+        U = out.cross(X).normalized()
+        b = Part()
+        ring_prev = None
+        for j, (rho, h) in enumerate(((1.0, 0.0), (0.82, 0.008), (0.5, 0.014), (0.0, 0.017))):
+            if rho == 0:
+                tip = b.v(c0 + out * (0.006 + h), {"chest": 1.0})
+                for k in range(12):
+                    b.f([ring_prev[k], ring_prev[(k + 1) % 12], tip], "metal", None, gold)
+                    b.f([ring_prev[(k + 1) % 12], ring_prev[k], tip], "metal", None, gold)
+                break
+            ring = [b.v(c0 + out * (0.006 + h) + X * (0.026 * rho * math.cos(k / 12 * 2 * math.pi)) + U * (0.036 * rho * math.sin(k / 12 * 2 * math.pi)), {"chest": 1.0}) for k in range(12)]
+            if ring_prev:
+                for k in range(12):
+                    c = bronze if j == 1 else gold
+                    b.f([ring_prev[k], ring_prev[(k + 1) % 12], ring[(k + 1) % 12], ring[k]], "metal", None, c)
+                    b.f([ring[k], ring[(k + 1) % 12], ring_prev[(k + 1) % 12], ring_prev[k]], "metal", None, c)
+            ring_prev = ring
+        parts.append(b)
+    z0 = ends[1][0].z - 0.03
+    for sag in (0.045, 0.085):
+        pts = []
+        for i in range(13):
+            u = -1 + 2 * i / 12
+            pts.append(D.surf(u * xs, z0 - sag * (1 - u * u), 0.024 + 0.007))
+        parts.append(tube_part(pts, [0.0035] * len(pts), 4, "metal", {"chest": 1.0}, gold, cap=False))
+    return parts
+
+
+def emanta_belt(C, D, z=1.04):
+    """Kudottu vyö esiliinan päällä, tupsupäät edessä, avain oikealla ja puukko tupessa vasemmalla."""
+    keep = lambda i, c: abs(c.x) < 0.2 and C.arm_frac[i] < 0.3
+    parts = [band(C, V((0, 0.02, z)), V((0, 0, 1)), V((0, -1, 0)), 0.055, 0.07, "trim_diamond", keep=keep, vspan=(0, 1), tile=0.2)]
+    hip = {"hips": 1.0}
+    for x0, zb, ex in ((0.015, 0.60, 0.032), (0.05, 0.66, 0.038)):
+        p = Part()
+        w = 0.04
+        zs = [z + 0.02, z - 0.04, z - 0.15, 0.5 * (z + zb), zb]
+        ids = [(p.v(D.surf(x0, zz, ex + (0.035 if i == 0 else 0)), hip), p.v(D.surf(x0 + w, zz, ex + (0.035 if i == 0 else 0)), hip)) for i, zz in enumerate(zs)]
+        for (a0, a1), (b0, b1), za, zc in zip(ids, ids[1:], zs, zs[1:]):
+            p.f([a0, a1, b1, b0], "trim_diamond", [(za / 0.2, 0), (za / 0.2, 1), (zc / 0.2, 1), (zc / 0.2, 0)])
+        t0, t1 = p.v(D.surf(x0 - 0.004, zb - 0.07, ex), hip), p.v(D.surf(x0 + w + 0.004, zb - 0.07, ex), hip)
+        p.f([ids[-1][0], ids[-1][1], t1, t0], "plain", None, (0.15, 0.012, 0.008))
+        parts.append(p)
+    # avain: rengas, varsi ja lehti; riippuu nyöristä vyöstä
+    iron = (0.16, 0.15, 0.14)
+    kc = D.surf(-0.065, z - 0.115, 0.04)
+    parts.append(tube_part([D.surf(-0.065, z - 0.02, 0.07), kc + V((0, 0, 0.02))], [0.003, 0.003], 4, "leather", hip, (0.8, 0.6, 0.4), cap=False))
+    ring = [kc + V((math.cos(i / 10 * 2 * math.pi) * 0.02, 0, math.sin(i / 10 * 2 * math.pi) * 0.02)) for i in range(11)]
+    parts.append(tube_part(ring, [0.0045] * 11, 5, "metal", hip, iron, cap=False))
+    parts.append(tube_part([kc + V((0, 0, -0.02)), kc + V((0, -0.004, -0.11))], [0.0045, 0.0045], 5, "metal", hip, iron))
+    parts.append(box_part(kc + V((0.012, -0.004, -0.098)), (0.02, 0.006, 0.022), "metal", hip, iron))
+    # puukko tupessa
+    top = D.surf(0.125, z - 0.03, 0.042)
+    R = Matrix.Rotation(-0.1, 3, 'Y')
+    parts.append(box_part(top + V((0, 0, -0.10)), (0.034, 0.018, 0.17), "leather", hip, (0.95, 0.85, 0.75), R))
+    parts.append(tube_part([top, top + V((-0.007, 0, 0.085))], [0.012, 0.014], 6, "wood", hip, (1.0, 0.9, 0.7)))
+    return parts
+
+
+def headscarf_parts(C, col=(1.0, 0.96, 0.86)):
+    """Pellavahuivi: peittää päälaen, sivut ja niskan ja laskeutuu selkään; kasvot jäävät auki."""
+    n = 24
+    ax, ref = V((0, 0, 1)), V((0, -1, 0))
+    ztop = max(c.z for c in C.co)
+    # (korkeus, kasvoaukon puolikas asteina)
+    spec = [(ztop - 0.012, 0), (1.655, 0), (1.635, 0), (1.612, 0), (1.59, 58), (1.56, 62), (1.53, 66), (1.50, 76), (1.47, 100),
+            (1.44, 116), (1.40, 126), (1.36, 131), (1.32, 134), (1.285, 136)]
+    p = Part()
+    rings, prev = [], None
+    for j, (z, g) in enumerate(spec):
+        cy = -0.02 if z > 1.47 else -0.02 + 0.04 * min(1.0, (1.47 - z) / 0.1)
+        keep = (lambda i, c: C.arm_frac[i] < 0.2 and abs(c.x) < 0.13) if z > 1.47 else (lambda i, c: C.arm_frac[i] < 0.3 and abs(c.x) < 0.2)
+        rad, e1, e2 = ring_profile(C, V((0, cy, z)), ax, ref, n, slab=0.012 if z > 1.6 else 0.02, keep=keep)
+        g = math.radians(g)
+        tail = smoothstep(1.50, 1.36, z)
+        ring, cur = [], []
+        for k in range(n + 1):
+            a = g + (2 * math.pi - 2 * g) * k / n
+            r = _interp(rad, a) + (0.036 if z > 1.47 else 0.078)
+            if prev and z < 1.56:
+                r = max(r, prev[k] * (0.985 if z > 1.47 else 0.9))
+            cur.append(r)
+            rr = r * (1 + 0.05 * math.sin(a * 11) * tail)
+            pt = V((0, cy, z)) + (e1 * math.cos(a) + e2 * math.sin(a)) * rr
+            t = smoothstep(1.50, 1.30, z)
+            ring.append(p.v(pt, {"head": 1.0} if t <= 0 else {"head": 1 - 0.7 * t, "chest": 0.7 * t}))
+        prev = cur
+        rings.append(ring)
+    apex = p.v(V((0, -0.02, ztop + 0.018)), {"head": 1.0})
+    for k in range(n):
+        p.f([apex, rings[0][k + 1], rings[0][k]], "jersey", [(0.5, 0), ((k + 1) / n * 4, 0.2), (k / n * 4, 0.2)], col)
+    for j in range(len(spec) - 1):
+        for k in range(n):
+            sh = 0.96 + 0.04 * math.sin(k * 1.9 + j)
+            uv = [(k / n * 4, spec[j][0] / 0.12), ((k + 1) / n * 4, spec[j][0] / 0.12), ((k + 1) / n * 4, spec[j + 1][0] / 0.12), (k / n * 4, spec[j + 1][0] / 0.12)]
+            p.f([rings[j][k], rings[j][k + 1], rings[j + 1][k + 1], rings[j + 1][k]], "jersey", uv, tuple(x * sh for x in col))
+    keep = lambda i, c: c.z > 1.5 and C.arm_frac[i] < 0.2
+    bandp = band(C, V((0, -0.03, 1.622)), V((0, 0.14, 1)).normalized(), V((0, -1, 0)), 0.042, 0.043, "trim_diamond", n=20, keep=keep, vspan=(0, 1), tile=0.16)
+    return [p, bandp]
+
+
+def shoes_parts(C, sock):
+    """Nahkakengät ja villasukat; pitkän helman alle ei tehdä housuja."""
+    is_leg = lambda i, c: C.leg_frac[i] > 0.5
+    parts = [shell(C, lambda i, c: is_leg(i, c) and 0.085 < c.z < 0.36, lambda c: 0.015, "wool", tile=0.1, smooth=3, col=sock)]
+    shoe = shell(C, lambda i, c: is_leg(i, c) and c.z < 0.125, lambda c: 0.014, "leather", tile=0.2, smooth=4, col=(1.0, 0.92, 0.85))
+    zmin = min(c.z for c in shoe.co)
+    for c in shoe.co:
+        if c.z < 0.07:
+            c.z -= (zmin + 0.004) * (1 - c.z / 0.07)
+    parts.append(shoe)
+    return parts
+
+
+def build_emanta():
+    C = Ctx(FEM["body"], FEM["src"], FEM["rig"], FEM_P, fem_xf())
+    hair = (0.62, 0.58, 0.5)
+    brown = (0.4, 0.31, 0.24)
+    red = (0.5, 0.07, 0.045)
+    edge = (0.16, 0.06, 0.015)
+    linen = (0.78, 0.78, 0.72)
+    D = Drape(C, 1.04, 0.17, 0.034, (0.37, 0.33))
+    P = skin_parts(C, 0.9, hair, skin=(0.72, 0.5, 0.39), lips=(0.5, 0.27, 0.24), face=(-0.008, 0.002), carve=False)
+    P += hair_parts(C, hair, length=1.55, beard=0, cap=True)
+    P += headscarf_parts(C, linen)
+    # väljä villamekko: enemmän silotusta ja ilmaa kuin jousineidolla, jotta vartalon muoto peittyy
+    P += torso_parts(C, "jersey", linen, 0.97, inflate=0.011, tile=0.14, smooth=3, sleeve_from=0.55, torso=False)      # pellavainen alushiha
+    P += torso_parts(C, "wool", brown, 0.80, inflate=0.024, tile=0.14, smooth=10, collar=linen, baggy=0.016)
+    P += [drape_skirt(D, "wool", brown)]
+    P += [skirt(C, 0.30, 0.115, 0.0, (0.36, 0.32), "jersey", tile=0.14, col=linen, rows=2)]      # pellavainen alushelma
+    P += cuff_parts(C, 0.785, "trim_diamond", 0.046)
+    P += shoes_parts(C, (0.45, 0.36, 0.28))
+    P += apron_parts(D, red, edge)
+    P += strap_brooch_parts(C, D, red)
+    P += emanta_belt(C, D)
+    return assemble("char_emanta", P, col_name="FOLK_F", rig_name=FEM["rig"])[1]
+
+
 # ---------- asento tarkistuskuvia varten ----------
 def pose_arms(down=True, rig="RIG"):
     """Laskee käsivarret sivuille (tai palauttaa lepoasennon), jotta viitan ja hihojen
@@ -516,9 +817,10 @@ def run_folk(preview_dir=None, out_dir=None, save=True, base_f=False, only=None)
                     out["base_f"] = build_base_f()["weights"]
                 pose_arms(False, FEM["rig"])
                 out["tris"].update({"char_jousineito": build_jousineito()["tris"], "jousi": build_bow()["tris"]})
+                out["tris"]["char_emanta"] = build_emanta()["tris"]
             bpy.context.view_layer.update()
             if preview_dir:
-                for name, rig, on in (("tietaja", "RIG", only != 'f'), ("jousineito", FEM["rig"], only != 'm')):
+                for name, rig, on in (("tietaja", "RIG", only != 'f'), ("jousineito", FEM["rig"], only != 'm'), ("emanta", FEM["rig"], only != 'm')):
                     if not on:
                         continue
                     sheet(["char_" + name], os.path.join(preview_dir, name + "_rest.png"), yaws=(0, math.pi / 2, math.pi), w=380, h=760)

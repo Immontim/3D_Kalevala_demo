@@ -57,7 +57,8 @@ Vartalo, pää, kädet ja silmät: Human Base Meshes v1.4.1,
 `GEO-body_female_realistic` (CC0), skaalattu ja hieman muotoiltu. Kankaat ja
 nahka kuten tiedostossa `characters.glb` (Poly Haven, CC0). Itse tehty
 (`char_folk.py`): luuranko ja painot, jousineidon vaatteet, letti, olkaviitta,
-nuoliviini ja jousi.
+nuoliviini ja jousi sekä emännän mekko, esiliina, kupurasoljet ketjuineen,
+huivi, vyö, avain ja puukko.
 
 ## `homestead.glb`
 
