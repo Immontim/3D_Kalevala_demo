@@ -81,23 +81,22 @@ pelissä):
 Päivitä versionumero koodiin ja rivi `docs/VERSION.md`-taulukkoon. Pelkät
 dokumenttimuutokset eivät nosta versiota.
 
-### Versiovaraus rinnakkaisessa työssä
+### Versionumero otetaan työn lopussa
 
-Koodia muuttavan työn ensimmäinen Git-toimi on version varaaminen:
+Rinnakkaiset branchit muokkaavat samaa riviä `src/version.ts`:ssä ja
+`docs/VERSION.md`:ssä, joten numeroa ei varata etukäteen eikä kirjoiteta
+branchin nimeen. Koodia muuttavan työn viimeistely:
 
-1. `git fetch origin` ja lue nykyinen versio tiedostosta
-   `origin/main:src/version.ts`.
-2. Tarkista etäbranchien nimistä jo varatut versiot.
-3. Valitse muutoksen laajuuden mukainen seuraava vapaa versio, nimeä branch
-   esimerkiksi `codex/v01.06.00-lyhyt-aihe` tai
-   `claude/v01.05.02-lyhyt-aihe` ja pushaa branch heti ennen toteutusta.
+1. `git fetch origin` ja `git merge origin/main` omaan branchiin (ei
+   rebasea julkaistuun historiaan). Ratkaise konfliktit.
+2. Lue versio tiedostosta `src/version.ts` mergen jälkeen ja nosta sitä
+   muutoksen laajuuden mukaan. Lisää rivi `docs/VERSION.md`:hen.
+3. Aja tarkistukset, commitoi ja pushaa.
 
-Pushattu branchin nimi toimii varauksena myöhemmin aloittaville agenteille.
-Suunniteltua versiota ei kirjoiteta handoffin nykytilaksi: handoffissa ja
-`src/version.ts`:ssä näkyy vain branchissa oikeasti oleva koodiversio.
-Varmista varaus uudelleen `git fetch origin` -komennolla ennen työn
-viimeistelyä. Pelkkä dokumentti- tai assettimuutos ei varaa eikä nosta pelin
-versionumeroa.
+Jos main ehtii muuttua ennen kuin omistaja mergeää ja PR näyttää
+konfliktin, toista vaiheet. Handoffissa ja `src/version.ts`:ssä näkyy vain
+branchissa oikeasti oleva koodiversio. Pelkkä dokumentti- tai
+assettimuutos ei nosta pelin versionumeroa.
 
 ## Handoff: kontekstiin mahtuva, ei hautausmaa
 
@@ -113,6 +112,11 @@ ajankohtaiset asiat.** Se ei ole versiohistoria.
 - `AGENT_HANDOFF.md`:n kokoraja: **noin 400 riviä / 30 kt**.
   `BLENDER_HANDOFF.md`:n kokoraja: **noin 250 riviä / 20 kt**. Jos raja
   ylittyy, karsi ennen kuin lisäät uutta.
+- **Yksi asia kirjataan vain yhteen handoffiin**, ja toinen viittaa siihen.
+  Mallien sisältö, mitat, Blender-putket ja mallien viat kuuluvat
+  `BLENDER_HANDOFF.md`:hen. Se, mitä peli lataa, sijoittelu, törmäykset,
+  materiaalien käsittely pelissä ja kohtausten suunnitelma kuuluvat
+  `AGENT_HANDOFF.md`:hen.
 - Osio "Nykytila" **kirjoitetaan uudelleen** jokaisessa päivityksessä, eikä
   sen perään lisätä uutta osiota.
 - Versiokohtaiset muutoskuvaukset menevät `docs/VERSION.md`:hen, ei

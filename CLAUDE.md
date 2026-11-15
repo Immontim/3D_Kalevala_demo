@@ -5,7 +5,7 @@ lukee. Älä kopioi sääntöjä tänne, jotta kaksi versiota ei ajaudu erilleen
 
 @AGENTS.md
 
-Lue ennen suunnittelua myös `docs/AGENT_HANDOFF.md` (nykytila ja seuraava
-tehtävä).
+Lue ennen suunnittelua myös `docs/AGENT_HANDOFF.md` (pelikoodin nykytila ja
+seuraava tehtävä) ja Blender- tai assettityössä `docs/BLENDER_HANDOFF.md`.
 
 Kirjoita omistajalle suomeksi.

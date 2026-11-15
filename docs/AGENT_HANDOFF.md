@@ -44,13 +44,16 @@ Päivitetty: 2026-11-15 (Codex, Windows)
   (`ARENA_RADIUS` 11) ovat yhteiset, ja nuotioaukio on ennallaan.
   **Uusi paikka:** lisää `ArenaId`, rivi `ARENAS`iin ja `SITES`iin sekä
   sijoittelu `populate`n loppuun.
-- **Pihapiirin ja rauhallisen kohtauksen assetit** ovat mainissa, mutta
-  peli ei vielä lataa talousesineitä eikä kyläläisiä. Pöydän ja penkin
-  törmäysmuodot ovat jo `PROP_COLLIDERS`issa. Seuraava integraatiotyö on
-  rauhallinen piha: uusi paikka, assettien materiaalikäsittely ja sijoittelu,
-  pysyvien hahmojen tyyppi sekä tekijäluettelo. Blender-mallien, putkien,
-  mittojen ja avoimien asset-riskien kanoninen tila on
-  `docs/BLENDER_HANDOFF.md`:ssä.
+- **Rauhallinen pihakohtaus** (omistaja hyväksyi 2026-11-14) on seuraava
+  integraatiotyö: uusi paikka, talousesineiden ja pysyvien hahmojen
+  sijoittelu, pysyvien hahmojen tyyppi (seisovat aluksi paikallaan) ja
+  tekijäluettelo peliin. Peli ei vielä lataa talousesineitä
+  (`household.glb`) eikä kyläläisiä (`villagers.glb`, `villagers_f.glb`);
+  pöydän ja penkin törmäysmuodot ovat jo `PROP_COLLIDERS`issa.
+  `prepareMaterials`iin pitää lisätä materiaalit `M_HH_*` ja `F_Weave`.
+  Naishahmo skaalataan noin 0,95:een, eikä miehen kädestä mitattu
+  `GRIP_CHANNEL` käy hänelle. Mallien sisältö, nimet ja viat:
+  `docs/BLENDER_HANDOFF.md`.
 - **Laulut ja valinta** (`src/songLogic.ts`: `SONGS`, `SONG_SLOTS`; kulku
   `engine/song.ts`): laulunappi täydellä voimalla → `openChoice()`:
   `choosing` pysäyttää maailman (dt = 0), hiiri vapautetaan
@@ -190,8 +193,7 @@ Päivitetty: 2026-11-15 (Codex, Windows)
   luonnollisuus pitää vielä arvioida tavallisessa pelissä. Raskaalla
   sivalluksella ja pistolla ei ole omaa asentoa (sama kuin kevyellä), ja
   keihäsmiehen torjunta näyttää samalta kaikissa kolmessa asennossa.
-- **Kypärän tekstuuri** on sama metallilevy kuin muissa osissa, ja kupu on
-  melko sileä; lentävä kypärä voi pudota puun tai kiven läpi.
+- Lentävä kypärä voi pudota puun tai kiven läpi.
 - **Suon reunus** on erillinen kumpu maan päällä ja näkyy läheltä; muta ei
   heijasta hahmoja.
 - Suorituskyky on mitattu vain tehokoneella; LOD-malleja tai
@@ -209,8 +211,6 @@ vasemman käden luonnollisuuden vartiossa, liikkeessä ja eri iskuissa.
 
 - Karttanäkymä ja siirtymät karttaan/3D-paikkoihin.
 - Git LFS (omistajan päätös 2026-11-10: ei vielä).
-- Muut referenssihahmot (Louhi, isäntä; Blender-virran tila omassa
-  handoffissaan).
 - Dialogijärjestelmä (ensin assetit ja rauhallinen kohtaus pystyyn).
 - Isojen skannattujen puiden lataus ja kevennys.
 - Aseiden laatuerot ja vahingon hajonta: rakenne on valmiina, mutta sisältö
