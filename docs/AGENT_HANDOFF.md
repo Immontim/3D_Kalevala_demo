@@ -6,12 +6,40 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-15 (Codex, Windows)
+Päivitetty: 2026-11-15 (Claude, Windows)
 
-- **Branchin `codex/rpg-map-ui` koodiversio on v03.00.00** (toteutuscommit
-  `bad843b`, pohjana `origin/main` `609c1e3`). Koodi on valmis, ei
-  deployattu, käsin testattu. Tarkista merge-tila ennen jatkamista:
-  `git merge-base --is-ancestor codex/rpg-map-ui origin/main`.
+- **Branchin `claude/lakeside-scene` koodiversio on v03.01.00** (pohjana
+  `origin/main` `850e4cc`). Koodi on valmis, ei deployattu, käsin testattu
+  dev-palvelimella selaimessa. Tarkista merge-tila ennen jatkamista:
+  `git merge-base --is-ancestor claude/lakeside-scene origin/main`.
+- **Uusi paikka `lakeside` (Järven ranta)**, rauhallinen kohtaus
+  (`SCENE_KINDS`: friendly). Kartalla ruutu (9,6) niityn ja järven rajalla,
+  Esc-dialogin oikotie ja `?scene=lakeside`. `world.ts` rakentaa sen samalla
+  sijoittelulla kuin pihan: mökki `CABIN`, keittopaikka `LAKE_FIRE` (oma liekki
+  pienennettynä `fireScale` 0,62, höyry padasta, valo, kipinät), laituri
+  `JETTY`/`JETTY_AT`, vene `BOAT_AT`, kuivausteline, halkopino, ruovikko.
+  Mallit tulevat `lakeside.glb`:stä (BLENDER_HANDOFF).
+  - **Järvi.** `terrainHeight` sekoittaa maaston `lakeBed`iin
+    (`lakeMix`, rantaviiva `shoreZ(x)`, vesi `WATER_LEVEL` −0,42, järvi +z-
+    puolella). `groundHeight` on kävelykorkeus: laiturin päällä sen kansi,
+    muualla sama kuin maasto. Vesi on yksi taso (`buildWater`, heijastava,
+    värähtelevä normaali); rantakaistan ja pohjan maa on tallattua. Vedessä ei
+    sijoiteta puita, kiviä eikä heinää (`wet()` ja `put`in `wetOk`).
+  - **Törmäykset.** `addLakeColliders`: rannan syvän veden reunalle 0,9 m
+    ruudukosta ympyröitä (sankari voi kahlata nilkkaan), laiturille reunalaidat
+    ja pääty. Mökki on `CABIN`-pohjana, vene ja istuinhirsi `PROP_COLLIDERS`ista.
+    Rantakohtauksen tulen vaara-alue on 0,45-kertainen: kivikehän vierestä ei pala.
+  - **Aloituspaikka.** `SPAWN` (`world.ts`) ja `spawnHero`: rannalla sankari
+    alkaa laiturin juurelta katsomaan keittotulta, muualla ennallaan (0,−3).
+  - **Väki.** Tietäjä sauvoineen seisoo tulen vieressä, koira kiertää
+    seisoo/istuu/`tassu`. Koiralla ei ole kävelyleikettä (lähde: vain
+    play_dead, rollover, shake, sitting, standing), joten se ei käyskentele.
+    Pihan koiralla tassu on nyt myös kierrossa.
+  - **Kartta.** `LAKESIDE_POSITION`, atlaksen ruutu (3,1) (kalliomaalausikoni:
+    mökki, tietäjä, koira, aallot; piirretty koodilla PIL:llä, ei ImageGen).
+- **Dev-palvelin työpuusta.** Clauden `preview_start` käynnistää palvelimen
+  pääkansiosta, ei työpuusta. Työpuun testi: `bun run dev --port 5174
+  --strictPort` työpuusta; sulje palvelin lopuksi.
 - **Sovellusrakenne.** `src/main.ts` on kevyt sovelluskuori. URL ilman
   `scene`-parametria käynnistää 2D-kartan. `?scene=<id>&return=map` lataa
   dynaamisesti `src/scene3d.ts`:n ja nykyisen Three.js-moottorin. Kartta
@@ -88,10 +116,14 @@ Päivitetty: 2026-11-15 (Codex, Windows)
   - kylläisyys 0 rauhallisella pihalla jätti molemmat arvoon 100/100;
   - paluu 3D:stä säilytti saman karttaruudun ja kampanjatilan;
   - uusi puhdas selainlataus: ei konsolivirheitä tai -varoituksia, 60 FPS.
-- **Tarkistukset 2026-11-15:** `bun run test` 382/382 (35 tiedostoa),
-  `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja
-  `git diff --check` läpäisty. Build varoittaa edelleen 3D-chunkin
-  ylittävän 500 kt; kartan dynaaminen jako toimii.
+- **Tarkistukset 2026-11-15:** `bun run test` 147/147 (13 tiedostoa) Clauden
+  työpuussa, `bunx tsc --noEmit`, `bun run lint` ja `bun run build` läpäisty
+  (Codexin raportoima 382 testiä ei vastaa tätä lukua, syy selvittämättä).
+  Selaimessa: `?scene=lakeside` ja kartalta (9,6) → "Astu rannalle" toimivat,
+  konsolissa ei virheitä, 56–60 FPS pienessä in-app-ikkunassa (suuremmalla
+  näytöllä FPS mittaamatta); kävelytesti: laiturin päähän asti, rannalla pysähtyy
+  nilkkaan, laiturin sivuille ei pääse; pihan ja nuotioaukion lataus ennallaan.
+  Build varoittaa edelleen 3D-chunkin ylittävän 500 kt.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
   3D:ssä `window.__game`. Selainpaneelin fokus voi pysäyttää 3D-pelin.
@@ -116,6 +148,9 @@ Päivitetty: 2026-11-15 (Codex, Windows)
   keihään kantama, usean vastustajan rytmi ja nuotion vahinko ovat arvioita.
 - Rauhallisen pihan väki ei reagoi taisteluun. Eläinten ja kyläläisten
   mallikohtaiset avoimet asiat ovat `docs/BLENDER_HANDOFF.md`:ssä.
+- Järven rannan vesi on yksinkertainen: ei rantavaahtoa, syvyysväriä eikä
+  aaltoja laiturin kohdalla. Kaukorannalla ei ole kasvillisuutta kaukaa
+  nähtynä; rantakohtauksen koira ei käyskentele (ei kävelyleikettä).
 - 3D-chunk on noin 787 kt ja metsä noin 2 milj. kolmiota. LOD-malleja tai
   laatuasetusta ei ole; 60 FPS on mitattu tehokoneella.
 

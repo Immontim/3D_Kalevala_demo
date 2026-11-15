@@ -6,6 +6,7 @@ describe("sovelluksen reitit", () => {
     expect(sceneKind("clearing")).toBe("battle");
     expect(sceneKind("homestead")).toBe("battle");
     expect(sceneKind("yard")).toBe("friendly");
+    expect(sceneKind("lakeside")).toBe("friendly");
   });
 
   it("hyväksyy vain tunnetut 3D-paikat", () => {
@@ -17,6 +18,9 @@ describe("sovelluksen reitit", () => {
     });
     expect(parseAppRoute("https://example.test/game/?scene=yard&return=MAP")).toEqual({
       mode: "scene", scene: "yard", returnToMap: false,
+    });
+    expect(parseAppRoute("https://example.test/game/?scene=lakeside&return=map")).toEqual({
+      mode: "scene", scene: "lakeside", returnToMap: true,
     });
     expect(parseAppRoute("https://example.test/game/?scene=unknown&return=map")).toEqual({ mode: "map" });
     expect(parseAppRoute("https://example.test/game/?return=map")).toEqual({ mode: "map" });

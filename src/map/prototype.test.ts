@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TERRAIN_IDS, mapCell } from "./domain";
-import { CAMPFIRE_POSITION, PROTOTYPE_MAP, PROTOTYPE_START, YARD_POSITION } from "./prototype";
+import { CAMPFIRE_POSITION, LAKESIDE_POSITION, PROTOTYPE_MAP, PROTOTYPE_START, YARD_POSITION } from "./prototype";
 
 describe("prototyyppikartta", () => {
   it("sisältää 20 × 20 ruutua ja kaikki kuusi maastoa", () => {
@@ -12,6 +12,15 @@ describe("prototyyppikartta", () => {
   it("aloitusruutu on kuljettava ja rauhallinen piha on omana paikkanaan", () => {
     expect(mapCell(PROTOTYPE_MAP, PROTOTYPE_START.x, PROTOTYPE_START.y)?.terrainId).not.toBe("water");
     expect(mapCell(PROTOTYPE_MAP, YARD_POSITION.x, YARD_POSITION.y)?.siteId).toBe("yard");
+  });
+
+  it("sijoittaa tietäjän rantamökin kuljettavalle ruudulle järven viereen", () => {
+    const cell = mapCell(PROTOTYPE_MAP, LAKESIDE_POSITION.x, LAKESIDE_POSITION.y);
+    expect(cell?.siteId).toBe("lakeside");
+    expect(cell?.terrainId).not.toBe("water");
+    const neighbours = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+      .map(([dx, dy]) => mapCell(PROTOTYPE_MAP, LAKESIDE_POSITION.x + dx, LAKESIDE_POSITION.y + dy)?.terrainId);
+    expect(neighbours).toContain("water");
   });
 
   it("sijoittaa saavutettavan punaisen käden nuotioaukion taistelulle", () => {

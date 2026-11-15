@@ -4,6 +4,7 @@ import forestUrl from "../assets/forest.glb?url";
 import homesteadUrl from "../assets/homestead.glb?url";
 import householdUrl from "../assets/household.glb?url";
 import yardUrl from "../assets/yard.glb?url";
+import lakesideUrl from "../assets/lakeside.glb?url";
 import villagersUrl from "../assets/villagers.glb?url";
 import villagersFUrl from "../assets/villagers_f.glb?url";
 import dogUrl from "../assets/animals/koira.glb?url";
@@ -19,6 +20,7 @@ import dirtNorUrl from "../assets/ground/dirt_nor.webp";
 import { COLLISION, CollisionWorld } from "./collision";
 import { spawnAnimal, spawnVillager, updateFolk } from "./folk";
 import { t } from "./i18n";
+import { SCENE_IDS, type SceneId } from "./app/route";
 
 // Taistelualueet kangasmetsässä: maasto, männyt, kuuset, koivut, varvut ja kivet
 // sekä alueen oma keskus (nuotioaukion kota tai pihapiirin rakennukset). Mallit
@@ -28,18 +30,23 @@ import { t } from "./i18n";
 /** Taistelukehän säde; sama molemmilla alueilla. */
 export const ARENA_RADIUS = 11;
 
-export type ArenaId = "clearing" | "homestead" | "yard";
+export type ArenaId = SceneId;
 export const ARENAS: Record<ArenaId, { name: string; desc: string }> = {
   clearing: { name: t("arena.clearing.name"), desc: t("arena.clearing.desc") },
   homestead: { name: t("arena.homestead.name"), desc: t("arena.homestead.desc") },
   yard: { name: t("arena.yard.name"), desc: t("arena.yard.desc") },
+  lakeside: { name: t("arena.lakeside.name"), desc: t("arena.lakeside.desc") },
 };
 const ARENA_STORE = "laulun-miekka.arena.v1";
+
+function isArena(v: string | null): v is ArenaId {
+  return v !== null && (SCENE_IDS as readonly string[]).includes(v);
+}
 
 function savedArena(): ArenaId {
   try {
     const v = localStorage.getItem(ARENA_STORE);
-    if (v === "clearing" || v === "homestead" || v === "yard") return v;
+    if (isArena(v)) return v;
   } catch { /* muisti ei käytössä */ }
   return "clearing";
 }
@@ -47,7 +54,7 @@ function savedArena(): ArenaId {
 function requestedArena(): ArenaId | null {
   try {
     const value = new URL(location.href).searchParams.get("scene");
-    return value === "clearing" || value === "homestead" || value === "yard" ? value : null;
+    return isArena(value) ? value : null;
   } catch { return null; }
 }
 
@@ -60,9 +67,11 @@ export function saveArena(id: ArenaId): boolean {
 export const ARENA: ArenaId = requestedArena() ?? savedArena();
 /** Rauhallinen paikka: kohtaus alkaa ilman vastustajia. Paikka voi silti muuttua vihamieliseksi,
  *  koska vastustajat tuo kohtaus (Encounter), ei paikka. */
-export const ARENA_PEACEFUL = ARENA === "yard";
+export const ARENA_PEACEFUL = ARENA === "yard" || ARENA === "lakeside";
 /** Pihan rakennukset, aita ja portti ovat yhteiset taistelupihalle ja rauhalliselle pihalle. */
-const HAS_YARD = ARENA !== "clearing";
+const HAS_YARD = ARENA === "homestead" || ARENA === "yard";
+/** Järven ranta: mökki, laituri ja vesi (lakeside.glb). */
+const LAKE = ARENA === "lakeside";
 
 /** Rakennuksen pohja maassa: suorakaide, jonka etusivu (ovi) osoittaa suuntaan yaw. */
 interface Footprint { x: number; z: number; yaw: number; hx: number; front: number; back: number; }
@@ -84,7 +93,10 @@ interface Site {
   footprints: Footprint[];
   /** Pyöreät esteet (nuotio, kota, uhrikivi): x, z, säde. */
   circles: { x: number; z: number; r: number }[];
+  /** Nuotion liekin koko (oletus 1): keittotulella liekki jää padan alle. */
+  fireScale?: number;
 }
+
 
 const KOTA = { x: 8.6, z: -9.6 };
 const OFFERING = { x: -7.5, z: 5 };
@@ -112,6 +124,31 @@ const GATE_HALF = 0.11;       // portin puolileveys radiaaneina (etelässä, +z)
  *  (homestead.py: dw + 0.34, L/2 - 0.25, L/2 + RAMP). */
 const PIT_HOLE = { half: 0.76, from: 2.05, to: 4.2 };
 
+// ---------- Järven ranta ----------
+/** Vesipinnan korkeus; maasto painuu sen alle rannasta järveen päin (+z). */
+export const WATER_LEVEL = -0.42;
+/** Rantaviivan (maan ja kaltevan rannan raja) z-paikka kohdassa x. */
+function shoreZ(x: number) { return 3.6 + Math.sin(x * 0.22 + 0.6) * 0.9 + Math.sin(x * 0.07 + 2.0) * 1.5; }
+/** Järven vaikutus 0..1: alkaa rantakaistalta, rajautuu sivuilta ja kaukorannalta. */
+function lakeMix(x: number, z: number) {
+  const d = z - shoreZ(x);
+  const side = 1 - THREE.MathUtils.smoothstep(Math.abs(x), 15, 28);
+  const far = 1 - THREE.MathUtils.smoothstep(d, 38, 50);
+  return THREE.MathUtils.smoothstep(d, -0.8, 3.8) * side * far;
+}
+const lakeBed = (d: number) => -0.5 - 1.7 * THREE.MathUtils.smoothstep(d, 2, 10);
+/** Veden reunan z-paikka kohdassa x (ensimmäinen kohta, jossa pohja on vesipinnan alla). */
+function waterlineZ(x: number) {
+  for (let z = shoreZ(x) - 1; z < shoreZ(x) + 8; z += 0.05) if (terrainHeight(x, z) < WATER_LEVEL) return z;
+  return shoreZ(x) + 2.5;
+}
+
+const CABIN: Footprint = { x: -1.6, z: -2.2, yaw: 0.1, hx: 2.5, front: 1.95, back: 1.95 };
+const LAKE_FIRE = { x: 2.7, z: 1.5 };
+/** Laituri: origo maalla, kansi 0,30 m origon yläpuolella, ulottuu +z-suuntaan (lakeside.py). */
+const JETTY = { x: -0.8, len: 3.9, half: 0.55, deck: 0.3 };
+const RACK_LAKE = { x: -6.4, z: 1.6, yaw: Math.PI / 2 + 0.12 };
+
 const SITES: Record<ArenaId, Site> = {
   clearing: {
     fire: { x: 4.5, z: 3 }, flat0: ARENA_RADIUS - 2, flat1: ARENA_RADIUS + 10, rough: 0.12,
@@ -130,6 +167,12 @@ const SITES: Record<ArenaId, Site> = {
     treeMin: 25, shrub0: 17, shrub1: 24, dirtR: 15, camMaxR: 12.2,
     footprints: [HOUSE, STY, STOREHOUSE, SHED, RACK],
     circles: [{ x: 3.6, z: -4.6, r: 2.0 }, { x: COOP.x, z: COOP.z, r: 1.6 }, { x: TABLE.x, z: TABLE.z, r: 2.0 }],
+  },
+  lakeside: {
+    fire: LAKE_FIRE, fireScale: 0.62, flat0: 20, flat1: 34, rough: 0.03,
+    treeMin: 11, shrub0: 10, shrub1: 18, dirtR: 7, camMaxR: Infinity,
+    footprints: [CABIN],
+    circles: [{ x: LAKE_FIRE.x, z: LAKE_FIRE.z, r: 1.8 }, { x: RACK_LAKE.x, z: RACK_LAKE.z, r: 2.2 }],
   },
 };
 const SITE = SITES[ARENA];
@@ -173,6 +216,9 @@ export const PROP_COLLIDERS: Record<string, PropColliderTemplate> = {
   kanakoppi: { kind: "box", halfX: 0.8, halfZ: 0.65, blocksMelee: true },
   pata: { kind: "circle", radius: 0.5, blocksMelee: false },
   tuohikontti: { kind: "circle", radius: 0.2, blocksMelee: false },
+  // Järven rannan esineet (lakeside.glb); mökki, laituri ja nuotio saavat törmäyksensä erikseen.
+  istuinhirsi: { kind: "box", halfX: 0.66, halfZ: 0.2, blocksMelee: false },
+  vene: { kind: "box", halfX: 0.36, halfZ: 1.7, blocksMelee: true },
   lyhde: { kind: "circle", radius: 0.25, blocksMelee: false },
 };
 
@@ -216,6 +262,10 @@ function fromLocal(f: Footprint, lx: number, lz: number): [number, number] {
 
 /** Onko piste rakennuksen, nuotion tai muun kiinteän kohteen alla (pad laajentaa aluetta). */
 function blocked(x: number, z: number, pad: number) {
+  if (LAKE) {
+    if (Math.abs(x - JETTY_AT.x) < 1.3 + pad && z > JETTY_AT.z - 1.2 - pad && z < JETTY_AT.z + JETTY.len + 0.8 + pad) return true;
+    if (Math.hypot(x - BOAT_AT.x, z - BOAT_AT.z) < 2.3 + pad) return true;
+  }
   for (const c of SITE.circles) if (Math.hypot(x - c.x, z - c.z) < c.r + pad) return true;
   for (const f of SITE.footprints) {
     const [lx, lz] = toLocal(f, x, z);
@@ -245,12 +295,52 @@ function noise2(x: number, y: number) {
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
 
-export function groundHeight(x: number, z: number): number {
+/** Maaston pinta ilman rakennelmia (maastoverkko, rantakaistan laskenta). */
+function terrainHeight(x: number, z: number): number {
   const r = Math.hypot(x, z);
   const n = noise2(x * 0.08, z * 0.08) * 2.2 + noise2(x * 0.3, z * 0.3) * 0.35;
   // Aukio on lähes tasainen, reunoilla maasto kumpuilee.
   const t = THREE.MathUtils.smoothstep(r, SITE.flat0, SITE.flat1);
-  return n * (SITE.rough + (1 - SITE.rough) * t) + t * 1.5;
+  const h = n * (SITE.rough + (1 - SITE.rough) * t) + t * 1.5;
+  if (!LAKE) return h;
+  const m = lakeMix(x, z);
+  return h * (1 - m) + lakeBed(z - shoreZ(x)) * m;
+}
+
+/** Laiturin paikka: origo (maan päässä), kantopinnan korkeus ja sen alla olevan maan korkeus. */
+const JETTY_AT = LAKE
+  ? (() => {
+    const z = shoreZ(JETTY.x) + 1.3;
+    const y = terrainHeight(JETTY.x, z);
+    return { x: JETTY.x, z, y, top: y + JETTY.deck };
+  })()
+  : { x: 0, z: 0, y: 0, top: 0 };
+
+/** Vene vedetty rantaan laiturin viereen, keula järvelle. */
+const BOAT_AT = LAKE
+  ? (() => {
+    const x = JETTY.x + 3.7, z = waterlineZ(x) - 0.3;
+    return { x, z, y: terrainHeight(x, z) + 0.08, yaw: -0.12 };
+  })()
+  : { x: 0, z: 0, y: 0, yaw: 0 };
+
+/** Sankarin aloituspaikka ja katseen suunta (yaw 0 = +z, π = -z). Rannalla hän astuu laiturin
+ *  juurelta katsomaan keittotulta: mökki jää vasemmalle ja järvi oikealle. */
+export const SPAWN = LAKE ? { x: JETTY_AT.x, z: JETTY_AT.z - 1.5, yaw: Math.PI - 0.7 } : { x: 0, z: -3, yaw: 0 };
+
+/** Korkeus, jolla hahmot kävelevät: maasto, ja laiturin päällä sen kansi. */
+export function groundHeight(x: number, z: number): number {
+  const h = terrainHeight(x, z);
+  if (!LAKE) return h;
+  const lx = Math.abs(x - JETTY_AT.x), lz = z - JETTY_AT.z;
+  if (lx > JETTY.half + 0.05 || lz < -0.4 || lz > JETTY.len + 0.1) return h;
+  const w = THREE.MathUtils.smoothstep(lz, -0.4, 0.5);        // luiska maasta kannelle
+  return h * (1 - w) + JETTY_AT.top * w;
+}
+
+/** Onko piste vedessä (maasto alle vesipinnan, laiturin ulkopuolella). */
+function wet(x: number, z: number) {
+  return LAKE && terrainHeight(x, z) < WATER_LEVEL + 0.12;
 }
 
 /** Kosteus 0..1: korkea arvo = sammalta, mustikkaa ja kuusia; matala = kuivaa kangasta. */
@@ -287,7 +377,7 @@ function buildGround(scene: THREE.Scene, maxAniso: number): GroundTex {
   const splat = new Float32Array(pos.count * 3);
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), z = pos.getZ(i);
-    pos.setY(i, groundHeight(x, z));
+    pos.setY(i, terrainHeight(x, z));
     const r = Math.hypot(x, z);
     const fire = Math.hypot(x - FIRE.x, z - FIRE.z);
     // Tallattu maa aukion keskellä ja nuotion ympärillä.
@@ -299,6 +389,7 @@ function buildGround(scene: THREE.Scene, maxAniso: number): GroundTex {
       const out = Math.max(Math.abs(lx) - f.hx, lz - f.front, -lz - f.back);
       dirt = Math.max(dirt, 1 - THREE.MathUtils.smoothstep(out + (noise2(x * 0.7, z * 0.7) - 0.5) * 1.2, 0.3, 2.2));
     }
+    if (LAKE) dirt = Math.max(dirt, (1 - THREE.MathUtils.smoothstep(pos.getY(i), WATER_LEVEL - 0.15, WATER_LEVEL + 0.3)) * 0.95);   // rantahiekka ja pohja
     dirt = THREE.MathUtils.clamp(dirt, 0, 1);
     const m = moisture(x, z) + (noise2(x * 0.9, z * 0.9) - 0.5) * 0.25;
     const moss = THREE.MathUtils.smoothstep(m, 0.42, 0.62) * THREE.MathUtils.smoothstep(r, SITE.shrub0 - 0.5, SITE.shrub1) * (1 - dirt);
@@ -396,6 +487,37 @@ function buildSky(scene: THREE.Scene, sunDir: THREE.Vector3) {
   return sky;
 }
 
+// ---------- Järven vesi ----------
+/** Tumma, hiljainen vesipinta: taivas heijastuu, pinta väreilee hitaasti. Pohja näkyy läpi rannassa. */
+function buildWater(scene: THREE.Scene, envMap: THREE.Texture) {
+  const geo = new THREE.PlaneGeometry(300, 300);
+  geo.rotateX(-Math.PI / 2);
+  const uTime = { value: 0 };
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x2a5560, roughness: 0.07, metalness: 0.1, envMap, envMapIntensity: 1.25, transparent: true, opacity: 0.84,
+  });
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = uTime;
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec2 vWp;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvWp = (modelMatrix * vec4(position, 1.0)).xz;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", "#include <common>\nuniform float uTime;\nvarying vec2 vWp;")
+      .replace(
+        "#include <normal_fragment_maps>",
+        `vec2 wp = vWp;
+        float wa = sin(wp.x * 1.3 + uTime * 0.9 + sin(wp.y * 0.7 + uTime * 0.5)) + sin(wp.y * 1.7 - uTime * 0.7 + wp.x * 0.4) + sin((wp.x + wp.y) * 3.1 + uTime * 1.6) * 0.5;
+        float wb = cos(wp.x * 1.1 - uTime * 0.6 + wp.y * 0.9) + cos(wp.y * 2.3 + uTime * 1.1) + cos((wp.x - wp.y) * 2.7 - uTime * 1.4) * 0.5;
+        normal = normalize(normal + (viewMatrix * vec4(wa * 0.02, 0.0, wb * 0.02, 0.0)).xyz);`,
+      );
+  };
+  const water = new THREE.Mesh(geo, mat);
+  water.position.y = WATER_LEVEL;
+  water.renderOrder = 1;
+  scene.add(water);
+  return { update(dt: number) { uTime.value += dt; } };
+}
+
 // ---------- Nuotion liekki ----------
 const FLAME_FRAG = `
   uniform float uTime; uniform float uSeed; varying vec2 vUv;
@@ -465,7 +587,9 @@ function makeSmoke(parent: THREE.Object3D, count: number, life: number, y0: numb
 function buildFire(scene: THREE.Scene) {
   const fy = groundHeight(FIRE.x, FIRE.z);
   const group = new THREE.Group();
+  const fs = SITE.fireScale ?? 1;
   group.position.set(FIRE.x, fy, FIRE.z);
+  group.scale.setScalar(fs);
   scene.add(group);
 
   // Kaksi lomittaista liekkitasoa, jotka kääntyvät kameraa kohti.
@@ -501,7 +625,7 @@ function buildFire(scene: THREE.Scene) {
   group.add(glow);
 
   const light = new THREE.PointLight(0xff8a3c, 9, 16, 1.5);
-  light.position.set(FIRE.x, fy + 0.9, FIRE.z);
+  light.position.set(FIRE.x, fy + 0.9 * fs, FIRE.z);
   scene.add(light);
 
   // Kipinät
@@ -519,6 +643,8 @@ function buildFire(scene: THREE.Scene) {
   group.add(embers);
 
   const smoke = makeSmoke(group, 22, 7, 1.2, 2.2, 0.16);
+  // Keittotulella padasta nousee ohut höyry (pata on 0,92 m korkeudella).
+  const steam = LAKE ? makeSmoke(group, 9, 3.4, 0.92 / fs, 0.5, 0.11) : null;
 
   let ft = 0;
   return {
@@ -542,6 +668,7 @@ function buildFire(scene: THREE.Scene) {
       }
       eGeo.attributes.position.needsUpdate = true;
       smoke(dt);
+      steam?.(dt);
     },
   };
 }
@@ -605,8 +732,9 @@ function populate(scene: THREE.Scene, protos: Map<string, Proto>, collision: Col
   const dummy = new THREE.Object3D();
   const batches = new Map<string, THREE.Matrix4[]>();
   let colliderId = 0;
-  const put = (key: string, x: number, z: number, scale: number, yaw: number, sink = 0, tilt = 0) => {
-    dummy.position.set(x, groundHeight(x, z) - sink, z);
+  const put = (key: string, x: number, z: number, scale: number, yaw: number, sink = 0, tilt = 0, opts: { wetOk?: boolean; y?: number } = {}) => {
+    if (!opts.wetOk && wet(x, z)) return;                     // ei puita, kiviä tai heinää veteen
+    dummy.position.set(x, opts.y ?? groundHeight(x, z) - sink, z);
     dummy.rotation.set(tilt * (r() - 0.5), yaw, tilt * (r() - 0.5));
     dummy.scale.setScalar(scale);
     dummy.updateMatrix();
@@ -627,7 +755,8 @@ function populate(scene: THREE.Scene, protos: Map<string, Proto>, collision: Col
     trees.push({ x, z });
     const m = moisture(x, z), k = r();
     let type: string;
-    if (k < 0.1) type = r() < 0.5 ? "birch_a" : "birch_b";
+    if (LAKE) type = k < 0.06 ? (r() < 0.5 ? "birch_a" : "birch_b") : k < 0.84 ? ["spruce_a", "spruce_b", "spruce_a", "spruce_young"][Math.floor(r() * 4)] : ["pine_a", "pine_b", "pine_c"][Math.floor(r() * 3)];
+    else if (k < 0.1) type = r() < 0.5 ? "birch_a" : "birch_b";
     else if (k < 0.1 + 0.42 * THREE.MathUtils.smoothstep(m, 0.38, 0.62) + 0.06) type = ["spruce_a", "spruce_b", "spruce_young"][Math.floor(r() * 3)];
     else type = ["pine_a", "pine_b", "pine_c"][Math.floor(r() * 3)];
     // Lähipuut heittävät varjon, kaukaiset eivät (säästää varjorenderöintiä).
@@ -652,7 +781,8 @@ function populate(scene: THREE.Scene, protos: Map<string, Proto>, collision: Col
     put(`rock_${1 + Math.floor(r() * 6)}@near`, x, z, s, r() * 6.28, 0.05, 0.3);
   }
   if (ARENA === "clearing") put("rock_3@near", OFFERING.x, OFFERING.z, 1.3, 0.7, 0.62);   // uhrikivi: sammaloitunut siirtolohkare
-  put("log@near", FIRE.x + 1.9, FIRE.z + 1.3, 0.75, 2.2, 0.02);       // istuinpuu nuotiolla
+  if (LAKE) put("istuinhirsi@near", FIRE.x - 1.75, FIRE.z + 0.35, 1, Math.PI / 2 + 0.2, 0.02);     // istuinhirsi keittotulella
+  else put("log@near", FIRE.x + 1.9, FIRE.z + 1.3, 0.75, 2.2, 0.02);       // istuinpuu nuotiolla
   for (let i = 0; i < 7; i++) {
     const a = r() * 6.28, d = SITE.treeMin + 0.8 + r() * 26;
     put("log@near", Math.cos(a) * d, Math.sin(a) * d, 0.7 + r() * 0.5, r() * 6.28, 0.04, 0.1);
@@ -693,9 +823,32 @@ function populate(scene: THREE.Scene, protos: Map<string, Proto>, collision: Col
     put(r() < 0.5 ? "fern_a" : "fern_b", x, z, 0.9 + r() * 0.8, r() * 6.28, 0.01);
   }
 
-  put("campfire@near", FIRE.x, FIRE.z, 1, 0.4, 0.02);
+  put(LAKE ? "keittopaikka@near" : "campfire@near", FIRE.x, FIRE.z, 1, LAKE ? 0 : 0.4, 0.02);
   if (ARENA === "clearing") {
     put("kota@near", KOTA.x, KOTA.z, 1, 2.45, 0.05);     // oviaukko aukiolle päin
+  } else if (LAKE) {
+    // Mökki oven kanssa rantaan päin, laituri, vene ja ruovikko; pihalla halkopino, pölkky, penkki ja kuivausteline.
+    place("mokki@near", CABIN, 0.04);
+    put("laituri@near", JETTY_AT.x, JETTY_AT.z, 1, 0, 0, 0, { y: JETTY_AT.y, wetOk: true });
+    put("vene@near", BOAT_AT.x, BOAT_AT.z, 1, BOAT_AT.yaw, 0, 0, { y: BOAT_AT.y, wetOk: true });
+    put("mela@near", BOAT_AT.x, BOAT_AT.z, 1, BOAT_AT.yaw, 0, 0, { y: BOAT_AT.y + 0.38, wetOk: true });
+    for (let i = 0; i < 46; i++) {
+      const x = -26 + r() * 52;
+      if (Math.abs(x - JETTY_AT.x) < 1.9 || Math.abs(x - BOAT_AT.x) < 2.6) continue;
+      const k = r();
+      put(k < 0.45 ? "ruoko_a@near" : k < 0.75 ? "ruoko_b@near" : "kaisla@near", x, waterlineZ(x) + 0.1 + r() * 1.6, 0.8 + r() * 0.5, r() * 6.28, 0.02, 0.1, { wetOk: true });
+    }
+    const at = (lx: number, lz: number) => fromLocal(CABIN, lx, lz);
+    const [wx, wz] = at(-3.3, 0.1);
+    put("pino@near", wx, wz, 1, CABIN.yaw + Math.PI / 2, 0.02);
+    put("haasia@near", RACK_LAKE.x, RACK_LAKE.z, 1, RACK_LAKE.yaw, 0.02);
+    const [cx, cz] = at(2.3, 2.9);
+    put("polkky@near", cx, cz, 1, 0.8, 0.02);
+    const [bx, bz] = at(1.35, 2.3);
+    put("penkki@near", bx, bz, 1, CABIN.yaw, 0.01);
+    put("kori@near", bx + 0.35, bz, 1, 0.9, 0, 0, { y: groundHeight(bx, bz) + 0.47 });
+    const [tx, tz] = at(-1.9, 2.3);
+    put("tuohikontti@near", tx, tz, 1, CABIN.yaw + 2.6, 0.01);
   } else {
     place("talo@near", HOUSE);
     if (ARENA === "homestead") place("kuoppatalo@near", PITHOUSE, 0);
@@ -824,6 +977,54 @@ function populateYardLife(scene: THREE.Scene, collision: CollisionWorld) {
   return Promise.all(jobs).then(() => undefined);
 }
 
+/** Rantakohtauksen väki: tietäjä seisoo keittotulen vieressä sauvaansa nojaten, koira lepäilee
+ *  tulen ja mökin välissä. */
+function populateLakeLife(scene: THREE.Scene, collision: CollisionWorld) {
+  const facing = (x: number, z: number, tx: number, tz: number) => Math.atan2(tx - x, tz - z);
+  const solid = (id: string, x: number, z: number, radius: number) =>
+    collision.add({ id: `folk:${id}`, kind: "circle", x, z, radius, blocksMovement: true, blocksMelee: false });
+  const jobs: Promise<void>[] = [];
+
+  const sx = FIRE.x + 1.45, sz = FIRE.z + 0.45;
+  jobs.push(spawnVillager(scene, {
+    url: villagersUrl, character: "tietaja", x: sx, y: groundHeight(sx, sz), z: sz, yaw: facing(sx, sz, FIRE.x, FIRE.z),
+    armR: { upper: [0.2, -1, 0.3], fore: [0.05, -0.1, 1] },
+    prop: { name: "sauva", hand: "R", kind: "staff", grip: GRIP_MALE_R },
+  }));
+  solid("tietaja", sx, sz, 0.4);
+
+  const dx = FIRE.x - 1.15, dz = FIRE.z - 1.2;
+  jobs.push(spawnAnimal(scene, { url: dogUrl, x: dx, y: groundHeight(dx, dz), z: dz, yaw: facing(dx, dz, FIRE.x, FIRE.z), behavior: "dog" }));
+  solid("koira", dx, dz, 0.3);
+
+  return Promise.all(jobs).then(() => undefined);
+}
+
+/** Rannan reunaan ja laiturin sivuille törmäykset: sankari voi kahlata matalassa mutta ei mene syvään veteen. */
+function addLakeColliders(collision: CollisionWorld) {
+  const cell = 0.9;
+  const deep = (x: number, z: number) => terrainHeight(x, z) < WATER_LEVEL - 0.1;
+  let id = 0;
+  for (let x = -44; x <= 44; x += cell) {
+    for (let z = -2; z <= 62; z += cell) {
+      if (!deep(x, z)) continue;
+      let edge = false;
+      for (const ox of [-cell, 0, cell]) for (const oz of [-cell, 0, cell]) if ((ox || oz) && !deep(x + ox, z + oz)) edge = true;
+      if (!edge) continue;
+      // Laiturin kohta jätetään auki.
+      if (Math.abs(x - JETTY_AT.x) < JETTY.half + 0.9 && z > JETTY_AT.z - 0.5 && z < JETTY_AT.z + JETTY.len + 1.0) continue;
+      collision.add({ id: `shore:${id++}`, kind: "circle", x, z, radius: 0.7, blocksMovement: true, blocksMelee: false });
+    }
+  }
+  // Laiturin reunat ja pää: kannelta ei pääse sivulle veteen.
+  const zc = JETTY_AT.z + (0.3 + JETTY.len) / 2;
+  for (const s of [-1, 1]) {
+    collision.add({ id: `jetty:rail${s}`, kind: "box", x: JETTY_AT.x + s * 1.4, z: zc, yaw: 0, halfX: 0.5, halfZ: (JETTY.len - 0.3) / 2, blocksMovement: true, blocksMelee: false });
+  }
+  collision.add({ id: "jetty:end", kind: "box", x: JETTY_AT.x, z: JETTY_AT.z + JETTY.len + 0.5, yaw: 0, halfX: 1.4, halfZ: 0.5, blocksMovement: true, blocksMelee: false });
+  return id;
+}
+
 export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): World {
   const maxAniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
@@ -850,6 +1051,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   scene.add(sun);
 
   const groundTex = buildGround(scene, maxAniso);
+  const water = LAKE ? buildWater(scene, envMap) : null;
   const protos = new Map<string, Proto>();
   const fire = buildFire(scene);
   const collision = new CollisionWorld();
@@ -858,14 +1060,22 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     blocksMovement: true, blocksMelee: true,
   });
   collision.addHazard({
-    id: "campfire", kind: "circle", x: FIRE.x, z: FIRE.z, radius: COLLISION.fireHazardRadius,
+    // Rantakohtauksen keittotuli on pieni ja rauhallinen: kivikehän vierestä ei pala.
+    id: "campfire", kind: "circle", x: FIRE.x, z: FIRE.z, radius: LAKE ? COLLISION.fireHazardRadius * 0.45 : COLLISION.fireHazardRadius,
     damagePerSecond: COLLISION.fireDamagePerSecond,
   });
   SITE.footprints.forEach((f, i) => addFootprintCollider(collision, `building:${i}`, f));
+  if (LAKE) addLakeColliders(collision);
 
-  // Talon savu nousee päädyn savuaukosta (pihapiiri).
+  // Talon savu nousee päädyn savuaukosta (pihapiiri) tai mökin kattoluukusta (ranta).
   let houseSmoke: ((dt: number) => void) | null = null;
-  if (HAS_YARD) {
+  if (LAKE) {
+    const [sx, sz] = fromLocal(CABIN, -0.9, -0.44);
+    const g = new THREE.Group();
+    g.position.set(sx, groundHeight(sx, sz), sz);
+    scene.add(g);
+    houseSmoke = makeSmoke(g, 12, 7, 3.5, 1.8, 0.09);
+  } else if (HAS_YARD) {
     const [sx, sz] = fromLocal(HOUSE, 5.0, 0);
     const g = new THREE.Group();
     g.position.set(sx, groundHeight(sx, sz), sz);
@@ -874,7 +1084,9 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   }
 
   const loader = new GLTFLoader();
-  const files = ARENA === "yard" ? [forestUrl, homesteadUrl, householdUrl, yardUrl] : HAS_YARD ? [forestUrl, homesteadUrl] : [forestUrl];
+  const files = ARENA === "yard" ? [forestUrl, homesteadUrl, householdUrl, yardUrl]
+    : LAKE ? [forestUrl, homesteadUrl, householdUrl, lakesideUrl]
+      : HAS_YARD ? [forestUrl, homesteadUrl] : [forestUrl];
   const ready = Promise.all(files.map((u) => loader.loadAsync(u))).then((gltfs) => {
     for (const gltf of gltfs) {
       for (const child of gltf.scene.children) {
@@ -890,6 +1102,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     const stats = populate(scene, protos, collision);
     (window as unknown as { __world: unknown }).__world = { ...stats, collision: collision.stats() };
     if (ARENA === "yard") return populateYardLife(scene, collision);
+    if (LAKE) return populateLakeLife(scene, collision);
   });
   ready.catch((e) => console.error("Maailman mallien lataus epäonnistui", e));
 
@@ -907,6 +1120,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     update(_t, dt, camera, focus) {
       fire.update(dt, camera);
       houseSmoke?.(dt);
+      water?.update(dt);
       updateFolk(dt, focus ?? null);
     },
   };

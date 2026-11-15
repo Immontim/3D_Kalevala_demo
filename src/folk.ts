@@ -202,6 +202,9 @@ export interface AnimalDef {
   ground?: (x: number, z: number) => number;
 }
 
+/** Koiran leikkeet kierrossa; ensimmäinen vaihto on istuminen, koska koira alkaa seisten. */
+const DOG_CYCLE = ["istuu", "seisoo", "tassu", "seisoo"];
+
 class Animal implements Living {
   readonly root = new THREE.Group();
   private mixer: THREE.AnimationMixer | null = null;
@@ -209,6 +212,7 @@ class Animal implements Living {
   private current = "";
   private nextSwitch = 6 + Math.random() * 8;
   private angle = Math.random() * Math.PI * 2;
+  private dogStep = 0;
 
   constructor(private def: AnimalDef, gltf: GLTF) {
     const model = def.node ? gltf.scene.getObjectByName(def.node) : gltf.scene;
@@ -243,14 +247,15 @@ class Animal implements Living {
     if (this.def.behavior === "dog") {
       this.nextSwitch -= dt;
       if (this.nextSwitch <= 0) {
-        const next = this.current === "seisoo" ? "istuu" : "seisoo";
+        // Koira vaihtaa vuorotellen asentoa: seisoo, istuu, seisoo, nostaa tassua.
+        const next = DOG_CYCLE[this.dogStep++ % DOG_CYCLE.length];
         const from = this.actions.get(this.current), to = this.actions.get(next);
-        if (from && to) {
+        if (from && to && from !== to) {
           to.reset().play();
           from.crossFadeTo(to, 0.6, false);
           this.current = next;
         }
-        this.nextSwitch = 9 + Math.random() * 9;
+        this.nextSwitch = next === "tassu" ? Math.max(3, (to?.getClip().duration ?? 2) * 2) : 9 + Math.random() * 9;
       }
     }
   }
