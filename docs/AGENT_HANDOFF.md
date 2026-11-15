@@ -11,6 +11,10 @@ Päivitetty: 2026-11-14 (Claude, Windows)
   talousesineet, tietäjä ja jousineito. Avoin branch
   `claude/villager-emanta` (vain malleja ja dokumentteja, ei pelikoodia;
   tarkista merge-tila `git merge-base --is-ancestor`).
+- **Versio v01.05.01**, branch `codex/sword-free-hand`, commit
+  `HEAD` (tämän muutoksen commit; tarkista merge-tila
+  `git merge-base --is-ancestor`). Mainissa on v01.05.00 sekä Clauden
+  talousesineet, tietäjä ja jousineito.
 - **Rakenne.** `src/engine/` on kohtaus- ja taistelumoottori, `src/ui/` sivun
   ikkunat (aloitus, tauko, säätö), `src/main.ts` vain käynnistys ja
   `src/debug.ts` savutestien `__game`. Säännöt ja luvut ovat yhä puhtaissa
@@ -31,32 +35,6 @@ Päivitetty: 2026-11-14 (Claude, Windows)
   `onEnemyDown`) päättää, keitä kentälle tuodaan (`addEnemy`). Moottori ei
   tiedä aalloista: aaltotaistelu on `skirmish.ts`, tyhjä kohtaus `peace`.
   Vaihto `startEncounter()`. Tuleva RPG-kerros kutsuu moottoria tätä kautta.
-- **Yksi vastaan monta** (luvut `combat.ts` `WAVES` ja `ENEMY_AI`, kaikki
-  Säätö-välilehdellä): `groupSize(wave)` antaa 1 / 2 (aalto 4–) / 3 (aalto
-  6–) vastustajaa, `groupHpScale` elämän kertoimen 0,6 / 0,45
-  (`EnemyDef.hpScale`). **Hyökkäysvuoro** (`ai.ts` `hasTurn`,
-  `mayStartAttack`): vain yksi vastustaja lyö kerrallaan, ja toinen saa
-  aloittaa aikaisintaan `attackGap` (0,5 s) edellisen iskun jälkeen.
-  Vuoroton pysyy `waitBack` (0,9 m) kauempana, vastustajat pitävät
-  `spread` (2,4 m) väliä ja kääntyvät takaisin, jos kulma pelaajan
-  katseesta ylittää `flankMax` (115°). Lukituksen kohde vaihtuu hiiren
-  rullalla (`cycleLock`, vasemmalta oikealle).
-- **Suoja-aika** (`COMBAT.graceBlock` 0,6 s, `graceParry` 1,0 s, `graceArc`
-  75°; `graceAfter`, `graceCovers`; `melee.ts` `resolveStrike`): torjunta
-  asettaa `Actor.graceUntil` ja `graceFrom`, ja sinä aikana muiden kuin
-  torjutun lyöjän osuma sektorin sisältä muuttuu torjunnaksi (tapahtuma
-  `…:blocked+suoja`). Ei koske horjuvaa eikä suohon juuttunutta.
-- **Tukiaskel ja osumahetki** (`COMBAT.strikePoint`, `melee.ts`
-  `updateCombatant`): lyöjä astuu `lunge` metriä eteen, ja isku ratkeaa
-  `strikePoint` (0,7) × release kohdalla. Kantama mitataan askeleen
-  lähtöpaikasta (`Actor.stepFrom`).
-- **Vapaa kääntyminen** (`aim.yaw`/`aim.pitch`, luvut `controls.ts`):
-  hiiri kääntää katsetta, sankari kääntyy sitä kohti nopeudella
-  `Stats.turnSpeed`, WASD liikkuu katseen suhteen. Lukitus (Tab /
-  keskinappi) on kytkin `aim.lockOn`. Vastustaja kääntyy kohti
-  `ai.seen`ia, joka seuraa pelaajaa `Stats.reaction` jäljessä.
-- **Torjuntasektorit** (`WEAPONS.*.blockArc` π/4 = ±45°,
-  `SHIELDS.round.blockArc` π/3 = ±60°; omistajan päätös 2026-11-14).
 - **Kaksi taistelupaikkaa** (`src/world.ts`): `ARENA` on tällä latauksella
   käytössä oleva paikka (`"clearing"` = nuotioaukio, `"homestead"` =
   pihapiiri), luettu avaimesta `laulun-miekka.arena.v1`. Maailma
@@ -108,6 +86,45 @@ Päivitetty: 2026-11-14 (Claude, Windows)
   pöydälle ja penkille ovat jo `PROP_COLLIDERS`issa. Mallit on tarkistettu
   vain Blenderin kuvista (hahmot myös kädet alhaalla), ei pelin valossa
   eikä liikkeessä; materiaalit `M_HH_*` ja `F_Weave` pitää ottaa mukaan
+  skriptissä ja `world.ts`:ssä. Rakennusten törmäykset ovat proxy-muotoja;
+  kamera pidetään lisäksi säteen `camMaxR` 12,2 sisällä (`World.clearCamera`).
+  Materiaalien sävyt viritetään pelin valoon `prepareMaterials`issa.
+  Skripti ajettiin taustalla (`blender --background --factory-startup
+  --python`), koska Blender MCP:n taustatyökalu ei löydä Blenderiä
+  (`BLENDER_PATH` puuttuu) ja avoimessa Blenderissä oli tallentamaton
+  `characters.blend`.
+- **Talousesineet** (malli `assets/household.glb`, 1,4 Mt, 19 000 kolmiota;
+  skripti `assets-src/blender/household.py`, ajetaan taustalla, lukee ensin
+  `homestead.py`:n): `pukkipoyta`, `penkki`, `tuohikontti`, `pata`,
+  `rieska`, `nauriit`, `kuivakalat`, `lyhde`, `kulho`, `kuppi`, `kauha`,
+  `lautanen`, `kori` ja `poyta_kattaus` (pöydälle katetut esineet yhtenä
+  mallina, origo sama kuin pöydällä; pöytälevyn pinta 0,76 m). Malli on
+  mainissa, mutta peli ei vielä lataa sitä. Verteksivärit ovat lineaarisia: skriptin `HH`
+  muuntaa sRGB-arvot. Tarkistettu vain Blenderin EEVEE-kuvista, ei pelin
+  valossa; materiaalit `M_HH_*` pitää ottaa mukaan `prepareMaterials`iin.
+  Tulikivet ja tuhka ovat tasaisen harmaita ilman tekstuuria.
+- **Kyläläiset** (`assets/villagers.glb`, 2,2 Mt; skripti `char_folk.py`
+  → `run_folk()` tiedostossa `characters.blend`): `char_tietaja`
+  (29 700 kolmiota, sama `RIG` ja luiden nimet kuin taistelijoilla) ja
+  `sauva` (ote origossa, linnunpää -Y, nokka +Z; ei luurankoa). Viitta ja
+  kanteleen kotelo on painotettu vartaloon, ei käsiin: vasen käsi pidetään
+  viitan alla sivulla, oikea on vapaa sauvalle. Lepoasennossa (kädet
+  levällään) vasen käsi tulee viitan läpi, mikä on tarkoituksellista.
+  Uusi hahmo: oma `build_…` ja rivi `run_folk`iin.
+- **Naishahmot** (`assets/villagers_f.glb`, 2,0 Mt): `char_jousineito`
+  (27 900 kolmiota) ja `jousi` (ote origossa, lavat Z-suunnassa, jänne +Y).
+  Naisvartalo (Human Base Meshes, skaalattu miehen pituiseksi ×1,026 ja
+  hieman muotoiltu, `shape_body_f`) käyttää **omaa luurankoa**: Blenderissä
+  `RIG_F`, tiedostossa nimellä `RIG`, samat 17 luun nimet mutta eri
+  lepoasento (pidemmät jalat, kädet jyrkemmin alas). Siksi naiset ovat
+  omassa tiedostossaan. Pelin pitää pienentää hahmoa sijoittaessaan (noin
+  0,95), ja `GRIP_CHANNEL` (keihäsote) on mitattu miehen kädestä eikä käy
+  naiselle. Olkaviitta on painotettu vartaloon: kädet alhaalla toimii,
+  jousen jännitys toisi käsivarret viitan läpi. Emäntä tehdään samalle
+  pohjalle (`Ctx(FEM…)`, `fitted_skirt`).
+- **Mitään näistä tiedostoista peli ei vielä lataa.** Tarkistettu vain
+  Blenderin kuvista (hahmot myös kädet alhaalla), ei pelin valossa eikä
+  liikkeessä; materiaalit `M_HH_*` ja `F_Weave` pitää ottaa mukaan
   `prepareMaterials`iin.
 - **Rauhallisen pihakohtauksen suunnitelma** (omistaja hyväksyi 2026-11-14):
   tehty 1 talousesineet, 3 tietäjä, 4 jousineito ja 5 emäntä. Jäljellä:
@@ -131,6 +148,10 @@ Päivitetty: 2026-11-14 (Claude, Windows)
   kulmat jalan paikasta, joten maassa oleva jalka ei liu'u. `animate`n
   `moveSpeed` kertoo, onko liike kävelyä: iskun työntö ja väistö eivät
   askella. Mittari: `__game.feet`.
+- **Kilvetön miekkamies** (`src/fighter.ts`, `SWORD_FREE_ARM`) käyttää
+  vartiossa, lyönneissä ja torjunnoissa omia vasemman käden asentoja.
+  Vapaa käsi toimii lyöntien vastapainona ja saa kävelystä sekä hengityksestä
+  pienen lisäliikkeen. Kilpi- ja keihäsasennot eivät muutu.
 - **Kaikki pelin luvut ovat parametritaulukoissa**, eikä uusia lukuja
   kovakoodata moottoriin: `src/combat.ts` (`CHARACTERS`, `WAVES`,
   `STAMINA`, `COMBAT`, `ENEMY_AI` sekä alla kuvatut `STRIKES`, `WEAPONS`,
@@ -164,9 +185,6 @@ Päivitetty: 2026-11-14 (Claude, Windows)
   - `makeAttack(ase, suunta, paino)` yhdistää nämä. Vahinko =
     lyöjän voima (`Actor.stats.power`) × ase × isku. Uusi aselaatu on uusi rivi
     `WEAPONS`-taulukkoon; hajontaa ei vielä ole.
-- **Säännöt:** kilpi torjuu aseiskut ja kuluu (kevyt 1, raskas 2;
-  täydellinen torjunta ei kuluta). Aseella torjunta onnistuu vain, jos
-  torjunta-asento vastaa iskun suuntaa. Raskas isku ei murra torjuntaa.
 - **Kilpityöntö** (`BASH`, `shouldShieldBash`, `melee.ts`): vain kilvellinen
   Pohjan soturi osaa käyttää sitä; lähietäisyydellä satunnainen valinta on
   12 % AI:n päätöksistä, ja pitkään torjuvaa vastaan valinta on
@@ -204,22 +222,19 @@ Päivitetty: 2026-11-14 (Claude, Windows)
   `.blend`-tiedostot eivät ole Gitissä, eikä lähdemallien tuontia
   SRC-kokoelmaan ole skriptattu.
 - **Koodi valmis ja mainissa:** v01.05.00. GitHub Pages julkaisee mainin
+- **Koodi valmis:** v01.05.01 branchissa `codex/sword-free-hand`.
+  **Ei deployattu:** GitHub Pages julkaisee mainin mergen jälkeen
   (Actions-ajo "Julkaise GitHub Pagesiin"). **Omistaja testaa julkaistusta
   osoitteesta**, ei dev-serveriltä.
-- **Käsin testattu 2026-11-14** in-app browserissa: peli käynnistyi,
-  maailma ja hahmot piirtyivät, 60 FPS, ei konsolivirheitä. Puhtaat testit
-  varmentavat liukumisen, pitkän väistön pysähtymisen, seinää vasten
-  puristumisen, iskuesteen ja lämpökehän. **Ei testattu käsin:** kaikkien
-  mallikohtaisten törmäysmittojen istuvuus, buildattu preview, hitaampi kone.
-- **Komennot 2026-11-14:** `bun run test` 161/161, `bun run lint` ja
-  `bun run build` ok. Build varoittaa ennestään yli 500 kt:n JS-palasta.
+- **Käsin testattu 2026-11-14** in-app browserissa: kilvettömän miekkamiehen
+  vartioasento, ylälyönnin vastapainoliike ja palautuminen; maailma ja hahmot
+  piirtyivät, 60 FPS, ei konsolivirheitä. Kilpi- ja keihäsasentoja ei muutettu.
+- **Komennot 2026-11-14:** `bun run test` 168/168, `bun run lint`,
+  `bun run build` ja `git diff --check` ok. Build varoittaa ennestään yli
+  500 kt:n JS-palasta.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
-- Savutestien apuna `window.__game` (`src/debug.ts`, lue sieltä koko
-  lista): `tick(n, dt)` ajaa peliä askelin ruudunpäivityksestä riippumatta,
-  `skipTo(n)`, `state`, `events` (`kuka:isku/paino:tulos`), `enemies`,
-  `addEnemy`, `encounter("peace")`, `setHp`, `setLock`, `placePlayer`,
-  `showcase`, `setCamera`. Selainpaneeli pysäyttää pelin, kun se menettää
-  fokuksen: kutsu `autoPause(false)` jokaisen latauksen jälkeen.
+- Savutestien apuna on `window.__game`; koko lista ja käyttö ovat
+  `src/debug.ts`:ssä. Selainpaneelin fokus voi pysäyttää pelin.
 
 ## Tunnetut rajoitteet ja riskit
 
@@ -266,6 +281,22 @@ Päivitetty: 2026-11-14 (Claude, Windows)
   Keihäsmiehen torjunta näyttää samalta kaikissa kolmessa asennossa.
 - **Kypärä:** sama metallilevytekstuuri kuin muissa osissa, kupu sileä.
 - **Suon reunus** näkyy läheltä erillisenä kumpuna. Muta ei heijasta hahmoja.
+  kaatuneen varusteet voivat lentää aidan läpi;
+  punosaita on sileä levy, jonka punos on tekstuuria; sisätilat ovat
+  mustia laatikoita; kuoppatalon kuilun reunassa maaston ja mallin raja
+  on jyrkkä. Patsasaitta ja luukulliset valoaukot ovat uskottavia mutta
+  eivät Suomen varhaisrautakaudelta todistettuja; hirsisalvosta ja
+  savupiippua ei ole käytetty, koska ne ovat myöhempiä. Paikan vaihto
+  lataa sivun uudelleen eikä onnistu kesken pelin.
+- **Asennot on viritetty silmämääräisesti** kuvakaappauksista. Kilvettömän
+  miekkamiehen vapaa käsi on nyt dynaamisempi, mutta kaikkien iskujen
+  luonnollisuus pitää vielä arvioida tavallisessa pelissä. Raskaalla
+  sivalluksella ja pistolla ei ole omaa asentoa (sama kuin kevyellä), ja
+  keihäsmiehen torjunta näyttää samalta kaikissa kolmessa asennossa.
+- **Kypärän tekstuuri** on sama metallilevy kuin muissa osissa, ja kupu on
+  melko sileä; lentävä kypärä voi pudota puun tai kiven läpi (ei törmäyksiä).
+- **Suon reunus** on erillinen kumpu maan päällä: sen ulkoreunan ja
+  tallatun maan raja näkyy läheltä. Muta ei heijasta hahmoja.
 - **Hahmojen avoimet viat:** kasvot ilman tekstuuria, rengaspanssari varjossa
   lähes musta, tukeva vartalo, hiukset sileä "verho", peukalo ei kierry
   kahvan ympäri, helma voi venyä haara-asennossa.
@@ -273,13 +304,14 @@ Päivitetty: 2026-11-14 (Claude, Windows)
   laatuasetusta ei ole. Metsässä 2 milj. kolmiota, hahmoissa 28 000 / kpl.
 - Metsän avoimet viat: kodan oviaukko, ruskea uhrikivi, paperiset
   latvukset vastavalossa, ei tuulta.
+  latvukset vastavalossa ja tuulen puute.
 - Blender-skriptien polut on kovakoodattu (`C:\Data\3D Kalevala`).
 - Osumat ratkaistaan etäisyyden ja kulman perusteella, ei terän liikeradasta.
 
 ## Seuraava tehtävä
 
-Omistaja kokeilee julkaistusta v01.05.00-versiosta kiven, nuotion, aidan ja
-seinää vasten ahdistamisen sekä arvioi lämpökehän ja 10 vahingon/s tuntuman.
+Omistaja kokeilee julkaistusta v01.05.01-versiosta kilvettömän miekkamiehen
+vasemman käden luonnollisuuden vartiossa, liikkeessä ja eri iskuissa.
 
 ## Ei vielä aloiteta
 

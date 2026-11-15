@@ -753,7 +753,21 @@ export class Fighter {
       this.setBone(`hand_${side}`, hand ? fo.multiply(hand) : fo);
     };
     arm("R", p.rShX, p.rShZ, p.rEl, qB.setFromEuler(eul.set(p.rHandX, p.rHandY, 0, "YXZ")).clone());
-    arm("L", p.lShX, p.lShZ, p.lEl, null);
+    // Yhden käden miekalla vapaa vasen käsi ei kanna kilpeä: se saa hengityksen ja
+    // askelen mukana pienen oman vastaliikkeen sekä rennomman ranteen. Varsinaiset
+    // lyöntikohtaiset vastapainoasennot tulevat SWORD_FREE_ARM-taulukosta.
+    const freeSword = this.look.loadout === "sword";
+    const freeSwing = freeSword
+      ? (-this.leftX * leftLead * 0.09 * w * dir.y + idle * 0.045 * calm) * life
+      : 0;
+    const freeHand = freeSword
+      ? qB.slerpQuaternions(
+        IDENT,
+        qA.setFromEuler(eul.set(-0.14 + idle * 0.035 * calm, this.leftX * 0.2, -this.leftX * 0.08)),
+        life,
+      ).clone()
+      : null;
+    arm("L", p.lShX + freeSwing, p.lShZ - freeSwing * 0.35, p.lEl - Math.abs(freeSwing) * 0.3, freeHand);
     eul.order = "XYZ";
     if (this.shieldHolder) {
       // Levossa ranne antaa periksi ja kilpi roikkuu kahvastaan pystyssä kyljellä, pinta ulospäin
@@ -842,7 +856,8 @@ export class Fighter {
     // Kilpikäsi: kilpi pysyy vartalon edessä ja nousee torjunnassa eteen, ei pään päälle.
     const over = this.hasShield
       ? (BLOCK_POSES.has(target) ? SHIELD_BLOCK : SHIELD_ARM.has(target) ? SHIELD_GUARD : null)
-      : this.look.loadout === "spear" ? SPEAR.get(target) ?? null : null;
+      : this.look.loadout === "spear" ? SPEAR.get(target) ?? null
+        : this.look.loadout === "sword" ? SWORD_FREE_ARM.get(target) ?? null : null;
     this.shieldHang += ((SHIELD_FRONT.has(target) ? 0 : 1) - this.shieldHang) * k;
     const strideWas = this.pose.stride;
     for (const key of KEYS) {
@@ -945,6 +960,25 @@ const SHIELD_FRONT = new Set<Pose>([...BLOCK_POSES, POSES.bashWindup, POSES.bash
 const SHIELD_ARM = new Set<Pose>([
   POSES.guard, POSES.windup, POSES.strike, POSES.heavyWindup, POSES.heavyStrike,
   POSES.slashWindup, POSES.slashStrike, POSES.thrustWindup, POSES.thrustStrike,
+]);
+
+// Kilvettömän miekkamiehen vapaa käsi. Perusasennossa käsi jää suojaamaan
+// keskivartaloa, mutta lyöntien nostoissa ja läpivienneissä se toimii vastapainona
+// eikä jää samaan kilpeä varten tehtyyn kulmaan. Vain vasemman käden kentät
+// korvataan; vartalo, jalat ja asekäsi käyttävät yhteisiä POSES-arvoja.
+const SWORD_FREE_ARM = new Map<Pose, Partial<Pose>>([
+  [POSES.guard, { lShX: -0.38, lShZ: 0.42, lEl: -1.05 }],
+  [POSES.windup, { lShX: -0.55, lShZ: 0.62, lEl: -1.0 }],
+  [POSES.strike, { lShX: 0.12, lShZ: 0.78, lEl: -0.72 }],
+  [POSES.heavyWindup, { lShX: -0.52, lShZ: 0.68, lEl: -1.08 }],
+  [POSES.heavyStrike, { lShX: 0.2, lShZ: 0.82, lEl: -0.74 }],
+  [POSES.slashWindup, { lShX: -0.7, lShZ: 0.58, lEl: -0.96 }],
+  [POSES.slashStrike, { lShX: 0.18, lShZ: 0.92, lEl: -0.68 }],
+  [POSES.thrustWindup, { lShX: -0.82, lShZ: 0.5, lEl: -0.92 }],
+  [POSES.thrustStrike, { lShX: 0.02, lShZ: 0.78, lEl: -0.78 }],
+  [POSES.block, { lShX: -0.62, lShZ: 0.62, lEl: -1.0 }],
+  [POSES.blockSide, { lShX: -0.48, lShZ: 0.68, lEl: -1.04 }],
+  [POSES.blockThrust, { lShX: -0.72, lShZ: 0.55, lEl: -0.92 }],
 ]);
 
 // Keihäs: vartalon asento (kierto, kyyry, haara-asento) tulee näistä; kädet vie otteeseen
