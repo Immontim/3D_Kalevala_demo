@@ -1,7 +1,8 @@
 import { createCampaign, parseCampaign, serializeCampaign, type CampaignState } from "./campaign";
 import { PROTOTYPE_MAP_ID, PROTOTYPE_START } from "./prototype";
 
-export const CAMPAIGN_STORE = "laulun-miekka.campaign.v1";
+export const CAMPAIGN_STORE = "laulun-miekka.campaign.v2";
+export const LEGACY_CAMPAIGN_STORE = "laulun-miekka.campaign.v1";
 
 export interface CampaignStorage {
   getItem(key: string): string | null;
@@ -22,8 +23,20 @@ function compatible(state: CampaignState): boolean {
 
 export function loadCampaign(storage?: CampaignStorage): CampaignState {
   try {
-    const loaded = parseCampaign((storage ?? localStorage).getItem(CAMPAIGN_STORE));
-    return loaded && compatible(loaded) ? loaded : newCampaign();
+    const target = storage ?? localStorage;
+    const current = parseCampaign(target.getItem(CAMPAIGN_STORE));
+    if (current && compatible(current)) return current;
+    const legacy = parseCampaign(target.getItem(LEGACY_CAMPAIGN_STORE));
+    if (legacy && compatible(legacy)) {
+      // Kelvollinen vanha tallennus on arvokkaampi kuin migraation kirjoitus.
+      // Yksityisessä selaustilassa set/remove voi epäonnistua, mutta peli saa silti jatkua.
+      try {
+        target.setItem(CAMPAIGN_STORE, serializeCampaign(legacy));
+        target.removeItem(LEGACY_CAMPAIGN_STORE);
+      } catch { /* migraatio yritetään uudelleen seuraavalla latauksella */ }
+      return legacy;
+    }
+    return newCampaign();
   } catch {
     return newCampaign();
   }
@@ -40,7 +53,9 @@ export function saveCampaign(state: CampaignState, storage?: CampaignStorage): b
 
 export function clearCampaign(storage?: CampaignStorage): boolean {
   try {
-    (storage ?? localStorage).removeItem(CAMPAIGN_STORE);
+    const target = storage ?? localStorage;
+    target.removeItem(CAMPAIGN_STORE);
+    target.removeItem(LEGACY_CAMPAIGN_STORE);
     return true;
   } catch {
     return false;

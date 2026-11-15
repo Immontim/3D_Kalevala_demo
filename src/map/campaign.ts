@@ -1,11 +1,11 @@
-// Pysyvä kampanjatila: maailmankartta, nälkä, tuohikontti ja varusteet.
+// Pysyvä kampanjatila: maailmankartta, kylläisyys, inventaario ja varusteet.
 // Moduuli on selaimesta ja Three.js:stä riippumaton, jotta tallennus voidaan validoida testeissä.
 import type { Loadout } from "../combat";
 import type { TextKey } from "../i18n";
 
-export const CAMPAIGN_SCHEMA_VERSION = 1 as const;
+export const CAMPAIGN_SCHEMA_VERSION = 2 as const;
 export const INVENTORY_CAPACITY = 8;
-export const HUNGER_MAX = 100;
+export const SATIETY_MAX = 100;
 
 export type FoodId = "barley_flatbread" | "dried_fish";
 export type EquipmentItemId = "sword" | "spear" | "round_shield";
@@ -15,7 +15,7 @@ export interface ItemDefinition {
   id: ItemId;
   nameKey: TextKey;
   stackMax: number;
-  hungerRelief?: number;
+  satietyGain?: number;
   equipmentSlot?: "mainHand" | "offHand";
 }
 
@@ -24,13 +24,13 @@ export const ITEMS: Record<ItemId, ItemDefinition> = {
     id: "barley_flatbread",
     nameKey: "map.item.barleyFlatbread",
     stackMax: 6,
-    hungerRelief: 24,
+    satietyGain: 24,
   },
   dried_fish: {
     id: "dried_fish",
     nameKey: "map.item.driedFish",
     stackMax: 4,
-    hungerRelief: 38,
+    satietyGain: 38,
   },
   sword: { id: "sword", nameKey: "map.item.sword", stackMax: 1, equipmentSlot: "mainHand" },
   spear: { id: "spear", nameKey: "map.item.spear", stackMax: 1, equipmentSlot: "mainHand" },
@@ -63,7 +63,8 @@ export interface CampaignWorld {
 }
 
 export interface CampaignPlayer {
-  hunger: number;
+  /** 100 = kylläinen, 0 = nääntynyt. Kylläisyys ei itsessään tapa. */
+  satiety: number;
   inventory: Inventory;
   equipment: Equipment;
 }
@@ -96,7 +97,7 @@ export function createCampaign(start: CampaignStart = {}): CampaignState {
     schemaVersion: CAMPAIGN_SCHEMA_VERSION,
     world: { mapId: start.mapId ?? "prototype", width, height, x, y, discovered, worldMinutes: 0 },
     player: {
-      hunger: 0,
+      satiety: SATIETY_MAX,
       inventory: {
         capacity: INVENTORY_CAPACITY,
         stacks: [
@@ -113,7 +114,9 @@ export function createCampaign(start: CampaignStart = {}): CampaignState {
 export function consumeFood(state: CampaignState, itemId: FoodId): { state: CampaignState; consumed: boolean } {
   const def = ITEMS[itemId];
   const i = state.player.inventory.stacks.findIndex((stack) => stack.itemId === itemId && stack.quantity > 0);
-  if (state.player.hunger <= 0 || i < 0 || def.hungerRelief === undefined) return { state, consumed: false };
+  if (state.player.satiety >= SATIETY_MAX || i < 0 || def.satietyGain === undefined) {
+    return { state, consumed: false };
+  }
   const stacks = state.player.inventory.stacks.map((stack, index) =>
     index === i ? { ...stack, quantity: stack.quantity - 1 } : { ...stack });
   return {
@@ -122,7 +125,7 @@ export function consumeFood(state: CampaignState, itemId: FoodId): { state: Camp
       ...state,
       player: {
         ...state.player,
-        hunger: clamp(state.player.hunger - def.hungerRelief, 0, HUNGER_MAX),
+        satiety: clamp(state.player.satiety + def.satietyGain, 0, SATIETY_MAX),
         inventory: { ...state.player.inventory, stacks: stacks.filter((stack) => stack.quantity > 0) },
       },
     },
@@ -159,9 +162,22 @@ export function parseCampaign(value: unknown): CampaignState | null {
   if (typeof value === "string") {
     try { data = JSON.parse(value); } catch { return null; }
   }
-  if (!isRecord(data) || data.schemaVersion !== CAMPAIGN_SCHEMA_VERSION) return null;
-  if (!validWorld(data.world) || !validPlayer(data.player)) return null;
-  return cloneCampaign(data as unknown as CampaignState);
+  if (!isRecord(data) || !validWorld(data.world)) return null;
+  if (data.schemaVersion === CAMPAIGN_SCHEMA_VERSION && validPlayer(data.player)) {
+    return cloneCampaign(data as unknown as CampaignState);
+  }
+  if (data.schemaVersion === 1 && validLegacyPlayer(data.player)) {
+    return cloneCampaign({
+      schemaVersion: CAMPAIGN_SCHEMA_VERSION,
+      world: data.world,
+      player: {
+        satiety: SATIETY_MAX - data.player.hunger,
+        inventory: data.player.inventory,
+        equipment: data.player.equipment,
+      },
+    });
+  }
+  return null;
 }
 
 function validWorld(value: unknown): value is CampaignWorld {
@@ -176,10 +192,22 @@ function validWorld(value: unknown): value is CampaignWorld {
 }
 
 function validPlayer(value: unknown): value is CampaignPlayer {
-  if (!isRecord(value) || typeof value.hunger !== "number" || !Number.isFinite(value.hunger)
-    || value.hunger < 0 || value.hunger > HUNGER_MAX) return false;
+  if (!isRecord(value) || typeof value.satiety !== "number" || !Number.isFinite(value.satiety)
+    || value.satiety < 0 || value.satiety > SATIETY_MAX) return false;
   if (!validInventory(value.inventory) || !validEquipment(value.equipment)) return false;
   return true;
+}
+
+interface LegacyCampaignPlayer {
+  hunger: number;
+  inventory: Inventory;
+  equipment: Equipment;
+}
+
+function validLegacyPlayer(value: unknown): value is LegacyCampaignPlayer {
+  if (!isRecord(value) || typeof value.hunger !== "number" || !Number.isFinite(value.hunger)
+    || value.hunger < 0 || value.hunger > SATIETY_MAX) return false;
+  return validInventory(value.inventory) && validEquipment(value.equipment);
 }
 
 function validInventory(value: unknown): value is Inventory {
@@ -209,7 +237,7 @@ function cloneCampaign(state: CampaignState): CampaignState {
     schemaVersion: CAMPAIGN_SCHEMA_VERSION,
     world: { ...state.world, discovered: [...state.world.discovered] },
     player: {
-      hunger: state.player.hunger,
+      satiety: state.player.satiety,
       inventory: { capacity: INVENTORY_CAPACITY, stacks: state.player.inventory.stacks.map((stack) => ({ ...stack })) },
       equipment: { ...state.player.equipment },
     },

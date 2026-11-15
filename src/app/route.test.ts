@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { mapUrl, parseAppRoute, sceneUrl } from "./route";
+import { mapUrl, parseAppRoute, sceneKind, sceneUrl } from "./route";
 
 describe("sovelluksen reitit", () => {
+  it("luokittelee nuotioaukion ja pihapiirin taisteluiksi mutta rauhallisen pihan ystävälliseksi", () => {
+    expect(sceneKind("clearing")).toBe("battle");
+    expect(sceneKind("homestead")).toBe("battle");
+    expect(sceneKind("yard")).toBe("friendly");
+  });
+
   it("hyväksyy vain tunnetut 3D-paikat", () => {
     expect(parseAppRoute("https://example.test/game/?scene=clearing")).toEqual({
       mode: "scene", scene: "clearing", returnToMap: false,

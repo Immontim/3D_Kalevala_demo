@@ -20,6 +20,7 @@ import { updateShowcase } from "./showcase";
 import { choosing, closeChoice, closeSong, songState, updateChoice, updateSong } from "./song";
 import { aim, bindUi, fx, g, inputs } from "./state";
 import { camera, canvas, composer, world } from "./view";
+import { createEmptySceneReturn, saveSceneReturn } from "../map/transition";
 
 export function onPlayerDeath() {
   g.gameOver = true;
@@ -52,6 +53,7 @@ export function restart() {
 export function toStartMenu() {
   const route = parseAppRoute(location.href);
   if (route.mode === "scene" && route.returnToMap) {
+    saveSceneReturn(createEmptySceneReturn(route.scene));
     location.href = mapUrl(location.href).href;
     return;
   }

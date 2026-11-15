@@ -1,16 +1,22 @@
 import atlasUrl from "../../assets/map/kalevala-map-atlas.png?url";
+import paperDollUrl from "../../assets/map/paper-doll-hero.png?url";
+import redHandUrl from "../../assets/map/red-hand-site.png?url";
+import satietyFacesUrl from "../../assets/map/satiety-faces.png?url";
 import { VERSION } from "../version";
 import { getLanguage, setLanguage, t } from "../i18n";
-import { mapUrl, sceneUrl } from "../app/route";
+import { mapUrl, sceneKind, sceneUrl, type SceneId } from "../app/route";
 import { combatLoadout, consumeFood, ITEMS, setEquipped, type CampaignState, type FoodId } from "./campaign";
 import { createWorldMapState, mapCell, moveOnMap, type MapDirection, type TerrainId } from "./domain";
 import { PROTOTYPE_MAP } from "./prototype";
-import { clearCampaign, loadCampaign, saveCampaign } from "./storage";
+import { clearCampaign, loadCampaign, newCampaign, saveCampaign } from "./storage";
+import { consumeSceneReturn } from "./transition";
+import { satietyBand, sceneForMapSite } from "./uiState";
 
 const TILE = 48;
-const VIEW_COLS = 13;
-const VIEW_ROWS = 11;
+const VIEW_COLS = 17;
+const VIEW_ROWS = 13;
 const MOON_PHASE_MINUTES = 180;
+const SCENE_SHORTCUTS = ["yard", "clearing", "homestead"] as const satisfies readonly SceneId[];
 
 const TERRAIN_FRAME: Record<TerrainId, [number, number]> = {
   water: [0, 0],
@@ -26,7 +32,8 @@ const HERO_FRAME: Record<MapDirection, [number, number]> = {
 
 let campaign: CampaignState;
 let facing: MapDirection = "down";
-let inventoryOpen = false;
+let settingsOpen = false;
+let settingsReturnFocus: HTMLElement | null = null;
 let message = "";
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) {
@@ -51,7 +58,7 @@ function buildUi(root: HTMLElement) {
 
   const layout = h("div", "map-layout");
   const status = h("aside", "map-panel map-status");
-  status.innerHTML = `<h2>${t("map.journey")}</h2><canvas id="moonCanvas" width="72" height="72" aria-label="${t("map.moon")}"></canvas><div id="mapTime"></div><div id="hungerFace" aria-live="polite"></div><div id="hungerText"></div><p class="map-help">${t("map.help")}</p>`;
+  status.innerHTML = `<h2>${t("map.journey")}</h2><canvas id="moonCanvas" width="72" height="72" aria-label="${t("map.moon")}"></canvas><div id="mapTime"></div><h3>${t("map.satiety")}</h3><div id="satietyFace" class="satiety-face" role="img"><span class="satiety-eyes" aria-hidden="true"></span><span class="satiety-mouth" aria-hidden="true"></span></div><div id="satietyText" role="status" aria-live="polite"></div><p class="map-help">${t("map.help")}</p>`;
 
   const mapFrame = h("section", "map-frame");
   const canvas = h("canvas") as HTMLCanvasElement;
@@ -61,27 +68,34 @@ function buildUi(root: HTMLElement) {
   canvas.setAttribute("aria-label", t("map.canvasLabel"));
   mapFrame.append(canvas);
 
-  const pack = h("aside", "map-panel map-pack");
-  pack.innerHTML = `<h2>${t("map.pack")}</h2><div id="packSummary"></div><button id="openPack" type="button">${t("map.openPack")}</button><div class="map-equipment-summary"><h3>${t("map.equipment")}</h3><div id="equipmentSummary"></div></div>`;
-  layout.append(status, mapFrame, pack);
+  const paper = h("aside", "map-panel map-paper");
+  const armourSlots = [
+    "map.slot.headwear", "map.slot.shirt", "map.slot.gloves", "map.slot.trousers", "map.slot.shoes",
+  ] as const;
+  const armourSlotHtml = armourSlots
+    .map((key) => `<div class="paper-armour-slot"><i aria-hidden="true">◇</i><span>${t(key)}</span></div>`)
+    .join("");
+  paper.innerHTML = `<h2>${t("map.paperDoll")}</h2><div class="paper-figure"><div class="paper-armour" aria-label="${t("map.clothingSlots")}">${armourSlotHtml}</div><div class="hero-portrait" aria-hidden="true"></div><div class="paper-hands"><label class="paper-hand paper-main-hand"><span>${t("map.mainHand")}</span><select id="mainHand"><option value="sword">${t("map.item.sword")}</option><option value="spear">${t("map.item.spear")}</option></select></label><label class="paper-hand paper-off-hand"><span>${t("map.offHand")}</span><select id="offHand"><option value="round_shield">${t("map.item.roundShield")}</option><option value="">${t("map.empty")}</option></select></label></div></div><div id="equipmentSummary" class="equipment-summary"></div><h3>${t("map.items")}</h3><div id="inventorySlots" class="inventory-slots"></div><p class="paper-hint">${t("map.foodHint")}</p>`;
+  layout.append(status, mapFrame, paper);
 
   const footer = h("footer", "map-footer");
   footer.innerHTML = `<span id="mapMessage"></span><span>${VERSION}</span>`;
-  const modal = h("div", "map-modal hidden");
-  modal.id = "packModal";
-  modal.innerHTML = `<div class="map-modal-card"><button id="closePack" class="map-close" type="button" aria-label="${t("map.close")}">×</button><h2>${t("map.heroAndPack")}</h2><div class="paper-layout"><section class="paper-doll"><div class="hero-portrait" aria-hidden="true"></div><label>${t("map.mainHand")}<select id="mainHand"><option value="sword">${t("map.item.sword")}</option><option value="spear">${t("map.item.spear")}</option></select></label><label>${t("map.offHand")}<select id="offHand"><option value="round_shield">${t("map.item.roundShield")}</option><option value="">${t("map.empty")}</option></select></label></section><section><h3>${t("map.pack")}</h3><div id="inventorySlots" class="inventory-slots"></div></section></div><button id="newJourney" class="map-secondary" type="button">${t("map.newJourney")}</button></div>`;
+  const settings = h("div", "map-modal hidden");
+  settings.id = "mapSettings";
+  settings.setAttribute("role", "dialog");
+  settings.setAttribute("aria-modal", "true");
+  settings.setAttribute("aria-labelledby", "mapSettingsTitle");
+  const sceneButtons = SCENE_SHORTCUTS.map((scene) => {
+    const kind = sceneKind(scene);
+    return `<button type="button" data-scene="${scene}"><span>${t(`arena.${scene}.name`)}</span><b class="scene-kind ${kind}">${t(kind === "friendly" ? "map.sceneFriendly" : "map.sceneBattle")}</b></button>`;
+  }).join("");
+  settings.innerHTML = `<div class="map-modal-card map-settings-card"><button id="closeSettings" class="map-close" type="button" aria-label="${t("map.close")}">×</button><h2 id="mapSettingsTitle">${t("map.settings")}</h2><p>${t("map.settingsHelp")}</p><p id="mapSettingsError" class="map-settings-error" role="status" aria-live="polite"></p><button id="newJourney" class="map-danger" type="button">${t("map.newJourney")}</button><section class="scene-shortcuts"><h3>${t("map.sceneShortcuts")}</h3>${sceneButtons}</section></div>`;
 
-  root.append(header, layout, footer, modal);
-  root.querySelector("#openPack")!.addEventListener("click", () => toggleInventory(true));
-  root.querySelector("#closePack")!.addEventListener("click", () => toggleInventory(false));
-  root.querySelector("#newJourney")!.addEventListener("click", () => {
-    if (!confirm(t("map.newJourneyConfirm"))) return;
-    clearCampaign();
-    campaign = loadCampaign();
-    ensureRevealed();
-    toggleInventory(false);
-    setMessage(t("map.journeyRestarted"));
-    persistAndRender();
+  root.append(header, layout, footer, settings);
+  root.querySelector("#closeSettings")!.addEventListener("click", () => toggleSettings(false));
+  root.querySelector("#newJourney")!.addEventListener("click", restartJourney);
+  root.querySelectorAll<HTMLButtonElement>("[data-scene]").forEach((button) => {
+    button.addEventListener("click", () => openScene(button.dataset.scene as SceneId));
   });
   root.querySelector<HTMLSelectElement>("#mainHand")!.addEventListener("change", (event) => {
     const value = (event.target as HTMLSelectElement).value as "sword" | "spear";
@@ -104,20 +118,20 @@ function buildUi(root: HTMLElement) {
 function ensureRevealed() {
   const state = createWorldMapState(PROTOTYPE_MAP, campaign.world, {
     worldMinutes: campaign.world.worldMinutes,
-    hunger: campaign.player.hunger,
+    satiety: campaign.player.satiety,
     discovered: campaign.world.discovered,
   });
   campaign = {
     ...campaign,
     world: { ...campaign.world, discovered: [...state.discovered] },
-    player: { ...campaign.player, hunger: state.hunger },
+    player: { ...campaign.player, satiety: state.satiety },
   };
 }
 
 function currentMapState() {
   return createWorldMapState(PROTOTYPE_MAP, campaign.world, {
     worldMinutes: campaign.world.worldMinutes,
-    hunger: campaign.player.hunger,
+    satiety: campaign.player.satiety,
     discovered: campaign.world.discovered,
   });
 }
@@ -139,21 +153,56 @@ function move(direction: MapDirection) {
       worldMinutes: result.state.worldMinutes,
       discovered: [...result.state.discovered],
     },
-    player: { ...campaign.player, hunger: result.state.hunger },
+    player: { ...campaign.player, satiety: result.state.satiety },
   };
-  setMessage(result.siteId === "yard" ? t("map.yardFound") : t("map.travelTime", { minutes: result.minutesSpent }));
+  setMessage(result.siteId === "yard" ? t("map.yardFound")
+    : result.siteId === "campfire" ? t("map.campfireFound")
+      : t("map.travelTime", { minutes: result.minutesSpent }));
   persistAndRender();
 }
 
 function enterSite() {
-  if (mapCell(PROTOTYPE_MAP, campaign.world.x, campaign.world.y)?.siteId !== "yard") return;
-  saveCampaign(campaign);
-  location.href = sceneUrl(location.href, "yard", true).href;
+  const siteId = mapCell(PROTOTYPE_MAP, campaign.world.x, campaign.world.y)?.siteId;
+  const scene = sceneForMapSite(siteId);
+  if (scene) openScene(scene);
 }
 
-function toggleInventory(open = !inventoryOpen) {
-  inventoryOpen = open;
-  document.getElementById("packModal")!.classList.toggle("hidden", !open);
+function openScene(scene: SceneId) {
+  if (!saveCampaign(campaign)) {
+    const error = t("map.saveFailed");
+    setMessage(error);
+    document.getElementById("mapSettingsError")!.textContent = settingsOpen ? error : "";
+    return;
+  }
+  location.href = sceneUrl(location.href, scene, true).href;
+}
+
+function toggleSettings(open = !settingsOpen) {
+  const root = document.getElementById("mapRoot")!;
+  const background = root.querySelectorAll<HTMLElement>(".map-header, .map-layout, .map-footer");
+  settingsOpen = open;
+  document.getElementById("mapSettings")!.classList.toggle("hidden", !open);
+  background.forEach((element) => { element.inert = open; });
+  if (open) {
+    document.getElementById("mapSettingsError")!.textContent = "";
+    settingsReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    document.getElementById("closeSettings")!.focus();
+  } else {
+    settingsReturnFocus?.focus();
+    settingsReturnFocus = null;
+  }
+  renderUi();
+}
+
+function restartJourney() {
+  if (!confirm(t("map.newJourneyConfirm"))) return;
+  clearCampaign();
+  campaign = newCampaign();
+  ensureRevealed();
+  const saved = saveCampaign(campaign);
+  toggleSettings(false);
+  setMessage(saved ? t("map.journeyRestarted") : t("map.saveFailed"));
+  renderMap();
   renderUi();
 }
 
@@ -198,26 +247,16 @@ function drawMoon() {
 }
 
 function renderUi() {
-  const hunger = campaign.player.hunger;
-  const face = hunger < 34 ? ":)" : hunger < 67 ? ":|" : ":(";
-  const hungerLabel = hunger < 34 ? t("map.sated") : hunger < 67 ? t("map.peckish") : t("map.hungry");
-  document.getElementById("hungerFace")!.textContent = face;
-  document.getElementById("hungerFace")!.setAttribute("aria-label", hungerLabel);
-  document.getElementById("hungerText")!.textContent = `${hungerLabel} · ${Math.round(hunger)} / 100`;
+  const band = satietyBand(campaign.player.satiety);
+  const satietyLabel = t(`map.satiety.${band}`);
+  const face = document.getElementById("satietyFace")!;
+  face.className = `satiety-face satiety-${band}`;
+  face.setAttribute("aria-label", satietyLabel);
+  document.getElementById("satietyText")!.textContent = satietyLabel;
   const hours = Math.floor(campaign.world.worldMinutes / 60);
   const minutes = campaign.world.worldMinutes % 60;
   document.getElementById("mapTime")!.textContent = t("map.elapsed", { hours, minutes: String(minutes).padStart(2, "0") });
   drawMoon();
-
-  const pack = document.getElementById("packSummary")!;
-  pack.innerHTML = "";
-  for (const stack of campaign.player.inventory.stacks) {
-    const line = h("div", "pack-line");
-    const icon = h("span", `atlas-icon item-${stack.itemId}`);
-    line.append(icon, h("span", "", `${t(ITEMS[stack.itemId].nameKey)} × ${stack.quantity}`));
-    pack.append(line);
-  }
-  if (!pack.childElementCount) pack.textContent = t("map.packEmpty");
 
   const loadout = combatLoadout(campaign.player.equipment);
   const loadoutName = loadout === "sword_shield" ? t("loadout.swordShield.name")
@@ -236,10 +275,15 @@ function renderUi() {
     const slot = h("button", "inventory-slot");
     slot.type = "button";
     if (stack) {
-      slot.title = t(ITEMS[stack.itemId].nameKey);
+      const itemName = t(ITEMS[stack.itemId].nameKey);
+      slot.title = itemName;
+      slot.setAttribute("aria-label", t("map.itemQuantity", { item: itemName, quantity: stack.quantity }));
       slot.append(h("span", `atlas-icon item-${stack.itemId}`), h("b", "", String(stack.quantity)));
-      if (ITEMS[stack.itemId].hungerRelief) slot.addEventListener("click", () => useFood(stack.itemId as FoodId));
-    } else slot.disabled = true;
+      if (ITEMS[stack.itemId].satietyGain) slot.addEventListener("click", () => useFood(stack.itemId as FoodId));
+    } else {
+      slot.disabled = true;
+      slot.setAttribute("aria-label", t("map.emptyItemSlot"));
+    }
     slots.append(slot);
   }
   document.getElementById("mapMessage")!.textContent = message;
@@ -248,9 +292,40 @@ function renderUi() {
 const atlas = new Image();
 atlas.src = atlasUrl;
 atlas.addEventListener("load", renderMap);
+const redHand = new Image();
+redHand.src = redHandUrl;
+redHand.addEventListener("load", renderMap);
 
 function sprite(ctx: CanvasRenderingContext2D, frame: [number, number], x: number, y: number) {
   ctx.drawImage(atlas, frame[0] * TILE, frame[1] * TILE, TILE, TILE, x, y, TILE, TILE);
+}
+
+function drawRedHand(ctx: CanvasRenderingContext2D, x: number, y: number) {
+  if (redHand.complete && redHand.naturalWidth > 0) {
+    ctx.drawImage(redHand, x, y, TILE, TILE);
+    return;
+  }
+  ctx.save();
+  ctx.fillStyle = "#ead9b6";
+  ctx.strokeStyle = "#492b20";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(x + 5, y + 5, 38, 38, 5);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#a7331d";
+  ctx.fillRect(x + 18, y + 22, 15, 13);
+  ctx.fillRect(x + 17, y + 11, 3, 14);
+  ctx.fillRect(x + 22, y + 8, 3, 16);
+  ctx.fillRect(x + 27, y + 9, 3, 15);
+  ctx.fillRect(x + 32, y + 13, 3, 14);
+  ctx.beginPath();
+  ctx.moveTo(x + 19, y + 25);
+  ctx.lineTo(x + 11, y + 20);
+  ctx.lineTo(x + 9, y + 24);
+  ctx.lineTo(x + 19, y + 32);
+  ctx.fill();
+  ctx.restore();
 }
 
 function renderMap() {
@@ -276,6 +351,7 @@ function renderMap() {
       }
       sprite(ctx, TERRAIN_FRAME[cell.terrainId], vx * TILE, vy * TILE);
       if (cell.siteId === "yard") sprite(ctx, [2, 1], vx * TILE, vy * TILE);
+      if (cell.siteId === "campfire") drawRedHand(ctx, vx * TILE, vy * TILE);
     }
   }
   sprite(ctx, HERO_FRAME[facing], (campaign.world.x - originX) * TILE, (campaign.world.y - originY) * TILE);
@@ -283,18 +359,27 @@ function renderMap() {
 
 function onKeyDown(event: KeyboardEvent) {
   if (event.repeat) return;
-  if (inventoryOpen) {
-    if (event.code === "Escape" || event.code === "KeyI") { event.preventDefault(); toggleInventory(false); }
+  if (settingsOpen) {
+    if (event.code === "Escape") { event.preventDefault(); toggleSettings(false); }
     return;
   }
+  if (event.code === "Escape") { event.preventDefault(); toggleSettings(true); return; }
+  if (event.target instanceof Element
+    && event.target.closest("button, select, input, textarea, a, [contenteditable='true']")) return;
   const directions: Partial<Record<string, MapDirection>> = {
     ArrowUp: "up", KeyW: "up", ArrowRight: "right", KeyD: "right",
     ArrowDown: "down", KeyS: "down", ArrowLeft: "left", KeyA: "left",
   };
   const direction = directions[event.code];
   if (direction) { event.preventDefault(); move(direction); return; }
-  if (event.code === "KeyI") { event.preventDefault(); toggleInventory(true); return; }
   if (event.code === "Enter" || event.code === "Space") { event.preventDefault(); enterSite(); }
+}
+
+function currentSiteMessage() {
+  const siteId = mapCell(PROTOTYPE_MAP, campaign.world.x, campaign.world.y)?.siteId;
+  if (siteId === "yard") return t("map.yardFound");
+  if (siteId === "campfire") return t("map.campfireFound");
+  return t("map.welcome");
 }
 
 export function initMap() {
@@ -302,12 +387,18 @@ export function initMap() {
   document.body.classList.remove("mode-scene");
   const root = document.getElementById("mapRoot")!;
   root.style.setProperty("--map-atlas", `url(${JSON.stringify(atlasUrl)})`);
+  root.style.setProperty("--paper-doll", `url(${JSON.stringify(paperDollUrl)})`);
+  root.style.setProperty("--satiety-faces", `url(${JSON.stringify(satietyFacesUrl)})`);
+  root.classList.add("has-satiety-art");
   root.classList.remove("hidden");
+  // 3D-puoli kirjoittaa toistaiseksi tyhjän paluukuorman. Kulutuskohta on
+  // valmiina myöhemmille ruoka- ja esinepalkinnoille ilman reittirefaktorointia.
+  const sceneReturn = consumeSceneReturn();
   campaign = loadCampaign();
   ensureRevealed();
   saveCampaign(campaign);
   buildUi(root);
-  setMessage(mapCell(PROTOTYPE_MAP, campaign.world.x, campaign.world.y)?.siteId === "yard" ? t("map.yardFound") : t("map.welcome"));
+  setMessage(currentSiteMessage());
   renderMap();
   renderUi();
   window.addEventListener("keydown", onKeyDown);
@@ -315,6 +406,7 @@ export function initMap() {
     get state() { return structuredClone(campaign); },
     move,
     enterSite,
+    sceneReturn,
     get route() { return mapUrl(location.href); },
   };
 }

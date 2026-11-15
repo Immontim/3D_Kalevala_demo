@@ -8,15 +8,20 @@ import { lockPointer } from "../engine/input";
 import { g, sfx } from "../engine/state";
 import { ARENA, ARENAS, ArenaId, saveArena } from "../world";
 import { Language, getLanguage, setLanguage, t } from "../i18n";
-import { sceneUrl } from "../app/route";
+import { sceneKind, sceneUrl, type SceneId } from "../app/route";
 
-export function initStartMenu(options: { returnToMap?: boolean } = {}) {
+export function initStartMenu(options: { returnToMap?: boolean; scene?: SceneId } = {}) {
   if (options.returnToMap) {
     document.body.classList.add("from-map");
+    const friendly = options.scene !== undefined && sceneKind(options.scene) === "friendly";
     const tag = document.querySelector<HTMLElement>("#start .tag");
-    if (tag) { tag.textContent = t("yard.sub"); tag.removeAttribute("data-i18n"); }
+    if (tag) {
+      tag.textContent = friendly ? t("yard.sub")
+        : options.scene ? t(`arena.${options.scene}.desc`) : t("start.subtitle");
+      tag.removeAttribute("data-i18n");
+    }
     const startButton = $("startBtn");
-    startButton.textContent = t("map.enterYard");
+    startButton.textContent = friendly ? t("map.enterYard") : t("map.enterBattle");
     startButton.removeAttribute("data-i18n");
     $("menuBtn").textContent = t("map.return");
     $("menuBtn").removeAttribute("data-i18n");
