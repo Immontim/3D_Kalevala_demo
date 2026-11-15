@@ -2,8 +2,8 @@
 import bpy, os
 
 
-def export_characters():
-    out = r"C:\Data\3D Kalevala\assets"
+def export_characters(out=None):
+    out = out or os.environ.get("KALEVALA_ASSETS_OUT") or r"C:\Data\3D Kalevala\assets"
     os.makedirs(out, exist_ok=True)
     for o in bpy.context.view_layer.objects:
         o.select_set(False)

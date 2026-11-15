@@ -8,12 +8,37 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 Päivitetty: 2026-11-15 (Claude, Windows)
 
-- **Mainissa** (pohja `c48b27e`) ovat `assets/forest.glb`,
+- **Mainissa** (pohja `3191123`) ovat `assets/forest.glb`,
   `characters.glb`, `bog.glb`, `homestead.glb`, `household.glb`,
-  `villagers.glb`, `villagers_f.glb` ja `assets/animals/`; branchissa
-  `claude/peaceful-yard` lisäksi `yard.glb` (tarkista merge-tila
-  `git merge-base --is-ancestor`). Se, mitä peli niistä lataa ja mitä
+  `yard.glb`, `villagers.glb`, `villagers_f.glb` ja `assets/animals/`.
+  Branchissa `claude/hero-peace-gear` on uusi `characters.glb` (sankarin
+  rauhan varustus, ks. alla); tarkista merge-tila
+  `git merge-base --is-ancestor`. Se, mitä peli niistä lataa ja mitä
   integraatiosta puuttuu, on `docs/AGENT_HANDOFF.md`:ssä.
+- **Sankarin rauhan varustus** (`characters.glb`, `char_build.py`;
+  pelikoodi ei vielä käytä, eikä nykyinen peli muutu):
+  - Huotra vyöllä (sankari ja Pohjan soturi) on nyt 0,80 m (oli 0,58 m,
+    miekan terä 0,74 m) ja painotettu vain lantioon (`SHEATH_TOP`,
+    `SHEATH_D`, `SHEATH_LEN`).
+  - Kiinnityspisteet ovat tyhjiä solmuja luiden lapsina (`build_mounts`):
+    `mount_huotra` lantioluun (`hips`) alla ja `mount_kilpi_selka`
+    rintaluun (`chest`) alla. Kun miekka tai kilpi siirretään pisteen
+    lapseksi nollasijaintiin ja -kiertoon, miekka on huotrassa (väistin
+    suuaukon helalla, lape kuvetta vasten) ja kilpi selässä etupinta
+    taaksepäin.
+  - `char_hero_hihna` (72 kolmiota) on kilven kantohihna oikean olan yli,
+    samassa luurangossa kuin hahmo. Nimi alkaa `char_`, joten nykyinen
+    `Fighter.build` poistaa sen; rauhan varustuksessa se jätetään näkyviin.
+  - Kypärä on jo oma kappaleensa, joten rauhassa sen voi jättää pois.
+- **Otekanavat pysyville hahmoille** (lepoasento, Blenderin koordinaatit;
+  peliin x, z, -y): tietäjällä on miesvartalon koverrettu nyrkki, joten
+  `GRIP_P`/`GRIP_D` (`char_build.py`, pelissä `GRIP_CHANNEL`) käy
+  sellaisenaan ja sauva (ote origossa) kulkee sen läpi. Jousineidon nyrkkiä
+  ei ole koverrettu (`carve=False`). Vasemman käden kanava on arvio, joka
+  on siirretty miehen kädestä luun mukana ja hienosäädetty: piste
+  (0,385; -0,058; 0,769), suunta (-0,283; -0,795; -0,537); oikea käsi on
+  peilikuva x:n suhteen. Jousen kahva uppoaa suljettuun nyrkkiin, mikä
+  näyttää otteelta, mutta kuvista tätä ei ole tarkistettu.
 - **Pihapiiri** tehdään skriptillä `assets-src/blender/homestead.py` →
   `build_homestead()`: `talo`, `kuoppatalo`, `aitta`, `katos`, `aita`,
   `portinpieli`, `pino`, `polkky`, `haasia` ja `ruukku`. Kuoppatalon
@@ -67,7 +92,11 @@ Päivitetty: 2026-11-15 (Claude, Windows)
 - **Tarkistuksen taso:** mallit on katsottu vain Blenderin kuvista
   (hahmot lepoasennossa ja kädet alhaalla). Kyläläiset, eläimet,
   talousesineet, sikolätti ja kanakoppi on lisäksi nähty pelissä
-  rauhallisella pihalla kuvakaappauksista, mutta ei liikkeessä. Eläinten viedyt tiedostot on tuotu takaisin Blenderiin ja
+  rauhallisella pihalla kuvakaappauksista, mutta ei liikkeessä. Rauhan
+  varustus on katsottu Blenderin kuvasta neljästä suunnasta (miekka ja
+  kilpi kiinnityspisteissä, lepoasento), ja uusi `characters.glb` on
+  ajettu pelissä: taistelijat näkyvät ennallaan, hihna on piilossa eikä
+  konsolissa ole virheitä. Eläinten viedyt tiedostot on tuotu takaisin Blenderiin ja
   jokainen leike kuvattu yhdestä ruudusta.
 - **Blender-putket** (`assets-src/blender/`): metsä `build_all.py`,
   taistelijat `char_all.py` → `run_chars()`, kyläläiset `char_folk.py` →
@@ -82,6 +111,17 @@ Päivitetty: 2026-11-15 (Claude, Windows)
     (`blender --background --factory-startup --python`). `household.py`
     lukee ensin `homestead.py`:n, ja `homestead.py` tarvitsee metsäputken
     `assets-src/textures/birch_bark_diff.png`n.
+  - `run_chars()` (tai `make_char_materials()` yksin) luo materiaalit
+    uudelleen, jolloin kyläläisten (FOLK, FOLK_F) ja aiemmin rakennettujen
+    kappaleiden materiaalipaikat tyhjenevät. Aja sen jälkeen aina
+    `run_folk()`; `out_dir` vain, jos kyläläistiedostot halutaan viedä.
+  - Toisesta työpuusta: aja työpuun skriptit itse (`exec` tiedosto
+    kerrallaan, kyläläisille `FOLK_DIR`) ja vie
+    `export_characters(out)` tai `KALEVALA_ASSETS_OUT`; `char_all.py`:n
+    `_B` osoittaa pääkansioon.
+  - Vienti lisää `characters.glb`:hen tyhjän juurisolmun `RIG_F` (ja
+    `villagers_f.glb`:hen `RIG__tmp`). Ne ovat viejän sivutuote toisesta
+    luurangosta ja harmittomia.
   - Blender MCP:n oma taustatyökalu ei toimi, koska `BLENDER_PATH` puuttuu.
     MCP-kutsut eivät säilytä Python-tilaa: jokainen kutsu lukee skriptin
     uudelleen.
@@ -105,13 +145,22 @@ Päivitetty: 2026-11-15 (Claude, Windows)
   koira sileä ja ihmishahmoja lelumaisempi. Possu on porsaan mittasuhteissa.
   Koiran 191 luuta on yhdelle koiralle hyväksyttävä, ei laumalle.
 - Talousesineiden tulikivet ja tuhka ovat tasaisen harmaita ilman tekstuuria.
+- Huotra on litteä laatikko ja seuraa vain lantiota, joten se menee
+  kävellessä reiden ja helman läpi. Selässä kilven kädensija painuu hieman
+  panssariin ja sankarin pitkät hiukset menevät kilven läpi. Kantohihna
+  kulkee selässä kilven alla, ei kiinnity kilpeen.
 - Blender-skriptien polut on kovakoodattu (`C:\Data\3D Kalevala`).
 
 ## Seuraava Blender-tehtävä
 
-Ei avointa Blender-tehtävää. Odotetaan omistajan palautetta rauhallisesta
-pihasta (`docs/AGENT_HANDOFF.md`); sen perusteella korjataan mallien viat,
-jotka näkyvät vasta pelin valossa.
+Ei avointa Blender-tehtävää ennen pelikoodin integraatiota (odottaa
+Codexin 2D-RPG-kerroksen valmistumista, koska koodiin ei nyt kosketa):
+sankarin rauhan varustus (miekka `mount_huotra`an, kilpi
+`mount_kilpi_selka`an, `char_hero_hihna` näkyviin, kypärä pois) sekä
+sauvan ja jousen kiinnitys käden luuhun otekanavan mukaan niin, että käsi
+on varren ympärillä. Jos jousineidon ote ei näytä hyvältä pelissä,
+koverretaan hänen nyrkkinsä (`skin_parts(carve=…)` omalla kanavalla) ja
+viedään `villagers_f.glb` uudelleen.
 
 ## Ei vielä aloiteta
 
