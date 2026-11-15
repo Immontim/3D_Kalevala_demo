@@ -2,6 +2,7 @@
 import * as THREE from "three";
 import { ActionState, BASH, COMBAT, StrikeStyle, StrikeWeight, angleBetween, bashPushStep, graceAfter, graceCovers, inStrikeZone, attackPhase, enemyAttackTiming, lungeProgress, makeAttack, resolveHit, shieldWear, staminaAfterBlock, staminaTick, strikeCost, strikeDamage, strikeLands, strikeTier, styleFor, weakened } from "../combat";
 import { FALLEN } from "../fighter";
+import { t } from "../i18n";
 import { effectiveStats } from "../stats";
 import { ARENA_RADIUS, groundHeight } from "../world";
 import { separateDiscBodies } from "../collision";
@@ -34,8 +35,8 @@ export function breakShield(a: Actor) {
   sfx.hit();
   fx.shake = Math.max(fx.shake, 0.25);
   fx.hitstop = Math.max(fx.hitstop, 0.1);
-  if (a === g.player) { showMsg("Kilpesi hajosi!", "Torju nyt miekalla oikeaan suuntaan", 1.6); flash("#b33a2e", 0.25); }
-  else showMsg("Kilpi hajosi!", "", 1.1);
+  if (a === g.player) { showMsg(t("combat.yourShieldBroke"), t("combat.blockWithSword"), 1.6); flash("#b33a2e", 0.25); }
+  else showMsg(t("combat.shieldBroke"), "", 1.1);
 }
 
 export function lerpAngle(a: number, b: number, t: number) { return a + angleBetween(a, b) * t; }
@@ -142,7 +143,7 @@ export function resolveStrike(att: Actor, def: Actor) {
       const prop = def.fighter.knockHelmet(dir);
       if (prop) { scene.add(prop.group); g.debris.push(prop); sfx.clang(false); }
     }
-    if (!isPlayer && defState === "block" && !died) showMsg("Väärä torjunta", `${STYLE_NAME[atk.kind]} meni läpi`, 0.9);
+    if (!isPlayer && defState === "block" && !died) showMsg(t("combat.wrongBlock"), t("combat.strikePassed", { strike: STYLE_NAME[atk.kind] }), 0.9);
     // Lyhyt horjahdus keskeyttää noston; kilpityöntö pysäyttää myös jo alkaneen iskun.
     const interrupts = atk.kind === "bash" ? defState !== "rooted" : defState === "idle" || defState === "block" || defState === "windup";
     if (!died && interrupts) {
@@ -162,15 +163,15 @@ export function resolveStrike(att: Actor, def: Actor) {
     // Murtaja toipuu nopeasti ja ehtii iskeä ennen kuin puolustaja saa suojan takaisin.
     att.extraRecovery = -COMBAT.guardbreakAdvantage;
     if (att.ai) att.ai.counter = true;
-    if (isPlayer) showMsg("Suoja murtui!", "Iske nyt", 0.9);
-    else { showMsg("Suojasi murtui", "", 0.8); flash("#b33a2e", 0.2); }
+    if (isPlayer) showMsg(t("combat.guardBroke"), t("combat.strikeNow"), 0.9);
+    else { showMsg(t("combat.yourGuardBroke"), "", 0.8); flash("#b33a2e", 0.2); }
   } else if (res === "blocked") {
     sfx.clang(false);
     emitSparks(contact, 32, 4);
     att.extraRecovery = COMBAT.blockRecoil;
     fx.shake = 0.08;
-    if (isPlayer) showMsg("Torjuttu", "", 0.6);
-    else if (graced) showMsg("Suoja piti", "", 0.6);
+    if (isPlayer) showMsg(t("combat.blocked"), "", 0.6);
+    else if (graced) showMsg(t("combat.guardHeld"), "", 0.6);
   } else if (res === "parried") {
     sfx.clang(true);
     emitSparks(contact, 56, 6);
@@ -179,11 +180,11 @@ export function resolveStrike(att: Actor, def: Actor) {
     setState(att, "stagger");
     if (!isPlayer) {
       g.songPower = Math.min(COMBAT.songMax, g.songPower + COMBAT.songGainParry);
-      showMsg("Täydellinen torjunta!", "Vastustaja horjuu, iske nyt", 1);
+      showMsg(t("combat.parried"), t("combat.enemyStaggers"), 1);
       flash("#f0c766", 0.25);
     }
   } else if (res === "dodged" && !isPlayer) {
-    showMsg("Väistit", "", 0.5);
+    showMsg(t("combat.dodged"), "", 0.5);
   }
 }
 

@@ -5,6 +5,7 @@
 // tai hiiren nappeja muodossa "Mouse0", "Mouse1", ... (MouseEvent.button).
 // Moninappihiiren lisänapit tulevat selaimelle joko nappeina 3 ja 4 tai ajurin
 // lähettäminä näppäinpainalluksina; molemmat kelpaavat sellaisinaan.
+import { t } from "./i18n";
 
 export type SongSlotAction = "song1" | "song2" | "song3" | "song4" | "song5";
 export type Action = "slash" | "overhead" | "thrust" | "block" | "dodge" | "song" | "lock" | SongSlotAction;
@@ -12,18 +13,18 @@ export type Action = "slash" | "overhead" | "thrust" | "block" | "dodge" | "song
 export const SONG_SLOT_ACTIONS: readonly SongSlotAction[] = ["song1", "song2", "song3", "song4", "song5"];
 
 export const ACTIONS: { id: Action; label: string }[] = [
-  { id: "slash", label: "Sivallus" },
-  { id: "overhead", label: "Ylälyönti" },
-  { id: "thrust", label: "Pisto" },
-  { id: "block", label: "Torjunta" },
-  { id: "dodge", label: "Väistö" },
-  { id: "song", label: "Laulu" },
-  { id: "lock", label: "Lukitus vastustajaan" },
-  { id: "song1", label: "Laulupaikka 1" },
-  { id: "song2", label: "Laulupaikka 2" },
-  { id: "song3", label: "Laulupaikka 3" },
-  { id: "song4", label: "Laulupaikka 4" },
-  { id: "song5", label: "Laulupaikka 5" },
+  { id: "slash", label: t("bindings.action.slash") },
+  { id: "overhead", label: t("bindings.action.overhead") },
+  { id: "thrust", label: t("bindings.action.thrust") },
+  { id: "block", label: t("bindings.action.block") },
+  { id: "dodge", label: t("bindings.action.dodge") },
+  { id: "song", label: t("bindings.action.song") },
+  { id: "lock", label: t("bindings.action.lock") },
+  { id: "song1", label: t("bindings.action.song1") },
+  { id: "song2", label: t("bindings.action.song2") },
+  { id: "song3", label: t("bindings.action.song3") },
+  { id: "song4", label: t("bindings.action.song4") },
+  { id: "song5", label: t("bindings.action.song5") },
 ];
 
 /** Jokaisella toiminnolla on kaksi paikkaa; tyhjä merkkijono on tyhjä paikka. */
@@ -109,21 +110,21 @@ export function parseBindings(data: unknown): Bindings {
   return out;
 }
 
-const MOUSE_NAMES = ["Hiiren vasen", "Hiiren keski", "Hiiren oikea", "Hiiren nappi 4", "Hiiren nappi 5"];
+const MOUSE_NAMES = [t("key.mouseLeft"), t("key.mouseMiddle"), t("key.mouseRight"), t("key.mouseButton", { number: 4 }), t("key.mouseButton", { number: 5 })];
 const KEY_NAMES: Record<string, string> = {
-  ShiftLeft: "Vasen Shift", ShiftRight: "Oikea Shift", ControlLeft: "Vasen Ctrl", ControlRight: "Oikea Ctrl",
-  AltLeft: "Vasen Alt", AltRight: "AltGr", Tab: "Tab", CapsLock: "Caps Lock", Enter: "Enter", Backquote: "§",
-  ArrowUp: "Nuoli ylös", ArrowDown: "Nuoli alas", ArrowLeft: "Nuoli vasen", ArrowRight: "Nuoli oikea",
+  ShiftLeft: t("key.shiftLeft"), ShiftRight: t("key.shiftRight"), ControlLeft: t("key.controlLeft"), ControlRight: t("key.controlRight"),
+  AltLeft: t("key.altLeft"), AltRight: t("key.altRight"), Tab: "Tab", CapsLock: "Caps Lock", Enter: "Enter", Backquote: "§",
+  ArrowUp: t("key.arrowUp"), ArrowDown: t("key.arrowDown"), ArrowLeft: t("key.arrowLeft"), ArrowRight: t("key.arrowRight"),
 };
 
 /** Koodin nimi ihmiselle. */
 export function codeLabel(code: string): string {
   if (!code) return "–";
   const mouse = /^Mouse(\d+)$/.exec(code);
-  if (mouse) return MOUSE_NAMES[+mouse[1]] ?? `Hiiren nappi ${+mouse[1] + 1}`;
+  if (mouse) return MOUSE_NAMES[+mouse[1]] ?? t("key.mouseButton", { number: +mouse[1] + 1 });
   if (KEY_NAMES[code]) return KEY_NAMES[code];
   if (/^Key[A-Z]$/.test(code)) return code.slice(3);
   if (/^Digit\d$/.test(code)) return code.slice(5);
-  if (/^Numpad/.test(code)) return `Num ${code.slice(6)}`;
+  if (/^Numpad/.test(code)) return t("key.num", { key: code.slice(6) });
   return code;
 }

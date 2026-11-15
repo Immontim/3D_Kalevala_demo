@@ -1,5 +1,6 @@
 // Laululoitsun puhdas logiikka: hidastus, alkuanimaation kesto, osuma-alueet ja lopputulos.
 // Kaikki säädettävät luvut ovat taulukossa SONG.
+import { VerbatimText, t, verbatim } from "./i18n";
 
 export const SONG = {
   /** Maailman nopeus laulun aikana (vastustaja liikkuu, mutta näin hitaasti). */
@@ -66,27 +67,27 @@ export function songOutcome(results: boolean[]): SongOutcome {
 }
 
 /** Kalevalan 3. runo (1849, vapaa käyttää). Yksi säe per riimu: säkeiden määrä on riimujen määrä. */
-export const SONG_VERSES: readonly string[] = [
-  "Lauloi vanha Väinämöinen:",
-  "järvet läikkyi, maa järisi,",
-  "vuoret vaskiset vapisi,",
-  "paaet vahvat paukahteli,",
-  "kalliot kaheksi lenti,",
-  "kivet rannoilla rakoili.",
-  "Lauloi nuoren Joukahaisen",
-  "suohon suonivyötäisistä.",
+export const SONG_VERSES: readonly VerbatimText[] = [
+  verbatim("Lauloi vanha Väinämöinen:", "fi", "Kalevala, runo 3"),
+  verbatim("järvet läikkyi, maa järisi,", "fi", "Kalevala, runo 3"),
+  verbatim("vuoret vaskiset vapisi,", "fi", "Kalevala, runo 3"),
+  verbatim("paaet vahvat paukahteli,", "fi", "Kalevala, runo 3"),
+  verbatim("kalliot kaheksi lenti,", "fi", "Kalevala, runo 3"),
+  verbatim("kivet rannoilla rakoili.", "fi", "Kalevala, runo 3"),
+  verbatim("Lauloi nuoren Joukahaisen", "fi", "Kalevala, runo 3"),
+  verbatim("suohon suonivyötäisistä.", "fi", "Kalevala, runo 3"),
 ];
 
 /** Kalevalan 9. runo (1849, vapaa käyttää): verensulkusanat. */
-export const HEAL_VERSES: readonly string[] = [
-  "Piäty, veri, vuotamasta,",
-  "hurme, huppelehtamasta,",
-  "päälleni päräjämästä,",
-  "riuskumasta rinnoilleni!",
-  "Veri, seiso kuin seinä,",
-  "asu, hurme, kuin aita,",
-  "kuin miekka meressä seiso,",
-  "saraheinä sammalessa!",
+export const HEAL_VERSES: readonly VerbatimText[] = [
+  verbatim("Piäty, veri, vuotamasta,", "fi", "Kalevala, runo 9"),
+  verbatim("hurme, huppelehtamasta,", "fi", "Kalevala, runo 9"),
+  verbatim("päälleni päräjämästä,", "fi", "Kalevala, runo 9"),
+  verbatim("riuskumasta rinnoilleni!", "fi", "Kalevala, runo 9"),
+  verbatim("Veri, seiso kuin seinä,", "fi", "Kalevala, runo 9"),
+  verbatim("asu, hurme, kuin aita,", "fi", "Kalevala, runo 9"),
+  verbatim("kuin miekka meressä seiso,", "fi", "Kalevala, runo 9"),
+  verbatim("saraheinä sammalessa!", "fi", "Kalevala, runo 9"),
 ];
 
 export type SongId = "bog" | "heal";
@@ -95,13 +96,13 @@ export interface SongDef {
   name: string;
   /** Laulun oma riimu valintaringissä. */
   rune: string;
-  verses: readonly string[];
+  verses: readonly VerbatimText[];
   /** Tarvitseeko laulu elävän vastustajan. */
   needsEnemy: boolean;
 }
 export const SONGS: Record<SongId, SongDef> = {
-  bog: { id: "bog", name: "Suolaulu", rune: "ᛚ", verses: SONG_VERSES, needsEnemy: true },
-  heal: { id: "heal", name: "Parannuslaulu", rune: "ᛒ", verses: HEAL_VERSES, needsEnemy: false },
+  bog: { id: "bog", name: t("song.bog.name"), rune: "ᛚ", verses: SONG_VERSES, needsEnemy: true },
+  heal: { id: "heal", name: t("song.heal.name"), rune: "ᛒ", verses: HEAL_VERSES, needsEnemy: false },
 };
 
 /** Laulupaikat valintaringissä. null = tyhjä paikka. */

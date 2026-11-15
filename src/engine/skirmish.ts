@@ -2,6 +2,7 @@
 import * as THREE from "three";
 import { WAVES, groupHpScale, groupSize } from "../combat";
 import { FighterLook } from "../fighter";
+import { t } from "../i18n";
 import { ARENA_RADIUS } from "../world";
 import { $ } from "./dom";
 import { addEnemy, clearEnemies } from "./enemies";
@@ -11,12 +12,12 @@ import { showMsg } from "./hud";
 import { g } from "./state";
 
 export const ENEMIES: { name: string; look: FighterLook }[] = [
-  { name: "Nuori urho", look: { character: "urho", loadout: "sword" } },
-  { name: "Pohjan soturi", look: { character: "pohja", loadout: "sword" } },
-  { name: "Nuori urho, keihäs", look: { character: "urho", loadout: "spear" } },
-  { name: "Pohjan soturi, kilpi", look: { character: "pohja", loadout: "sword_shield" } },
-  { name: "Nuori urho, kilpi", look: { character: "urho", loadout: "sword_shield" } },
-  { name: "Pohjan soturi, keihäs", look: { character: "pohja", loadout: "spear" } },
+  { name: t("enemy.urho"), look: { character: "urho", loadout: "sword" } },
+  { name: t("enemy.pohja"), look: { character: "pohja", loadout: "sword" } },
+  { name: t("enemy.urhoSpear"), look: { character: "urho", loadout: "spear" } },
+  { name: t("enemy.pohjaShield"), look: { character: "pohja", loadout: "sword_shield" } },
+  { name: t("enemy.urhoShield"), look: { character: "urho", loadout: "sword_shield" } },
+  { name: t("enemy.pohjaSpear"), look: { character: "pohja", loadout: "spear" } },
 ];
 
 let wave = 0;
@@ -38,8 +39,8 @@ function nextWave() {
     addEnemy({ name: def.name, look: def.look, level: wave, hpScale: groupHpScale(size) }, pos);
     first ||= def.name;
   }
-  $("wave").textContent = `Aalto ${wave}`;
-  showMsg(`Aalto ${wave}`, size === 1 ? first : `${size} vastustajaa`);
+  $("wave").textContent = t("wave.title", { wave });
+  showMsg(t("wave.title", { wave }), size === 1 ? first : t("wave.opponents", { count: size }));
 }
 
 export const skirmish: Encounter = {
@@ -60,10 +61,10 @@ export const skirmish: Encounter = {
   },
   onEnemyDown() {
     if (g.enemies.length > 0) {
-      showMsg("Vastustaja kaatui", `${g.enemies.length} jäljellä`, 1.4);
+      showMsg(t("wave.enemyDown"), t("wave.remaining", { count: g.enemies.length }), 1.4);
       return;
     }
-    showMsg("Vastustaja kaatui", "Seuraava saapuu metsästä…", 2.4);
+    showMsg(t("wave.enemyDown"), t("wave.next"), 2.4);
     nextWaveAt = g.gameTime + WAVES.nextWaveDelay;
   },
 };

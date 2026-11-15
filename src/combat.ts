@@ -7,6 +7,8 @@
 // joten saman asekategorian sisään voi myöhemmin tehdä laadultaan erilaisia aseita
 // ja lisätä hajontaa koskematta iskujen määrittelyihin.
 
+import { t } from "./i18n";
+
 export type ActionState =
   | "idle"
   | "windup"
@@ -257,13 +259,13 @@ export interface WeaponDef {
 
 export const WEAPONS: Record<WeaponId, WeaponDef> = {
   sword: {
-    id: "sword", name: "Miekka", damage: 1, reach: 0, lunge: 0, minRange: 0, slowness: 1,
+    id: "sword", name: t("weapon.sword"), damage: 1, reach: 0, lunge: 0, minRange: 0, slowness: 1,
     styles: { overhead: 1, slash: 1, thrust: 1 }, blockArc: Math.PI / 4,
   },
   // Kantama on mitattu mallista: pistossa keihään kärki on 1,91 m hahmon keskeltä ja miekan
   // 1,25 m, ja syöksy on 0,3 m pidempi. Samalla pelivaralla kuin miekalla ero on 1,0 m.
   spear: {
-    id: "spear", name: "Keihäs", damage: 1, reach: 1.0, lunge: 0.3, minRange: 1.3, slowness: 1.35,
+    id: "spear", name: t("weapon.spear"), damage: 1, reach: 1.0, lunge: 0.3, minRange: 1.3, slowness: 1.35,
     styles: { thrust: 1.3 }, blockArc: Math.PI / 4,
   },
 };

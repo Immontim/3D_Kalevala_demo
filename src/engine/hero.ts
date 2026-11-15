@@ -10,13 +10,14 @@ import { strikeHeld } from "./input";
 import { lerpAngle, moveActor, startAttack } from "./melee";
 import { openChoice, songState } from "./song";
 import { DEG, aim, g, inputs, keys, sfx } from "./state";
+import { t } from "../i18n";
 
 // Sankarin varusteet valitaan aloitusikkunassa, ja valinta tallentuu selaimeen.
 export const LOADOUT_STORE = "laulun-miekka.loadout.v1";
 export const LOADOUTS: Record<Loadout, { name: string; desc: string }> = {
-  sword_shield: { name: "Miekka ja kilpi", desc: "Kilpi suojaa leveältä ja sillä voi työntää, mutta se kuluu." },
-  sword: { name: "Miekka", desc: "Torjunta aseella: asennon on vastattava iskun suuntaa." },
-  spear: { name: "Keihäs", desc: "Pitkä ulottuma ja vain pisto. Ei osu aivan lähelle." },
+  sword_shield: { name: t("loadout.swordShield.name"), desc: t("loadout.swordShield.desc") },
+  sword: { name: t("loadout.sword.name"), desc: t("loadout.sword.desc") },
+  spear: { name: t("loadout.spear.name"), desc: t("loadout.spear.desc") },
 };
 export function savedLoadout(): Loadout {
   try {

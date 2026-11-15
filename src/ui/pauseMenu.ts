@@ -2,6 +2,7 @@
 import { ACTIONS, Bindings, DEFAULT_BINDINGS, RESERVED, SLOTS, assign, clearSlot, cloneBindings, codeLabel, mouseCode } from "../bindings";
 import { $ } from "../engine/dom";
 import { bindings, setBindings } from "../engine/input";
+import { t } from "../i18n";
 import { paused, restart, resume } from "../engine/loop";
 import { bindUi } from "../engine/state";
 import { DEFAULTS, FIELDS, applyChanges, changedValues, exportTuning, parseTuningText } from "../tuning";
@@ -32,7 +33,7 @@ export function renderBinds(note = "") {
       const b = document.createElement("button");
       const listening = bindUi.capture?.action === id && bindUi.capture.slot === slot;
       b.className = "bind" + (listening ? " listening" : "") + (bindings[id][slot] ? "" : " empty");
-      b.textContent = listening ? "Paina nappia…" : codeLabel(bindings[id][slot]);
+      b.textContent = listening ? t("bindings.press") : codeLabel(bindings[id][slot]);
       b.addEventListener("click", () => {
         // Sama klikkaus, jolla hiiren nappi juuri sidottiin, ei avaa kuuntelua uudelleen.
         if (performance.now() - bindUi.endedAt < 350) return;
@@ -43,7 +44,7 @@ export function renderBinds(note = "") {
     }
     rootEl.appendChild(row);
   }
-  $("bindNote").textContent = note || (bindUi.capture ? "Paina näppäintä tai hiiren nappia. Esc peruu, Delete tyhjentää." : "Napsauta paikkaa ja paina uutta näppäintä tai hiiren nappia.");
+  $("bindNote").textContent = note || (bindUi.capture ? t("bindings.capture") : t("bindings.choose"));
 }
 export function endCapture(next: Bindings | null, note = "") {
   if (next) setBindings(next);
@@ -81,7 +82,7 @@ export function buildTuneFields() {
     input.min = String(f.min);
     input.max = String(f.max);
     input.step = String(f.step);
-    row.title = `Oletus ${fmtValue(def)} · sallittu ${f.min}–${f.max} · ${f.path}`;
+    row.title = t("tune.defaultTitle", { default: fmtValue(def), min: f.min, max: f.max, path: f.path });
     const read = (final: boolean) => {
       const raw = input.valueAsNumber;
       if (!Number.isFinite(raw)) { if (final) refreshTune(); return; } // kenttä on kesken tai tyhjä
@@ -113,14 +114,14 @@ export function refreshTune(skip?: HTMLInputElement | HTMLTextAreaElement, note 
   if (skip !== tuneText) tuneText.value = exportTuning(VERSION, tuneDraft);
   const pending = !sameDraft(tuneDraft, changedValues());
   $("tuneApply").classList.toggle("pending", pending);
-  const count = tuneDraft.size === 0 ? "Kaikki arvot ovat oletuksissa." : `${tuneDraft.size} arvoa poikkeaa oletuksista.`;
-  $("tuneNote").textContent = note || `${count} ${pending ? "Muutokset eivät ole vielä käytössä." : "Nämä arvot ovat käytössä."}`;
+  const count = tuneDraft.size === 0 ? t("tune.allDefault") : t("tune.changedCount", { count: tuneDraft.size });
+  $("tuneNote").textContent = note || `${count} ${pending ? t("tune.pending") : t("tune.active")}`;
 }
 
 /** Kulmaan merkki, kun pelataan muilla kuin oletusarvoilla. */
 export function showTunedBadge() {
   const n = changedValues().size;
-  $("tuned").textContent = n > 0 ? `säädetyt arvot (${n}) · ` : "";
+  $("tuned").textContent = n > 0 ? t("tune.badge", { count: n }) : "";
 }
 
 export function openTune() {
@@ -160,7 +161,7 @@ export function initPauseMenu() {
     e.stopImmediatePropagation();
     if (e.code === "Escape") endCapture(null);
     else if (e.code === "Delete" || e.code === "Backspace") endCapture(clearSlot(bindings, bindUi.capture.action, bindUi.capture.slot));
-    else if (RESERVED.includes(e.code)) endCapture(null, `${codeLabel(e.code)} on varattu (liike, laulun tahti, uusi peli).`);
+    else if (RESERVED.includes(e.code)) endCapture(null, t("bindings.reserved", { key: codeLabel(e.code) }));
     else endCapture(assign(bindings, bindUi.capture.action, bindUi.capture.slot, e.code));
   }, true);
   window.addEventListener("mousedown", (e) => {
@@ -171,7 +172,7 @@ export function initPauseMenu() {
   }, true);
   $("resetBinds").addEventListener("click", () => {
     if (performance.now() - bindUi.endedAt < 350) return;
-    endCapture(cloneBindings(DEFAULT_BINDINGS), "Oletusnäppäimet palautettu.");
+    endCapture(cloneBindings(DEFAULT_BINDINGS), t("bindings.restored"));
   });
   renderBinds();
 
@@ -180,11 +181,11 @@ export function initPauseMenu() {
 
   tuneText.addEventListener("input", () => {
     const parsed = parseTuningText(tuneText.value);
-    if ("error" in parsed) { $("tuneNote").textContent = `Tekstiä ei voi lukea: ${parsed.error}`; return; }
+    if ("error" in parsed) { $("tuneNote").textContent = t("tune.cannotRead", { error: parsed.error }); return; }
     tuneDraft = parsed.values;
     const notes: string[] = [];
-    if (parsed.rejected.length) notes.push(`Tuntematon tai virheellinen: ${parsed.rejected.join(", ")}.`);
-    if (parsed.clamped.length) notes.push(`Rajattu sallittuun väliin: ${parsed.clamped.join(", ")}.`);
+    if (parsed.rejected.length) notes.push(t("tune.rejected", { paths: parsed.rejected.join(", ") }));
+    if (parsed.clamped.length) notes.push(t("tune.clamped", { paths: parsed.clamped.join(", ") }));
     refreshTune(tuneText, notes.join(" "));
   });
 
@@ -204,7 +205,7 @@ export function initPauseMenu() {
     let ok = false;
     try { await navigator.clipboard.writeText(tuneText.value); ok = true; } catch { /* leikepöytä ei sallittu: kokeillaan valintaa */ }
     if (!ok) { tuneText.select(); ok = document.execCommand("copy"); }
-    refreshTune(tuneText, ok ? "Arvot kopioitu leikepöydälle." : "Kopiointi ei onnistunut: valitse teksti ja kopioi se käsin (Ctrl+C).");
+    refreshTune(tuneText, ok ? t("tune.copied") : t("tune.copyFailed"));
   });
 
   $("tuneReset").addEventListener("click", () => {

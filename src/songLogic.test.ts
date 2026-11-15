@@ -46,6 +46,11 @@ describe("laulut ja laulupaikat", () => {
     expect(SONGS.heal.needsEnemy).toBe(false);
     expect(SONGS.bog.needsEnemy).toBe(true);
   });
+  it("Kalevalan säkeet on merkitty alkuperäiskielisiksi eikä käännettäviksi", () => {
+    expect(SONG_VERSES[0]).toMatchObject({ kind: "verbatim", lang: "fi", source: "Kalevala, runo 3" });
+    expect(HEAL_VERSES[0]).toMatchObject({ kind: "verbatim", lang: "fi", source: "Kalevala, runo 9" });
+    expect(SONG_VERSES[0].text).toBe("Lauloi vanha Väinämöinen:");
+  });
   it("paikkoja on viisi: kaksi laulua ja kolme tyhjää", () => {
     expect(SONG_SLOTS).toEqual(["bog", "heal", null, null, null]);
   });

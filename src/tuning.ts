@@ -8,6 +8,7 @@
 import { CHARACTERS, COMBAT, ENEMY_AI, SHIELDS, STAMINA, STRIKES, WAVES, WEAPONS } from "./combat";
 import { SONG } from "./songLogic";
 import { CONTROLS } from "./controls";
+import { t } from "./i18n";
 
 type Tree = { [key: string]: Tree | number | unknown };
 
@@ -69,56 +70,54 @@ export interface Field {
 }
 
 const character = (group: string, id: string): Field[] => [
-  { group, label: "Elämä", path: `characters.${id}.hp`, min: 1, max: 1000, step: 5 },
-  { group, label: "Kestävyys", path: `characters.${id}.stamina`, min: 1, max: 1000, step: 5 },
-  { group, label: "Kestävyyden palautuminen / s", path: `characters.${id}.staminaRegen`, min: 0, max: 50, step: 0.5 },
-  { group, label: "Lyöjän voima", path: `characters.${id}.power`, min: 0, max: 200, step: 1 },
-  { group, label: "Kääntymisnopeus, °/s", path: `characters.${id}.turnSpeed`, min: 10, max: 1440, step: 5 },
+  { group, label: t("tune.field.hp"), path: `characters.${id}.hp`, min: 1, max: 1000, step: 5 },
+  { group, label: t("tune.field.stamina"), path: `characters.${id}.stamina`, min: 1, max: 1000, step: 5 },
+  { group, label: t("tune.field.staminaRegen"), path: `characters.${id}.staminaRegen`, min: 0, max: 50, step: 0.5 },
+  { group, label: t("tune.field.power"), path: `characters.${id}.power`, min: 0, max: 200, step: 1 },
+  { group, label: t("tune.field.turnSpeed"), path: `characters.${id}.turnSpeed`, min: 10, max: 1440, step: 5 },
 ];
 const reaction = (group: string, id: string): Field =>
-  ({ group, label: "Reaktioviive, s", path: `characters.${id}.reaction`, min: 0, max: 3, step: 0.05 });
+  ({ group, label: t("tune.field.reaction"), path: `characters.${id}.reaction`, min: 0, max: 3, step: 0.05 });
 
 /** Säätövälilehden kentät ryhmittäin. Rajat koskevat myös JSON-tekstistä luettuja arvoja. */
 export const FIELDS: readonly Field[] = [
-  ...character("Sankari (pelaaja)", "hero"),
-  ...character("Nuori urho (aallon 0 arvot)", "urho"),
-  reaction("Nuori urho (aallon 0 arvot)", "urho"),
-  ...character("Pohjan soturi (aallon 0 arvot)", "pohja"),
-  reaction("Pohjan soturi (aallon 0 arvot)", "pohja"),
-  { group: "Ohjaus", label: "Hiiren herkkyys, ° / pikseli", path: "controls.mouseSens", min: 0.01, max: 1, step: 0.01 },
-  { group: "Ohjaus", label: "Vastustajan kääntymiskerroin iskun aikana", path: "enemyAi.attackTurnScale", min: 0, max: 1, step: 0.05 },
-  { group: "Aallot", label: "Vastustajan elämän lisäys / aalto", path: "waves.hpPerWave", min: 0, max: 200, step: 5 },
-  { group: "Aallot", label: "Vastustajan voiman lisäys / aalto", path: "waves.powerPerWave", min: 0, max: 20, step: 0.5 },
-  { group: "Aallot", label: "Pelaajan elämän palautus aaltojen välissä", path: "waves.restHp", min: 0, max: 1000, step: 5 },
-  { group: "Aallot", label: "Pelaajan kestävyyden palautus aaltojen välissä", path: "waves.restStamina", min: 0, max: 1000, step: 5 },
-  { group: "Aallot", label: "Kaksi vastustajaa aallosta", path: "waves.twoFrom", min: 1, max: 99, step: 1 },
-  { group: "Aallot", label: "Kolme vastustajaa aallosta", path: "waves.threeFrom", min: 1, max: 99, step: 1 },
-  { group: "Aallot", label: "Elämän kerroin, kun vastustajia on kaksi", path: "waves.hpScaleTwo", min: 0.1, max: 2, step: 0.05 },
-  { group: "Aallot", label: "Elämän kerroin, kun vastustajia on kolme", path: "waves.hpScaleThree", min: 0.1, max: 2, step: 0.05 },
-  { group: "Aallot", label: "Väli toisen vastustajan iskuun, s", path: "enemyAi.attackGap", min: 0, max: 5, step: 0.05 },
-  { group: "Aallot", label: "Vuoroaan odottavan lisäetäisyys, m", path: "enemyAi.waitBack", min: 0, max: 5, step: 0.1 },
-  { group: "Aallot", label: "Vastustajien väli toisiinsa, m", path: "enemyAi.spread", min: 0, max: 8, step: 0.1 },
-  { group: "Aallot", label: "Suurin kiertokulma sankarin katseesta, °", path: "enemyAi.flankMax", min: 30, max: 180, step: 5 },
-  { group: "Aallot", label: "Suoja-aika torjunnan jälkeen, s", path: "combat.graceBlock", min: 0, max: 5, step: 0.05 },
-  { group: "Aallot", label: "Suoja-aika täydellisen torjunnan jälkeen, s", path: "combat.graceParry", min: 0, max: 5, step: 0.05 },
-  { group: "Aallot", label: "Suoja-ajan sektorin puolikas, °", path: "combat.graceArc", min: 0, max: 180, step: 5 },
-  { group: "Kestävyyden hinnat", label: "Kevyt lyönti", path: "stamina.light", min: 0, max: 100, step: 1 },
-  { group: "Kestävyyden hinnat", label: "Raskas lyönti", path: "stamina.heavy", min: 0, max: 100, step: 1 },
-  { group: "Kestävyyden hinnat", label: "Toteutunut torjunta", path: "stamina.blockHit", min: 0, max: 100, step: 1 },
-  { group: "Kestävyyden hinnat", label: "Torjunta-asento / s", path: "stamina.blockHold", min: 0, max: 50, step: 0.5 },
-  { group: "Kestävyyden hinnat", label: "Uupuneen lyönnin vahinkokerroin", path: "stamina.weakDamage", min: 0, max: 1, step: 0.05 },
-  { group: "Aseet ja lyönnit", label: "Miekan vahinkokerroin", path: "weapons.sword.damage", min: 0, max: 10, step: 0.05 },
-  { group: "Aseet ja lyönnit", label: "Keihään vahinkokerroin", path: "weapons.spear.damage", min: 0, max: 10, step: 0.05 },
-  { group: "Aseet ja lyönnit", label: "Noston kerroin (kaikki lyönnit)", path: "combat.windupScale", min: 0.2, max: 5, step: 0.05 },
-  { group: "Aseet ja lyönnit", label: "Osumahetki iskuvaiheessa (0–1, tukiaskel sitä ennen)", path: "combat.strikePoint", min: 0.1, max: 1, step: 0.05 },
-  { group: "Aseet ja lyönnit", label: "Palautumisen kerroin (kaikki lyönnit)", path: "combat.recoveryScale", min: 0.2, max: 5, step: 0.05 },
-  { group: "Aseet ja lyönnit", label: "Täydellisen torjunnan ikkuna, s", path: "combat.parryWindow", min: 0, max: 1, step: 0.01 },
-  { group: "Laulu", label: "Laulunauhan nopeus", path: "song.speed", min: 0.25, max: 4, step: 0.05 },
-  { group: "Laulu", label: "Vaaditut osumat", path: "song.minHits", min: 1, max: 8, step: 1 },
-  { group: "Laulu", label: "Suon kesto / osuma, s", path: "song.rootTimePerHit", min: 0, max: 10, step: 0.05 },
-  { group: "Laulu", label: "Parannus / osuma, elämää", path: "song.healPerHit", min: 0, max: 100, step: 1 },
-  { group: "Laulu", label: "Laulun voima osumasta", path: "combat.songGainHit", min: 0, max: 100, step: 1 },
-  { group: "Laulu", label: "Laulun voima täydellisestä torjunnasta", path: "combat.songGainParry", min: 0, max: 100, step: 1 },
+  ...character(t("tune.group.hero"), "hero"),
+  ...character(t("tune.group.urho"), "urho"), reaction(t("tune.group.urho"), "urho"),
+  ...character(t("tune.group.pohja"), "pohja"), reaction(t("tune.group.pohja"), "pohja"),
+  { group: t("tune.group.controls"), label: t("tune.field.mouseSens"), path: "controls.mouseSens", min: 0.01, max: 1, step: 0.01 },
+  { group: t("tune.group.controls"), label: t("tune.field.attackTurn"), path: "enemyAi.attackTurnScale", min: 0, max: 1, step: 0.05 },
+  { group: t("tune.group.waves"), label: t("tune.field.hpPerWave"), path: "waves.hpPerWave", min: 0, max: 200, step: 5 },
+  { group: t("tune.group.waves"), label: t("tune.field.powerPerWave"), path: "waves.powerPerWave", min: 0, max: 20, step: 0.5 },
+  { group: t("tune.group.waves"), label: t("tune.field.restHp"), path: "waves.restHp", min: 0, max: 1000, step: 5 },
+  { group: t("tune.group.waves"), label: t("tune.field.restStamina"), path: "waves.restStamina", min: 0, max: 1000, step: 5 },
+  { group: t("tune.group.waves"), label: t("tune.field.twoFrom"), path: "waves.twoFrom", min: 1, max: 99, step: 1 },
+  { group: t("tune.group.waves"), label: t("tune.field.threeFrom"), path: "waves.threeFrom", min: 1, max: 99, step: 1 },
+  { group: t("tune.group.waves"), label: t("tune.field.hpScaleTwo"), path: "waves.hpScaleTwo", min: 0.1, max: 2, step: 0.05 },
+  { group: t("tune.group.waves"), label: t("tune.field.hpScaleThree"), path: "waves.hpScaleThree", min: 0.1, max: 2, step: 0.05 },
+  { group: t("tune.group.waves"), label: t("tune.field.attackGap"), path: "enemyAi.attackGap", min: 0, max: 5, step: 0.05 },
+  { group: t("tune.group.waves"), label: t("tune.field.waitBack"), path: "enemyAi.waitBack", min: 0, max: 5, step: 0.1 },
+  { group: t("tune.group.waves"), label: t("tune.field.spread"), path: "enemyAi.spread", min: 0, max: 8, step: 0.1 },
+  { group: t("tune.group.waves"), label: t("tune.field.flankMax"), path: "enemyAi.flankMax", min: 30, max: 180, step: 5 },
+  { group: t("tune.group.waves"), label: t("tune.field.graceBlock"), path: "combat.graceBlock", min: 0, max: 5, step: 0.05 },
+  { group: t("tune.group.waves"), label: t("tune.field.graceParry"), path: "combat.graceParry", min: 0, max: 5, step: 0.05 },
+  { group: t("tune.group.waves"), label: t("tune.field.graceArc"), path: "combat.graceArc", min: 0, max: 180, step: 5 },
+  { group: t("tune.group.stamina"), label: t("tune.field.lightCost"), path: "stamina.light", min: 0, max: 100, step: 1 },
+  { group: t("tune.group.stamina"), label: t("tune.field.heavyCost"), path: "stamina.heavy", min: 0, max: 100, step: 1 },
+  { group: t("tune.group.stamina"), label: t("tune.field.blockHit"), path: "stamina.blockHit", min: 0, max: 100, step: 1 },
+  { group: t("tune.group.stamina"), label: t("tune.field.blockHold"), path: "stamina.blockHold", min: 0, max: 50, step: 0.5 },
+  { group: t("tune.group.stamina"), label: t("tune.field.weakDamage"), path: "stamina.weakDamage", min: 0, max: 1, step: 0.05 },
+  { group: t("tune.group.weapons"), label: t("tune.field.swordDamage"), path: "weapons.sword.damage", min: 0, max: 10, step: 0.05 },
+  { group: t("tune.group.weapons"), label: t("tune.field.spearDamage"), path: "weapons.spear.damage", min: 0, max: 10, step: 0.05 },
+  { group: t("tune.group.weapons"), label: t("tune.field.windup"), path: "combat.windupScale", min: 0.2, max: 5, step: 0.05 },
+  { group: t("tune.group.weapons"), label: t("tune.field.strikePoint"), path: "combat.strikePoint", min: 0.1, max: 1, step: 0.05 },
+  { group: t("tune.group.weapons"), label: t("tune.field.recovery"), path: "combat.recoveryScale", min: 0.2, max: 5, step: 0.05 },
+  { group: t("tune.group.weapons"), label: t("tune.field.parryWindow"), path: "combat.parryWindow", min: 0, max: 1, step: 0.01 },
+  { group: t("tune.group.song"), label: t("tune.field.songSpeed"), path: "song.speed", min: 0.25, max: 4, step: 0.05 },
+  { group: t("tune.group.song"), label: t("tune.field.songHits"), path: "song.minHits", min: 1, max: 8, step: 1 },
+  { group: t("tune.group.song"), label: t("tune.field.rootTime"), path: "song.rootTimePerHit", min: 0, max: 10, step: 0.05 },
+  { group: t("tune.group.song"), label: t("tune.field.heal"), path: "song.healPerHit", min: 0, max: 100, step: 1 },
+  { group: t("tune.group.song"), label: t("tune.field.songGainHit"), path: "combat.songGainHit", min: 0, max: 100, step: 1 },
+  { group: t("tune.group.song"), label: t("tune.field.songGainParry"), path: "combat.songGainParry", min: 0, max: 100, step: 1 },
 ];
 
 const FIELD_BY_PATH = new Map(FIELDS.map((f) => [f.path, f]));
@@ -171,7 +170,7 @@ export function parseChanges(input: unknown): Parsed {
   const res: Parsed = { values: new Map(), rejected: [], clamped: [] };
   const src = isTree(input) && isTree(input.muutokset) ? input.muutokset : input;
   if (!isTree(src)) {
-    if (input !== null && input !== undefined) res.rejected.push("(koko teksti)");
+    if (input !== null && input !== undefined) res.rejected.push(t("tune.entireText"));
     return res;
   }
   const walk = (node: Tree, prefix: string) => {
@@ -219,7 +218,7 @@ export function changesAsTree(values: ReadonlyMap<string, number> = changedValue
  * poikkeavat arvot, joten sen voi liittää sellaisenaan takaisin tai antaa uusiksi oletuksiksi.
  */
 export function exportTuning(version: string, values: ReadonlyMap<string, number> = changedValues()): string {
-  return JSON.stringify({ peli: "Laulun miekka", versio: version, muutokset: changesAsTree(values) }, null, 2);
+  return JSON.stringify({ peli: t("meta.title"), versio: version, muutokset: changesAsTree(values) }, null, 2);
 }
 
 /** Lukee JSON-tekstin muuttamatta mitään. */
@@ -229,8 +228,8 @@ export function parseTuningText(text: string): Parsed | { error: string } {
   try {
     parsed = JSON.parse(text);
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "virheellinen JSON" };
+    return { error: t("tune.invalidJson") };
   }
-  if (!isTree(parsed)) return { error: "tekstin pitää olla JSON-olio" };
+  if (!isTree(parsed)) return { error: t("tune.notObject") };
   return parseChanges(parsed);
 }
