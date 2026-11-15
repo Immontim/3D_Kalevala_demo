@@ -6,12 +6,13 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-15 (Codex, Windows)
+Päivitetty: 2026-11-15 (Claude, Windows)
 
-- **Branchin `codex/rpg-map` koodiversio on v02.00.00** (toteutuscommit
-  `c87f9e6`, pohjana `origin/main` `3191123`). Koodi on valmis, ei
-  deployattu. Tarkista merge-tila ennen jatkamista:
-  `git merge-base --is-ancestor codex/rpg-map origin/main`.
+- **Mainin koodiversio on v02.00.00** (Codexin 2D-kartta, PR #37).
+  **Branchin `claude/yard-peace-gear` koodiversio on v02.01.00** (pohjana
+  `origin/main` `533d485`): rauhan varustus ja sauvan/jousen ote. Koodi
+  valmis, ei deployattu. Tarkista merge-tila:
+  `git merge-base --is-ancestor claude/yard-peace-gear origin/main`.
 - **Sovellusrakenne.** `src/main.ts` on kevyt sovelluskuori. URL ilman
   `scene`-parametria käynnistää 2D-kartan; `?scene=yard&return=map`
   lataa dynaamisesti `src/scene3d.ts`:n ja nykyisen Three.js-moottorin.
@@ -64,6 +65,40 @@ Päivitetty: 2026-11-15 (Codex, Windows)
   ja rauhallisen pihan `visit`-tilan. Rauhallisella pihalla ovat talo,
   ulkorakennukset, emäntä, tietäjä, jousineito, koira, kanat, kukko ja possu.
   Kartta antaa 3D-sankarille paperinuken varustuksen ennen `spawnHero()`:a.
+- **Rauhallinen piha ja rauhan varustus.** Piha: `ARENA === "yard"`
+  (`ARENA_PEACEFUL`, `world.ts`), sama talo ja aita kuin pihapiirissä mutta
+  sikolätti (`STY`), kanakoppi (`COOP`) ja katettu pöytä (`TABLE`).
+  Väki tulee `populateYardLife`sta (`world.ts`) ja `src/folk.ts`:stä:
+  `spawnVillager` (kevyt hahmo, ei `Fighter`: kädet käännetään lepoasennosta,
+  pää seuraa kulkijaa alle 7 m päässä) ja `spawnAnimal` (`AnimationMixer`;
+  koira, kana, kiertävä possu). Kyläläiset ja eläimet ovat pyöreitä esteitä
+  (`blocksMelee: false`) eivätkä reagoi taisteluun. Vihamieliseksi
+  muuttuminen ei vaatinut refaktorointia: `startEncounter` tai `addEnemy`
+  toimii pihalla.
+  - **Rauhan varustus** (`Fighter.setSheathed`, `hero.ts` `heroAtPeace`):
+    kun `g.encounter.peaceful` ja `g.enemies` on tyhjä, miekka siirtyy
+    kiinnityspisteeseen `mount_huotra`, kilpi pisteeseen
+    `mount_kilpi_selka`, `char_hero_hihna` tulee näkyviin, kypärä piiloon
+    ja guard-asento korvataan `POSES.rest`illä. Lyönti ja torjunta on
+    estetty (`updatePlayer`). Ensimmäinen vastustaja palauttaa aseen
+    käteen heti; vetämisen animaatiota ei ole. Keihäs ei mene huotraan
+    (ei kantopaikkaa) ja pysyy kädessä. Aloitusikkunan taustalla sankari on
+    jo rauhan varustuksessa (`spawnHero`). Uusi rauhallinen kohtaus asettaa
+    `peaceful: true`.
+  - **Sauva ja jousi** (`folk.ts`, `VillagerDef.prop.grip`): ranneluu
+    käännetään niin, että nyrkin otekanava (`GRIP_MALE_R` = taistelijoiden
+    `GRIP_CHANNEL`, `GRIP_FEMALE_L` = arvio, ks. BLENDER_HANDOFF) on
+    pystyssä, ja esine kiinnitetään käden luun lapseksi. Sauva nojaa
+    maahan, jousi on kädessä kahvastaan.
+  - **Avoimet:** possun askel ei vastaa kävelynopeutta ja leikkeessä ei ole
+    lepoa; koiran `tassu`-leike ei ole käytössä; jousineidon ote on arvio
+    ja kuvasta se näyttää hyvältä vain osasta kulmia; kyläläisen
+    muuttuminen vastustajaksi vaatisi `Fighter`in tuen `villagers*.glb`:lle
+    (sama luuranko ja luiden nimet, naisilla eri lepoasento ja oma
+    otekanava). Tekijäluettelo on aloitusikkunan `#credits`.
+  - **Esikatselu työpuusta:** `preview_start` käynnistää palvelimen
+    pääkansiosta. Työpuun testi: `bun run dev --port 5174 --strictPort`
+    työpuusta, selain `localhost:5174/?scene=yard`; sulje palvelin lopuksi.
 - **Savutestattu käsin 2026-11-15** Codexin in-app browserissa:
   - kartta käynnistyi ilman GLB-pyyntöjä;
   - alku paljasti 3 × 3 ruutua, kolme askelta pihalle kulutti 30 min ja
@@ -73,10 +108,14 @@ Päivitetty: 2026-11-15 (Codex, Windows)
   - pihasiirtymä avasi rauhallisen `yard`-kohtauksen ilman aaltoa;
   - 3D näytti 60 FPS ja kartalle paluu säilytti koko kampanjatilan;
   - selaimen konsolissa ei ollut varoituksia tai virheitä.
-- **Tarkistukset 2026-11-15:** `bun run test` 206/206 (17 tiedostoa),
-  `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja
-  `git diff --check` läpäisty. Build varoittaa edelleen 3D-chunkin
-  ylittävän 500 kt; kartan dynaaminen jako toimii.
+- **Tarkistukset 2026-11-15:** `bun run test` 118/118 (11 tiedostoa)
+  Clauden työpuussa, `bunx tsc --noEmit` ja `bun run build` ok. Clauden
+  savutesti `?scene=yard`: rauhassa miekka huotrassa, kilpi selässä ja
+  isku ei käynnisty; `addEnemy` antaa aseet käteen ja isku käynnistyy;
+  `encounter("peace")` palauttaa huotraan; sauva ja jousi kädessä;
+  konsolissa ei virheitä. FPS mittaamatta (selainpaneeli piilossa).
+  Codexin raportoima 206 testiä ei vastaa tätä lukua, syy selvittämättä.
+  Build varoittaa edelleen 3D-chunkin ylittävän 500 kt.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`), 3D:ssä
   `window.__game`. Selainpaneelin fokus voi pysäyttää 3D-pelin.

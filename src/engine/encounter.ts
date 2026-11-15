@@ -13,10 +13,13 @@ export interface Encounter {
   update(dt: number): void;
   /** Vastustaja kaatui. Se on jo poistettu elävien listalta (g.enemies). */
   onEnemyDown(e: Actor): void;
+  /** Rauhallinen kohtaus: niin kauan kuin kentällä ei ole vastustajia, sankarin ase on huotrassa. */
+  peaceful?: boolean;
 }
 
 /** Rauhallinen kohtaus: kentällä ei ole vastustajia, sankari voi liikkua vapaasti. */
 export const peace: Encounter = {
+  peaceful: true,
   start() { $("wave").textContent = ""; },   // edellisen kohtauksen aaltonumero pois näkyvistä
   update() {},
   onEnemyDown() {},
@@ -26,6 +29,7 @@ export const peace: Encounter = {
  *  muuttaa vihamieliseksi vaihtamalla kohtauksen (startEncounter) tai tuomalla yksittäisen
  *  vastustajan (addEnemy); vastustajan mittarit tulevat näkyviin itsestään. */
 export const visit: Encounter = {
+  peaceful: true,
   start() { peace.start(); showMsg(t("yard.title"), t("yard.sub"), 3); },
   update() {},
   onEnemyDown() {},

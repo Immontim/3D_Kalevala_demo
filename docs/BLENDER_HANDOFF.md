@@ -11,12 +11,10 @@ Päivitetty: 2026-11-15 (Claude, Windows)
 - **Mainissa** (pohja `3191123`) ovat `assets/forest.glb`,
   `characters.glb`, `bog.glb`, `homestead.glb`, `household.glb`,
   `yard.glb`, `villagers.glb`, `villagers_f.glb` ja `assets/animals/`.
-  Branchissa `claude/hero-peace-gear` on uusi `characters.glb` (sankarin
-  rauhan varustus, ks. alla); tarkista merge-tila
-  `git merge-base --is-ancestor`. Se, mitä peli niistä lataa ja mitä
-  integraatiosta puuttuu, on `docs/AGENT_HANDOFF.md`:ssä.
-- **Sankarin rauhan varustus** (`characters.glb`, `char_build.py`;
-  pelikoodi ei vielä käytä, eikä nykyinen peli muutu):
+  `characters.glb` sisältää sankarin rauhan varustuksen (ks. alla). Se,
+  mitä peli niistä lataa, on `docs/AGENT_HANDOFF.md`:ssä.
+- **Sankarin rauhan varustus** (`characters.glb`, `char_build.py`; peli
+  käyttää sitä rauhallisella pihalla, ks. AGENT_HANDOFF):
   - Huotra vyöllä (sankari ja Pohjan soturi) on nyt 0,80 m (oli 0,58 m,
     miekan terä 0,74 m) ja painotettu vain lantioon (`SHEATH_TOP`,
     `SHEATH_D`, `SHEATH_LEN`).
@@ -153,14 +151,10 @@ Päivitetty: 2026-11-15 (Claude, Windows)
 
 ## Seuraava Blender-tehtävä
 
-Ei avointa Blender-tehtävää ennen pelikoodin integraatiota (odottaa
-Codexin 2D-RPG-kerroksen valmistumista, koska koodiin ei nyt kosketa):
-sankarin rauhan varustus (miekka `mount_huotra`an, kilpi
-`mount_kilpi_selka`an, `char_hero_hihna` näkyviin, kypärä pois) sekä
-sauvan ja jousen kiinnitys käden luuhun otekanavan mukaan niin, että käsi
-on varren ympärillä. Jos jousineidon ote ei näytä hyvältä pelissä,
-koverretaan hänen nyrkkinsä (`skin_parts(carve=…)` omalla kanavalla) ja
-viedään `villagers_f.glb` uudelleen.
+Ei avointa Blender-tehtävää. Jos omistaja pitää jousineidon otetta
+huonona, koverretaan hänen nyrkkinsä (`skin_parts(carve=…)` omalla
+kanavalla) ja viedään `villagers_f.glb` uudelleen. Muuten odotetaan
+palautetta pelissä näkyvistä virheistä.
 
 ## Ei vielä aloiteta
 

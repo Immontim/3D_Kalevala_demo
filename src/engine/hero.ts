@@ -11,6 +11,7 @@ import { lerpAngle, moveActor, startAttack } from "./melee";
 import { openChoice, songState } from "./song";
 import { DEG, aim, g, inputs, keys, sfx } from "./state";
 import { t } from "../i18n";
+import { ARENA_PEACEFUL } from "../world";
 
 // Sankarin varusteet valitaan aloitusikkunassa, ja valinta tallentuu selaimeen.
 export const LOADOUT_STORE = "laulun-miekka.loadout.v1";
@@ -40,11 +41,19 @@ export function renewPlayerShield() {
 /** Luo sankarin aloituspaikalleen. Vanha sankari on poistettava ensin (removeActor). */
 export function spawnHero() {
   g.player = makeActor(PLAYER_LOOK, new THREE.Vector3(0, 0, -3), 0, 0xffd27a);
+  // Rauhallisessa paikassa sankari näkyy jo aloitusikkunan taustalla ase huotrassa.
+  g.player.fighter.setSheathed(ARENA_PEACEFUL);
 }
+
+/** Rauha: kohtaus on rauhallinen eikä kentällä ole vastustajia. Silloin miekka on huotrassa ja
+ *  kilpi selässä, eikä sankari lyö tai torju. Ensimmäinen vastustaja saa hänet vetämään aseen. */
+export function heroAtPeace() { return !!g.encounter.peaceful && g.enemies.length === 0; }
 
 export function updatePlayer(dt: number) {
   const p = g.player;
   if (p.state === "dead") return;
+  const calm = heroAtPeace();
+  p.fighter.setSheathed(calm);
   // Lukittuna katse seuraa vastustajaa; muuten sitä ohjaa hiiri. Sankari kääntyy katseen suuntaan.
   const target = lockTarget();
   if (target) aim.yaw = lerpAngle(aim.yaw, bearing(p.pos, target.pos), 1 - Math.exp(-CONTROLS.lockTurn * dt));
@@ -88,7 +97,7 @@ export function updatePlayer(dt: number) {
       p.dodgeDir.copy(move.lengthSq() > 0 ? move.normalize() : right.clone().negate());
       return;
     }
-    if (inputs.strikeQueued) {
+    if (inputs.strikeQueued && !calm) {
       if (p.state === "idle") { startAttack(p, inputs.strikeQueued, "light", true); return; }
       // Torjunnan aikana: kilven kanssa kilpityöntö, pelkällä aseella torjunta-asennon vaihto.
       if (p.shield) { startAttack(p, "bash"); return; }
@@ -97,8 +106,8 @@ export function updatePlayer(dt: number) {
     }
     // Uupunut ei pysty torjumaan: suoja laskee itsestään.
     const tired = exhausted(p.stamina);
-    if (inputs.blockHeld && !tired && p.state === "idle") { setState(p, "block"); p.blockStart = g.gameTime; }
-    if ((!inputs.blockHeld || tired) && p.state === "block") setState(p, "idle");
+    if (inputs.blockHeld && !tired && !calm && p.state === "idle") { setState(p, "block"); p.blockStart = g.gameTime; }
+    if ((!inputs.blockHeld || tired || calm) && p.state === "block") setState(p, "idle");
   }
   const walk = p.stats.moveSpeed;
   const speed = p.state === "idle" ? walk : p.state === "block" || p.state === "windup" || p.state === "recovery" ? walk * COMBAT.guardMoveScale : 0;

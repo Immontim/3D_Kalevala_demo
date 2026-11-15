@@ -100,6 +100,11 @@ export const FALLEN: FallenPose[] = [
 ];
 
 export const POSES: Record<string, Pose> = {
+  // Rauhan lepoasento: kädet rennosti sivuilla, ase huotrassa (Fighter.setSheathed).
+  rest: {
+    spineYaw: 0, spinePitch: 0.02, rShX: 0.04, rShZ: -0.1, rEl: -0.22, rHandX: 0, rHandY: 0,
+    lShX: 0.04, lShZ: 0.1, lEl: -0.22, crouch: 0, headPitch: 0, stride: 0.04,
+  },
   guard: {
     spineYaw: -0.15, spinePitch: 0.08, rShX: -0.55, rShZ: -0.15, rEl: -1.15, rHandX: 0.95, rHandY: 0,
     lShX: -0.5, lShZ: 0.25, lEl: -1.3, crouch: 0.06, headPitch: 0, stride: 0.22,
@@ -263,6 +268,12 @@ export class Fighter {
   private footRestY = 0;
   private bladeMats: THREE.MeshStandardMaterial[] = [];
   private helmet: THREE.Object3D | null = null;
+  /** Rauhan varustus: miekka huotrassa, kilpi selässä kantohihnassa, kypärä poissa. */
+  private sheathed = false;
+  private weaponModel: THREE.Object3D | null = null;
+  private mountSheath: THREE.Object3D | null = null;
+  private mountBack: THREE.Object3D | null = null;
+  private strap: THREE.Object3D | null = null;
   private shieldHolder: THREE.Group | null = null;
   /** Kilven asento kyynärvarteen nähden torjunnassa (pinta kyynärvarren suuntaan). */
   private shieldFront = new THREE.Quaternion();
@@ -339,7 +350,9 @@ export class Fighter {
   private build(source: THREE.Object3D) {
     const clone = SkeletonUtils.clone(source);
     const rig = clone.getObjectByName("RIG") ?? clone;
-    const keep = new Set<string>([`char_${this.look.character}`]);
+    // Kantohihna (char_<hahmo>_hihna) on oma kappaleensa samassa luurangossa; näkyy vain rauhan varustuksessa.
+    const strapName = `char_${this.look.character}_hihna`;
+    const keep = new Set<string>([`char_${this.look.character}`, strapName]);
     const equip: Record<string, THREE.Object3D> = {};
     for (const child of [...clone.children, ...rig.children]) {
       const n = child.name;
@@ -358,6 +371,10 @@ export class Fighter {
     });
     this.body.add(clone);
     this.rig = rig;
+    this.strap = rig.getObjectByName(strapName) ?? null;
+    // Kiinnityspisteet luiden lapsina (Blender: build_mounts): lapsi nolla-asennossa on huotrassa tai selässä.
+    this.mountSheath = rig.getObjectByName("mount_huotra") ?? null;
+    this.mountBack = rig.getObjectByName("mount_kilpi_selka") ?? null;
     clone.updateMatrixWorld(true);
 
     // Lepoasennot hahmon omassa koordinaatistossa (klooni on vielä origossa).
@@ -412,6 +429,7 @@ export class Fighter {
         }
       });
       this.weapon.add(weaponModel);
+      this.weaponModel = weaponModel;
     }
     if (this.look.loadout === "sword_shield") {
       const shield = equip[`shield_${this.look.character}`];
@@ -442,7 +460,31 @@ export class Fighter {
       this.bones.get("head")!.bone.attach(helmet);
       this.helmet = helmet;
     }
+    this.applySheath();
     this.apply();
+  }
+
+  /**
+   * Rauhan varustus päälle tai pois: miekka huotraan lantiolle, kilpi selkään ja kantohihna
+   * näkyviin, kypärä pois päästä. Keihäs pysyy kädessä (sille ei ole kantopaikkaa).
+   * Vaihto on välitön; vetämisen animaatiota ei ole.
+   */
+  setSheathed(on: boolean) {
+    if (on === this.sheathed) return;
+    this.sheathed = on;
+    this.applySheath();
+  }
+
+  get isSheathed() { return this.sheathed; }
+
+  private applySheath() {
+    if (!this.rig) return;
+    const s = this.sheathed;
+    if (this.weaponModel && this.mountSheath && this.look.loadout !== "spear") (s ? this.mountSheath : this.weapon).add(this.weaponModel);
+    const carried = !!(this.shieldModel && this.shieldHolder && this.mountBack);
+    if (carried) (s ? this.mountBack! : this.shieldHolder!).add(this.shieldModel!);
+    if (this.strap) this.strap.visible = s && carried && this.hasShield;
+    if (this.helmet) this.helmet.visible = !s;
   }
 
   get hasHelmet() { return this.helmet !== null; }
@@ -853,6 +895,7 @@ export class Fighter {
   animate(target: Pose, rate: number, dt: number, moveSpeed: number) {
     const k = 1 - Math.exp(-rate * dt);
     if (this.fall > 0) target = this.fallen.pose;
+    else if (this.sheathed && this.look.loadout !== "spear" && target === POSES.guard) target = POSES.rest;
     // Kilpikäsi: kilpi pysyy vartalon edessä ja nousee torjunnassa eteen, ei pään päälle.
     const over = this.hasShield
       ? (BLOCK_POSES.has(target) ? SHIELD_BLOCK : SHIELD_ARM.has(target) ? SHIELD_GUARD : null)
