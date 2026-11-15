@@ -100,6 +100,15 @@ Sikolätti ja kanakoppi: geometria itse tehty Blenderissä (skripti
 `assets-src/blender/yard.py`), samat materiaalit ja lähteet kuin
 `homestead.glb`:ssä.
 
+## `lakeside.glb`
+
+Järvenrannan kohtaus: hirsimökki, keittopaikka (kolmijalka, pata, tuli),
+istuinhirsi, laituri, tukkivene, mela, ruoko ja kaisla. Geometria itse tehty
+Blenderissä (skripti `assets-src/blender/lakeside.py`); materiaalit ja
+tekstuurilähteet samat kuin `homestead.glb`:ssä ja `household.glb`:ssä
+(Poly Haven `pine_bark`, `forest_leaves_02`, `clay_plaster`, `thatch_roof_angled`,
+CC0). Ei uusia ulkopuolisia lähteitä.
+
 ## `household.glb`
 
 | Pelin malli | Lähde (Poly Haven -tunniste, CC0) | Käyttö |

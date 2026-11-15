@@ -6,13 +6,28 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-15 (Claude, Windows)
+Päivitetty: 2026-11-15 (Claude, Windows; pohja main e27a495)
 
 - **Mainissa** (pohja `3191123`) ovat `assets/forest.glb`,
   `characters.glb`, `bog.glb`, `homestead.glb`, `household.glb`,
   `yard.glb`, `villagers.glb`, `villagers_f.glb` ja `assets/animals/`.
   `characters.glb` sisältää sankarin rauhan varustuksen (ks. alla). Se,
   mitä peli niistä lataa, on `docs/AGENT_HANDOFF.md`:ssä.
+- **Järvenrannan kohtaus** (`assets/lakeside.glb`, noin 0,9 Mt / 9 300
+  kolmiota; `assets-src/blender/lakeside.py`, ajetaan taustalla ja lukee
+  ensin `homestead.py`:n ja `household.py`:n; Blender on
+  `C:\Program Files (x86)\Blender 5.4.0\blender.exe`). Koordinaatit,
+  mitat ja törmäysehdotukset ovat skriptin alun kommentissa. Mallit:
+  `mokki` (pieni hirsimökki, 4 100 kolmiota, turve- ja tuohikatto, ovi
+  raollaan -Y, ikkuna +X-päädyssä, savuluukku katolla; sisus pimeä laatikko),
+  `keittopaikka` (kivikehä, hiillos, kalikat, kolmijalka, ketju ja savipata;
+  tyhjät pisteet `mount_tuli` ja `mount_pata` liekin, valon ja höyryn
+  paikaksi), `istuinhirsi`, `laituri` (kansi +0,30 m, paalut 1 m alas),
+  `vene` (tukkivene) ja `mela`, `ruoko_a`, `ruoko_b` ja `kaisla` (tupaat).
+  Tietäjä (`villagers.glb`), koira (`animals/koira.glb`), kuuset, kivet ja
+  kelo (`forest.glb`) käytetään sellaisenaan. Ei vettä, rantaviivaa eikä
+  liekkiä: ne ovat pelikoodin asia. Katsottu vain Blenderin
+  esikatselukuvista (EEVEE, maa ja vesitaso), ei pelissä.
 - **Sankarin rauhan varustus** (`characters.glb`, `char_build.py`; peli
   käyttää sitä rauhallisella pihalla, ks. AGENT_HANDOFF):
   - Huotra vyöllä (sankari ja Pohjan soturi) on nyt 0,80 m (oli 0,58 m,
@@ -151,7 +166,10 @@ Päivitetty: 2026-11-15 (Claude, Windows)
 
 ## Seuraava Blender-tehtävä
 
-Ei avointa Blender-tehtävää. Jos omistaja pitää jousineidon otetta
+Ei avointa Blender-tehtävää. Järvenranta odottaa pelikoodia (Codex):
+kohtauksen asettelu, vesi ja ranta, liekki/valo `mount_tuli`-pisteeseen.
+Tietäjällä on vain lepoasento, joten istuva tietäjä vaatisi uuden
+istumaleikkeen. Jos omistaja pitää jousineidon otetta
 huonona, koverretaan hänen nyrkkinsä (`skin_parts(carve=…)` omalla
 kanavalla) ja viedään `villagers_f.glb` uudelleen. Muuten odotetaan
 palautetta pelissä näkyvistä virheistä.
