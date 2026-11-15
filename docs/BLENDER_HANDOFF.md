@@ -10,8 +10,8 @@ Päivitetty: 2026-11-15 (Claude, Windows)
 
 - **Mainissa** (pohja `c48b27e`) ovat `assets/forest.glb`,
   `characters.glb`, `bog.glb`, `homestead.glb`, `household.glb`,
-  `villagers.glb` ja `villagers_f.glb`; branchissa `claude/animals`
-  lisäksi `assets/animals/` (tarkista merge-tila
+  `villagers.glb`, `villagers_f.glb` ja `assets/animals/`; branchissa
+  `claude/peaceful-yard` lisäksi `yard.glb` (tarkista merge-tila
   `git merge-base --is-ancestor`). Se, mitä peli niistä lataa ja mitä
   integraatiosta puuttuu, on `docs/AGENT_HANDOFF.md`:ssä.
 - **Pihapiiri** tehdään skriptillä `assets-src/blender/homestead.py` →
@@ -20,6 +20,13 @@ Päivitetty: 2026-11-15 (Claude, Windows)
   kulkukuilun mitat on pidettävä samoina Blender-skriptissä ja
   `src/world.ts`:ssä. Hirsisalvosta ja savupiippua ei käytetä, koska ne
   ovat myöhempiä.
+- **Rauhallisen pihan rakennelmat** (`assets/yard.glb`, noin 1,1 Mt;
+  `assets-src/blender/yard.py`, ajetaan taustalla ja lukee ensin
+  `homestead.py`:n): `sikolatti` (940 kolmiota; olkikatos takana,
+  riukuaitaus edessä sisämitoiltaan noin 2,9 × 2,4 m, kaukalo etulaidalla)
+  ja `kanakoppi` (718 kolmiota; paaluilla seisova lautakoppi, kulkulauta
+  ja orsi kyljessä 0,6 m korkeudella). Etusivu -Y, origo pohjan keskellä,
+  samat materiaalit kuin pihapiirissä.
 - **Talousesineet** (`assets/household.glb`, noin 1,4 Mt / 19 000
   kolmiota; `assets-src/blender/household.py`): `pukkipoyta`, `penkki`,
   `tuohikontti`, `pata`, `rieska`, `nauriit`, `kuivakalat`, `lyhde`,
@@ -58,13 +65,15 @@ Päivitetty: 2026-11-15 (Claude, Windows)
   (`key_static_channels`): ilman sitä koiran viikset ja varpaat siirtyvät
   viennissä. Uusi eläin on rivi `ANIMALS`-taulukkoon.
 - **Tarkistuksen taso:** mallit on katsottu vain Blenderin kuvista
-  (hahmot lepoasennossa ja kädet alhaalla), ei pelin valossa eikä
-  liikkeessä. Eläinten viedyt tiedostot on tuotu takaisin Blenderiin ja
+  (hahmot lepoasennossa ja kädet alhaalla). Kyläläiset, eläimet,
+  talousesineet, sikolätti ja kanakoppi on lisäksi nähty pelissä
+  rauhallisella pihalla kuvakaappauksista, mutta ei liikkeessä. Eläinten viedyt tiedostot on tuotu takaisin Blenderiin ja
   jokainen leike kuvattu yhdestä ruudusta.
 - **Blender-putket** (`assets-src/blender/`): metsä `build_all.py`,
   taistelijat `char_all.py` → `run_chars()`, kyläläiset `char_folk.py` →
   `run_folk()`, suo `bog.py` → `build_bog()`, pihapiiri `homestead.py` ja
-  esineet `household.py` ja eläimet `animals.py`.
+  esineet `household.py`, rauhallisen pihan rakennelmat `yard.py` ja
+  eläimet `animals.py`.
   - Hahmot rakennetaan **avoimessa `characters.blend`-tiedostossa** Blender
     MCP:n kautta (kokoelmat GAME, SRC, WORK, FOLK, FOLK_F). Uusi
     kyläläinen: oma `build_…`-funktio ja rivi `run_folk`iin.
@@ -100,11 +109,11 @@ Päivitetty: 2026-11-15 (Claude, Windows)
 
 ## Seuraava Blender-tehtävä
 
-Ei avointa Blender-tehtävää. Seuraava työ on rauhallisen pihan
-integraatio pelikoodiin (`docs/AGENT_HANDOFF.md`); sen jälkeen korjataan
-mallien viat, jotka näkyvät vasta pelin valossa ja liikkeessä.
+Ei avointa Blender-tehtävää. Odotetaan omistajan palautetta rauhallisesta
+pihasta (`docs/AGENT_HANDOFF.md`); sen perusteella korjataan mallien viat,
+jotka näkyvät vasta pelin valossa.
 
 ## Ei vielä aloiteta
 
 - Louhen ja isännän mallit.
-- Dialogianimaatiot ennen rauhallisen pihan selainintegraatiota.
+- Dialogianimaatiot ennen omistajan palautetta rauhallisesta pihasta.

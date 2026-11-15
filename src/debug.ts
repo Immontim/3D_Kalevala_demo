@@ -31,7 +31,7 @@ export function initDebug() {
     get look() { return { camYaw: +aim.yaw.toFixed(3), camPitch: +aim.pitch.toFixed(3), lockOn: aim.lockOn, locked: !!lockTarget(), playerYaw: +g.player.yaw.toFixed(3), enemyYaw: d.enemy ? +d.enemy.yaw.toFixed(3) : null }; },
     setLook(yaw: number, pitch = aim.pitch) { aim.yaw = yaw; aim.pitch = pitch; },
     setLock(on: boolean) { aim.lockOn = on; },
-    /** Käytössä oleva taistelualue ("clearing" tai "homestead"). */
+    /** Käytössä oleva paikka ("clearing", "homestead" tai "yard"). */
     get arena() { return ARENA; },
     /** Törmäysrekisterin määrä ja pelaajaa juuri koskettavat vaara-alueet. */
     get collision() {
@@ -82,7 +82,8 @@ export function initDebug() {
     },
     /** Vaihtaa kohtauksen: "skirmish" = aaltotaistelu, "peace" = ei vastustajia. */
     encounter(kind: "skirmish" | "peace") { startEncounter(kind === "peace" ? peace : skirmish); },
-    /** Tuo kentälle ylimääräisen vastustajan (i = rivi taulukossa ENEMIES) annettuun kohtaan. */
+    /** Tuo kentälle ylimääräisen vastustajan (i = rivi taulukossa ENEMIES) annettuun kohtaan.
+     *  Rauhallisella pihalla tämä muuttaa paikan osin vihamieliseksi. */
     addEnemy(i: number, x: number, z: number, level = 1) {
       const def = ENEMIES[i % ENEMIES.length];
       addEnemy({ name: def.name, look: def.look, level }, new THREE.Vector3(x, groundHeight(x, z), z));

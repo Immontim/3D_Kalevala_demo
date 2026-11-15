@@ -94,6 +94,12 @@ rautakauden lopulla ja varhaisella keskiajalla* (Turun yliopisto 2009), luku 2
 
 Haku: `tools/fetch-homestead.ps1`. Ladattu mutta ei käytössä: `reed_roof_03`.
 
+## `yard.glb`
+
+Sikolätti ja kanakoppi: geometria itse tehty Blenderissä (skripti
+`assets-src/blender/yard.py`), samat materiaalit ja lähteet kuin
+`homestead.glb`:ssä.
+
 ## `household.glb`
 
 | Pelin malli | Lähde (Poly Haven -tunniste, CC0) | Käyttö |
