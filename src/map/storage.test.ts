@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { CAMPAIGN_STORE, clearCampaign, loadCampaign, saveCampaign, type CampaignStorage } from "./storage";
+import {
+  CAMPAIGN_STORE,
+  LEGACY_CAMPAIGN_STORE,
+  clearCampaign,
+  loadCampaign,
+  saveCampaign,
+  type CampaignStorage,
+} from "./storage";
 
 function memoryStorage(initial?: string): CampaignStorage & { data: Map<string, string> } {
   const data = new Map<string, string>();
@@ -13,12 +20,12 @@ function memoryStorage(initial?: string): CampaignStorage & { data: Map<string, 
 }
 
 describe("kampanjan selainvarasto", () => {
-  it("tallentaa ja palauttaa karttaruudun, ajan, nälän ja varusteet", () => {
+  it("tallentaa ja palauttaa karttaruudun, ajan, kylläisyyden ja varusteet", () => {
     const storage = memoryStorage();
     const state = loadCampaign(storage);
     state.world.x = 3;
     state.world.worldMinutes = 95;
-    state.player.hunger = 14;
+    state.player.satiety = 86;
     state.player.equipment = { mainHand: "spear", offHand: null };
     expect(saveCampaign(state, storage)).toBe(true);
     expect(loadCampaign(storage)).toEqual(state);
@@ -26,8 +33,45 @@ describe("kampanjan selainvarasto", () => {
 
   it("korvaa rikkinäisen tallennuksen turvallisella uudella kampanjalla", () => {
     const state = loadCampaign(memoryStorage("{not-json"));
-    expect(state.schemaVersion).toBe(1);
+    expect(state.schemaVersion).toBe(2);
     expect(state.world).toMatchObject({ mapId: "kalevala-prototype", width: 20, height: 20 });
+  });
+
+  it("migroi v1-avaimen tallennuksen v2-avaimeen menettämättä etenemistä", () => {
+    const storage = memoryStorage();
+    const current = loadCampaign(storage);
+    current.world.x = 4;
+    current.world.worldMinutes = 210;
+    const legacy = JSON.parse(JSON.stringify(current));
+    legacy.schemaVersion = 1;
+    delete legacy.player.satiety;
+    legacy.player.hunger = 65;
+    storage.data.set(LEGACY_CAMPAIGN_STORE, JSON.stringify(legacy));
+
+    const migrated = loadCampaign(storage);
+    expect(migrated.world).toEqual(current.world);
+    expect(migrated.player.satiety).toBe(35);
+    expect(storage.data.has(CAMPAIGN_STORE)).toBe(true);
+    expect(storage.data.has(LEGACY_CAMPAIGN_STORE)).toBe(false);
+  });
+
+  it("palauttaa kelvollisen v1-tallennuksen vaikka migraation kirjoitus estetään", () => {
+    const source = loadCampaign(memoryStorage());
+    source.world.x = 7;
+    const legacy = JSON.parse(JSON.stringify(source));
+    legacy.schemaVersion = 1;
+    delete legacy.player.satiety;
+    legacy.player.hunger = 25;
+    const serialized = JSON.stringify(legacy);
+    const blocked: CampaignStorage = {
+      getItem: (key) => key === LEGACY_CAMPAIGN_STORE ? serialized : null,
+      setItem: () => { throw new DOMException("blocked", "SecurityError"); },
+      removeItem: () => { throw new DOMException("blocked", "SecurityError"); },
+    };
+
+    const migrated = loadCampaign(blocked);
+    expect(migrated.world.x).toBe(7);
+    expect(migrated.player.satiety).toBe(75);
   });
 
   it("korvaa turvallisesti myös eri karttaversiolle kuuluvan tallennuksen", () => {
@@ -44,9 +88,11 @@ describe("kampanjan selainvarasto", () => {
 
   it("poistaa vain kampanjan oman avaimen", () => {
     const storage = memoryStorage("saved");
+    storage.data.set(LEGACY_CAMPAIGN_STORE, "old");
     storage.data.set("other", "keep");
     expect(clearCampaign(storage)).toBe(true);
     expect(storage.data.get(CAMPAIGN_STORE)).toBeUndefined();
+    expect(storage.data.get(LEGACY_CAMPAIGN_STORE)).toBeUndefined();
     expect(storage.data.get("other")).toBe("keep");
   });
 });

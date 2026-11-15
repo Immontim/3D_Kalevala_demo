@@ -25,8 +25,8 @@ export const TERRAINS: Record<TerrainId, TerrainDefinition> = {
 };
 
 export const MAP_RULES = {
-  /** Nälkää per maailmassa kulunut minuutti; 0 = kylläinen ja 100 = nälkäinen. */
-  hungerPerMinute: 0.05,
+  /** Menetettyä kylläisyyttä per maailmassa kulunut minuutti. */
+  satietyLossPerMinute: 0.05,
   revealRadius: 1,
 } as const;
 
@@ -50,8 +50,8 @@ export interface MapPosition {
 
 export interface WorldMapState extends MapPosition {
   worldMinutes: number;
-  /** 0 = kylläinen, 100 = nälkäinen. Nälkä ei itsessään estä toimintaa tai tapa. */
-  hunger: number;
+  /** 100 = kylläinen, 0 = nääntynyt. Kylläisyys ei itsessään estä toimintaa tai tapa. */
+  satiety: number;
   /** Pysyvä tutkimussumu samassa rivijärjestyksessä kuin kartan cells. */
   discovered: readonly boolean[];
 }
@@ -108,7 +108,7 @@ export function revealAround(
 export function createWorldMapState(
   map: WorldMapDefinition,
   start: MapPosition,
-  values: { worldMinutes?: number; hunger?: number; discovered?: readonly boolean[] } = {},
+  values: { worldMinutes?: number; satiety?: number; discovered?: readonly boolean[] } = {},
 ): WorldMapState {
   if (!mapCell(map, start.x, start.y)) throw new Error("Kartan aloituspaikka on kartan ulkopuolella.");
   const discovered = values.discovered ?? Array<boolean>(map.cells.length).fill(false);
@@ -116,13 +116,13 @@ export function createWorldMapState(
   return {
     ...start,
     worldMinutes: Math.max(0, values.worldMinutes ?? 0),
-    hunger: clampHunger(values.hunger ?? 0),
+    satiety: clampSatiety(values.satiety ?? 100),
     discovered: revealAround(map, discovered, start),
   };
 }
 
-export function clampHunger(hunger: number): number {
-  return Math.max(0, Math.min(100, hunger));
+export function clampSatiety(satiety: number): number {
+  return Math.max(0, Math.min(100, satiety));
 }
 
 /** Ratkaisee yhden atomisen, vain pääilmansuuntiin sallitun karttaliikkeen. */
@@ -146,7 +146,7 @@ export function moveOnMap(
     x,
     y,
     worldMinutes: state.worldMinutes + minutesSpent,
-    hunger: clampHunger(state.hunger + minutesSpent * MAP_RULES.hungerPerMinute),
+    satiety: clampSatiety(state.satiety - minutesSpent * MAP_RULES.satietyLossPerMinute),
     discovered: revealAround(map, state.discovered, { x, y }),
   };
   return { state: next, moved: true, minutesSpent, siteId: cell.siteId };

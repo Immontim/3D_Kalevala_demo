@@ -66,7 +66,7 @@ describe("tutkimussumu", () => {
   });
 });
 
-describe("karttaliike, aika ja nälkä", () => {
+describe("karttaliike, aika ja kylläisyys", () => {
   it("liikkuu vain pääilmansuuntiin yhden ruudun", () => {
     const map = mapWith();
     const start = createWorldMapState(map, { x: 10, y: 10 });
@@ -79,29 +79,29 @@ describe("karttaliike, aika ja nälkä", () => {
     expect(invalid.state).toBe(start);
   });
 
-  it("estynyt liike ei muuta paikkaa, aikaa, nälkää tai paljastusta", () => {
+  it("estynyt liike ei muuta paikkaa, aikaa, kylläisyyttä tai paljastusta", () => {
     const map = mapWith([{ x: 11, y: 10, terrainId: "water" }]);
-    const start = createWorldMapState(map, { x: 10, y: 10 }, { worldMinutes: 50, hunger: 12 });
+    const start = createWorldMapState(map, { x: 10, y: 10 }, { worldMinutes: 50, satiety: 88 });
     const result = moveOnMap(map, start, "right");
     expect(result).toMatchObject({ moved: false, minutesSpent: 0 });
     expect(result.state).toBe(start);
   });
 
-  it("kohdetiilin aika kasvattaa samalla maailmanaikaa ja nälkää", () => {
+  it("kohdetiilin aika kasvattaa maailmanaikaa ja vähentää kylläisyyttä", () => {
     const map = mapWith([{ x: 11, y: 10, terrainId: "bog" }]);
-    const start = createWorldMapState(map, { x: 10, y: 10 }, { worldMinutes: 100, hunger: 20 });
+    const start = createWorldMapState(map, { x: 10, y: 10 }, { worldMinutes: 100, satiety: 80 });
     const result = moveOnMap(map, start, "right");
     expect(result.minutesSpent).toBe(TERRAINS.bog.minuteCost);
     expect(result.state.worldMinutes).toBe(100 + TERRAINS.bog.minuteCost);
-    expect(result.state.hunger).toBeCloseTo(20 + TERRAINS.bog.minuteCost * MAP_RULES.hungerPerMinute);
+    expect(result.state.satiety).toBeCloseTo(80 - TERRAINS.bog.minuteCost * MAP_RULES.satietyLossPerMinute);
   });
 
-  it("nälkä pysyy välillä 0–100 eikä estä liikkumista", () => {
+  it("kylläisyys pysyy välillä 0–100 eikä estä liikkumista", () => {
     const map = mapWith([{ x: 11, y: 10, terrainId: "bog" }]);
-    const start = createWorldMapState(map, { x: 10, y: 10 }, { hunger: 99.9 });
+    const start = createWorldMapState(map, { x: 10, y: 10 }, { satiety: 0.1 });
     const result = moveOnMap(map, start, "right");
     expect(result.moved).toBe(true);
-    expect(result.state.hunger).toBe(100);
+    expect(result.state.satiety).toBe(0);
   });
 
   it("välittää kohderuudun pihapiirin tunnisteen", () => {

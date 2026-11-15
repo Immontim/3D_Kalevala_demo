@@ -3,6 +3,7 @@ import { MAP_HEIGHT, MAP_WIDTH, createWorldMap, type MapCell, type TerrainId } f
 export const PROTOTYPE_MAP_ID = "kalevala-prototype";
 export const PROTOTYPE_START = { x: 10, y: 14 } as const;
 export const YARD_POSITION = { x: 10, y: 11 } as const;
+export const CAMPFIRE_POSITION = { x: 13, y: 14 } as const;
 
 const LEGEND: Record<string, TerrainId> = {
   w: "water",
@@ -44,6 +45,7 @@ if (ROWS.length !== MAP_HEIGHT || ROWS.some((row) => row.length !== MAP_WIDTH)) 
 const cells: MapCell[] = ROWS.flatMap((row, y) => [...row].map((symbol, x) => ({
   terrainId: LEGEND[symbol],
   ...(x === YARD_POSITION.x && y === YARD_POSITION.y ? { siteId: "yard" } : {}),
+  ...(x === CAMPFIRE_POSITION.x && y === CAMPFIRE_POSITION.y ? { siteId: "campfire" } : {}),
 })));
 
 export const PROTOTYPE_MAP = createWorldMap(cells);

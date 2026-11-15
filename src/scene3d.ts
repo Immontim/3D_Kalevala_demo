@@ -16,12 +16,23 @@ import { initStartMenu } from "./ui/startMenu";
 import { initDebug } from "./debug";
 import { combatLoadout } from "./map/campaign";
 import { loadCampaign } from "./map/storage";
+import { sceneKind } from "./app/route";
+import {
+  campaignSatiety,
+  configureMapToSceneTransition,
+  createMapToSceneTransition,
+} from "./map/transition";
 
 export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   document.body.classList.add("mode-scene");
   document.body.classList.toggle("from-map", route.returnToMap);
   $("ver").textContent = VERSION;
   const campaign = loadCampaign();
+  const satiety = campaignSatiety(campaign.player);
+  const mapTransition = route.returnToMap
+    ? createMapToSceneTransition(route.scene, sceneKind(route.scene), satiety)
+    : null;
+  configureMapToSceneTransition(mapTransition);
   const loadout = combatLoadout(campaign.player.equipment);
   if (!loadout) throw new Error("Kampanjan varusteyhdistelmää ei voi tuoda 3D-kohtaukseen.");
   PLAYER_LOOK.loadout = loadout;
@@ -33,7 +44,7 @@ export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   initInput();
   initPauseMenu();
   initLoop();
-  initStartMenu({ returnToMap: route.returnToMap });
+  initStartMenu({ returnToMap: route.returnToMap, scene: route.scene });
   initDebug();
   requestAnimationFrame(frame);
 }

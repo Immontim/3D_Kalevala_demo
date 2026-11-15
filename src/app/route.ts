@@ -2,6 +2,18 @@
 
 export const SCENE_IDS = ["clearing", "homestead", "yard"] as const;
 export type SceneId = (typeof SCENE_IDS)[number];
+export type SceneKind = "battle" | "friendly";
+
+/** Reititystason kohtausluokitus on kevyt eikä vedä 3D-maailmaa karttareitille. */
+export const SCENE_KINDS: Record<SceneId, SceneKind> = {
+  clearing: "battle",
+  homestead: "battle",
+  yard: "friendly",
+};
+
+export function sceneKind(scene: SceneId): SceneKind {
+  return SCENE_KINDS[scene];
+}
 
 export type AppRoute =
   | { mode: "map" }

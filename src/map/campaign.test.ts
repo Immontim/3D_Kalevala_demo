@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CAMPAIGN_SCHEMA_VERSION,
-  HUNGER_MAX,
+  SATIETY_MAX,
   ITEMS,
   combatLoadout,
   consumeFood,
@@ -22,25 +22,26 @@ describe("kampanjatila", () => {
       { itemId: "barley_flatbread", quantity: 3 },
       { itemId: "dried_fish", quantity: 2 },
     ]);
-    expect(ITEMS.barley_flatbread.hungerRelief).toBeGreaterThan(0);
-    expect(ITEMS.dried_fish.hungerRelief).toBeGreaterThan(ITEMS.barley_flatbread.hungerRelief!);
+    expect(state.player.satiety).toBe(SATIETY_MAX);
+    expect(ITEMS.barley_flatbread.satietyGain).toBeGreaterThan(0);
+    expect(ITEMS.dried_fish.satietyGain).toBeGreaterThan(ITEMS.barley_flatbread.satietyGain!);
   });
 
-  it("syö yhden ruuan, vähentää nälkää ja poistaa tyhjän pinon", () => {
+  it("syö yhden ruuan, kasvattaa kylläisyyttä ja poistaa tyhjän pinon", () => {
     const start = createCampaign();
-    start.player.hunger = 30;
+    start.player.satiety = 70;
     start.player.inventory.stacks = [{ itemId: "barley_flatbread", quantity: 1 }];
     const result = consumeFood(start, "barley_flatbread");
     expect(result.consumed).toBe(true);
-    expect(result.state.player.hunger).toBe(6);
+    expect(result.state.player.satiety).toBe(94);
     expect(result.state.player.inventory.stacks).toEqual([]);
-    expect(start.player.hunger).toBe(30);
+    expect(start.player.satiety).toBe(70);
   });
 
-  it("ei laske nälkää alle nollan eikä syö puuttuvaa ruokaa", () => {
+  it("ei nosta kylläisyyttä yli sadan eikä syö puuttuvaa tai täysin kylläisenä", () => {
     const start = createCampaign();
-    start.player.hunger = 5;
-    expect(consumeFood(start, "dried_fish").state.player.hunger).toBe(0);
+    start.player.satiety = 95;
+    expect(consumeFood(start, "dried_fish").state.player.satiety).toBe(SATIETY_MAX);
     const empty = createCampaign();
     empty.player.inventory.stacks = [];
     const result = consumeFood(empty, "dried_fish");
@@ -68,7 +69,7 @@ describe("kampanjatila", () => {
 describe("kampanjatallennus", () => {
   it("serialisoi ja lukee turvallisen kopion", () => {
     const state = createCampaign({ x: 2, y: 4 });
-    state.player.hunger = HUNGER_MAX;
+    state.player.satiety = 0;
     const loaded = parseCampaign(serializeCampaign(state));
     expect(loaded).toEqual(state);
     expect(loaded).not.toBe(state);
@@ -77,10 +78,40 @@ describe("kampanjatallennus", () => {
 
   it("hylkää rikkinäisen JSONin, väärän version ja kartan koon", () => {
     expect(parseCampaign("{" )).toBeNull();
-    expect(parseCampaign({ schemaVersion: 2 })).toBeNull();
+    expect(parseCampaign({ schemaVersion: 99 })).toBeNull();
     const state = createCampaign();
     state.world.discovered.pop();
     expect(parseCampaign(state)).toBeNull();
+  });
+
+  it("migroi version 1 nälän version 2 kylläisyydeksi ja säilyttää etenemisen", () => {
+    const current = createCampaign({ x: 7, y: 9 });
+    current.world.worldMinutes = 345;
+    current.world.discovered[0] = true;
+    const legacy = {
+      ...current,
+      schemaVersion: 1,
+      player: { ...current.player, hunger: 73, satiety: undefined },
+    };
+    const migrated = parseCampaign(JSON.parse(JSON.stringify(legacy)));
+    expect(migrated).not.toBeNull();
+    expect(migrated!.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
+    expect(migrated!.player.satiety).toBe(27);
+    expect(migrated!.world).toEqual(current.world);
+    expect(migrated!.player.inventory).toEqual(current.player.inventory);
+    expect(migrated!.player.equipment).toEqual(current.player.equipment);
+  });
+
+  it("hylkää kylläisyyden ja vanhan nälän sallitun alueen ulkopuolelta", () => {
+    const invalidCurrent = createCampaign();
+    invalidCurrent.player.satiety = 101;
+    expect(parseCampaign(invalidCurrent)).toBeNull();
+
+    const legacy = JSON.parse(serializeCampaign(createCampaign()));
+    legacy.schemaVersion = 1;
+    delete legacy.player.satiety;
+    legacy.player.hunger = -1;
+    expect(parseCampaign(legacy)).toBeNull();
   });
 
   it("hylkää tuntemattomat ja liian suuret esinepinot", () => {
