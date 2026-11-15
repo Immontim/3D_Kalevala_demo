@@ -52,7 +52,10 @@ Päivitetty: 2026-11-15 (Codex, Windows)
   pöydän ja penkin törmäysmuodot ovat jo `PROP_COLLIDERS`issa.
   `prepareMaterials`iin pitää lisätä materiaalit `M_HH_*` ja `F_Weave`.
   Naishahmo skaalataan noin 0,95:een, eikä miehen kädestä mitattu
-  `GRIP_CHANNEL` käy hänelle. Mallien sisältö, nimet ja viat:
+  `GRIP_CHANNEL` käy hänelle. Eläimet (`assets/animals/*.glb`, branch
+  `claude/animals`) tuovat mukanaan animaatioleikkeet, joten ne tarvitsevat
+  `THREE.AnimationMixer`in; tämä on poikkeus päätöksestä animoida koodilla
+  ja odottaa omistajan vahvistusta. Mallien sisältö, nimet ja viat:
   `docs/BLENDER_HANDOFF.md`.
 - **Laulut ja valinta** (`src/songLogic.ts`: `SONGS`, `SONG_SLOTS`; kulku
   `engine/song.ts`): laulunappi täydellä voimalla → `openChoice()`:

@@ -10,7 +10,9 @@ Päivitetty: 2026-11-15 (Claude, Windows)
 
 - **Mainissa** (pohja `c48b27e`) ovat `assets/forest.glb`,
   `characters.glb`, `bog.glb`, `homestead.glb`, `household.glb`,
-  `villagers.glb` ja `villagers_f.glb`. Se, mitä peli niistä lataa ja mitä
+  `villagers.glb` ja `villagers_f.glb`; branchissa `claude/animals`
+  lisäksi `assets/animals/` (tarkista merge-tila
+  `git merge-base --is-ancestor`). Se, mitä peli niistä lataa ja mitä
   integraatiosta puuttuu, on `docs/AGENT_HANDOFF.md`:ssä.
 - **Pihapiiri** tehdään skriptillä `assets-src/blender/homestead.py` →
   `build_homestead()`: `talo`, `kuoppatalo`, `aitta`, `katos`, `aita`,
@@ -41,13 +43,28 @@ Päivitetty: 2026-11-15 (Claude, Windows)
   Emännän pitkä helma seuraa reisiä ja sääriä, mutta kävelyä ei ole
   kokeiltu. Jousineidon olkaviitta ei kestä käsien nostoa jousen
   jännitysasentoon ilman läpimenoa.
+- **Eläimet** (`assets/animals/`, yhteensä 3,1 Mt; skripti `animals.py`,
+  ajetaan taustalla; lähteet Sketchfabista CC-BY 4.0, omistaja lataa
+  glTF-muodossa kansioon `assets-src/_downloads/animals/<nimi>/`):
+  `koira.glb` (8 000 kolmiota, 191 luuta, korkeus 0,56 m; leikkeet
+  `seisoo`, `istuu`, `tassu`), `kana.glb` (5 000, 56 luuta, 0,37 m; `olo`
+  = nokkii maata), `possu.glb` (7 000, 54 luuta, 0,50 m; `kavely`
+  paikallaan, ei lepoleikettä) ja `kukko_kana.glb` (liikkumattomat `kukko`
+  2 400 ja `kana_b` 2 000 kolmiota). Juurisolmu on eläimen nimi, origo
+  jalkojen välissä maassa, nokka -Y, koko valmiiksi metreinä (juuressa on
+  skaala). Eläimet ovat omissa tiedostoissaan, koska lähdemallien luiden
+  nimet menevät päällekkäin. Materiaali `M_AN_*`, vain värikartta.
+  Skripti kirjoittaa leikkeisiin luiden avaimettomat kanavat
+  (`key_static_channels`): ilman sitä koiran viikset ja varpaat siirtyvät
+  viennissä. Uusi eläin on rivi `ANIMALS`-taulukkoon.
 - **Tarkistuksen taso:** mallit on katsottu vain Blenderin kuvista
   (hahmot lepoasennossa ja kädet alhaalla), ei pelin valossa eikä
-  liikkeessä.
+  liikkeessä. Eläinten viedyt tiedostot on tuotu takaisin Blenderiin ja
+  jokainen leike kuvattu yhdestä ruudusta.
 - **Blender-putket** (`assets-src/blender/`): metsä `build_all.py`,
   taistelijat `char_all.py` → `run_chars()`, kyläläiset `char_folk.py` →
   `run_folk()`, suo `bog.py` → `build_bog()`, pihapiiri `homestead.py` ja
-  esineet `household.py`.
+  esineet `household.py` ja eläimet `animals.py`.
   - Hahmot rakennetaan **avoimessa `characters.blend`-tiedostossa** Blender
     MCP:n kautta (kokoelmat GAME, SRC, WORK, FOLK, FOLK_F). Uusi
     kyläläinen: oma `build_…`-funktio ja rivi `run_folk`iin.
@@ -75,17 +92,17 @@ Päivitetty: 2026-11-15 (Claude, Windows)
 - Tietäjän vasen käsi tulee levällään olevassa lepoasennossa viitan läpi;
   suunniteltu lepoasento pitää käden viitan alla.
 - Emännän pitkä helma ja jousineidon viitta pitää testata pelin animaatioilla.
+- Eläinten tyyli ei ole yhtenäinen: kukko ja kanat ovat käsinmaalattuja,
+  koira sileä ja ihmishahmoja lelumaisempi. Possu on porsaan mittasuhteissa.
+  Koiran 191 luuta on yhdelle koiralle hyväksyttävä, ei laumalle.
 - Talousesineiden tulikivet ja tuhka ovat tasaisen harmaita ilman tekstuuria.
 - Blender-skriptien polut on kovakoodattu (`C:\Data\3D Kalevala`).
 
 ## Seuraava Blender-tehtävä
 
-Eläimet rauhalliseen pihaan. Omistaja on ladannut Sketchfabista
-(CC-BY) kansioon `assets-src/_downloads/animals/`: koira (Shiba Inu,
-quander), kana (Halva the Chicken, Pia Heugel), kukko ja kana (Enkarra)
-sekä possu (grs). Tarkista lisenssi ladatuista tiedostoista, kevennä
-selaimelle (koira ja possu noin 8 000 kolmioon), sävytä aikakauteen, vie
-omaksi `.glb`-tiedostokseen ja kirjaa tekijät `assets/CREDITS.md`:hen.
+Ei avointa Blender-tehtävää. Seuraava työ on rauhallisen pihan
+integraatio pelikoodiin (`docs/AGENT_HANDOFF.md`); sen jälkeen korjataan
+mallien viat, jotka näkyvät vasta pelin valossa ja liikkeessä.
 
 ## Ei vielä aloiteta
 
