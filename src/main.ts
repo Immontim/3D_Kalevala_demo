@@ -1,31 +1,14 @@
-// Käynnistys: kokoaa moottorin ja sivun käyttöliittymän.
-import { VERSION } from "./version";
-import { $ } from "./engine/dom";
-import { initView } from "./engine/view";
-import { initEffects } from "./engine/effects";
-import { spawnHero } from "./engine/hero";
-import { initInput } from "./engine/input";
-import { frame, initLoop } from "./engine/loop";
-import { initPauseMenu, loadSavedTuning } from "./ui/pauseMenu";
-import { skirmish } from "./engine/skirmish";
-import { visit } from "./engine/encounter";
-import { ARENA_PEACEFUL } from "./world";
-import { g } from "./engine/state";
-import { initStartMenu } from "./ui/startMenu";
-import { initDebug } from "./debug";
+// Sovelluskuori: kartta on oletus, raskas 3D-moottori ladataan vain scene-reitillä.
+import { parseAppRoute } from "./app/route";
 import { translateDocument } from "./i18n";
 
 translateDocument();
-$("ver").textContent = VERSION;
-loadSavedTuning(); // ennen kuin yhtään hahmoa luodaan
-initView();
-initEffects();
-spawnHero();
-// Kohtaus alkaa Aloita-napista: rauhallisella pihalla vierailu ilman vastustajia, muualla aaltotaistelu.
-g.encounter = ARENA_PEACEFUL ? visit : skirmish;
-initInput();
-initPauseMenu();
-initLoop();
-initStartMenu();
-initDebug();
-requestAnimationFrame(frame);
+
+const route = parseAppRoute(location.href);
+if (route.mode === "scene") {
+  document.body.classList.add("mode-scene");
+  await import("./scene3d").then((module) => module.initScene3d(route));
+} else {
+  document.body.classList.add("mode-map");
+  await import("./map/app").then((module) => module.initMap());
+}

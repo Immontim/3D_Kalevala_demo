@@ -8,8 +8,19 @@ import { lockPointer } from "../engine/input";
 import { g, sfx } from "../engine/state";
 import { ARENA, ARENAS, ArenaId, saveArena } from "../world";
 import { Language, getLanguage, setLanguage, t } from "../i18n";
+import { sceneUrl } from "../app/route";
 
-export function initStartMenu() {
+export function initStartMenu(options: { returnToMap?: boolean } = {}) {
+  if (options.returnToMap) {
+    document.body.classList.add("from-map");
+    const tag = document.querySelector<HTMLElement>("#start .tag");
+    if (tag) { tag.textContent = t("yard.sub"); tag.removeAttribute("data-i18n"); }
+    const startButton = $("startBtn");
+    startButton.textContent = t("map.enterYard");
+    startButton.removeAttribute("data-i18n");
+    $("menuBtn").textContent = t("map.return");
+    $("menuBtn").removeAttribute("data-i18n");
+  }
   for (const btn of document.querySelectorAll<HTMLButtonElement>("#languagePick button[data-language]")) {
     const language = btn.dataset.language as Language;
     btn.classList.toggle("on", language === getLanguage());
@@ -34,7 +45,7 @@ export function initStartMenu() {
         if (id === ARENA) return;
         if (!saveArena(id)) { $("arenaNote").textContent = t("start.arenaSaveFailed"); return; }
         $("arenaNote").textContent = t("start.loading", { name: ARENAS[id].name });
-        location.reload();
+        location.href = sceneUrl(location.href, id, !!options.returnToMap).href;
       });
       box.appendChild(btn);
     }
