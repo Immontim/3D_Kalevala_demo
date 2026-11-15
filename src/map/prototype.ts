@@ -1,0 +1,49 @@
+import { MAP_HEIGHT, MAP_WIDTH, createWorldMap, type MapCell, type TerrainId } from "./domain";
+
+export const PROTOTYPE_MAP_ID = "kalevala-prototype";
+export const PROTOTYPE_START = { x: 10, y: 14 } as const;
+export const YARD_POSITION = { x: 10, y: 11 } as const;
+
+const LEGEND: Record<string, TerrainId> = {
+  w: "water",
+  f: "forest",
+  d: "deepForest",
+  m: "meadow",
+  b: "bog",
+  r: "rock",
+};
+
+/** Käsin sommiteltu vertailukartta tulevan generaattorin laatutavoitteeksi. */
+const ROWS = [
+  "wwwwwwwwwwwwwwwwwwww",
+  "wwwfffffwwwwwrrrrwww",
+  "wwfffffffwwwrrrrrwww",
+  "wfffdddfffwwrrrffffw",
+  "wffddddffffwrrffffff",
+  "wffdddffffwwffffbfff",
+  "wfffffffmmwwfffbbbff",
+  "wwffffmmmmwwffbbbbfw",
+  "wwwffmmmmmmwfffbbffw",
+  "wwffmmmmmmmmffffffww",
+  "wfffmmmmmmmmmmfffffw",
+  "wffmmmmmmmmmmmmffffw",
+  "wfffmmmmmmmmmmmffffw",
+  "wwffmmmmmmmmmmffffww",
+  "wwwfffmmmmmmmmfffwww",
+  "wwwwfffmmmmmmfffwwww",
+  "wwwbbfffmmmmfffrrwww",
+  "wwbbbbffffffffrrrrww",
+  "wwwbbbfffffffrrrrwww",
+  "wwwwwwwwwwwwwwwwwwww",
+] as const;
+
+if (ROWS.length !== MAP_HEIGHT || ROWS.some((row) => row.length !== MAP_WIDTH)) {
+  throw new Error("Prototyyppikartan ruudukko ei ole 20 × 20.");
+}
+
+const cells: MapCell[] = ROWS.flatMap((row, y) => [...row].map((symbol, x) => ({
+  terrainId: LEGEND[symbol],
+  ...(x === YARD_POSITION.x && y === YARD_POSITION.y ? { siteId: "yard" } : {}),
+})));
+
+export const PROTOTYPE_MAP = createWorldMap(cells);

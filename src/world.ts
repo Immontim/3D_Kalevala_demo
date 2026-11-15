@@ -44,13 +44,20 @@ function savedArena(): ArenaId {
   return "clearing";
 }
 
+function requestedArena(): ArenaId | null {
+  try {
+    const value = new URL(location.href).searchParams.get("scene");
+    return value === "clearing" || value === "homestead" || value === "yard" ? value : null;
+  } catch { return null; }
+}
+
 /** Tallentaa valinnan; se tulee voimaan, kun sivu ladataan uudelleen (maailma rakennetaan kerran). */
 export function saveArena(id: ArenaId): boolean {
   try { localStorage.setItem(ARENA_STORE, id); return true; } catch { return false; }
 }
 
 /** Tällä latauksella käytössä oleva alue. */
-export const ARENA: ArenaId = savedArena();
+export const ARENA: ArenaId = requestedArena() ?? savedArena();
 /** Rauhallinen paikka: kohtaus alkaa ilman vastustajia. Paikka voi silti muuttua vihamieliseksi,
  *  koska vastustajat tuo kohtaus (Encounter), ei paikka. */
 export const ARENA_PEACEFUL = ARENA === "yard";

@@ -1,6 +1,7 @@
 // Pääsilmukka, uusi peli ja tauko.
 import { SONG } from "../songLogic";
 import { t } from "../i18n";
+import { mapUrl, parseAppRoute } from "../app/route";
 import { openTune, renderBinds } from "../ui/pauseMenu";
 import { groundHeight } from "../world";
 import { removeActor } from "./actor";
@@ -49,6 +50,11 @@ export function restart() {
 
 /** Paluu aloitusikkunaan: taistelupaikan ja varusteet voi valita uudelleen. */
 export function toStartMenu() {
+  const route = parseAppRoute(location.href);
+  if (route.mode === "scene" && route.returnToMap) {
+    location.href = mapUrl(location.href).href;
+    return;
+  }
   resetField();
   g.running = false;
   paused = false;

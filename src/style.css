@@ -163,3 +163,89 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; col
 .panel button.secondary { background: transparent; color: var(--bronze); border: 1px solid rgba(217, 164, 65, 0.6); margin-left: 8px; font-size: 15px; }
 #bindNote { min-height: 1.3em; }
 @media (max-width: 520px) { .bindrow { grid-template-columns: 1fr 96px 96px; } }
+
+/* ---------- 2D-maailmankartta ---------- */
+body.mode-map > #c,
+body.mode-map > #vignette,
+body.mode-map > #flash,
+body.mode-map > #hud,
+body.mode-map > #choice,
+body.mode-map > #song,
+body.mode-map > #touch,
+body.mode-map > #pause,
+body.mode-map > #start { display: none !important; }
+body.mode-scene > #mapRoot { display: none !important; }
+#mapRoot.hidden { display: none; }
+#mapRoot { height: 100%; min-height: 100%; overflow: auto; color: #2a2119; background:
+  radial-gradient(circle at 50% 15%, rgba(215, 190, 132, 0.18), transparent 34%),
+  repeating-linear-gradient(0deg, rgba(77, 53, 31, 0.035) 0 1px, transparent 1px 5px), #dfd0ae;
+  font-family: Georgia, "Palatino Linotype", serif; padding: 12px 16px 14px; user-select: none; }
+.map-header { position: relative; max-width: 1130px; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; gap: 20px;
+  min-height: 52px; color: #8f2f18; border-top: 5px double #a33c20; border-bottom: 5px double #a33c20; }
+.map-header h1 { margin: 0; font-size: clamp(24px, 3vw, 38px); font-weight: normal; letter-spacing: 0.08em; }
+.map-ornament { letter-spacing: 0.28em; color: #a33c20; }
+.map-languages { position: absolute; right: 7px; display: flex; gap: 4px; }
+.map-languages button { border: 1px solid #8d6040; background: #eee2c5; color: #5b3827; padding: 4px 7px; cursor: pointer; }
+.map-languages button.on { color: #f2e5c6; background: #9c351c; }
+.map-layout { display: grid; grid-template-columns: 210px minmax(0, 624px) 210px; justify-content: center; align-items: start; gap: 14px; }
+.map-panel { min-height: 260px; padding: 14px; background: rgba(240, 226, 194, 0.92); border: 4px double #9c351c;
+  box-shadow: inset 0 0 0 3px rgba(112, 71, 39, 0.16), 0 3px 9px rgba(46, 32, 20, 0.25); }
+.map-panel h2, .map-panel h3 { margin: 0 0 10px; color: #8f2f18; font-weight: normal; text-align: center; letter-spacing: 0.05em; }
+.map-panel button, .map-modal-card button, .map-modal-card select { font: inherit; color: #f2e5c6; background: #8f2f18; border: 2px solid #5b2c1d; padding: 7px 10px; cursor: pointer; }
+.map-panel button:hover, .map-modal-card button:hover { filter: brightness(1.12); }
+.map-frame { border: 6px double #8f2f18; background: #17140f; box-shadow: 0 4px 14px rgba(42, 28, 17, 0.42); line-height: 0; }
+#mapCanvas { display: block; width: 100%; height: auto; max-width: 624px; image-rendering: pixelated; }
+#moonCanvas { display: block; margin: 2px auto; }
+#mapTime, #hungerText { text-align: center; margin: 5px 0 13px; }
+#hungerFace { color: #2a2119; font: bold 42px/1 ui-monospace, Consolas, monospace; text-align: center; transform: scaleX(1.15); }
+.map-help { margin-top: 24px; color: #644934; font-size: 13px; line-height: 1.45; }
+.pack-line { display: flex; align-items: center; gap: 7px; margin: 6px 0; }
+.atlas-icon { display: inline-block; width: 48px; height: 48px; flex: 0 0 48px; background-image: var(--map-atlas); background-size: 192px 192px; image-rendering: pixelated; }
+.item-barley_flatbread { background-position: 0 -144px; }
+.item-dried_fish { background-position: -48px -144px; }
+.map-equipment-summary { margin-top: 20px; padding-top: 12px; border-top: 1px solid #9f7652; }
+.map-footer { max-width: 1060px; min-height: 30px; margin: 9px auto 0; display: flex; justify-content: space-between; gap: 16px; padding: 6px 10px;
+  color: #5b3827; border-top: 2px solid #a33c20; font-size: 14px; }
+.map-modal { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(22, 19, 15, 0.72); }
+.map-modal.hidden { display: none; }
+.map-modal-card { position: relative; width: min(720px, 92vw); padding: 24px; color: #2a2119; background: #e4d4b2; border: 8px double #9c351c;
+  box-shadow: 0 12px 38px #000; }
+.map-modal-card > h2 { margin: 0 42px 20px; color: #8f2f18; text-align: center; font-weight: normal; }
+.map-modal-card .map-close { position: absolute; right: 10px; top: 8px; font-size: 25px; padding: 0 8px; }
+.paper-layout { display: grid; grid-template-columns: 240px 1fr; gap: 24px; }
+.paper-doll { display: grid; gap: 10px; padding-right: 20px; border-right: 2px solid #a16a45; }
+.paper-doll label { display: grid; grid-template-columns: 84px 1fr; align-items: center; gap: 6px; }
+.paper-doll select { min-width: 0; background: #f0e3c4; color: #2a2119; }
+.hero-portrait { width: 96px; height: 96px; margin: 0 auto 8px; background-image: var(--map-atlas); background-size: 384px 384px;
+  background-position: -192px -192px; image-rendering: pixelated; }
+.inventory-slots { display: grid; grid-template-columns: repeat(4, 58px); gap: 8px; }
+.inventory-slot { position: relative; width: 58px; height: 58px; padding: 3px !important; background: #cdbb94 !important; border-color: #7e5237 !important; }
+.inventory-slot .atlas-icon { transform: scale(0.94); }
+.inventory-slot b { position: absolute; right: 3px; bottom: 1px; min-width: 18px; color: #fff1cd; background: #8f2f18; border-radius: 9px; font-size: 12px; }
+.inventory-slot:disabled { cursor: default; opacity: 0.42; }
+.map-secondary { margin-top: 20px; background: transparent !important; color: #8f2f18 !important; }
+body.from-map #start h2,
+body.from-map #arenaPick,
+body.from-map #arenaNote,
+body.from-map #gearPick,
+body.from-map #start ul,
+body.from-map #start .panel > p.small { display: none; }
+body.from-map #start .panel { max-width: 500px; }
+
+@media (max-width: 1050px) {
+  .map-layout { grid-template-columns: 170px minmax(0, 624px) 170px; gap: 8px; }
+  .map-panel { padding: 9px; }
+}
+@media (max-width: 820px) {
+  .map-layout { grid-template-columns: 1fr; }
+  .map-frame { grid-row: 1; max-width: 630px; margin: auto; }
+  .map-panel { min-height: 0; max-width: 630px; width: 100%; margin: auto; }
+  .map-ornament { display: none; }
+  .map-languages { position: static; }
+}
+@media (max-width: 560px) {
+  .paper-layout { grid-template-columns: 1fr; }
+  .paper-doll { border: 0; border-bottom: 2px solid #a16a45; padding: 0 0 14px; }
+  .inventory-slots { grid-template-columns: repeat(4, 52px); }
+  .inventory-slot { width: 52px; height: 52px; }
+}
