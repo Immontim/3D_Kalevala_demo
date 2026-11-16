@@ -3,7 +3,7 @@
 import type { Loadout } from "../combat";
 import type { TextKey } from "../i18n";
 
-export const CAMPAIGN_SCHEMA_VERSION = 3 as const;
+export const CAMPAIGN_SCHEMA_VERSION = 4 as const;
 export const INVENTORY_CAPACITY = 8;
 export const SATIETY_MAX = 100;
 
@@ -60,6 +60,8 @@ export interface CampaignWorld {
   x: number;
   y: number;
   discovered: boolean[];
+  /** Pelaajan todella näkemien tai muuten tietämien 2D-kohtaamisinstanssien tunnisteet. */
+  knownSiteIds: string[];
   worldMinutes: number;
 }
 
@@ -84,6 +86,7 @@ export interface CampaignStart {
   x?: number;
   y?: number;
   discovered?: readonly boolean[];
+  knownSiteIds?: readonly string[];
 }
 
 /** Uusi kampanja sisältää kaksi ruokalajia ja nykyistä 3D-oletusta vastaavat varusteet. */
@@ -93,11 +96,22 @@ export function createCampaign(start: CampaignStart = {}): CampaignState {
   const x = start.x ?? Math.floor(width / 2);
   const y = start.y ?? Math.floor(height / 2);
   const discovered = start.discovered ? [...start.discovered] : Array<boolean>(width * height).fill(false);
+  const knownSiteIds = start.knownSiteIds ? [...new Set(start.knownSiteIds)] : [];
   if (discovered.length !== width * height) throw new Error("Paljastetun kartan koko ei vastaa karttaa");
+  if (!validKnownSiteIds(knownSiteIds)) throw new Error("Tunnettujen paikkojen lista ei ole kelvollinen");
   if (x < 0 || y < 0 || x >= width || y >= height) throw new Error("Aloituspaikka ei ole kartalla");
   return {
     schemaVersion: CAMPAIGN_SCHEMA_VERSION,
-    world: { mapId: start.mapId ?? "prototype", width, height, x, y, discovered, worldMinutes: 0 },
+    world: {
+      mapId: start.mapId ?? "prototype",
+      width,
+      height,
+      x,
+      y,
+      discovered,
+      knownSiteIds,
+      worldMinutes: 0,
+    },
     player: {
       gender: "male",
       satiety: SATIETY_MAX,
@@ -171,21 +185,30 @@ export function parseCampaign(value: unknown): CampaignState | null {
   if (typeof value === "string") {
     try { data = JSON.parse(value); } catch { return null; }
   }
-  if (!isRecord(data) || !validWorld(data.world)) return null;
-  if (data.schemaVersion === CAMPAIGN_SCHEMA_VERSION && validPlayer(data.player)) {
+  if (!isRecord(data) || !validLegacyWorld(data.world)) return null;
+  if (data.schemaVersion === CAMPAIGN_SCHEMA_VERSION
+    && validKnownSiteIds(data.world.knownSiteIds)
+    && validPlayer(data.player)) {
     return cloneCampaign(data as unknown as CampaignState);
+  }
+  if (data.schemaVersion === 3 && validPlayer(data.player)) {
+    return cloneCampaign({
+      schemaVersion: CAMPAIGN_SCHEMA_VERSION,
+      world: withEmptySiteKnowledge(data.world),
+      player: data.player,
+    });
   }
   if (data.schemaVersion === 2 && validVersion2Player(data.player)) {
     return cloneCampaign({
       schemaVersion: CAMPAIGN_SCHEMA_VERSION,
-      world: data.world,
+      world: withEmptySiteKnowledge(data.world),
       player: { ...data.player, gender: "male" },
     });
   }
   if (data.schemaVersion === 1 && validLegacyPlayer(data.player)) {
     return cloneCampaign({
       schemaVersion: CAMPAIGN_SCHEMA_VERSION,
-      world: data.world,
+      world: withEmptySiteKnowledge(data.world),
       player: {
         gender: "male",
         satiety: SATIETY_MAX - data.player.hunger,
@@ -197,7 +220,10 @@ export function parseCampaign(value: unknown): CampaignState | null {
   return null;
 }
 
-function validWorld(value: unknown): value is CampaignWorld {
+type LegacyCampaignWorld = Omit<CampaignWorld, "knownSiteIds">;
+type ParsedCampaignWorld = LegacyCampaignWorld & { knownSiteIds?: unknown };
+
+function validLegacyWorld(value: unknown): value is ParsedCampaignWorld {
   if (!isRecord(value) || typeof value.mapId !== "string" || value.mapId.length < 1 || value.mapId.length > 80) return false;
   const { width, height, x, y, worldMinutes, discovered } = value;
   if (!integerBetween(width, 1, 512) || !integerBetween(height, 1, 512)) return false;
@@ -206,6 +232,20 @@ function validWorld(value: unknown): value is CampaignWorld {
   return Array.isArray(discovered)
     && discovered.length === width * height
     && discovered.every((cell) => typeof cell === "boolean");
+}
+
+function validKnownSiteIds(value: unknown): value is string[] {
+  if (!Array.isArray(value) || value.length > 2_048) return false;
+  const unique = new Set<string>();
+  for (const siteId of value) {
+    if (typeof siteId !== "string" || siteId.length < 1 || siteId.length > 80 || unique.has(siteId)) return false;
+    unique.add(siteId);
+  }
+  return true;
+}
+
+function withEmptySiteKnowledge(world: LegacyCampaignWorld): CampaignWorld {
+  return { ...world, discovered: [...world.discovered], knownSiteIds: [] };
 }
 
 function validPlayer(value: unknown): value is CampaignPlayer {
@@ -265,7 +305,11 @@ function validEquipment(value: unknown): value is Equipment {
 function cloneCampaign(state: CampaignState): CampaignState {
   return {
     schemaVersion: CAMPAIGN_SCHEMA_VERSION,
-    world: { ...state.world, discovered: [...state.world.discovered] },
+    world: {
+      ...state.world,
+      discovered: [...state.world.discovered],
+      knownSiteIds: [...state.world.knownSiteIds],
+    },
     player: {
       gender: state.player.gender,
       satiety: state.player.satiety,

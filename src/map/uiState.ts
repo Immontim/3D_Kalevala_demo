@@ -53,10 +53,3 @@ export function satietyBand(value: number): SatietyBand {
   if (satiety > 20) return "peckish";
   return "starving";
 }
-
-export function sceneForMapSite(siteId: string | undefined): "yard" | "clearing" | "lakeside" | null {
-  if (siteId === "yard") return "yard";
-  if (siteId === "lakeside") return "lakeside";
-  if (siteId === "campfire") return "clearing";
-  return null;
-}

@@ -8,12 +8,19 @@ import {
   RIVER_ROUTE,
   YARD_POSITION,
 } from "./prototype";
+import { mapSiteDefinition } from "./sites";
 
 describe("prototyyppikartta", () => {
   it("sisältää 20 × 20 ruutua ja kaikki seitsemän maastoa", () => {
     expect(PROTOTYPE_MAP.cells).toHaveLength(400);
     const terrains = new Set(PROTOTYPE_MAP.cells.map((cell) => cell.terrainId));
     expect([...terrains].sort()).toEqual([...TERRAIN_IDS].sort());
+  });
+
+  it("käyttää jokaiselle karttapaikalle rekisteröityä 2D-instanssia", () => {
+    for (const cell of PROTOTYPE_MAP.cells) {
+      if (cell.siteId) expect(mapSiteDefinition(cell.siteId)).toBeDefined();
+    }
   });
 
   it("kaivertaa yhtenäisen joen järvestä ulkoveteen osumatta paikkoihin", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapCalendarTime, mapCellVisibility, satietyBand, sceneForMapSite } from "./uiState";
+import { mapCalendarTime, mapCellVisibility, satietyBand } from "./uiState";
 
 describe("karttaruudun näkyvyys", () => {
   it("näyttää sankarin ruudun ja kaikki kahdeksan naapuria", () => {
@@ -48,15 +48,5 @@ describe("kylläisyyden viisi kasvokuvaa", () => {
   it("rajaa esityksessä virheellisen arvon turvallisesti", () => {
     expect(satietyBand(120)).toBe("full");
     expect(satietyBand(-5)).toBe("starving");
-  });
-});
-
-describe("karttapaikan 3D-kohde", () => {
-  it("kytkee pihan rauhalliseen pihaan ja punaisen käden nuotioaukioon", () => {
-    expect(sceneForMapSite("yard")).toBe("yard");
-    expect(sceneForMapSite("campfire")).toBe("clearing");
-    expect(sceneForMapSite("lakeside")).toBe("lakeside");
-    expect(sceneForMapSite(undefined)).toBeNull();
-    expect(sceneForMapSite("unknown")).toBeNull();
   });
 });

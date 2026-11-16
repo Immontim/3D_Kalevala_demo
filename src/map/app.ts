@@ -20,10 +20,11 @@ import {
 } from "./campaign";
 import { createWorldMapState, mapCell, moveOnMap, type MapDirection } from "./domain";
 import { PROTOTYPE_MAP } from "./prototype";
+import { discoverVisibleSites, mapSiteDisplay, sceneForMapSite } from "./sites";
 import { clearCampaign, loadCampaign, newCampaign, saveCampaign } from "./storage";
 import { riverTile, terrainFrame, type AtlasFrame } from "./tiles";
 import { consumeSceneReturn } from "./transition";
-import { mapCalendarTime, mapCellVisibility, satietyBand, sceneForMapSite } from "./uiState";
+import { mapCalendarTime, mapCellVisibility, satietyBand } from "./uiState";
 
 const TILE = 48;
 const VIEW_COLS = 17;
@@ -136,7 +137,15 @@ function ensureRevealed() {
   });
   campaign = {
     ...campaign,
-    world: { ...campaign.world, discovered: [...state.discovered] },
+    world: {
+      ...campaign.world,
+      discovered: [...state.discovered],
+      knownSiteIds: discoverVisibleSites(
+        PROTOTYPE_MAP,
+        campaign.world.knownSiteIds,
+        state,
+      ),
+    },
     player: { ...campaign.player, satiety: state.satiety },
   };
 }
@@ -165,6 +174,11 @@ function move(direction: MapDirection) {
       y: result.state.y,
       worldMinutes: result.state.worldMinutes,
       discovered: [...result.state.discovered],
+      knownSiteIds: discoverVisibleSites(
+        PROTOTYPE_MAP,
+        campaign.world.knownSiteIds,
+        result.state,
+      ),
     },
     player: { ...campaign.player, satiety: result.state.satiety },
   };
@@ -403,6 +417,7 @@ function renderMap() {
   const maxY = PROTOTYPE_MAP.height - VIEW_ROWS;
   const originX = Math.max(0, Math.min(maxX, campaign.world.x - Math.floor(VIEW_COLS / 2)));
   const originY = Math.max(0, Math.min(maxY, campaign.world.y - Math.floor(VIEW_ROWS / 2)));
+  const knownSiteIds = new Set(campaign.world.knownSiteIds);
   for (let vy = 0; vy < VIEW_ROWS; vy++) {
     for (let vx = 0; vx < VIEW_COLS; vx++) {
       const x = originX + vx, y = originY + vy;
@@ -424,11 +439,17 @@ function renderMap() {
       } else {
         sprite(ctx, terrainFrame(cell.terrainId, x, y), vx * TILE, vy * TILE);
       }
-      if (visibility === "visible") {
+      const siteDisplay = mapSiteDisplay(cell.siteId, {
+        active: true,
+        known: cell.siteId !== undefined && knownSiteIds.has(cell.siteId),
+        cellVisibility: visibility,
+      });
+      if (siteDisplay !== "hidden") {
         if (cell.siteId === "yard") sprite(ctx, [2, 1], vx * TILE, vy * TILE);
         if (cell.siteId === "lakeside") sprite(ctx, [3, 1], vx * TILE, vy * TILE);
         if (cell.siteId === "campfire") drawRedHand(ctx, vx * TILE, vy * TILE);
-      } else {
+      }
+      if (visibility === "remembered") {
         ctx.fillStyle = "rgba(20, 17, 13, 0.44)";
         ctx.fillRect(vx * TILE, vy * TILE, TILE, TILE);
       }
