@@ -49,6 +49,9 @@ export interface VillagerDef {
 const q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion(), q3 = new THREE.Quaternion();
 const v1 = new THREE.Vector3(), v2 = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
+const AXIS_Z = new THREE.Vector3(0, 0, 1);
+/** Sormiluiden täysi avaus (rad) nyrkistä suoriksi: rystys-, keski- ja kärkinivel (Blender: FINGER_ANG). Lepoasento on nyrkki. */
+export const FINGER_OPEN = [1.25, 1.5, 0.9] as const;
 
 /** Kääntää luun niin, että sen oma akseli (oletus: luun pituussuunta) osoittaa annettuun
  *  suuntaan maailman koordinaatistossa; lapsiluut seuraavat. */
@@ -112,6 +115,15 @@ class Villager implements Living {
       const pose = (side === "L" ? def.armL : def.armR) ?? ARM_DOWN;
       aimBone(upper, new THREE.Vector3(pose.upper[0] * out, pose.upper[1], pose.upper[2]));
       aimBone(fore, new THREE.Vector3(pose.fore[0] * out, pose.fore[1], pose.fore[2]));
+    }
+
+    // Sormet: nyrkki on lepoasento. Vapaa käsi on rennosti auki, esinettä pitävä käsi pysyy nyrkissä.
+    for (const side of ["L", "R"] as const) {
+      if (def.prop?.hand === side) continue;
+      [1, 2, 3].forEach((i) => {
+        const f = rig.getObjectByName(`finger${i}_${side}`);
+        if (f) f.quaternion.multiply(q1.setFromAxisAngle(AXIS_Z, FINGER_OPEN[i - 1] * 0.7));
+      });
     }
 
     if (prop && def.prop && hand) {

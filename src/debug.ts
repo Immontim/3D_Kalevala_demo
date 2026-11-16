@@ -120,6 +120,14 @@ export function initDebug() {
     },
     /** Vapaa kamera kuvakaappauksia varten; null palauttaa pelikameran. */
     setCamera(pos: number[] | null, look: number[] = [0, 1, 0]) { aim.override = pos ? { pos, look } : null; },
+    /** Rauhan eleet kuin painikkeilla (savutestit): "talk" = iskunappi, "use" = torjuntanappi. */
+    gesture(kind: "talk" | "use") { if (kind === "talk") inputs.strikeQueued = "slash"; else inputs.useQueued = true; },
+    /** Kohtauksen solmut nimen mukaan maailmankoordinaatteina (kuvakaappausten kameran asetukseen, esim. "hand_R"). */
+    findNamed(name: string) {
+      const out: number[][] = [];
+      scene.traverse((o) => { if (o.name === name) out.push(o.getWorldPosition(new THREE.Vector3()).toArray().map((v) => +v.toFixed(2))); });
+      return out;
+    },
     /** Sekunteja (reaaliaikaa) seuraavaan laulun tahtiin, tai null. */
     get nextBeatIn() {
       if (!songState) return null;
