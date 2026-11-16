@@ -6,18 +6,14 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `bc3eb43`)
+Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `5d18967`)
 
-- **Branchin `codex/combat-stamina-tuning` koodiversio on v03.07.01.** Koodi
-  valmis, ei deployattu; arvomuutos on automaattitestattu mutta ei vielä käsin
-  pelitestattu. Tarkista merge-tila ennen jatkamista:
-  `git merge-base --is-ancestor codex/combat-stamina-tuning origin/main`.
-Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `bc3eb43`)
-
-- **Branchin `claude/lakeside-bay-ruin` koodiversio on v03.09.00** (v03.08.00 järven
-  laajennus, v03.09.00 hävitetty ranta). Koodi valmis, ei deployattu, käsin
-  testattu (alla). Tarkista merge-tila ennen jatkamista:
-  `git merge-base --is-ancestor claude/lakeside-bay-ruin origin/main`.
+- **Origin/mainin koodiversio on v03.09.00.** Siinä ovat v03.08.00:n järven
+  laajennus, v03.09.00:n hävitetty ranta sekä niiden jälkeen mergattu stamina-
+  ja keihästasapaino. Branch `codex/version-docs-sync` yhtenäistää vain
+  dokumentaation; pelin koodi tai versionumero ei muutu. Dokumentaatio valmis,
+  ei deployattu. Tarkista merge-tila ennen jatkamista:
+  `git merge-base --is-ancestor codex/version-docs-sync origin/main`.
 - **Rauhan kävely ja eleet** (`src/fighter.ts`, `src/interact.ts`,
   `src/engine/{hero,melee,animate}.ts`). `POSES.rest` on rennompi (kädet
   hieman irti vartalosta, kyynärpää taipuu); `apply()` heiluttaa käsiä
@@ -115,7 +111,7 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `bc3eb43`)
   `scene`-parametria käynnistää 2D-kartan. `?scene=<id>&return=map` lataa
   dynaamisesti `src/scene3d.ts`:n ja nykyisen Three.js-moottorin. Kartta
   ei pyydä GLB-tiedostoja eikä aja 3D-silmukkaa. Tuotantobuildin kartta-UI
-  on noin 15 kt JS; 3D-chunk noin 787 kt.
+  on noin 19 kt JS; 3D-chunk noin 803 kt.
 - **2D-maailmankartta** (`src/map/app.ts`) on Canvas 2D -näkymä: 20 × 20
   ruudun maailma, 48 × 48 px:n tiilet ja 17 × 13 ruudun kamera
   (816 × 624 px). 1135 px leveässä testinäkymässä canvas oli noin 798 px.
@@ -228,7 +224,7 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `bc3eb43`)
   - kylläisyys 0 rauhallisella pihalla jätti molemmat arvoon 100/100;
   - paluu 3D:stä säilytti saman karttaruudun ja kampanjatilan;
   - uusi puhdas selainlataus: ei konsolivirheitä tai -varoituksia, 60 FPS.
-- **Tarkistukset 2026-11-16 (v03.07.01):** erillisessä worktreessä
+- **Tarkistukset 2026-11-16 (v03.09.00):** erillisessä worktreessä
   `bun run test` 194/194 (17 versionhallittua testitiedostoa),
   `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja
   `git diff --check` läpäisty. Pääkansion aiempi 416/37-lukema sisälsi
@@ -237,7 +233,8 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `bc3eb43`)
   konsolissa ei virheitä, 56–60 FPS pienessä in-app-ikkunassa (suuremmalla
   näytöllä FPS mittaamatta); kävelytesti: laiturin päähän asti, rannalla pysähtyy
   nilkkaan, laiturin sivuille ei pääse; pihan ja nuotioaukion lataus ennallaan.
-  Build varoittaa edelleen 3D-chunkin ylittävän 500 kt (noin 800 kt).
+  Build varoittaa edelleen 3D-chunkin ylittävän 500 kt (803,27 kt;
+  gzip 214,11 kt). Build sisältää myös uuden `lakeruin.glb`:n (1,88 Mt).
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
   3D:ssä `window.__game`. Selainpaneelin fokus voi pysäyttää 3D-pelin.
@@ -274,7 +271,7 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `bc3eb43`)
 - Järven rannan vesi on yksinkertainen: ei rantavaahtoa, syvyysväriä eikä
   aaltoja laiturin kohdalla. Kaukorannalla ei ole kasvillisuutta kaukaa
   nähtynä; rantakohtauksen koira ei käyskentele (ei kävelyleikettä).
-- 3D-chunk on noin 787 kt ja metsä noin 2 milj. kolmiota. LOD-malleja tai
+- 3D-chunk on noin 803 kt ja metsä noin 2 milj. kolmiota. LOD-malleja tai
   laatuasetusta ei ole; 60 FPS on mitattu tehokoneella.
 
 ## Seuraava tehtävä
