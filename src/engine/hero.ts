@@ -13,6 +13,7 @@ import { DEG, aim, g, inputs, keys, sfx } from "./state";
 import { t } from "../i18n";
 import { ARENA_PEACEFUL, SPAWN, groundHeight } from "../world";
 import { applyActiveMapTransition } from "../map/transition";
+import { lockFocusedSceneItem } from "./sceneItems";
 
 // Sankarin varusteet valitaan aloitusikkunassa, ja valinta tallentuu selaimeen.
 export const LOADOUT_STORE = "laulun-miekka.loadout.v1";
@@ -107,7 +108,7 @@ export function updatePlayer(dt: number) {
     // Rauhassa iskunappi puhuu ja torjuntanappi käyttää; kumpikin on lyhyt ele paikallaan seisten.
     if (calm && p.state === "idle") {
       if (inputs.strikeQueued) { startGesture(p, "talk"); return; }
-      if (inputs.useQueued) { startGesture(p, "use"); return; }
+      if (inputs.useQueued) { lockFocusedSceneItem(); startGesture(p, "use"); return; }
     }
     if (inputs.strikeQueued && !calm) {
       if (p.state === "idle") { startAttack(p, inputs.strikeQueued, "light", true); return; }

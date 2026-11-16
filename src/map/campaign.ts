@@ -3,14 +3,14 @@
 import type { Loadout } from "../combat";
 import type { TextKey } from "../i18n";
 
-export const CAMPAIGN_SCHEMA_VERSION = 4 as const;
+export const CAMPAIGN_SCHEMA_VERSION = 5 as const;
 export const INVENTORY_CAPACITY = 8;
 export const SATIETY_MAX = 100;
 
 export type PlayerGender = "male" | "female";
 export type FoodId = "barley_flatbread" | "dried_fish";
 export type EquipmentItemId = "sword" | "spear" | "round_shield";
-export type ItemId = FoodId | EquipmentItemId;
+export type ItemId = FoodId | EquipmentItemId | "birch_bark_pack";
 
 export interface ItemDefinition {
   id: ItemId;
@@ -33,6 +33,11 @@ export const ITEMS: Record<ItemId, ItemDefinition> = {
     stackMax: 4,
     satietyGain: 38,
   },
+  birch_bark_pack: {
+    id: "birch_bark_pack",
+    nameKey: "map.item.birchBarkPack",
+    stackMax: 1,
+  },
   sword: { id: "sword", nameKey: "map.item.sword", stackMax: 1, equipmentSlot: "mainHand" },
   spear: { id: "spear", nameKey: "map.item.spear", stackMax: 1, equipmentSlot: "mainHand" },
   round_shield: { id: "round_shield", nameKey: "map.item.roundShield", stackMax: 1, equipmentSlot: "offHand" },
@@ -53,6 +58,58 @@ export interface Equipment {
   offHand: Extract<EquipmentItemId, "round_shield"> | null;
 }
 
+export type TakeMode = "allowed" | "theft";
+
+/** Koodissa määritelty, pysyvällä tunnisteella varustettu maailmanesine. */
+export interface SceneItemDefinition {
+  instanceId: string;
+  siteId: string;
+  itemId: ItemId;
+  quantity: number;
+  takeMode: TakeMode;
+  ownerId?: string;
+}
+
+export interface SceneItemTakeModeOverride {
+  instanceId: string;
+  takeMode: TakeMode;
+}
+
+export interface TheftRecord {
+  type: "theft";
+  instanceId: string;
+  siteId: string;
+  itemId: ItemId;
+  quantity: number;
+  ownerId?: string;
+  atWorldMinutes: number;
+}
+
+/**
+ * Pelaajan myöhemmin pudottama esine. Pudotus-UI ei vielä käytä tätä rakennetta,
+ * mutta tallennusmuoto on valmis ilman seuraavaa skeemamuutosta.
+ */
+export interface DroppedSceneItem {
+  instanceId: string;
+  siteId: string;
+  itemId: ItemId;
+  quantity: number;
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+  takeMode: "allowed";
+}
+
+/** Tallennetaan vain poikkeamat koodissa olevien staattisten esineiden oletuksiin. */
+export interface SceneItemState {
+  takenInstanceIds: string[];
+  takeModeOverrides: SceneItemTakeModeOverride[];
+  thefts: TheftRecord[];
+  droppedItems: DroppedSceneItem[];
+  nextDroppedItemId: number;
+}
+
 export interface CampaignWorld {
   mapId: string;
   width: number;
@@ -63,6 +120,17 @@ export interface CampaignWorld {
   /** Pelaajan todella näkemien tai muuten tietämien 2D-kohtaamisinstanssien tunnisteet. */
   knownSiteIds: string[];
   worldMinutes: number;
+  sceneItems: SceneItemState;
+}
+
+export function createSceneItemState(): SceneItemState {
+  return {
+    takenInstanceIds: [],
+    takeModeOverrides: [],
+    thefts: [],
+    droppedItems: [],
+    nextDroppedItemId: 1,
+  };
 }
 
 export interface CampaignPlayer {
@@ -89,7 +157,7 @@ export interface CampaignStart {
   knownSiteIds?: readonly string[];
 }
 
-/** Uusi kampanja sisältää kaksi ruokalajia ja nykyistä 3D-oletusta vastaavat varusteet. */
+/** Uusi kampanja alkaa kolmella rieskalla ja nykyistä 3D-oletusta vastaavilla varusteilla. */
 export function createCampaign(start: CampaignStart = {}): CampaignState {
   const width = start.width ?? 20;
   const height = start.height ?? 20;
@@ -111,6 +179,7 @@ export function createCampaign(start: CampaignStart = {}): CampaignState {
       discovered,
       knownSiteIds,
       worldMinutes: 0,
+      sceneItems: createSceneItemState(),
     },
     player: {
       gender: "male",
@@ -119,12 +188,99 @@ export function createCampaign(start: CampaignStart = {}): CampaignState {
         capacity: INVENTORY_CAPACITY,
         stacks: [
           { itemId: "barley_flatbread", quantity: 3 },
-          { itemId: "dried_fish", quantity: 2 },
         ],
       },
       equipment: { mainHand: "sword", offHand: "round_shield" },
     },
   };
+}
+
+/**
+ * Lisää määrän inventaarioon atomisesti. Vajaat pinot täytetään ensin ja tarvittaessa
+ * luodaan useita saman esinelajin pinoja. null tarkoittaa, ettei koko määrä mahdu.
+ */
+export function tryAddItem(inventory: Inventory, itemId: ItemId, quantity: number): Inventory | null {
+  const def = ITEMS[itemId];
+  if (!def || !Number.isInteger(quantity) || quantity < 1) return null;
+  const stacks = inventory.stacks.map((stack) => ({ ...stack }));
+  let remaining = quantity;
+  for (const stack of stacks) {
+    if (stack.itemId !== itemId || stack.quantity >= def.stackMax) continue;
+    const add = Math.min(remaining, def.stackMax - stack.quantity);
+    stack.quantity += add;
+    remaining -= add;
+    if (remaining === 0) return { capacity: INVENTORY_CAPACITY, stacks };
+  }
+  while (remaining > 0 && stacks.length < inventory.capacity) {
+    const add = Math.min(remaining, def.stackMax);
+    stacks.push({ itemId, quantity: add });
+    remaining -= add;
+  }
+  return remaining === 0 ? { capacity: INVENTORY_CAPACITY, stacks } : null;
+}
+
+export function sceneItemTakeMode(state: CampaignState, item: Pick<SceneItemDefinition, "instanceId" | "takeMode">): TakeMode {
+  return state.world.sceneItems.takeModeOverrides.find((entry) => entry.instanceId === item.instanceId)?.takeMode
+    ?? item.takeMode;
+}
+
+/** Dialogi tai tapahtuma voi muuttaa ottamisen luvan muuttamatta staattista kohtaustietoa. */
+export function setSceneItemTakeMode(state: CampaignState, instanceId: string, takeMode: TakeMode): CampaignState {
+  const previous = state.world.sceneItems.takeModeOverrides;
+  const existing = previous.find((entry) => entry.instanceId === instanceId);
+  if (existing?.takeMode === takeMode) return state;
+  const takeModeOverrides = existing
+    ? previous.map((entry) => entry.instanceId === instanceId ? { instanceId, takeMode } : { ...entry })
+    : [...previous.map((entry) => ({ ...entry })), { instanceId, takeMode }];
+  return withSceneItems(state, { ...state.world.sceneItems, takeModeOverrides });
+}
+
+export type TakeSceneItemResult =
+  | { state: CampaignState; status: "taken"; takeMode: TakeMode; theft: TheftRecord | null }
+  | { state: CampaignState; status: "already-taken" | "inventory-full" };
+
+/**
+ * Siirtää staattisen maailmanesineen inventaarioon yhtenä muuttumattomana operaationa.
+ * Varkaus ei estä ottamista, vaan tallentaa myöhempien seurausten tarvitseman faktan.
+ */
+export function tryTakeSceneItem(state: CampaignState, item: SceneItemDefinition): TakeSceneItemResult {
+  if (state.world.sceneItems.takenInstanceIds.includes(item.instanceId)) {
+    return { state, status: "already-taken" };
+  }
+  const inventory = tryAddItem(state.player.inventory, item.itemId, item.quantity);
+  if (!inventory) return { state, status: "inventory-full" };
+  const takeMode = sceneItemTakeMode(state, item);
+  const theft: TheftRecord | null = takeMode === "theft" ? {
+    type: "theft",
+    instanceId: item.instanceId,
+    siteId: item.siteId,
+    itemId: item.itemId,
+    quantity: item.quantity,
+    ...(item.ownerId ? { ownerId: item.ownerId } : {}),
+    atWorldMinutes: state.world.worldMinutes,
+  } : null;
+  const sceneItems: SceneItemState = {
+    ...state.world.sceneItems,
+    takenInstanceIds: [...state.world.sceneItems.takenInstanceIds, item.instanceId],
+    takeModeOverrides: state.world.sceneItems.takeModeOverrides.map((entry) => ({ ...entry })),
+    thefts: theft ? [...state.world.sceneItems.thefts.map((entry) => ({ ...entry })), theft]
+      : state.world.sceneItems.thefts.map((entry) => ({ ...entry })),
+    droppedItems: state.world.sceneItems.droppedItems.map((entry) => ({ ...entry })),
+  };
+  return {
+    status: "taken",
+    takeMode,
+    theft,
+    state: {
+      ...state,
+      world: { ...state.world, sceneItems },
+      player: { ...state.player, inventory },
+    },
+  };
+}
+
+function withSceneItems(state: CampaignState, sceneItems: SceneItemState): CampaignState {
+  return { ...state, world: { ...state.world, sceneItems } };
 }
 
 /** Vaihtaa karttasankarin ulkoasun muuttamatta matkan muuta tilaa. */
@@ -188,27 +344,37 @@ export function parseCampaign(value: unknown): CampaignState | null {
   if (!isRecord(data) || !validLegacyWorld(data.world)) return null;
   if (data.schemaVersion === CAMPAIGN_SCHEMA_VERSION
     && validKnownSiteIds(data.world.knownSiteIds)
+    && validSceneItemState(data.world.sceneItems)
     && validPlayer(data.player)) {
     return cloneCampaign(data as unknown as CampaignState);
+  }
+  if (data.schemaVersion === 4
+    && validKnownSiteIds(data.world.knownSiteIds)
+    && validPlayer(data.player)) {
+    return cloneCampaign({
+      schemaVersion: CAMPAIGN_SCHEMA_VERSION,
+      world: withEmptySceneItems(data.world as unknown as Version4CampaignWorld),
+      player: data.player,
+    });
   }
   if (data.schemaVersion === 3 && validPlayer(data.player)) {
     return cloneCampaign({
       schemaVersion: CAMPAIGN_SCHEMA_VERSION,
-      world: withEmptySiteKnowledge(data.world),
+      world: withEmptySiteKnowledge(data.world as unknown as LegacyCampaignWorld),
       player: data.player,
     });
   }
   if (data.schemaVersion === 2 && validVersion2Player(data.player)) {
     return cloneCampaign({
       schemaVersion: CAMPAIGN_SCHEMA_VERSION,
-      world: withEmptySiteKnowledge(data.world),
+      world: withEmptySiteKnowledge(data.world as unknown as LegacyCampaignWorld),
       player: { ...data.player, gender: "male" },
     });
   }
   if (data.schemaVersion === 1 && validLegacyPlayer(data.player)) {
     return cloneCampaign({
       schemaVersion: CAMPAIGN_SCHEMA_VERSION,
-      world: withEmptySiteKnowledge(data.world),
+      world: withEmptySiteKnowledge(data.world as unknown as LegacyCampaignWorld),
       player: {
         gender: "male",
         satiety: SATIETY_MAX - data.player.hunger,
@@ -220,8 +386,9 @@ export function parseCampaign(value: unknown): CampaignState | null {
   return null;
 }
 
-type LegacyCampaignWorld = Omit<CampaignWorld, "knownSiteIds">;
-type ParsedCampaignWorld = LegacyCampaignWorld & { knownSiteIds?: unknown };
+type Version4CampaignWorld = Omit<CampaignWorld, "sceneItems">;
+type LegacyCampaignWorld = Omit<CampaignWorld, "knownSiteIds" | "sceneItems">;
+type ParsedCampaignWorld = LegacyCampaignWorld & { knownSiteIds?: unknown; sceneItems?: unknown };
 
 function validLegacyWorld(value: unknown): value is ParsedCampaignWorld {
   if (!isRecord(value) || typeof value.mapId !== "string" || value.mapId.length < 1 || value.mapId.length > 80) return false;
@@ -244,8 +411,61 @@ function validKnownSiteIds(value: unknown): value is string[] {
   return true;
 }
 
+function withEmptySceneItems(world: Version4CampaignWorld): CampaignWorld {
+  return {
+    ...world,
+    discovered: [...world.discovered],
+    knownSiteIds: [...world.knownSiteIds],
+    sceneItems: createSceneItemState(),
+  };
+}
+
 function withEmptySiteKnowledge(world: LegacyCampaignWorld): CampaignWorld {
-  return { ...world, discovered: [...world.discovered], knownSiteIds: [] };
+  return { ...world, discovered: [...world.discovered], knownSiteIds: [], sceneItems: createSceneItemState() };
+}
+
+function validSceneItemState(value: unknown): value is SceneItemState {
+  if (!isRecord(value)
+    || !Array.isArray(value.takenInstanceIds)
+    || !Array.isArray(value.takeModeOverrides)
+    || !Array.isArray(value.thefts)
+    || !Array.isArray(value.droppedItems)
+    || !integerBetween(value.nextDroppedItemId, 1, 1_000_000_000)) return false;
+  if (value.takenInstanceIds.length > 4_096 || value.takeModeOverrides.length > 4_096
+    || value.thefts.length > 4_096 || value.droppedItems.length > 1_024) return false;
+
+  const takenIds = new Set<string>();
+  for (const id of value.takenInstanceIds) {
+    if (!validId(id, 160) || takenIds.has(id)) return false;
+    takenIds.add(id);
+  }
+
+  const overrideIds = new Set<string>();
+  for (const entry of value.takeModeOverrides) {
+    if (!isRecord(entry) || !validId(entry.instanceId, 160) || !isTakeMode(entry.takeMode)
+      || overrideIds.has(entry.instanceId)) return false;
+    overrideIds.add(entry.instanceId);
+  }
+
+  const theftIds = new Set<string>();
+  for (const theft of value.thefts) {
+    if (!isRecord(theft) || theft.type !== "theft" || !validId(theft.instanceId, 160)
+      || theftIds.has(theft.instanceId) || !validId(theft.siteId, 80) || !isItemId(theft.itemId)
+      || !integerBetween(theft.quantity, 1, 999) || !integerBetween(theft.atWorldMinutes, 0, Number.MAX_SAFE_INTEGER)
+      || (theft.ownerId !== undefined && !validId(theft.ownerId, 80))) return false;
+    theftIds.add(theft.instanceId);
+  }
+
+  const droppedIds = new Set<string>();
+  for (const dropped of value.droppedItems) {
+    if (!isRecord(dropped) || !validId(dropped.instanceId, 160) || droppedIds.has(dropped.instanceId)
+      || !validId(dropped.siteId, 80) || !isItemId(dropped.itemId)
+      || !integerBetween(dropped.quantity, 1, 999) || dropped.takeMode !== "allowed"
+      || !finiteCoordinate(dropped.x) || !finiteCoordinate(dropped.y) || !finiteCoordinate(dropped.z)
+      || typeof dropped.yaw !== "number" || !Number.isFinite(dropped.yaw) || Math.abs(dropped.yaw) > Math.PI * 2) return false;
+    droppedIds.add(dropped.instanceId);
+  }
+  return true;
 }
 
 function validPlayer(value: unknown): value is CampaignPlayer {
@@ -283,12 +503,10 @@ function validLegacyPlayer(value: unknown): value is LegacyCampaignPlayer {
 function validInventory(value: unknown): value is Inventory {
   if (!isRecord(value) || value.capacity !== INVENTORY_CAPACITY || !Array.isArray(value.stacks)
     || value.stacks.length > INVENTORY_CAPACITY) return false;
-  const seen = new Set<ItemId>();
   for (const stack of value.stacks) {
     if (!isRecord(stack) || !isItemId(stack.itemId) || !Number.isInteger(stack.quantity)) return false;
     const quantity = stack.quantity as number;
-    if (quantity < 1 || quantity > ITEMS[stack.itemId].stackMax || seen.has(stack.itemId)) return false;
-    seen.add(stack.itemId);
+    if (quantity < 1 || quantity > ITEMS[stack.itemId].stackMax) return false;
   }
   return true;
 }
@@ -309,6 +527,13 @@ function cloneCampaign(state: CampaignState): CampaignState {
       ...state.world,
       discovered: [...state.world.discovered],
       knownSiteIds: [...state.world.knownSiteIds],
+      sceneItems: {
+        takenInstanceIds: [...state.world.sceneItems.takenInstanceIds],
+        takeModeOverrides: state.world.sceneItems.takeModeOverrides.map((entry) => ({ ...entry })),
+        thefts: state.world.sceneItems.thefts.map((entry) => ({ ...entry })),
+        droppedItems: state.world.sceneItems.droppedItems.map((entry) => ({ ...entry })),
+        nextDroppedItemId: state.world.sceneItems.nextDroppedItemId,
+      },
     },
     player: {
       gender: state.player.gender,
@@ -329,6 +554,18 @@ function isItemId(value: unknown): value is ItemId {
 
 function isPlayerGender(value: unknown): value is PlayerGender {
   return value === "male" || value === "female";
+}
+
+function isTakeMode(value: unknown): value is TakeMode {
+  return value === "allowed" || value === "theft";
+}
+
+function validId(value: unknown, max: number): value is string {
+  return typeof value === "string" && value.length >= 1 && value.length <= max;
+}
+
+function finiteCoordinate(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= 10_000;
 }
 
 function integerBetween(value: unknown, min: number, max: number): value is number {

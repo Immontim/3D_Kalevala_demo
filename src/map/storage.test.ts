@@ -4,11 +4,13 @@ import {
   EARLIEST_CAMPAIGN_STORE,
   LEGACY_CAMPAIGN_STORE,
   PREVIOUS_CAMPAIGN_STORE,
+  VERSION3_CAMPAIGN_STORE,
   clearCampaign,
   loadCampaign,
   saveCampaign,
   type CampaignStorage,
 } from "./storage";
+import { CAMPAIGN_SCHEMA_VERSION } from "./campaign";
 import { MAP_SITE_DEFINITIONS } from "./sites";
 
 function memoryStorage(initial?: string): CampaignStorage & { data: Map<string, string> } {
@@ -36,11 +38,11 @@ describe("kampanjan selainvarasto", () => {
 
   it("korvaa rikkinäisen tallennuksen turvallisella uudella kampanjalla", () => {
     const state = loadCampaign(memoryStorage("{not-json"));
-    expect(state.schemaVersion).toBe(4);
+    expect(state.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
     expect(state.world).toMatchObject({ mapId: "kalevala-prototype", width: 20, height: 20 });
   });
 
-  it("migroi v1-avaimen v4-avaimeen menettämättä etenemistä", () => {
+  it("migroi v1-avaimen nykyiseen avaimeen menettämättä etenemistä", () => {
     const storage = memoryStorage();
     const current = loadCampaign(storage);
     current.world.x = 4;
@@ -60,7 +62,7 @@ describe("kampanjan selainvarasto", () => {
     expect(storage.data.has(EARLIEST_CAMPAIGN_STORE)).toBe(false);
   });
 
-  it("migroi v2-avaimen miesoletuksella v4-avaimeen", () => {
+  it("migroi v2-avaimen miesoletuksella nykyiseen avaimeen", () => {
     const storage = memoryStorage();
     const legacy = JSON.parse(JSON.stringify(loadCampaign(storage)));
     legacy.schemaVersion = 2;
@@ -71,7 +73,7 @@ describe("kampanjan selainvarasto", () => {
     storage.data.set(LEGACY_CAMPAIGN_STORE, JSON.stringify(legacy));
 
     const migrated = loadCampaign(storage);
-    expect(migrated.schemaVersion).toBe(4);
+    expect(migrated.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
     expect(migrated.player.gender).toBe("male");
     expect(migrated.world.worldMinutes).toBe(360);
     expect(storage.data.has(CAMPAIGN_STORE)).toBe(true);
@@ -86,10 +88,27 @@ describe("kampanjan selainvarasto", () => {
     const yard = MAP_SITE_DEFINITIONS.yard.position;
     legacy.world.discovered[yard.y * legacy.world.width + yard.x] = true;
     storage.data.delete(CAMPAIGN_STORE);
-    storage.data.set(PREVIOUS_CAMPAIGN_STORE, JSON.stringify(legacy));
+    storage.data.set(VERSION3_CAMPAIGN_STORE, JSON.stringify(legacy));
 
     const migrated = loadCampaign(storage);
     expect(migrated.world.knownSiteIds).toEqual(["yard"]);
+    expect(storage.data.has(CAMPAIGN_STORE)).toBe(true);
+    expect(storage.data.has(VERSION3_CAMPAIGN_STORE)).toBe(false);
+  });
+
+  it("migroi v4-avaimen v5-avaimeen tyhjällä maailmanesinetilalla", () => {
+    const storage = memoryStorage();
+    const legacy = JSON.parse(JSON.stringify(loadCampaign(storage)));
+    legacy.schemaVersion = 4;
+    delete legacy.world.sceneItems;
+    legacy.world.x = 5;
+    storage.data.delete(CAMPAIGN_STORE);
+    storage.data.set(PREVIOUS_CAMPAIGN_STORE, JSON.stringify(legacy));
+
+    const migrated = loadCampaign(storage);
+    expect(migrated.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
+    expect(migrated.world.x).toBe(5);
+    expect(migrated.world.sceneItems.takenInstanceIds).toEqual([]);
     expect(storage.data.has(CAMPAIGN_STORE)).toBe(true);
     expect(storage.data.has(PREVIOUS_CAMPAIGN_STORE)).toBe(false);
   });
@@ -133,11 +152,13 @@ describe("kampanjan selainvarasto", () => {
     const storage = memoryStorage("saved");
     storage.data.set(LEGACY_CAMPAIGN_STORE, "old");
     storage.data.set(PREVIOUS_CAMPAIGN_STORE, "previous");
+    storage.data.set(VERSION3_CAMPAIGN_STORE, "version3");
     storage.data.set(EARLIEST_CAMPAIGN_STORE, "oldest");
     storage.data.set("other", "keep");
     expect(clearCampaign(storage)).toBe(true);
     expect(storage.data.get(CAMPAIGN_STORE)).toBeUndefined();
     expect(storage.data.get(PREVIOUS_CAMPAIGN_STORE)).toBeUndefined();
+    expect(storage.data.get(VERSION3_CAMPAIGN_STORE)).toBeUndefined();
     expect(storage.data.get(LEGACY_CAMPAIGN_STORE)).toBeUndefined();
     expect(storage.data.get(EARLIEST_CAMPAIGN_STORE)).toBeUndefined();
     expect(storage.data.get("other")).toBe("keep");

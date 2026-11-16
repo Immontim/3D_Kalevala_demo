@@ -15,6 +15,15 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; col
 #vignette.on { opacity: 1; }
 #flash { position: fixed; inset: 0; pointer-events: none; background: var(--blood); opacity: 0; }
 #hud { position: fixed; inset: 0; pointer-events: none; }
+#gazeFocus { position: absolute; left: 50%; top: 50%; z-index: 8; transform: translate(-50%, -50%); color: #f3ddb0; text-align: center; text-shadow: 0 1px 3px #17100b, 0 0 5px #17100b; }
+#gazeDot { display: block; width: 7px; height: 7px; margin: -4px auto 0; border: 1px solid rgba(243, 221, 176, 0.82); border-radius: 50%; background: rgba(55, 38, 25, 0.52); box-shadow: 0 0 0 2px rgba(31, 21, 15, 0.24); }
+#gazePrompt { display: none; margin-top: 10px; padding: 4px 9px; border: 1px solid rgba(113, 73, 39, 0.75); border-radius: 3px; background: rgba(35, 25, 18, 0.78); font-size: 15px; white-space: nowrap; }
+#gazeFocus.target #gazeDot { width: 10px; height: 10px; margin-top: -5px; border-color: #ffd27a; background: rgba(181, 119, 43, 0.7); box-shadow: 0 0 7px rgba(255, 210, 122, 0.72); }
+#gazeFocus.target #gazePrompt { display: inline-block; }
+#gazeFocus.theft #gazeDot { border-color: #e88d72; background: rgba(146, 50, 32, 0.75); box-shadow: 0 0 7px rgba(216, 83, 54, 0.72); }
+#gazeFocus.theft #gazePrompt { border-color: rgba(161, 66, 43, 0.9); color: #ffd1bd; }
+#gazeFocus.blocked #gazeDot { border-color: #a99d86; background: rgba(73, 67, 57, 0.72); box-shadow: none; }
+#gazeFocus.blocked #gazePrompt { border-color: rgba(116, 107, 91, 0.85); color: #d2c7b2; }
 .bars { display: flex; justify-content: space-between; padding: 16px; gap: 16px; }
 .bar-wrap { width: min(460px, 44vw); }
 /* Tauon aikana mittarit nousevat taukoikkunan tummennuksen päälle ja niitä voi raahata. */
@@ -214,6 +223,7 @@ body.mode-scene > #mapRoot { display: none !important; }
 .atlas-icon { display: inline-block; width: 48px; height: 48px; flex: 0 0 48px; background-image: var(--map-atlas); background-size: 192px 192px; image-rendering: pixelated; }
 .item-barley_flatbread { background-position: 0 -144px; }
 .item-dried_fish { background-position: -48px -144px; }
+.item-birch_bark_pack { background-image: url("../assets/map/birch-bark-pack-icon.svg"); background-position: center; background-size: contain; background-repeat: no-repeat; }
 .map-footer { max-width: 1480px; min-height: 30px; margin: 8px auto 0; display: flex; justify-content: space-between; gap: 16px; padding: 6px 10px;
   color: #5b3827; border-top: 2px solid #a33c20; font-size: 14px; }
 .map-modal { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(22, 19, 15, 0.72); }
