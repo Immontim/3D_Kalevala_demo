@@ -6,11 +6,11 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `df7cf2e`)
+Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `98c8c2a`)
 
-- **Branchin `codex/map-calendar` koodiversio on v03.03.01.** Koodi valmis,
-  ei deployattu, käsin testattu (alla). Tarkista merge-tila ennen jatkamista:
-  `git merge-base --is-ancestor codex/map-calendar origin/main`.
+- **Branchin `claude/hero-wrists-hands` koodiversio on v03.04.00.** Koodi
+  valmis, ei deployattu, käsin testattu (alla). Tarkista merge-tila ennen
+  jatkamista: `git merge-base --is-ancestor claude/hero-wrists-hands origin/main`.
 - **Rauhan kävely ja eleet** (`src/fighter.ts`, `src/interact.ts`,
   `src/engine/{hero,melee,animate}.ts`). `POSES.rest` on rennompi (kädet
   hieman irti vartalosta, kyynärpää taipuu); `apply()` heiluttaa käsiä
@@ -26,15 +26,26 @@ Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `df7cf2e`)
   vastustajan ilmestyminen keskeyttää eleen. Keihäsmies kantaa keihästä
   `restSpear`-otteessa (vasen käsi vapaa, `spearLeftW`) ja vilkuttaa vasemmalla.
 - **Naissankari 3D:ssä.** `scene3d.ts` asettaa `PLAYER_LOOK.female` kampanjan
-  sukupuolesta. `Fighter.build` ottaa vartalon `villagers_f.glb`:stä
-  (`char_jousineito`, jousi pois), varusteet, kypärän ja kiinnityspisteet
-  `characters.glb`:stä ja siirtää ne luurankojen lepoasentojen erotuksen verran
-  (`attachFemaleGear`). Huotra on koodilla tehty kolmesta laatikosta; kilven
-  kantohihnaa ei ole. Keihään otteessa käytetään naisen arvioitua kanavaa
-  (`GRIP_CHANNEL_F`). Ei skaalausta (nainen miehen mittainen). Naisen ulkonäkö
-  ja eleet katsottu rannalla (rauha, kävely, vilkutus, miekkaisku); keihästä ja
-  ilman kilpeä -asetta naisella ei ole katsottu.
-- **Debug:** `__game.freeze()` pysäyttää pelin ajan ja `__game.step(n)` etenee
+  sukupuolesta. `Fighter.build` ottaa vartalon, huotran
+  (`char_jousineito_huotra`), kantohihnan (`char_jousineito_hihna`) ja
+  kiinnityspisteet (`mount_huotra_f`, `mount_kilpi_selka_f`) `villagers_f.glb`:stä
+  (`char_jousineito`, jousi pois) sekä varusteet ja kypärän `characters.glb`:stä;
+  kypärä siirretään luurankojen lepoasentojen erotuksen verran
+  (`attachFemaleGear`). Keihään otteessa käytetään naisen arvioitua kanavaa
+  (`GRIP_CHANNEL_F`). Ei skaalausta (nainen miehen mittainen). Ulkonäkö, eleet,
+  huotra ja hihna katsottu rannalla ja pihalla (rauha, miekkaisku); keihästä
+  ja ilman kilpeä -asetta naisella ei ole katsottu.
+- **Sormet.** Kaikilla luurangoilla on sormiluut `finger1..3_L/R` (nyrkki on
+  lepoasento). `Fighter.applyFingers` kiertää ne auki paikallisen Z-akselin
+  ympäri (`FINGER_OPEN` rystys/keski/kärki 1,25/1,5/0,9 rad × avaus 0..1,
+  `handOpen`): rauhassa 0,7, eleissä 0,9, taistelussa asekäsi 0 ja kilpikäsi 0
+  (kilvetön miekka 0,35); keihäsmiehen oikea käsi on aina nyrkissä. Kyläläiset
+  (`folk.ts`) avaavat vapaan käden 0,7:ään, esinettä pitävä käsi pysyy nyrkissä.
+  Peukalolla ei ole luuta. Katkenneet ranteet olivat hihamallin vika
+  (BLENDER_HANDOFF), ei animaation.
+- **Debug:** `__game.gesture("talk"|"use")` laukaisee eleen, `__game.findNamed("hand_R")`
+  antaa solmujen paikat (kameran kohdistukseen `setCamera`lla), `__game.freeze()`
+  pysäyttää pelin ajan ja `__game.step(n)` etenee
   n ruutua (kuvakaappaukset tarkasta hetkestä; kuvakaappaus voi laahata
   sekunnin). Dev-palvelimen moduulit voivat monistua monien muokkausten
   jälkeen (varusteet eivät vaihdu): käynnistä palvelin uudelleen. 3D lukee
@@ -189,9 +200,9 @@ Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `df7cf2e`)
 - Paperinuken viisi vaatepaikkaa ovat vasta visuaalisia varauksia. Vain
   pää- ja sivukäsi ovat toimivia; alkuvarusteet eivät vie tavarapaikkoja.
 - Sukupuolivalinta vaihtaa 2D-kartan spriten, paperinuken ja kylläisyyskasvot
-  sekä 3D-sankarin (jousineidon vartalo). Miehen nyrkit ovat suljetut (mallissa
-  ei ole sormiluita), joten vilkutus ja kävely näyttävät jäykiltä; naisen kädet
-  ovat avoimet. Jousineito-NPC pihalla on edelleen jousen kanssa.
+  sekä 3D-sankarin (jousineidon vartalo). Jousineito-NPC pihalla on edelleen
+  jousen kanssa, joten naissankarin rinnalla on kaksi samannäköistä hahmoa.
+  Naissankarin kilpi on selässä jousineidon viinen päällä.
 - Paluusillan kuljetus toimii, mutta 3D ei vielä myönnä palkintoja eikä kartta
   lisää `rewards`-kentän esineitä inventaarioon.
 - Kartta–3D-siirtymä lataa sivun uudelleen. Samassa ajossa mount/dispose

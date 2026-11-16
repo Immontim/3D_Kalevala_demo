@@ -90,17 +90,22 @@ def landmarks(ob, P=None, xf=None):
     return L
 
 
-def curl_fingers_chain(ob, L, side=1, angles=(1.25, 1.5, 0.9)):
-    """Koukistaa sormet nyrkkiin: kolme niveltä (rystyset, keski- ja kärkinivel),
-    joista jokainen kiertää kärkipuolensa kämmentä kohti. Peukalo jää paikalleen.
-    side=1 vasen (+X), -1 oikea."""
-    me = ob.data
+FINGER_J = (0.0, 0.04, 0.07)           # nivelten paikat rystysistä sormenpäitä kohti (m)
+FINGER_ANG = (1.25, 1.5, 0.9)          # nyrkkiin koukistuksen kulmat (rad)
+FINGER_TIP = 0.105                     # sormenpään etäisyys rystysistä
+FINGER_BONES = [f"finger{i}_{s}" for s in ("L", "R") for i in (1, 2, 3)]
+
+
+def finger_setup(co, L, side=1):
+    """Sormien valinta ja kehys koukistamattomasta vartalosta (co = verteksien paikat järjestyksessä).
+    side=1 vasen (+X), -1 oikea. Palauttaa kehyksen, josta nyrkkiin koukistus ja sormiluiden painot
+    lasketaan samoilla luvuilla."""
     mir = lambda p: V((p.x * side, p.y, p.z))
     W, K = mir(L["wrist"]), mir(L["knuckle"])
     a = (mir(L["fingertip"]) - mir(L["shoulder"])).normalized()
-    idx = [v.index for v in me.vertices
-           if v.co.x * side > 0.2 and (v.co - W).dot(a) > -0.02 and (v.co - (W + a * (v.co - W).dot(a))).length < 0.13]
-    pts = np.array([me.vertices[i].co[:] for i in idx])
+    idx = [i for i, p in enumerate(co)
+           if p.x * side > 0.2 and (p - W).dot(a) > -0.02 and (p - (W + a * (p - W).dot(a))).length < 0.13]
+    pts = np.array([co[i][:] for i in idx])
     c = pts - pts.mean(axis=0)
     _, vec = np.linalg.eigh(c.T @ c)
     n = V(vec[:, 0])            # kämmenen normaali
@@ -112,26 +117,105 @@ def curl_fingers_chain(ob, L, side=1, angles=(1.25, 1.5, 0.9)):
     off = np.array([(V(p) - K).dot(axis) for p in pts])
     back = d < -0.03
     thumb_sign = 1 if off[back].max() > -off[back].min() else -1
-    joints = (0.0, 0.04, 0.07)
-    out = []
+    thumb = []
     for i in range(len(idx)):
-        p = V(pts[i])
         o = off[i] * thumb_sign
-        if (o > 0.040 and d[i] < 0.025) or (o > 0.030 and d[i] < -0.015):
+        thumb.append(bool((o > 0.040 and d[i] < 0.025) or (o > 0.030 and d[i] < -0.015)))
+    return {"idx": idx, "pts": pts, "a": a, "axis": axis, "K": K, "d": d, "thumb": thumb, "side": side}
+
+
+def finger_ks(dd):
+    """Nivelten koukistusosuudet (0..1) etäisyydellä dd rystysistä; myöhempi nivel vaikuttaa vain, jos edellinen on."""
+    out = []
+    for j0 in FINGER_J:
+        k = smoothstep(j0 - 0.01, j0 + 0.01, dd)
+        if k <= 0:
+            break
+        out.append(k)
+    return out
+
+
+def curl_fingers_chain(ob, L, side=1, angles=FINGER_ANG):
+    """Koukistaa sormet nyrkkiin: kolme niveltä (rystyset, keski- ja kärkinivel),
+    joista jokainen kiertää kärkipuolensa kämmentä kohti. Peukalo jää paikalleen.
+    side=1 vasen (+X), -1 oikea."""
+    me = ob.data
+    S = finger_setup([v.co.copy() for v in me.vertices], L, side)
+    K, a, axis, d = S["K"], S["a"], S["axis"], S["d"]
+    out = []
+    for i, p0 in enumerate(S["pts"]):
+        p = V(p0)
+        if S["thumb"][i]:
             out.append(p)       # peukalo
             continue
         M = Matrix.Identity(4)
-        for j0, ang in zip(joints, angles):
-            k = smoothstep(j0 - 0.01, j0 + 0.01, d[i])
-            if k <= 0:
-                break
+        for j0, ang, k in zip(FINGER_J, angles, finger_ks(d[i])):
             piv = K + a * j0
             M = M @ Matrix.Translation(piv) @ Matrix.Rotation(-ang * k, 4, axis) @ Matrix.Translation(-piv)
         out.append(M @ p)
-    for vi, p in zip(idx, out):
+    for vi, p in zip(S["idx"], out):
         me.vertices[vi].co = p
     me.update()
-    return {"count": len(idx), "thumb_sign": thumb_sign}
+    return {"count": len(S["idx"]), "thumb_sign": None}
+
+
+def finger_joints(S, angles=FINGER_ANG):
+    """Sormiluiden nivelet koukistetussa (lepo)asennossa: rystyset, kaksi niveltä ja sormenpää."""
+    K, a, axis = S["K"], S["a"], S["axis"]
+    P = [K + a * j for j in FINGER_J]
+    Ms = [Matrix.Translation(p) @ Matrix.Rotation(-ang, 4, axis) @ Matrix.Translation(-p) for p, ang in zip(P, angles)]
+    tip = K + a * FINGER_TIP
+    return [P[0], Ms[0] @ P[1], Ms[0] @ Ms[1] @ P[2], Ms[0] @ Ms[1] @ Ms[2] @ tip]
+
+
+def add_fingers(body, rig, co_straight, L):
+    """Lisää luurankoon sormiluut (finger1..3 kummallekin kädelle) ja jakaa vartalon sormien painot niille.
+    Lepoasento on nyrkki, kuten ennenkin: luut ovat koukistetun sormen mukaisessa asennossa, ja sormien
+    avaaminen on luun kierto sen paikallisen Z-akselin ympäri (Z = koukistuksen akseli).
+    co_straight = vartalon verteksit ennen koukistusta."""
+    for o in bpy.context.view_layer.objects:
+        o.select_set(False)
+    bpy.context.view_layer.objects.active = rig
+    rig.select_set(True)
+    setups = {s: finger_setup(co_straight, L, 1 if s == "L" else -1) for s in ("L", "R")}
+    bpy.ops.object.mode_set(mode='EDIT')
+    eb = rig.data.edit_bones
+    for s, S in setups.items():
+        J = finger_joints(S)
+        for i in range(3):
+            nm = f"finger{i + 1}_{s}"
+            if nm in eb:
+                eb.remove(eb[nm])
+            b = eb.new(nm)
+            b.head, b.tail = J[i], J[i + 1]
+            b.parent = eb[f"hand_{s}"] if i == 0 else eb[f"finger{i}_{s}"]
+            b.use_connect = False
+            b.align_roll(S["axis"])
+    bpy.ops.object.mode_set(mode='OBJECT')
+    me = body.data
+    groups = {nm: body.vertex_groups.get(nm) or body.vertex_groups.new(name=nm) for nm in FINGER_BONES}
+    moved = 0
+    for s, S in setups.items():
+        hg = body.vertex_groups[f"hand_{s}"]
+        for n_i, vi in enumerate(S["idx"]):
+            if S["thumb"][n_i]:
+                continue
+            ks = finger_ks(S["d"][n_i])
+            if not ks:
+                continue
+            try:
+                h = hg.weight(vi)
+            except RuntimeError:
+                continue
+            k = ks + [0.0] * (3 - len(ks))
+            share = [1 - k[0], k[0] * (1 - k[1]), k[0] * k[1] * (1 - k[2]), k[0] * k[1] * k[2]]
+            hg.add([vi], h * share[0], 'REPLACE')
+            for j in range(3):
+                groups[f"finger{j + 1}_{s}"].add([vi], h * share[j + 1], 'REPLACE')
+            moved += 1
+    me.update()
+    return {"moved": moved, "joints": {s: [[round(x, 3) for x in p] for p in finger_joints(S)] for s, S in setups.items()},
+            "axis": {s: [round(x, 3) for x in S["axis"]] for s, S in setups.items()}}
 
 
 BONES = [
@@ -196,5 +280,6 @@ def build_base():
     info = {"L": curl_fingers_chain(body, L, 1), "R": curl_fingers_chain(body, L, -1)}
     rig = make_rig(L)
     info["weights"] = auto_weights(body, rig)
+    info["fingers"] = add_fingers(body, rig, [v.co.copy() for v in bpy.data.objects["GEO-body_male_realistic"].data.vertices], L)
     info["landmarks"] = {k: [round(x, 3) for x in v] for k, v in L.items()}
     return info

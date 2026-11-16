@@ -13,8 +13,8 @@ import numpy as np
 from mathutils import Vector, Matrix, kdtree
 
 V = Vector
-GROUPS = [b[0] for b in BONES]
-ARM = {"upper_arm", "forearm", "hand"}
+GROUPS = [b[0] for b in BONES] + FINGER_BONES
+ARM = {"upper_arm", "forearm", "hand", "finger1", "finger2", "finger3"}
 LEG = {"thigh", "shin", "foot"}
 
 
@@ -454,7 +454,8 @@ def grip_carve(p, R=0.0145, Rf=0.028, half=0.07):
     Etäisyydellä r < Rf olevat pinnat siirretään säteittäin välille R..Rf."""
     for i, c in enumerate(p.co):
         for g, s in (("hand_R", 1), ("hand_L", -1)):
-            w = p.w[i].get(g, 0.0)
+            sd = g[-1]
+            w = p.w[i].get(g, 0.0) + sum(p.w[i].get(f"finger{j}_{sd}", 0.0) for j in (1, 2, 3))
             if w < 0.05:
                 continue
             ctr = V((GRIP_P.x * s, GRIP_P.y, GRIP_P.z))
@@ -733,10 +734,14 @@ def build_mounts():
 
 def torso_parts(C, mat, col, sleeve_to, inflate=0.016, tile=0.25, smooth=3, sleeve_from=-9, torso=True, collar=None, baggy=0.0):
     def sel(i, c):
-        if c.z < 0.95 or c.z > 1.435:
+        if c.z > 1.435:
             return False
         if C.arm_frac[i] > 0.5:
+            # Käsivarsi rajataan vain käsivarren mittaa pitkin: riippuva ranne on alle 0,95 m:n, ja
+            # vartalon alaraja leikkasi pitkän hihan irti ennen ranneketta ("katkennut ranne").
             return sleeve_from < C.arm_t(c) < sleeve_to
+        if c.z < 0.95:
+            return False
         if C.leg_frac[i] > 0.6:
             return False
         nk = C.w[i].get("neck", 0) + C.w[i].get("head", 0)

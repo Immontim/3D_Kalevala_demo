@@ -110,9 +110,11 @@ def build_base_f(shape=True):
     if shape:
         shape_body_f(ob)
     L = landmarks(ob, FEM_P)
+    straight = [v.co.copy() for v in ob.data.vertices]
     info = {"L": curl_fingers_chain(ob, L, 1), "R": curl_fingers_chain(ob, L, -1)}
     rig = make_rig(L, FEM["rig"], "FOLK_F")
     info["weights"] = auto_weights(ob, rig)
+    info["fingers"] = add_fingers(ob, rig, straight, L)
     info["landmarks"] = {k: [round(x, 3) for x in v] for k, v in L.items()}
     return info
 
@@ -438,6 +440,56 @@ def build_jousineito():
     P += quiver_parts(C)
     P += mantle_parts(C, col=dark, edge=(0.04, 0.04, 0.05), z_hem=1.27, a_open=12, gap=1, pleat=0.06, pleat_n=26, hem_trim=None, cowl=False, clear=0.03, brooch_row=2)
     return assemble("char_jousineito", P, col_name="FOLK_F", rig_name=FEM["rig"])[1]
+
+
+# ---------- naissankarin varusteet (jousineidon vartalolla) ----------
+# Naissankari on jousineidon vartalo ilman jousta. Huotra ja kilven kantohihna tehdään omiksi
+# kappaleikseen samassa luurangossa (RIG_F), jotta peli voi näyttää ne vain naissankarille.
+# Nimet: char_jousineito_huotra (aina näkyvissä), char_jousineito_hihna (vain rauhan varustuksessa)
+# sekä kiinnityspisteet mount_huotra_f ja mount_kilpi_selka_f (kuten build_mounts miehelle).
+SHEATH_TOP_F = V((0.19, -0.03, 1.03))      # vyö on naisella 7 cm miestä korkeammalla
+
+
+def sheath_f_parts():
+    top, d, n = SHEATH_TOP_F, SHEATH_D, SHEATH_LEN
+    R = d.to_track_quat('Z', 'Y').to_matrix()
+    w = {"hips": 1.0}
+    def place(part):
+        part.co = [top + R @ c for c in part.co]
+        return part
+    leather = (0.95, 0.85, 0.75)
+    brass = (0.62, 0.42, 0.14)
+    zero = V((0, 0, 0))
+    # nahkarunko: soikea, suippenee kärkeä kohti
+    body = lathe(zero, [(0.0001, 0.0), (0.033, 0.0), (0.034, 0.05), (0.031, 0.25), (0.025, 0.5), (0.019, n * 0.8), (0.016, n - 0.05), (0.0001, n - 0.045)],
+                 14, "leather", w, leather, sx=1.0, sy=0.36, tile=0.12)
+    throat = lathe(zero, [(0.0001, -0.012), (0.040, -0.012), (0.039, 0.0), (0.037, 0.045), (0.0001, 0.046)], 14, "metal", w, brass, sx=1.0, sy=0.44)
+    chape = lathe(zero, [(0.0001, n - 0.085), (0.021, n - 0.085), (0.020, n - 0.06), (0.014, n - 0.015), (0.0001, n + 0.012)], 12, "metal", w, brass, sx=1.0, sy=0.5)
+    parts = [place(body), place(throat), place(chape)]
+    # vyöhän ripustava nahkasilmukka vyön ja huotran suun välillä
+    parts.append(box_part(V((0.155, -0.03, 1.045)), (0.07, 0.034, 0.03), "leather", w, leather))
+    return parts
+
+
+def build_hero_f_gear():
+    C = Ctx(FEM["body"], FEM["src"], FEM["rig"], FEM_P, fem_xf())
+    out = {}
+    out["huotra"] = assemble("char_jousineito_huotra", sheath_f_parts(), col_name="FOLK_F", rig_name=FEM["rig"])[1]
+    out["hihna"] = assemble("char_jousineito_hihna", strap_parts(C, off=0.07), col_name="FOLK_F", rig_name=FEM["rig"])[1]
+    rig = bpy.data.objects[FEM["rig"]]
+    def mount(name, bone, M):
+        remove_obj(name)
+        e = bpy.data.objects.new(name, None)
+        e.empty_display_size = 0.06
+        e.empty_display_type = 'ARROWS'
+        get_col("FOLK_F").objects.link(e)
+        e.parent, e.parent_type, e.parent_bone = rig, 'BONE', bone
+        bpy.context.view_layer.update()
+        e.matrix_world = M
+    R = SHEATH_D.to_track_quat('Z', 'Y').to_matrix() @ Matrix(((1, 0, 0), (0, 0, 1), (0, -1, 0)))
+    mount("mount_huotra_f", "hips", Matrix.Translation(SHEATH_TOP_F - SHEATH_D * 0.06) @ R.to_4x4())
+    mount("mount_kilpi_selka_f", "chest", Matrix.Translation(V((0.0, 0.11, 1.13))) @ Matrix.Rotation(0.22, 4, 'Y') @ Matrix.Rotation(math.pi, 4, 'Z'))
+    return out
 
 
 def build_bow():
@@ -818,14 +870,15 @@ def run_folk(preview_dir=None, out_dir=None, save=True, base_f=False, only=None)
                 pose_arms(False, FEM["rig"])
                 out["tris"].update({"char_jousineito": build_jousineito()["tris"], "jousi": build_bow()["tris"]})
                 out["tris"]["char_emanta"] = build_emanta()["tris"]
+                out["gear_f"] = build_hero_f_gear()
             bpy.context.view_layer.update()
             if preview_dir:
                 for name, rig, on in (("tietaja", "RIG", only != 'f'), ("jousineito", FEM["rig"], only != 'm'), ("emanta", FEM["rig"], only != 'm')):
                     if not on:
                         continue
-                    sheet(["char_" + name], os.path.join(preview_dir, name + "_rest.png"), yaws=(0, math.pi / 2, math.pi), w=380, h=760)
+                    sheet(["char_" + name] + (["char_jousineito_huotra", "char_jousineito_hihna"] if name == "jousineito" else []), os.path.join(preview_dir, name + "_rest.png"), yaws=(0, math.pi / 2, math.pi), w=380, h=760)
                     pose_arms(True, rig)
-                    sheet(["char_" + name], os.path.join(preview_dir, name + "_pose.png"), yaws=(0, math.pi / 2, math.pi, -math.pi / 2), w=380, h=760)
+                    sheet(["char_" + name] + (["char_jousineito_huotra", "char_jousineito_hihna"] if name == "jousineito" else []), os.path.join(preview_dir, name + "_pose.png"), yaws=(0, math.pi / 2, math.pi, -math.pi / 2), w=380, h=760)
                     pose_arms(False, rig)
                 if only != 'f':
                     sheet(["sauva"], os.path.join(preview_dir, "sauva.png"), yaws=(math.pi / 2,), w=300, h=900)

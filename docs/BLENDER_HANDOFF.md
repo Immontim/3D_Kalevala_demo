@@ -6,7 +6,7 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-15 (Claude, Windows; pohja main 850e4cc)
+Päivitetty: 2026-11-16 (Claude, Windows; pohja main 98c8c2a)
 
 - **Mainissa** (pohja `3191123`) ovat `assets/forest.glb`,
   `characters.glb`, `bog.glb`, `homestead.glb`, `household.glb`,
@@ -54,6 +54,35 @@ Päivitetty: 2026-11-15 (Claude, Windows; pohja main 850e4cc)
   (0,385; -0,058; 0,769), suunta (-0,283; -0,795; -0,537); oikea käsi on
   peilikuva x:n suhteen. Jousen kahva uppoaa suljettuun nyrkkiin, mikä
   näyttää otteelta, mutta kuvista tätä ei ole tarkistettu.
+- **Hihat ja ranteet.** Pitkän hihan (`torso_parts`, hihan loppu 0,97) leikkasi
+  aiemmin vartalon korkeusraja z < 0,95, ja riippuvan käden ranne on tämän
+  alapuolella: hiha päättyi rosoisesti kyynärvarren puolivälissä ja ranneke ja
+  käsi leijuivat irrallaan ("katkennut ranne"). Käsivarren verteksejä rajaa nyt
+  vain `arm_t`; z-alaraja koskee vain vartaloa. Korjaus näkyy tietäjällä,
+  jousineidolla (myös naissankari), emännällä, nuorella urholla ja Pohjan
+  sotureilla. Sankarin hiha (loppu 0,78) ei muuttunut.
+- **Sormiluut** (`char_rig.py`: `finger_setup`, `add_fingers`, `FINGER_*`):
+  `finger1..3_L/R` (rystys, keskinivel, kärkinivel; peukalolla ei luuta)
+  kummallakin luurangolla (`RIG`, `RIG_F`), vanhempana `hand_*`. Lepoasento on
+  edelleen nyrkki (verkko ei muuttunut), luut ovat koukistetun sormen
+  nivelissä ja luun paikallinen Z on koukistusakseli: sormet aukeavat
+  kiertämällä luita Z:n ympäri +1,25/+1,5/+0,9 rad (täysin suorat sormet).
+  Painot: sormiverteksit jaetaan `hand_*`n painosta samoilla nivelkohdilla
+  kuin koukistus (`finger_ks`); peukalo jää `hand_*`lle. `ARM`-ryhmä ja
+  `grip_carve` laskevat sormiluut käden osaksi. `build_base`/`build_base_f`
+  kutsuvat `add_fingers`ia (uusi vartalo), nykyisen `characters.blend`in
+  BODY ja BODY_F päivitettiin paikallaan. Sormen ulkonäkö on `h_open`-kuvissa
+  hyvä; sormet ovat yhtenä levynä (neljä sormea liikkuu yhdessä) ja peukalo
+  pysyy kämmenellä kiinni.
+- **Naissankarin varusteet** (`char_folk.py`: `build_hero_f_gear`, osa
+  `run_folk(only='f')`ia, jousineidon vartalolla): `char_jousineito_huotra`
+  (416 kolmiota; soikea nahkarunko, messinkisuu ja -kärki, vyösilmukka;
+  painotettu lantioon, `SHEATH_TOP_F` (0,19; −0,03; 1,03), sama suunta ja pituus
+  kuin miehellä), `char_jousineito_hihna` (72 kolmiota, kantohihna viitan
+  päältä, `strap_parts(off=0,07)`) sekä tyhjät `mount_huotra_f` (lantioluu) ja
+  `mount_kilpi_selka_f` (rintaluu). Kaikki ovat `villagers_f.glb`:ssä; NPC-koodi
+  poistaa ne, `Fighter.build` käyttää naissankarilla. Huotra menee kävellessä
+  reiden läpi kuten miehen. Kilpi selässä menee jousineidon viinen päälle.
 - **Pihapiiri** tehdään skriptillä `assets-src/blender/homestead.py` →
   `build_homestead()`: `talo`, `kuoppatalo`, `aitta`, `katos`, `aita`,
   `portinpieli`, `pino`, `polkky`, `haasia` ja `ruukku`. Kuoppatalon
@@ -173,7 +202,7 @@ Päivitetty: 2026-11-15 (Claude, Windows; pohja main 850e4cc)
   koira sileä ja ihmishahmoja lelumaisempi. Possu on porsaan mittasuhteissa.
   Koiran 191 luuta on yhdelle koiralle hyväksyttävä, ei laumalle.
 - Talousesineiden tulikivet ja tuhka ovat tasaisen harmaita ilman tekstuuria.
-- Huotra on litteä laatikko ja seuraa vain lantiota, joten se menee
+- Miehen huotra on litteä laatikko ja seuraa vain lantiota, joten se menee
   kävellessä reiden ja helman läpi. Selässä kilven kädensija painuu hieman
   panssariin ja sankarin pitkät hiukset menevät kilven läpi. Kantohihna
   kulkee selässä kilven alla, ei kiinnity kilpeen.
@@ -181,18 +210,13 @@ Päivitetty: 2026-11-15 (Claude, Windows; pohja main 850e4cc)
 
 ## Seuraava Blender-tehtävä
 
-Ei avointa Blender-tehtävää. Ehdotus omistajalle: miehen sankarin rennot
-avokädet (nyt suljetut nyrkit näkyvät kävelyssä ja vilkutuksessa; vaatii
-`char_hero`n käteen morph-targetin tai toisen käsiverkon, koska luurangossa ei
-ole sormiluita) sekä naissankarin oma huotra ja kantohihna (nyt huotra on
-koodilla tehty laatikoista `Fighter.attachFemaleGear`issa ja hihna puuttuu).
-Muuta mahdollista: koiran kävelyleike
-(`animals.py`, 191 luuta) ranta- ja pihakoiran käyskentelyyn.
-Tietäjällä on vain lepoasento, joten istuva tietäjä vaatisi uuden
-istumaleikkeen. Jos omistaja pitää jousineidon otetta
-huonona, koverretaan hänen nyrkkinsä (`skin_parts(carve=…)` omalla
-kanavalla) ja viedään `villagers_f.glb` uudelleen. Muuten odotetaan
-palautetta pelissä näkyvistä virheistä.
+Ei avointa Blender-tehtävää. Ehdotus omistajalle: sormien viimeistely
+(neljä sormea erilleen ja peukalolle oma luu, jos vilkutus näyttää
+jäykältä), koiran kävelyleike (`animals.py`, 191 luuta) ranta- ja
+pihakoiran käyskentelyyn sekä istuva tietäjä (uusi istumaleike). Jos omistaja
+pitää jousineidon otetta huonona, koverretaan hänen nyrkkinsä
+(`skin_parts(carve=…)` omalla kanavalla). Muuten odotetaan palautetta pelissä
+näkyvistä virheistä.
 
 ## Ei vielä aloiteta
 

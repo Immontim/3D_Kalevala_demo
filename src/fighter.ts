@@ -3,7 +3,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import charactersUrl from "../assets/characters.glb?url";
 import villagersFUrl from "../assets/villagers_f.glb?url";
-import { loadGltf } from "./folk";
+import { FINGER_OPEN, loadGltf } from "./folk";
 import type { Loadout } from "./combat";
 
 // Blenderissä mallinnettu luurankohahmo, jota ohjataan koodilla: asennot (Pose) ovat
@@ -277,6 +277,8 @@ const BONE_NAMES = [
 type BoneName = (typeof BONE_NAMES)[number];
 const ARM_BONES = new Set<BoneName>(["upper_arm_L", "forearm_L", "hand_L", "upper_arm_R", "forearm_R", "hand_R"]);
 
+const Z_AXIS = new THREE.Vector3(0, 0, 1);
+
 const characterAssets = new GLTFLoader().loadAsync(charactersUrl);
 /** Valmistuu, kun hahmomallit on ladattu. */
 export const charactersReady: Promise<void> = characterAssets.then(() => undefined);
@@ -386,6 +388,9 @@ export class Fighter {
   private strideVel = 0;
   /** 0..1: kädet ovat vapaat (rauhan lepoasento), jolloin ne heiluvat kävellessä. */
   private relax = 0;
+  /** Sormiluut (finger1..3 kummallekin kädelle): lepoasento on nyrkki, avaus 0..1 kiertää luita auki. */
+  private fingers: Partial<Record<"L" | "R", { bones: THREE.Bone[]; rest: THREE.Quaternion[] }>> = {};
+  private handOpen = { L: 0, R: 0 };
   /** Terän kärjen välähdys, joka näkyy myös toisen hahmon takaa (vihollisen iskuvihje). */
   private glint: THREE.Sprite | null = null;
   /** Oma kello ja vaihe, jotta kaksi hahmoa ei huoju samassa tahdissa. */
@@ -437,7 +442,8 @@ export class Fighter {
     // Kantohihna (char_<hahmo>_hihna) on oma kappaleensa samassa luurangossa; näkyy vain rauhan varustuksessa.
     const bodyName = female ? "char_jousineito" : `char_${this.look.character}`;
     const strapName = `${bodyName}_hihna`;
-    const keep = new Set<string>([bodyName, strapName]);
+    // Naissankarin huotra (char_jousineito_huotra) on oma kappale kuten kantohihna: aina näkyvissä.
+    const keep = new Set<string>([bodyName, strapName, `${bodyName}_huotra`]);
     const equip: Record<string, THREE.Object3D> = {};
     const gearRig = gear.getObjectByName("RIG") ?? gear;
     let gearHelmet: THREE.Object3D | null = null;
@@ -469,8 +475,10 @@ export class Fighter {
     this.rig = rig;
     this.strap = rig.getObjectByName(strapName) ?? null;
     // Kiinnityspisteet luiden lapsina (Blender: build_mounts): lapsi nolla-asennossa on huotrassa tai selässä.
-    this.mountSheath = rig.getObjectByName("mount_huotra") ?? null;
-    this.mountBack = rig.getObjectByName("mount_kilpi_selka") ?? null;
+    // Naisen luurangolla pisteet ovat mount_huotra_f ja mount_kilpi_selka_f (char_folk.py: build_hero_f_gear).
+    const sfx = female ? "_f" : "";
+    this.mountSheath = rig.getObjectByName(`mount_huotra${sfx}`) ?? null;
+    this.mountBack = rig.getObjectByName(`mount_kilpi_selka${sfx}`) ?? null;
     clone.updateMatrixWorld(true);
 
     // Lepoasennot hahmon omassa koordinaatistossa (klooni on vielä origossa).
@@ -486,6 +494,10 @@ export class Fighter {
       }
       const p = bone.parent && (BONE_NAMES as readonly string[]).includes(bone.parent.name) ? (bone.parent.name as BoneName) : null;
       this.bones.set(name, { bone, parent: p, canon, world: new THREE.Quaternion() });
+    }
+    for (const side of ["L", "R"] as const) {
+      const bones = [1, 2, 3].map((i) => rig.getObjectByName(`finger${i}_${side}`) as THREE.Bone | undefined);
+      if (bones.every((b) => b)) this.fingers[side] = { bones: bones as THREE.Bone[], rest: bones.map((b) => b!.quaternion.clone()) };
     }
     const hips = this.bones.get("hips")!.bone;
     this.hipsRest.copy(hips.position);
@@ -562,50 +574,17 @@ export class Fighter {
   }
 
   /**
-   * Naissankarin varusteiden kiinnitys. Miehen tiedoston kypärä, huotran kiinnityspiste ja
-   * selkäkiinnike siirretään naisen luurangolle luiden lepoasentojen erotuksen verran.
-   * Naisen mallissa ei ole huotraa eikä kilven hihnaa, joten huotra tehdään tässä laatikoista
-   * samoin mitoin kuin Blenderin char_build.py (belt_parts); hihna puuttuu.
+   * Naissankarin kypärä. Kypärä tulee miehen tiedostosta ja siirretään naisen luurankoon luiden
+   * lepoasentojen erotuksen verran. Huotra, kantohihna ja kiinnityspisteet ovat naisen omassa
+   * tiedostossa (villagers_f.glb).
    */
   private attachFemaleGear(clone: THREE.Object3D, gear: THREE.Object3D, helmet: THREE.Object3D | null) {
+    if (!helmet) return;
     clone.updateMatrixWorld(true);
     gear.updateMatrixWorld(true);
     const wp = (root: THREE.Object3D, name: string) => root.getObjectByName(name)!.getWorldPosition(new THREE.Vector3());
-    const off = (bone: string) => wp(clone, bone).sub(wp(gear, bone));
-    if (helmet) { helmet.position.add(off("head")); clone.add(helmet); }
-    const mount = (name: string, bone: string) => {
-      const src = gear.getObjectByName(name);
-      if (!src) return null;
-      const o = new THREE.Object3D();
-      o.name = name;
-      src.matrixWorld.decompose(o.position, o.quaternion, o.scale);
-      o.position.add(off(bone));
-      clone.add(o);
-      o.updateMatrixWorld(true);
-      clone.getObjectByName(bone)!.attach(o);
-      return o;
-    };
-    this.mountSheath = mount("mount_huotra", "hips");
-    this.mountBack = mount("mount_kilpi_selka", "chest");
-    // Huotra vasemmalle kupeelle (pelin koordinaatit: x, korkeus, -y Blenderin y:stä).
-    const top = new THREE.Vector3(0.19, 0.985, 0.03).add(off("hips"));
-    const d = new THREE.Vector3(0.1, -0.93, -0.35).normalize();
-    const len = 0.8;
-    const box = (w: number, th: number, l: number, at: number, color: number, metal: boolean) => {
-      const mat = new THREE.MeshStandardMaterial({ color, roughness: metal ? 0.45 : 0.8, metalness: metal ? 0.5 : 0 });
-      if (metal) { envTargets.add(mat); mat.envMapIntensity = 0.45; if (envMap) mat.envMap = envMap; }
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, l, th), mat);
-      m.position.copy(top).addScaledVector(d, at);
-      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d);
-      m.castShadow = true;
-      m.frustumCulled = false;
-      clone.add(m);
-      clone.updateMatrixWorld(true);
-      clone.getObjectByName("hips")!.attach(m);
-    };
-    box(0.062, 0.02, len, len / 2, 0x5b3a22, false);
-    box(0.066, 0.024, 0.05, len - 0.005, 0xa07a2a, true);
-    box(0.068, 0.026, 0.04, 0.02, 0xa07a2a, true);
+    helmet.position.add(wp(clone, "head").sub(wp(gear, "head")));
+    clone.add(helmet);
   }
 
   /**
@@ -976,6 +955,7 @@ export class Fighter {
       this.shieldHolder.quaternion.slerpQuaternions(this.shieldFront, qB, hw);
     }
     if (this.look.loadout === "spear") this.spearArms();
+    this.applyFingers();
 
     // Jalat: asennon mukainen jalan paikka lasketaan ensin (reisi ja polvi), siihen lisätään
     // askel, ja nivelkulmat ratkaistaan jalan paikasta. Näin maassa oleva jalka liikkuu
@@ -1047,6 +1027,16 @@ export class Fighter {
     this.rig.position.y = this.footRestY - low - this.sink;
   }
 
+  /** Sormet auki sen mukaan, kuinka paljon kämmen on auki (0 = nyrkki, 1 = suorat sormet). */
+  private applyFingers() {
+    for (const side of ["L", "R"] as const) {
+      const f = this.fingers[side];
+      if (!f) continue;
+      const open = this.handOpen[side];
+      f.bones.forEach((b, i) => b.quaternion.copy(f.rest[i]).multiply(qA.setFromAxisAngle(Z_AXIS, FINGER_OPEN[i] * open)));
+    }
+  }
+
   /** Liu'uttaa asentoa kohti kohdeasentoa. rate = kuinka nopeasti (1/s). */
   animate(target: Pose, rate: number, dt: number, moveSpeed: number) {
     const k = 1 - Math.exp(-rate * dt);
@@ -1064,6 +1054,14 @@ export class Fighter {
     const strideWas = this.pose.stride;
     // Rauhan lepoasennossa kädet ovat vapaat ja heiluvat; eleet ja taisteluasennot hallitsevat käsiä itse.
     this.relax += ((target === POSES.rest || target === POSES.restSpear ? 1 : 0) - this.relax) * k;
+    // Kämmenet: rauhassa ja eleissä sormet ovat rennosti auki, taistelussa ase- ja kilpikäsi puristaa nyrkkiin.
+    const freeHands = target === POSES.rest || target === POSES.restSpear || gesture;
+    const openAmt = gesture ? 0.9 : 0.7;
+    const goalR = freeHands && this.look.loadout !== "spear" ? openAmt : 0;
+    const goalL = freeHands ? openAmt : this.look.loadout === "sword" ? 0.35 : 0;
+    const kh = 1 - Math.exp(-9 * dt);
+    this.handOpen.R += (goalR - this.handOpen.R) * kh;
+    this.handOpen.L += (goalL - this.handOpen.L) * kh;
     for (const key of KEYS) {
       const goal = over && key in over ? over[key as keyof typeof over]! : target[key];
       this.pose[key] += (goal - this.pose[key]) * k;
