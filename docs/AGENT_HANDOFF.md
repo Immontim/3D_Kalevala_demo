@@ -6,14 +6,46 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `5d18967`)
+Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `eed0b8c`)
 
-- **Origin/mainin koodiversio on v03.09.00.** Siinä ovat v03.08.00:n järven
-  laajennus, v03.09.00:n hävitetty ranta sekä niiden jälkeen mergattu stamina-
-  ja keihästasapaino. Branch `codex/version-docs-sync` yhtenäistää vain
-  dokumentaation; pelin koodi tai versionumero ei muutu. Dokumentaatio valmis,
-  ei deployattu. Tarkista merge-tila ennen jatkamista:
-  `git merge-base --is-ancestor codex/version-docs-sync origin/main`.
+- **Origin/mainin koodiversio on v03.09.00** (järven laajennus, hävitetty ranta,
+  stamina- ja keihästasapaino). **Branchin `claude/cairn-birch-grove` koodiversio on
+  v03.10.00** (kalmisto). Koodi valmis, ei deployattu, käsin testattu (alla).
+  Tarkista merge-tila ennen jatkamista:
+  `git merge-base --is-ancestor claude/cairn-birch-grove origin/main`.
+- **Kalmisto `cairnfield` (v03.10.00)**, rauhallinen kohtaus (`SCENE_KINDS`:
+  friendly). Esc-dialogin oikotie, aloitusvalikon paikanvalinta ja `?scene=cairnfield`;
+  ei vielä karttapaikkaa (`sites.ts`:ään lisätään kuten rannalle, kun omistaja haluaa).
+  `world.ts`: `CAIRN`-lippu; `LAKE` = `LAKESIDE || CAIRN` (vesi, kaukoranta, rantakaistan
+  maasto), mökki/laituri/vene `LAKESIDE`ssä. Maasto: kallionokka (`terrainHeight`:
+  loiva kumpare keskipisteessä (1, 4), +1,15 m, ja matalia kalliokumpuja), `shoreZ`
+  siirtää rannan z ≈ 21:een ja vetää sen sivuille, joten järvi on kumpareen takana ja
+  sivuilla. Sijoittelu vakioina `world.ts`:n alussa: `CUPSTONE` (1,2; 3,0),
+  `CAIRNS_AT` (kuusi röykkiötä, kehällä r ≤ 12), `KARSIKKO` (−11,6; 9,2), `LOUHI_AT`
+  (−9,9; 7,5; katse kuppikiveen), `DARK_SOIL` (musta maa: kuusi canvas-tekstuurilla
+  piirrettyä läikkää, jotka seuraavat maastoa; ei mallia). Aloitus (−0,6; −9,5) katse
+  järvelle. Mallit `cairnfield.glb`:stä (BLENDER_HANDOFF); törmäykset
+  `PROP_COLLIDERS`ista (kuppikivi laatikko, röykkiöt ympyrä/laatikko ilman
+  `blocksMelee`, karsikko ympyrä) ja Louhi ympyrä. Puut harvaa (koivu 40 %, mänty,
+  vähän kuusta), ei puita järvinäkymän kaistalla (z > 7, |x| < 14) eikä kumpareen
+  13 m:n sisällä. Heinää 40 %, sammalta ja varvikkoa enemmän, valo ja sumu vaaleaa
+  (`FOG_COLOR`). Ei tulta (`buildFire` palauttaa sammuneen), ei tulen törmäystä.
+  Louhi: `populateCairnLife`, `louhi.glb` `spawnVillager`illä (kädet kuten emännällä),
+  puhuteltava (`folk.louhi`). Kaukainen vesilintu `buildLoon` (koodigeometria, ei
+  sumua, sukeltaa 70 s kierroksella). **Ääni:** `Sfx.birds(dt, taso)` (`audio.ts`),
+  taso `birdSongLevel` (`ambience.ts`, testattu): hiljaa alle 4 m kuppikivestä, täysi
+  yli 11 m; muissa kohtauksissa taso 0 eli ei lintuja. Veden ääntä ei ole, vain
+  vanha tuulikohina. Tarkistettu pelissä: 60 FPS (1024×768 in-app, 1,15 milj.
+  kolmiota), ei konsolivirheitä, rauha/ranta/aukio latautuvat ennallaan. **Ei
+  tarkistettu:** käveleminen törmäyksiä vasten (in-app-selain ei saanut näppäimiä
+  perille; laatikon `yaw`-konventio tarkistettu koodista), ääni kuultuna, tarkka
+  FPS suurella näytöllä.
+- **Taisteluvaraukset (Louhi suohon):** kuppikiven ympärillä on röykkeistä vapaa
+  noin 5 m:n alue, ja suoloitsun efekti (`bog`, `effects.ts`) on jo olemassa. Puuttuu
+  vielä vihollistyyppi `louhi` (nyt vain NPC), hänen taistelumalli ja animaatiot
+  (kävely, kädet ylös) sekä `Encounter`, joka vaihtaa `cairnfieldVisit`in taisteluun.
+  `ARENA_RADIUS` 11 m kattaa kuppikiven ja neljä röykkiötä; karsikko ja Louhi ovat
+  sen ulkopuolella.
 - **Rauhan kävely ja eleet** (`src/fighter.ts`, `src/interact.ts`,
   `src/engine/{hero,melee,animate}.ts`). `POSES.rest` on rennompi (kädet
   hieman irti vartalosta, kyynärpää taipuu); `apply()` heiluttaa käsiä
@@ -285,6 +317,8 @@ vielä täyttä karttaeditoria.
 
 ## Ei vielä aloiteta
 
+- Louhen taistelu ja suoloitsu (varaukset yllä); esine- ja puhemekaniikka kalmistolla
+  on Codexin suunnittelema.
 - Täysi karttaeditori, satunnaiset matkakohtaamiset ja sivujuonigeneraattori.
 - Paperinuken vaate-esineiden datamalli ja 3D-ulkoasun vaihto.
 - 3D-palkintojen tai ruokien lisääminen paluukuormasta inventaarioon.

@@ -45,6 +45,33 @@ export class Sfx {
     src.start();
   }
 
+  private birdTimer = 2;
+
+  /** Lintujen laulu: lyhyitä sirahduksia, joiden tiheys seuraa tasoa 0..1 (0 = linnut vaikenevat kokonaan).
+   *  Kutsutaan joka ruudulla; taso tulee pelistä (kalmistolla etäisyys kuppikivestä). */
+  birds(dt: number, level: number) {
+    if (!this.ctx || level <= 0.02) { this.birdTimer = Math.max(this.birdTimer, 1.5); return; }
+    this.birdTimer -= dt;
+    if (this.birdTimer > 0) return;
+    this.birdTimer = (0.9 + Math.random() * 3.2) / level;
+    const ctx = this.ctx, now = ctx.currentTime;
+    const notes = 2 + Math.floor(Math.random() * 4), base = 2600 + Math.random() * 2000;
+    for (let i = 0; i < notes; i++) {
+      const t0 = now + i * (0.09 + Math.random() * 0.05);
+      const o = ctx.createOscillator();
+      o.type = "sine";
+      o.frequency.setValueAtTime(base * (1 + 0.12 * Math.random()), t0);
+      o.frequency.exponentialRampToValueAtTime(base * (0.8 + 0.5 * Math.random()), t0 + 0.07);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.045 * level, t0 + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09);
+      o.connect(g).connect(this.master);
+      o.start(t0);
+      o.stop(t0 + 0.1);
+    }
+  }
+
   swing() {
     if (!this.ctx) return;
     const ctx = this.ctx;

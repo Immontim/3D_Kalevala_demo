@@ -16,12 +16,12 @@ export function initStartMenu(options: { returnToMap?: boolean; scene?: SceneId 
     const friendly = options.scene !== undefined && sceneKind(options.scene) === "friendly";
     const tag = document.querySelector<HTMLElement>("#start .tag");
     if (tag) {
-      tag.textContent = friendly ? t(options.scene === "lakeside" ? "lakeside.sub" : options.scene === "lakeruin" ? "lakeruin.sub" : "yard.sub")
+      tag.textContent = friendly ? t(options.scene === "lakeside" ? "lakeside.sub" : options.scene === "lakeruin" ? "lakeruin.sub" : options.scene === "cairnfield" ? "cairnfield.sub" : "yard.sub")
         : options.scene ? t(`arena.${options.scene}.desc`) : t("start.subtitle");
       tag.removeAttribute("data-i18n");
     }
     const startButton = $("startBtn");
-    startButton.textContent = friendly ? t(options.scene === "lakeside" || options.scene === "lakeruin" ? "map.enterLakeside" : "map.enterYard") : t("map.enterBattle");
+    startButton.textContent = friendly ? t(options.scene === "lakeside" || options.scene === "lakeruin" || options.scene === "cairnfield" ? "map.enterLakeside" : "map.enterYard") : t("map.enterBattle");
     startButton.removeAttribute("data-i18n");
     $("menuBtn").textContent = t("map.return");
     $("menuBtn").removeAttribute("data-i18n");
