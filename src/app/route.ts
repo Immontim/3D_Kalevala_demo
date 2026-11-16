@@ -1,6 +1,6 @@
 /** Sovelluksen kevyet kartta- ja 3D-reitit. Tämä moduuli ei riipu 3D-moottorista. */
 
-export const SCENE_IDS = ["clearing", "homestead", "yard", "lakeside", "lakeruin"] as const;
+export const SCENE_IDS = ["clearing", "homestead", "yard", "lakeside", "lakeruin", "cairnfield"] as const;
 export type SceneId = (typeof SCENE_IDS)[number];
 export type SceneKind = "battle" | "friendly";
 
@@ -11,6 +11,7 @@ export const SCENE_KINDS: Record<SceneId, SceneKind> = {
   yard: "friendly",
   lakeside: "friendly",
   lakeruin: "friendly",
+  cairnfield: "friendly",
 };
 
 export function sceneKind(scene: SceneId): SceneKind {

@@ -41,3 +41,5 @@ export const visit: Encounter = makeVisit("yard.title", "yard.sub");
 export const lakesideVisit: Encounter = makeVisit("lakeside.title", "lakeside.sub");
 /** Sama ranta tuhon jälkeen. */
 export const lakeruinVisit: Encounter = makeVisit("lakeruin.title", "lakeruin.sub");
+/** Kalmisto järven rannalla: kuppikivi, röykkiöt ja Louhi. */
+export const cairnfieldVisit: Encounter = makeVisit("cairnfield.title", "cairnfield.sub");

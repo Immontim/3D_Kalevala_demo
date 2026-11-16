@@ -6,7 +6,7 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-16 (Claude, Windows; pohja main 56d200a)
+Päivitetty: 2026-11-16 (Claude, Windows; pohja main eed0b8c)
 
 - **Mainissa** (pohja `3191123`) ovat `assets/forest.glb`,
   `characters.glb`, `bog.glb`, `homestead.glb`, `household.glb`,
@@ -93,6 +93,22 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja main 56d200a)
   hahmo asetetaan keskelle) ja `verilammikko_pieni`. Veren väri tulee verteksiväreistä
   (materiaali `M_Blood` valkoinen, kiiltävä); peli nostaa sen syvyydessä. Mallien mitat ja
   tarkistus Blenderin kuvista (a-e); pelissä katsottu vain ylhäältä ja läheltä.
+- **Kalmisto** (`assets/cairnfield.glb`, noin 5,0 Mt; `assets-src/blender/cairnfield.py`,
+  ajetaan taustalla ja lukee ensin `homestead.py`:n ja `household.py`:n, `trees.py`
+  luetaan omaan nimiavaruuteensa karsikkoa varten; esikatselukuvat `KALEVALA_PREVIEW`):
+  `kuppikivi` (26 000 kolmiota; litteä lakipinta 2,2 x 1,75 m, korkeus 0,8 m, 11 kuppia
+  ja juoksutusura laskettu korkeuskenttään 2,2 cm:n ruudukolla, helma 0,3 m maan alle,
+  graniitin väri verteksiväreistä + `mossy_rock`-rakenne), `roykkio_a` (pyöreä),
+  `roykkio_b` (soikea), `roykkio_c` (kehäröykkiö, keskellä kuoppa) ja `roykkio_d`
+  (pieni): sammalpeitteinen kumpu (`M_CairnMoss`) ja 40–60 satunnaiskiertoista kiveä
+  (8 600–14 600 kolmiota/malli), sekä `karsikko` (2 600 kolmiota; 14 m mänty, jonka
+  oksat on karsittu tyngiksi 11 m:iin asti, latvassa pieni oksatupsu `trees.py`:n
+  korteilla). Mitat ja törmäysehdotukset ovat skriptin alun kommentissa. Katsottu
+  Blenderin kuvista ja pelissä (kuppikivi lähellä ja ylhäältä, röykkiöt, Louhi ja
+  karsikon alaosa; karsikon latvaa ei pelissä). Kupit ovat mallissa melko pieniä:
+  jos haluat näkyvämmät, nosta `cup_depth`in syvyyttä ja `CUPS`in säteitä.
+  Röykkiöiden kivet ovat matalapolygonisia ja hieman kulmikkaita; samaa mallia
+  käytetään kahdesti eri kierrolla ja mittakaavalla.
 - **Pihapiiri** tehdään skriptillä `assets-src/blender/homestead.py` →
   `build_homestead()`: `talo`, `kuoppatalo`, `aitta`, `katos`, `aita`,
   `portinpieli`, `pino`, `polkky`, `haasia` ja `ruukku`. Kuoppatalon
@@ -131,7 +147,8 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja main 56d200a)
   ovat mekon alla paljain jaloin. Kuvalähde oli omistajan antama
   Sketchfab-referenssi (ei käytetty mallina eikä kopioitu); kaikki
   geometria on tehty itse. Katsottu vain Blenderin kuvista lepoasennossa
-  ja kädet alhaalla; ei ajettu pelissä, kävelyä ei kokeiltu.
+  ja kädet alhaalla. Pelissä (kalmisto) hän seisoo paikallaan emännän käsiasennolla;
+  ulkonäkö on katsottu läheltä, kävelyä ei kokeiltu.
 - **Naishahmot** (`assets/villagers_f.glb`, noin 3,2 Mt):
   `char_jousineito` (noin 27 900 kolmiota), `jousi` (ote origossa, lavat
   Z-suunnassa, jänne +Y) ja `char_emanta` (noin 26 600 kolmiota).

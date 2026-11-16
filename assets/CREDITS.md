@@ -117,6 +117,15 @@ tekstuurilähteet samat kuin `homestead.glb`:ssä ja `household.glb`:ssä
 (Poly Haven `pine_bark`, `forest_leaves_02`, `clay_plaster`, `thatch_roof_angled`,
 CC0). Ei uusia ulkopuolisia lähteitä.
 
+## `cairnfield.glb`
+
+Kalmisto: kuppikivi, neljä röykkiömallia ja karsikkomänty. Geometria itse tehty
+Blenderissä (skripti `assets-src/blender/cairnfield.py`). Kuppikiven ja röykkiöiden
+kivipinta on Poly Havenin `mossy_rock`-tekstuurista (CC0), josta sammal on poistettu
+(vain kiven rakenne, muu väri verteksiväreistä); sammalpeite on `forest_leaves_02` (CC0)
+ja karsikon kaarna `pine_bark` (CC0) sekä oksakorttiatlas (`assets-src/cards`, oma).
+Ei uusia ulkopuolisia lähteitä. `louhi.glb` on kuvattu aiemmin.
+
 ## `household.glb`
 
 | Pelin malli | Lähde (Poly Haven -tunniste, CC0) | Käyttö |
@@ -152,5 +161,5 @@ kansion `ground/` sammal- ja maatekstuureja sekä `forest.glb`:n heinämalleja.
 | `moss_*.webp` | `forest_leaves_02` |
 | `dirt_*.webp` | `forest_ground_04` |
 
-Ladattu mutta ei käytössä pelissä: `moss_01`, `boulder_01`, `mossy_rock`,
+Ladattu mutta ei käytössä pelissä: `moss_01`, `boulder_01`,
 `pine_tree_01` (vain tekstuurit).

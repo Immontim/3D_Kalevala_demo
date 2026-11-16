@@ -29,7 +29,7 @@ import { mapCalendarTime, mapCellVisibility, satietyBand } from "./uiState";
 const TILE = 48;
 const VIEW_COLS = 17;
 const VIEW_ROWS = 13;
-const SCENE_SHORTCUTS = ["yard", "lakeside", "lakeruin", "clearing", "homestead"] as const satisfies readonly SceneId[];
+const SCENE_SHORTCUTS = ["yard", "lakeside", "lakeruin", "cairnfield", "clearing", "homestead"] as const satisfies readonly SceneId[];
 
 const HERO_FRAME: Record<MapDirection, [number, number]> = {
   up: [0, 2], right: [1, 2], down: [2, 2], left: [3, 2],

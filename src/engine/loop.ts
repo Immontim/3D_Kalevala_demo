@@ -4,7 +4,7 @@ import { stepFreeCam } from "../freecam";
 import { t } from "../i18n";
 import { mapUrl, parseAppRoute } from "../app/route";
 import { openTune, renderBinds } from "../ui/pauseMenu";
-import { groundHeight } from "../world";
+import { birdSongLevel, groundHeight } from "../world";
 import { removeActor } from "./actor";
 import { updateAi } from "./ai";
 import { syncVisual } from "./animate";
@@ -20,7 +20,7 @@ import { keepApartAndInside, updateCombatant } from "./melee";
 import { updateHazards } from "./hazards";
 import { updateShowcase } from "./showcase";
 import { choosing, closeChoice, closeSong, songState, updateChoice, updateSong } from "./song";
-import { aim, bindUi, fx, g, inputs, keys } from "./state";
+import { aim, bindUi, fx, g, inputs, keys, sfx } from "./state";
 import { camera, canvas, composer, world } from "./view";
 import { createEmptySceneReturn, saveSceneReturn } from "../map/transition";
 
@@ -136,6 +136,7 @@ export function simulate(realDt: number) {
 
 
   world.update(g.realTime, dt, camera, g.player.pos);
+  if (g.running && !paused) sfx.birds(realDt, birdSongLevel(g.player.pos.x, g.player.pos.z));
   updateSparks(dt);
   fx.shake = Math.max(0, fx.shake - realDt * 1.2);
   if (freeCam.active) stepFreeCam(freeCam.cam, (code) => keys.has(code), realDt);
