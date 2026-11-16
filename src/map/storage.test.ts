@@ -3,11 +3,13 @@ import {
   CAMPAIGN_STORE,
   EARLIEST_CAMPAIGN_STORE,
   LEGACY_CAMPAIGN_STORE,
+  PREVIOUS_CAMPAIGN_STORE,
   clearCampaign,
   loadCampaign,
   saveCampaign,
   type CampaignStorage,
 } from "./storage";
+import { MAP_SITE_DEFINITIONS } from "./sites";
 
 function memoryStorage(initial?: string): CampaignStorage & { data: Map<string, string> } {
   const data = new Map<string, string>();
@@ -34,17 +36,18 @@ describe("kampanjan selainvarasto", () => {
 
   it("korvaa rikkinäisen tallennuksen turvallisella uudella kampanjalla", () => {
     const state = loadCampaign(memoryStorage("{not-json"));
-    expect(state.schemaVersion).toBe(3);
+    expect(state.schemaVersion).toBe(4);
     expect(state.world).toMatchObject({ mapId: "kalevala-prototype", width: 20, height: 20 });
   });
 
-  it("migroi v1-avaimen tallennuksen v2-avaimeen menettämättä etenemistä", () => {
+  it("migroi v1-avaimen v4-avaimeen menettämättä etenemistä", () => {
     const storage = memoryStorage();
     const current = loadCampaign(storage);
     current.world.x = 4;
     current.world.worldMinutes = 210;
     const legacy = JSON.parse(JSON.stringify(current));
     legacy.schemaVersion = 1;
+    delete legacy.world.knownSiteIds;
     delete legacy.player.satiety;
     legacy.player.hunger = 65;
     storage.data.set(EARLIEST_CAMPAIGN_STORE, JSON.stringify(legacy));
@@ -57,28 +60,48 @@ describe("kampanjan selainvarasto", () => {
     expect(storage.data.has(EARLIEST_CAMPAIGN_STORE)).toBe(false);
   });
 
-  it("migroi v2-avaimen miesoletuksella v3-avaimeen", () => {
+  it("migroi v2-avaimen miesoletuksella v4-avaimeen", () => {
     const storage = memoryStorage();
     const legacy = JSON.parse(JSON.stringify(loadCampaign(storage)));
     legacy.schemaVersion = 2;
     delete legacy.player.gender;
+    delete legacy.world.knownSiteIds;
     legacy.world.worldMinutes = 360;
     storage.data.delete(CAMPAIGN_STORE);
     storage.data.set(LEGACY_CAMPAIGN_STORE, JSON.stringify(legacy));
 
     const migrated = loadCampaign(storage);
-    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.schemaVersion).toBe(4);
     expect(migrated.player.gender).toBe("male");
     expect(migrated.world.worldMinutes).toBe(360);
     expect(storage.data.has(CAMPAIGN_STORE)).toBe(true);
     expect(storage.data.has(LEGACY_CAMPAIGN_STORE)).toBe(false);
   });
 
+  it("migroi v3:sta tunnetuiksi vain todella löydetyt vanhat paikat", () => {
+    const storage = memoryStorage();
+    const legacy = JSON.parse(JSON.stringify(loadCampaign(storage)));
+    legacy.schemaVersion = 3;
+    delete legacy.world.knownSiteIds;
+    const yard = MAP_SITE_DEFINITIONS.yard.position;
+    legacy.world.discovered[yard.y * legacy.world.width + yard.x] = true;
+    storage.data.delete(CAMPAIGN_STORE);
+    storage.data.set(PREVIOUS_CAMPAIGN_STORE, JSON.stringify(legacy));
+
+    const migrated = loadCampaign(storage);
+    expect(migrated.world.knownSiteIds).toEqual(["yard"]);
+    expect(storage.data.has(CAMPAIGN_STORE)).toBe(true);
+    expect(storage.data.has(PREVIOUS_CAMPAIGN_STORE)).toBe(false);
+  });
+
   it("palauttaa kelvollisen v1-tallennuksen vaikka migraation kirjoitus estetään", () => {
     const source = loadCampaign(memoryStorage());
     source.world.x = 7;
+    const yard = MAP_SITE_DEFINITIONS.yard.position;
+    source.world.discovered[yard.y * source.world.width + yard.x] = true;
     const legacy = JSON.parse(JSON.stringify(source));
     legacy.schemaVersion = 1;
+    delete legacy.world.knownSiteIds;
     delete legacy.player.satiety;
     legacy.player.hunger = 25;
     const serialized = JSON.stringify(legacy);
@@ -91,6 +114,7 @@ describe("kampanjan selainvarasto", () => {
     const migrated = loadCampaign(blocked);
     expect(migrated.world.x).toBe(7);
     expect(migrated.player.satiety).toBe(75);
+    expect(migrated.world.knownSiteIds).toEqual(["yard"]);
   });
 
   it("korvaa turvallisesti myös eri karttaversiolle kuuluvan tallennuksen", () => {
@@ -108,10 +132,12 @@ describe("kampanjan selainvarasto", () => {
   it("poistaa vain kampanjan oman avaimen", () => {
     const storage = memoryStorage("saved");
     storage.data.set(LEGACY_CAMPAIGN_STORE, "old");
+    storage.data.set(PREVIOUS_CAMPAIGN_STORE, "previous");
     storage.data.set(EARLIEST_CAMPAIGN_STORE, "oldest");
     storage.data.set("other", "keep");
     expect(clearCampaign(storage)).toBe(true);
     expect(storage.data.get(CAMPAIGN_STORE)).toBeUndefined();
+    expect(storage.data.get(PREVIOUS_CAMPAIGN_STORE)).toBeUndefined();
     expect(storage.data.get(LEGACY_CAMPAIGN_STORE)).toBeUndefined();
     expect(storage.data.get(EARLIEST_CAMPAIGN_STORE)).toBeUndefined();
     expect(storage.data.get("other")).toBe("keep");

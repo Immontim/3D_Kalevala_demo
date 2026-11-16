@@ -6,11 +6,11 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `53b5bdc`)
+Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `56d200a`)
 
-- **Branchin `codex/map-visibility-river` koodiversio on v03.05.00.** Koodi
+- **Branchin `codex/map-site-knowledge` koodiversio on v03.07.00.** Koodi
   valmis, ei deployattu, käsin testattu (alla). Tarkista merge-tila ennen
-  jatkamista: `git merge-base --is-ancestor codex/map-visibility-river origin/main`.
+  jatkamista: `git merge-base --is-ancestor codex/map-site-knowledge origin/main`.
 - **Rauhan kävely ja eleet** (`src/fighter.ts`, `src/interact.ts`,
   `src/engine/{hero,melee,animate}.ts`). `POSES.rest` on rennompi (kädet
   hieman irti vartalosta, kyynärpää taipuu); `apply()` heiluttaa käsiä
@@ -59,7 +59,7 @@ Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `53b5bdc`)
   n ruutua (kuvakaappaukset tarkasta hetkestä; kuvakaappaus voi laahata
   sekunnin). Dev-palvelimen moduulit voivat monistua monien muokkausten
   jälkeen (varusteet eivät vaihdu): käynnistä palvelin uudelleen. 3D lukee
-  varusteet ja sukupuolen kampanjatallennuksesta (`laulun-miekka.campaign.v3`).
+  varusteet ja sukupuolen kampanjatallennuksesta (`laulun-miekka.campaign.v4`).
 - **Uusi paikka `lakeside` (Järven ranta)**, rauhallinen kohtaus
   (`SCENE_KINDS`: friendly). Kartalla ruutu (9,6) niityn ja järven rajalla,
   Esc-dialogin oikotie ja `?scene=lakeside`. `world.ts` rakentaa sen samalla
@@ -98,8 +98,9 @@ Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `53b5bdc`)
   (816 × 624 px). 1135 px leveässä testinäkymässä canvas oli noin 798 px.
   Sankarin ruutu ja kaikki kahdeksan naapuria paljastuvat pysyvästi. Vain tämä
   nykyinen 3 × 3 -alue on kirkas; aiemmin löydetty terrain näkyy sumutettuna,
-  eikä sen paikka-/kohtaamisikoneita piirretä. WASD/nuolet liikuttavat vain
-  neljään pääilmansuuntaan.
+  ja löydetyt kiinteät paikat näkyvät siinä himmeinä. Tuntematon paikka tai
+  liikkuva kohtaaminen ei näy sumun läpi. WASD/nuolet liikuttavat vain neljään
+  pääilmansuuntaan.
 - **Karttadata ja säännöt** ovat puhtaassa `src/map/domain.ts`:ssä. Kuusi
   aiempaa maastoa (niitty, metsä, umpimetsä, suo, kallio ja vesi) sekä uusi
   joki. Kohderuudun `minuteCost` lisää maailmanaikaa; estynyt liike ei kuluta
@@ -123,12 +124,13 @@ Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `53b5bdc`)
   kylläisyyttä eivätkä kulu arvossa 100. Keihäs tyhjentää sivukäden.
   Vain 3D-moottorin tukemat `sword_shield`-, `sword`- ja `spear`-yhdistelmät
   hyväksytään.
-- **Kampanjatallennus** (`campaign.ts`, `storage.ts`) käyttää skeemaa 3 ja
-  avainta `laulun-miekka.campaign.v3`. Se säilyttää karttaruudun, ajan,
-  kylläisyyden, paljastukset, ruuat, varusteet ja sankarin sukupuolen.
-  Skeeman 1 `hunger` muunnetaan kylläisyydeksi ja v1/v2-tallennukset saavat
-  miesoletuksen; kelvollinen vanha tallennus palautetaan myös silloin, kun
-  migraation kirjoitus estetään.
+- **Kampanjatallennus** (`campaign.ts`, `storage.ts`) käyttää skeemaa 4 ja
+  avainta `laulun-miekka.campaign.v4`. Se säilyttää terrain-paljastusten lisäksi
+  erilliset `knownSiteIds`-paikkatiedot. V1–v3-migraatio päättelee tunnetuiksi
+  vain ne kolmesta vanhasta paikasta, joiden ruutu oli löydetty; tulevia paikkoja
+  ei skannata rekisteristä. Skeeman 1 `hunger` muunnetaan kylläisyydeksi ja
+  v1/v2-tallennukset saavat miesoletuksen. Kelvollinen vanha tallennus ja sen
+  päätelty paikkatieto palautetaan myös silloin, kun migraation kirjoitus estyy.
 - **Matkan asetukset.** Esc avaa saavutettavan dialogin. Siellä valitaan
   kieli fontista riippumattomilla FI/GB-lipuilla ja karttasankarin sukupuoli
   kylläisimmistä kasvokuvista. Mies on uuden ja migroidun kampanjan oletus.
@@ -136,10 +138,12 @@ Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `53b5bdc`)
   oikotiet kaikkiin 3D-paikkoihin; rauhallinen piha ja järven ranta ovat
   ystävällisiä, nuotioaukio ja pihapiiri taisteluita. Paperinuken selectit ja
   tavaranapit eivät vuoda kartan näppäinohjaukseen.
-- **Paikat.** Pihapiirin ihmisikoni vie `yard`-kohtaukseen. Erillinen 48 × 48
-  px:n rautapunainen kädenjälki vie `clearing`-nuotioaukiolle. Enter tai
-  välilyönti aktivoi ruudun paikan. 3D:n kartalta avattu aloitusikkuna näyttää
-  ystävälliselle pihalle "Astu pihalle" ja taisteluille "Astu taisteluun".
+- **Paikat.** `src/map/sites.ts` omistaa 2D-instanssin liikkumisen
+  (`fixed|mobile`), elinkaaren (`persistent|temporary`), sijainnin ja erillisen
+  `sceneId`-kytkennän. Piha, järven ranta ja nuotioaukio ovat `fixed+persistent`:
+  ne löytyvät lähinäössä ja jäävät sen jälkeen sumuun himmeinä. Sama 3D-scene
+  voidaan myöhemmin kytkeä moneen eri 2D-instanssiin. Enter tai välilyönti
+  aktivoi sankarin ruudun paikan kuten ennen.
 - **Yleinen 2D→3D-silta** on `src/map/transition.ts`. Kohtaukset luokitellaan
   `src/app/route.ts`:ssä. `SCENE_TRANSITION_BALANCE` säätää vaikutuksen:
   taistelussa kylläisyys 50–100 ei rankaise, 1–alle 50 vähentää 20 ja 0
@@ -172,6 +176,9 @@ Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `53b5bdc`)
   kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
   tyypitetyissä FI/EN-sanakirjoissa.
 - **Käsin testattu 2026-11-16 Codexin in-app browserissa:**
+  - punainen käsi ei näkynyt ennen lähestymistä, löytyi 3 × 3 -lähinäössä;
+  - löydetty käsi jäi etääntymisen jälkeen sumuun himmeänä;
+  - himmennetty ikoni ja paikkatieto säilyivät sivun uudelleenlatauksen yli;
   - vain nykyinen 3 × 3 näkyi kirkkaana ja vanha terrain jäi himmeäksi;
   - pihapiirin ikoni katosi kahden ruudun päässä ja palasi lähinäössä;
   - joen suorat ja mutkat liittyivät, reitti kiemurteli ja liike jokeen estyi;
@@ -194,8 +201,8 @@ Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `53b5bdc`)
   - kylläisyys 0 rauhallisella pihalla jätti molemmat arvoon 100/100;
   - paluu 3D:stä säilytti saman karttaruudun ja kampanjatilan;
   - uusi puhdas selainlataus: ei konsolivirheitä tai -varoituksia, 60 FPS.
-- **Tarkistukset 2026-11-16 (v03.05.00):** erillisessä worktreessä
-  `bun run test` 179/179 (15 versionhallittua testitiedostoa),
+- **Tarkistukset 2026-11-16 (v03.07.00):** erillisessä worktreessä
+  `bun run test` 193/193 (17 versionhallittua testitiedostoa),
   `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja
   `git diff --check` läpäisty. Pääkansion aiempi 416/37-lukema sisälsi
   myös sen alle luotujen Claude-worktreeiden testit.
@@ -203,7 +210,7 @@ Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `53b5bdc`)
   konsolissa ei virheitä, 56–60 FPS pienessä in-app-ikkunassa (suuremmalla
   näytöllä FPS mittaamatta); kävelytesti: laiturin päähän asti, rannalla pysähtyy
   nilkkaan, laiturin sivuille ei pääse; pihan ja nuotioaukion lataus ennallaan.
-  Build varoittaa edelleen 3D-chunkin ylittävän 500 kt (noin 797 kt).
+  Build varoittaa edelleen 3D-chunkin ylittävän 500 kt (noin 800 kt).
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
   3D:ssä `window.__game`. Selainpaneelin fokus voi pysäyttää 3D-pelin.
@@ -215,6 +222,9 @@ Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `53b5bdc`)
   laajasti pelitestattua tasapainoa.
 - Prototyyppikartta on käsin tehty ja kiinteä. Deterministinen
   siemenpohjainen generaattori, juonipaikkojen ehdot ja validaattori puuttuvat.
+- Liikkuvien ja väliaikaisten kohtaamisten luokitus sekä piirron piilotussääntö
+  ovat valmiina, mutta niiden instanssilistaa, liikeratoja tai poistumistiloja
+  ei ole vielä toteutettu.
 - Jokigrafiikka tukee suoria, kaarteita ja päitä, mutta ei vielä haaroja,
   siltoja, koskia, venettä tai vesianimaatiota.
 - Vanha v3-tallennus voi ensimmäisellä latauksella asettaa sankarin ruutuun,
@@ -269,7 +279,8 @@ vielä täyttä karttaeditoria.
   tulee karjalaisesta kirjonta-/käspaikkageometriasta.
 - Karttaliike on nelisuuntainen. Paljastus on pysyvä 3 × 3 alue myös viistoon.
 - Vain sankarin nykyinen 3 × 3 on aktiivisesti näkyvä. Löydetty maasto jää
-  muistiksi sumun alle; paikat ja liikkuvat kohtaamiset eivät näy sumun läpi.
+  muistiksi sumun alle. Löydetty kiinteä paikka näkyy sumussa himmeänä;
+  tuntematon paikka ja liikkuva kohtaaminen eivät näy sumun läpi.
 - Kartalla ei ole erillistä liikevoimaa. Maaston aika vähentää kylläisyyttä;
   kylläisyys ei tapa. Kampanjatila on eri asia kuin 3D:n `Actor` ja aika.
 - Karttakalenterissa yksi kuunkierto on 180 tausta-aikayksikköä ja 28 päivää.
