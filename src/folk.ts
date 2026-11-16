@@ -40,6 +40,8 @@ export interface VillagerDef {
   x: number; y: number; z: number; yaw: number;
   scale?: number;
   armL?: ArmPose; armR?: ArmPose;
+  /** Makaa selällään maassa (kuollut): käsivarret asetetaan ensin pystyasennossa, sitten koko hahmo kaadetaan. Jalkaterien kohta on juuri, vartalo ulottuu juuren -z-suuntaan. */
+  lying?: boolean;
   /** Kädessä pidettävä esine. Varsi kulkee pystyssä nyrkin otekanavan läpi: sauva nojaa maahan,
    *  jousi on kädessä kahvastaan. grip = kanavan piste ja suunta lepoasennossa (mallin
    *  koordinaatit, ks. docs/BLENDER_HANDOFF.md "Otekanavat"). */
@@ -126,7 +128,18 @@ class Villager implements Living {
       });
     }
 
-    if (prop && def.prop && hand) {
+    if (prop && def.lying) {
+      // Pudonnut sauva makaa maassa vartalon vieressä, varsi hahmon pituussuunnassa (-z).
+      prop.position.set(0, 0, 0);
+      prop.scale.setScalar(1);
+      prop.quaternion.identity();
+      prepareMeshes(prop);
+      this.root.add(prop);
+      this.root.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(prop);
+      prop.position.set(0.8, 0.02 - box.min.y, -0.55);
+      prop.rotation.y = 0.14;
+    } else if (prop && def.prop && hand) {
       // Ranne käännetään niin, että nyrkin kanava on pystyssä (lähempään pystysuuntaan, ettei
       // ranne kierry ympäri); varsi asetetaan kanavan kohdalle.
       const up = gripD.clone().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion())).y >= 0 ? 1 : -1;
@@ -152,6 +165,14 @@ class Villager implements Living {
       hand.attach(prop);      // seuraa kättä (hengitys)
     }
 
+    if (def.lying) {
+      // Selälleen: -90° x-akselin ympäri (pää -z-suuntaan, etupuoli ylös). Selän paksuus (viitta, kantele) nostaa vartaloa.
+      clone.rotation.x = -Math.PI / 2;
+      clone.position.y = 0.24;
+      const head = rig.getObjectByName("head");
+      if (head) head.rotation.z += 0.45;      // pää kääntyy sivulle
+    }
+
     this.head = rig.getObjectByName("head") ?? null;
     if (this.head) {
       this.headRest.copy(this.head.quaternion);
@@ -166,6 +187,7 @@ class Villager implements Living {
   }
 
   update(dt: number, focus: THREE.Vector3 | null) {
+    if (this.def.lying) return;        // kuollut ei hengitä eikä katso
     this.t += dt;
     // Katse seuraa kulkijaa, kun tämä on lähellä ja edessä; muuten pää palaa hitaasti eteen.
     let want = 0;

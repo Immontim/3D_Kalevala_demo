@@ -9,7 +9,7 @@ import { initInput } from "./engine/input";
 import { frame, initLoop } from "./engine/loop";
 import { initPauseMenu, loadSavedTuning } from "./ui/pauseMenu";
 import { skirmish } from "./engine/skirmish";
-import { lakesideVisit, visit } from "./engine/encounter";
+import { lakeruinVisit, lakesideVisit, visit } from "./engine/encounter";
 import { ARENA, ARENA_PEACEFUL } from "./world";
 import { g } from "./engine/state";
 import { initStartMenu } from "./ui/startMenu";
@@ -41,7 +41,7 @@ export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   initView();
   initEffects();
   spawnHero();
-  g.encounter = !ARENA_PEACEFUL ? skirmish : ARENA === "lakeside" ? lakesideVisit : visit;
+  g.encounter = !ARENA_PEACEFUL ? skirmish : ARENA === "lakeside" ? lakesideVisit : ARENA === "lakeruin" ? lakeruinVisit : visit;
   initInput();
   initPauseMenu();
   initLoop();
