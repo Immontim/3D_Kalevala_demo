@@ -6,7 +6,7 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-16 (Claude, Windows; pohja main 98c8c2a)
+Päivitetty: 2026-11-16 (Claude, Windows; pohja main 56d200a)
 
 - **Mainissa** (pohja `3191123`) ovat `assets/forest.glb`,
   `characters.glb`, `bog.glb`, `homestead.glb`, `household.glb`,
@@ -83,6 +83,16 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja main 98c8c2a)
   `mount_kilpi_selka_f` (rintaluu). Kaikki ovat `villagers_f.glb`:ssä; NPC-koodi
   poistaa ne, `Fighter.build` käyttää naissankarilla. Huotra menee kävellessä
   reiden läpi kuten miehen. Kilpi selässä menee jousineidon viinen päälle.
+- **Hävitetty ranta** (`assets/lakeruin.glb`, noin 1,9 Mt; `assets-src/blender/lakeruin.py`,
+  ajetaan taustalla ja lukee ensin `lakeside.py`:n): `mokki_palanut` (5 500 kolmiota; sama
+  pohja kuin `mokki`, hiiltyneet hirsiseinät eri korkeuksille, ovi- ja ikkunaaukko tallessa,
+  sortuneet parrut, turvelaatat ja tuohi sisällä, ympärillä noen tummentama maa),
+  `keittopaikka_sammunut` (3 100; kivikehä, kylmä tuhka, sortunut kolmijalka, ketju maassa,
+  kaatunut pata suu +X-suuntaan ja valunut keitto), `haasia_kaatunut` (900; heinät roikkuvat
+  maailman alas-suuntaan), `verilammikko` (1 300; noin 1,7 x 1,3 m läikkä ja roiskeet, makaava
+  hahmo asetetaan keskelle) ja `verilammikko_pieni`. Veren väri tulee verteksiväreistä
+  (materiaali `M_Blood` valkoinen, kiiltävä); peli nostaa sen syvyydessä. Mallien mitat ja
+  tarkistus Blenderin kuvista (a-e); pelissä katsottu vain ylhäältä ja läheltä.
 - **Pihapiiri** tehdään skriptillä `assets-src/blender/homestead.py` →
   `build_homestead()`: `talo`, `kuoppatalo`, `aitta`, `katos`, `aita`,
   `portinpieli`, `pino`, `polkky`, `haasia` ja `ruukku`. Kuoppatalon

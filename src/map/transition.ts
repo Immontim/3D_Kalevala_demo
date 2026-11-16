@@ -190,5 +190,5 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isSceneId(value: unknown): value is SceneId {
-  return value === "clearing" || value === "homestead" || value === "yard" || value === "lakeside";
+  return value === "clearing" || value === "homestead" || value === "yard" || value === "lakeside" || value === "lakeruin";
 }
