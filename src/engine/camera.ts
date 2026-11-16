@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { choosing, songState } from "./song";
 import { lockTarget } from "./enemies";
 import { aim, fx, g } from "./state";
+import { applyFreeCam, freeCam } from "./freecam";
 import { camera, world } from "./view";
 
 // ---------- Katse ja lukitus ----------
@@ -21,6 +22,7 @@ export function updateCamera(dt: number) {
     camera.lookAt(aim.override.look[0], aim.override.look[1], aim.override.look[2]);
     return;
   }
+  if (freeCam.active) { applyFreeCam(); return; }
   // Kamera katseen suunnassa sankarin takana; pystykulma nostaa kameraa ja kallistaa katsetta.
   const locked = lockTarget();
   const dir = new THREE.Vector3(Math.sin(aim.yaw), 0, Math.cos(aim.yaw));

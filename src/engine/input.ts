@@ -4,7 +4,9 @@ import { CONTROLS } from "../controls";
 import { setState } from "./actor";
 import { cycleLock, lockTarget } from "./enemies";
 import { $, isTouch } from "./dom";
-import { pause, paused, pausedAt, restart, resume, toStartMenu } from "./loop";
+import { exitFreeCam, pause, paused, pausedAt, restart, resume, toStartMenu } from "./loop";
+import { freeCam } from "./freecam";
+import { lookFreeCam, scaleFreeCamSpeed } from "../freecam";
 import { choosing, songState } from "./song";
 import { DEG, aim, bindUi, g, inputs, keys } from "./state";
 import { canvas } from "./view";
@@ -80,6 +82,7 @@ export function initInput() {
     if (bindUi.capture || e.repeat) return;
     if (typing(e) && e.code !== "Escape") return;
     if (e.code === "Escape") {
+      if (freeCam.active) { exitFreeCam(); return; }
       // Esc myös jatkaa peliä: sivuun raahatun taukoikkunan Jatka-nappi voi olla ruudun ulkopuolella.
       // Viive estää sen, että hiiren lukituksen vapauttava Esc sekä pysäyttäisi että jatkaisi.
       if (!paused) pause();
@@ -87,6 +90,7 @@ export function initInput() {
       return;
     }
     keys.add(e.code);
+    if (freeCam.active) { if (e.code === "Space" || e.code === "Tab") e.preventDefault(); return; } // tarkastelutila: ei pelitoimintoja
     if (pressCode(e.code)) e.preventDefault();
     if (e.code === "Space") { inputs.beatQueued = true; e.preventDefault(); }
     if (e.code === "KeyR" && g.gameOver) restart();
@@ -99,12 +103,15 @@ export function initInput() {
   canvas.addEventListener("mousedown", (e) => {
     if (bindUi.capture) return;
     if (g.running && !choosing && !document.pointerLockElement) lockPointer();
+    if (freeCam.active) return;
     if (e.button === 0) inputs.beatQueued = true;
     pressCode(mouseCode(e.button));
   });
   window.addEventListener("mouseup", (e) => releaseCode(mouseCode(e.button)));
   // Hiiren liike kääntää katsetta, kun hiiri on lukittu peliin. Lukittuna sivuttaisliike ei käännä.
   window.addEventListener("mousemove", (e) => {
+    // Vapaa kamera: hiiri katsoo lukittuna tai nappi pohjassa (jos lukitus ei ole saatavilla).
+    if (freeCam.active) { if (document.pointerLockElement === canvas || e.buttons) lookFreeCam(freeCam.cam, e.movementX, e.movementY); return; }
     if (!g.running || paused || choosing || songState || document.pointerLockElement !== canvas) return;
     const k = CONTROLS.mouseSens * DEG;
     if (!lockTarget()) aim.yaw -= e.movementX * k;
@@ -116,6 +123,7 @@ export function initInput() {
   }
   // Rulla vaihtaa lukituksen kohdetta, kun vastustajia on useita.
   window.addEventListener("wheel", (e) => {
+    if (freeCam.active) { scaleFreeCamSpeed(freeCam.cam, e.deltaY); return; }
     if (!g.running || paused || choosing || !aim.lockOn || e.deltaY === 0) return;
     cycleLock(e.deltaY > 0 ? 1 : -1);
   }, { passive: true });

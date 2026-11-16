@@ -303,3 +303,12 @@ body.from-map #start .panel { max-width: 500px; }
   .inventory-slot { width: 52px; height: 52px; }
   .map-setting-grid { grid-template-columns: 1fr; }
 }
+
+/* Vapaa kamera (tauon tarkastelu): pelin käyttöliittymä piiloon, ohje alareunaan. */
+body.freecam #hud, body.freecam #foeBars, body.freecam #lockMark, body.freecam #rearWarn,
+body.freecam #song, body.freecam #choice, body.freecam #vignette, body.freecam #flash { display: none; }
+#freecamHint { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); max-width: calc(100vw - 24px);
+  padding: 8px 14px; border: 1px solid #d9a44173; border-radius: 4px; background: var(--panel); color: var(--muted);
+  font-size: 14px; text-align: center; pointer-events: none; }
+#freecamHint b { color: var(--bronze); font-weight: 400; }
+#freecamHint.hidden { display: none; }
