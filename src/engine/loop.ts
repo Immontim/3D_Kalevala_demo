@@ -1,5 +1,6 @@
 // Pääsilmukka, uusi peli ja tauko.
 import { SONG } from "../songLogic";
+import { stepFreeCam } from "../freecam";
 import { t } from "../i18n";
 import { mapUrl, parseAppRoute } from "../app/route";
 import { openTune, renderBinds } from "../ui/pauseMenu";
@@ -9,6 +10,7 @@ import { updateAi } from "./ai";
 import { syncVisual } from "./animate";
 import { updateCamera } from "./camera";
 import { $, isTouch } from "./dom";
+import { freeCam, startFreeCam, stopFreeCam } from "./freecam";
 import { bog, updateRing, updateSparks } from "./effects";
 import { clearEnemies } from "./enemies";
 import { spawnHero, updatePlayer } from "./hero";
@@ -18,7 +20,7 @@ import { keepApartAndInside, updateCombatant } from "./melee";
 import { updateHazards } from "./hazards";
 import { updateShowcase } from "./showcase";
 import { choosing, closeChoice, closeSong, songState, updateChoice, updateSong } from "./song";
-import { aim, bindUi, fx, g, inputs } from "./state";
+import { aim, bindUi, fx, g, inputs, keys } from "./state";
 import { camera, canvas, composer, world } from "./view";
 import { createEmptySceneReturn, saveSceneReturn } from "../map/transition";
 
@@ -136,6 +138,7 @@ export function simulate(realDt: number) {
   world.update(g.realTime, dt, camera, g.player.pos);
   updateSparks(dt);
   fx.shake = Math.max(0, fx.shake - realDt * 1.2);
+  if (freeCam.active) stepFreeCam(freeCam.cam, (code) => keys.has(code), realDt);
   updateCamera(realDt);
   updateHud();
 
@@ -168,6 +171,7 @@ export function pause() {
 }
 
 export function resume() {
+  if (freeCam.active) return;
   if (performance.now() - bindUi.endedAt < 350) return; // klikkaus, jolla juuri sidottiin hiiren nappi
   bindUi.capture = null;
   paused = false;
@@ -177,10 +181,32 @@ export function resume() {
   if (!choosing) lockPointer();
 }
 
+/** Tauon tarkastelu: valikko piiloon ja kamera vapaaksi. Peli pysyy pysäytettynä. */
+export function enterFreeCam() {
+  if (!paused || freeCam.active || bindUi.capture) return;
+  startFreeCam();
+  $("pause").classList.add("hidden");
+  $("freecamHint").classList.remove("hidden");
+  lockPointer();
+}
+
+/** Takaisin taukovalikkoon. Tauon alkuhetki päivitetään, jotta lukon vapauttava Esc ei jatka peliä. */
+export function exitFreeCam() {
+  if (!freeCam.active) return;
+  stopFreeCam();
+  keys.clear();
+  $("freecamHint").classList.add("hidden");
+  $("pause").classList.remove("hidden");
+  pausedAt = performance.now();
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+
 export function autoPauseNow() { if (g.autoPause) pause(); }
 
 export function initLoop() {
   document.addEventListener("pointerlockchange", () => {
+    // Hiiren lukon vapautus (Esc) lopettaa vapaan kameran ja palaa taukovalikkoon.
+    if (freeCam.active && document.pointerLockElement !== canvas) { exitFreeCam(); return; }
     if (document.pointerLockElement === canvas) pointerLockWorked = true;
     else if (g.choiceUnlock) g.choiceUnlock = false;
     else if (pointerLockWorked) autoPauseNow();
@@ -190,5 +216,6 @@ export function initLoop() {
   document.addEventListener("visibilitychange", () => { if (document.hidden) autoPauseNow(); });
   document.addEventListener("mouseleave", () => { if (!pointerLockWorked && !isTouch) autoPauseNow(); });
   $("resumeBtn").addEventListener("click", resume);
+  $("freeCamBtn").addEventListener("click", enterFreeCam);
   $("menuBtn").addEventListener("click", toStartMenu);
 }

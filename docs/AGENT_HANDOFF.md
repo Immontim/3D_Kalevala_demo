@@ -47,6 +47,12 @@ Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `53b5bdc`)
   (`folk.ts`) avaavat vapaan käden 0,7:ään, esinettä pitävä käsi pysyy nyrkissä.
   Peukalolla ei ole luuta. Katkenneet ranteet olivat hihamallin vika
   (BLENDER_HANDOFF), ei animaation.
+- **Vapaa kamera** (pause-valikon nappi, `src/freecam.ts` puhdas liike + testit,
+  `src/engine/freecam.ts` tila, `enterFreeCam`/`exitFreeCam` `loop.ts`:ssä): peli
+  pysyy `paused`-tilassa, `body.freecam` piilottaa pelin käyttöliittymän,
+  `updateCamera` käyttää vapaata kameraa, Esc tai hiiren lukon vapautus palaa
+  valikkoon (`pausedAt` päivitetään, ettei Esc jatka peliä). Konsolin
+  `__game.setCamera` on erillinen ohjelmallinen kamera.
 - **Debug:** `__game.gesture("talk"|"use")` laukaisee eleen, `__game.findNamed("hand_R")`
   antaa solmujen paikat (kameran kohdistukseen `setCamera`lla), `__game.freeze()`
   pysäyttää pelin ajan ja `__game.step(n)` etenee
