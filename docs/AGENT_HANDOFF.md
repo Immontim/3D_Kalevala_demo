@@ -8,7 +8,8 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `56d200a`)
 
-- **Branchin `claude/lakeside-bay-ruin` koodiversio on v03.07.00.** Koodi
+- **Branchin `claude/lakeside-bay-ruin` koodiversio on v03.08.00** (v03.07.00 järven
+  laajennus, v03.08.00 hävitetty ranta). Koodi
   valmis, ei deployattu, käsin testattu (alla). Tarkista merge-tila ennen
   jatkamista: `git merge-base --is-ancestor claude/lakeside-bay-ruin origin/main`.
 - **Rauhan kävely ja eleet** (`src/fighter.ts`, `src/interact.ts`,
@@ -78,6 +79,17 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `56d200a`)
     muualla sama kuin maasto. Vesi on yksi taso (`buildWater`, heijastava,
     värähtelevä normaali); rantakaistan ja pohjan maa on tallattua. Vedessä ei
     sijoiteta puita, kiviä eikä heinää (`wet()` ja `put`in `wetOk`).
+  - **Hävitetty ranta (`lakeruin`, v03.08.00).** `ArenaId`/`SCENE_IDS` sisältävät
+    `lakeruin`in (friendly, Esc-oikotie, aloitusvalikko; `?scene=lakeruin`). Sama
+    maailma kuin rannalla (`LAKE`), lisäksi `RUIN`-lippu `world.ts`:ssä:
+    `lakeruin.glb`:n `mokki_palanut`, `keittopaikka_sammunut`, `haasia_kaatunut`,
+    `verilammikko`, `verilammikko_pieni`; ei venettä, melaa, koiraa, liekkiä, valoa
+    (`buildFire` palauttaa sammuneen tulen), tulen vaara-aluetta eikä hirviöitä;
+    mökin kohdalla kytevä tumma savu; utuisempi sumu ja himmeämpi valo. Tietäjä
+    makaa selällään (`VillagerDef.lying`: hahmo kaadetaan -90° x:n ympäri, ei
+    elävää animaatiota), `RUIN_SAGE`/`RUIN_BODY` antavat paikan ja suunnan; sauva
+    makaa vieressä, veri rinnan kohdalla ja jälki mökin ovelta. Mökin törmäys on
+    sama laatikko kuin ehjällä mökillä (matalat seinät eivät ole kulkukelpoisia).
   - **Törmäykset.** `addLakeColliders`: rannan syvän veden reunalle 0,9 m
     ruudukosta ympyröitä (sankari voi kahlata nilkkaan), laiturille reunalaidat
     ja pääty. Mökki on `CABIN`-pohjana, vene ja istuinhirsi `PROP_COLLIDERS`ista.

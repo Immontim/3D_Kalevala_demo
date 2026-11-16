@@ -39,3 +39,5 @@ function makeVisit(title: TextKey, sub: TextKey): Encounter {
 export const visit: Encounter = makeVisit("yard.title", "yard.sub");
 /** Vierailu järven rannalla: sama rauhallinen kohtaus, oma otsikko. */
 export const lakesideVisit: Encounter = makeVisit("lakeside.title", "lakeside.sub");
+/** Sama ranta tuhon jälkeen. */
+export const lakeruinVisit: Encounter = makeVisit("lakeruin.title", "lakeruin.sub");
