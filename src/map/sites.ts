@@ -2,7 +2,7 @@ import type { SceneId } from "../app/route";
 import { MAP_RULES, mapCell, type MapPosition, type WorldMapDefinition } from "./domain";
 import type { MapCellVisibility } from "./uiState";
 
-export const MAP_SITE_IDS = ["yard", "lakeside", "campfire"] as const;
+export const MAP_SITE_IDS = ["yard", "lakeside", "campfire", "cairnfield"] as const;
 export type MapSiteId = (typeof MAP_SITE_IDS)[number];
 export type MapSiteMovement = "fixed" | "mobile";
 export type MapSiteLifetime = "persistent" | "temporary";
@@ -40,6 +40,15 @@ export const MAP_SITE_DEFINITIONS: Record<MapSiteId, MapSiteDefinition> = {
     mapId: "kalevala-prototype",
     position: { x: 13, y: 14 },
     sceneId: "clearing",
+    movement: "fixed",
+    lifetime: "persistent",
+  },
+  /** Kaakon vaaran kalliokumpu veden rannalla: rauhallinen kalmisto kuppikivineen. */
+  cairnfield: {
+    id: "cairnfield",
+    mapId: "kalevala-prototype",
+    position: { x: 16, y: 16 },
+    sceneId: "cairnfield",
     movement: "fixed",
     lifetime: "persistent",
   },

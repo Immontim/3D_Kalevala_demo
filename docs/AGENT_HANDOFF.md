@@ -6,11 +6,13 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `c1083d5`)
+Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `568bdf2`)
 
-- **Branchin `codex/scene-items` koodiversio on v03.11.00.** Koodi valmis,
-  ei deployattu, käsin testattu (alla). Tarkista merge-tila ennen jatkamista:
-  `git merge-base --is-ancestor codex/scene-items origin/main`.
+- **Branchin `claude/cairn-map-site` koodiversio on v03.12.00** (kalmisto
+  kartalla, alla). Koodi valmis, ei deployattu, käsin testattu selaimessa
+  (kartta → Enter → kohtaus). Tarkista merge-tila ennen jatkamista:
+  `git merge-base --is-ancestor claude/cairn-map-site origin/main`.
+  `codex/scene-items` (v03.11.00) on mergattu.
 - **Rauhallisten 3D-kohtausten esineet.** `sceneInteraction.ts` valitsee
   sankarin katseakselilta enintään 2,8 m:n päässä olevan esineen. HUDin pieni
   piste projisoidaan maailmaan; osuva piste näyttää esineen nimen, varkauden ja
@@ -30,8 +32,9 @@ Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `c1083d5`)
   luontia ei vielä ole. Uusi matka alkaa kolmella ohrarieskalla ilman kalaa;
   tuohikontti on tavallinen yhden kappaleen esine.
 - **Kalmisto `cairnfield` (v03.10.00)**, rauhallinen kohtaus (`SCENE_KINDS`:
-  friendly). Esc-dialogin oikotie, aloitusvalikon paikanvalinta ja `?scene=cairnfield`;
-  ei vielä karttapaikkaa (`sites.ts`:ään lisätään kuten rannalle, kun omistaja haluaa).
+  friendly). Esc-dialogin oikotie, aloitusvalikon paikanvalinta, `?scene=cairnfield`
+  ja karttapaikka `cairnfield` (v03.12.00, ruutu 16,16 kaakon vaaran kalliolla;
+  ikoni `assets/map/cairn-site.png`; koillisen kallio on joen takana, ei kuljettava).
   `world.ts`: `CAIRN`-lippu; `LAKE` = `LAKESIDE || CAIRN` (vesi, kaukoranta, rantakaistan
   maasto), mökki/laituri/vene `LAKESIDE`ssä. Maasto: kallionokka (`terrainHeight`:
   loiva kumpare keskipisteessä (1, 4), +1,15 m, ja matalia kalliokumpuja), `shoreZ`
@@ -173,7 +176,8 @@ Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `c1083d5`)
   joki. Kohderuudun `minuteCost` lisää maailmanaikaa; estynyt liike ei kuluta
   aikaa. Vesi ja joki ovat jalan kulkukelvottomia. Joki kiemurtelee keskisen
   järven etelälaidasta itäiseen ulkoveteen. `prototype.ts` on vertailukartta:
-  aloitus (10,14), rauhallinen piha (10,11), punainen käsi (13,14).
+  aloitus (10,14), rauhallinen piha (10,11), punainen käsi (13,14), rantamökki
+  (9,6) ja kalmisto (16,16).
 - **Aika ja kylläisyys.** Erillistä karttavoimaa ei ole. Tallennuksen
   `worldMinutes` on nyt pelaajalta piilotettu tausta-aika: maastokustannukset
   ja kylläisyyden kulumisnopeus 0,05 / yksikkö säilyivät ennallaan. Yksi
@@ -209,7 +213,7 @@ Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `c1083d5`)
   tavaranapit eivät vuoda kartan näppäinohjaukseen.
 - **Paikat.** `src/map/sites.ts` omistaa 2D-instanssin liikkumisen
   (`fixed|mobile`), elinkaaren (`persistent|temporary`), sijainnin ja erillisen
-  `sceneId`-kytkennän. Piha, järven ranta ja nuotioaukio ovat `fixed+persistent`:
+  `sceneId`-kytkennän. Piha, järven ranta, nuotioaukio ja kalmisto ovat `fixed+persistent`:
   ne löytyvät lähinäössä ja jäävät sen jälkeen sumuun himmeinä. Sama 3D-scene
   voidaan myöhemmin kytkeä moneen eri 2D-instanssiin. Enter tai välilyönti
   aktivoi sankarin ruudun paikan kuten ennen.

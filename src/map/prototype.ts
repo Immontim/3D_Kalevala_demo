@@ -7,6 +7,8 @@ export const YARD_POSITION = MAP_SITE_DEFINITIONS.yard.position;
 export const CAMPFIRE_POSITION = MAP_SITE_DEFINITIONS.campfire.position;
 /** Niityn ja järven rajalla: tietäjän mökki rannalla (rauhallinen 3D-kohtaus). */
 export const LAKESIDE_POSITION = MAP_SITE_DEFINITIONS.lakeside.position;
+/** Kaakon vaaran kalliokumpu veden rannalla: kalmisto (rauhallinen 3D-kohtaus). */
+export const CAIRNFIELD_POSITION = MAP_SITE_DEFINITIONS.cairnfield.position;
 
 const LEGEND: Record<string, TerrainId> = {
   w: "water",
@@ -61,6 +63,7 @@ const cells: MapCell[] = ROWS.flatMap((row, y) => [...row].map((symbol, x) => ({
   ...(x === YARD_POSITION.x && y === YARD_POSITION.y ? { siteId: "yard" } : {}),
   ...(x === CAMPFIRE_POSITION.x && y === CAMPFIRE_POSITION.y ? { siteId: "campfire" } : {}),
   ...(x === LAKESIDE_POSITION.x && y === LAKESIDE_POSITION.y ? { siteId: "lakeside" } : {}),
+  ...(x === CAIRNFIELD_POSITION.x && y === CAIRNFIELD_POSITION.y ? { siteId: "cairnfield" } : {}),
 })));
 
 export const PROTOTYPE_MAP = createWorldMap(cells);

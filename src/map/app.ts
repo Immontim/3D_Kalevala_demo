@@ -2,6 +2,7 @@ import atlasUrl from "../../assets/map/kalevala-map-atlas-v2.png?url";
 import femaleMapHeroUrl from "../../assets/map/map-hero-female.png?url";
 import femalePaperDollUrl from "../../assets/map/paper-doll-hero.png?url";
 import malePaperDollUrl from "../../assets/map/paper-doll-hero-male.png?url";
+import cairnSiteUrl from "../../assets/map/cairn-site.png?url";
 import redHandUrl from "../../assets/map/red-hand-site.png?url";
 import femaleSatietyFacesUrl from "../../assets/map/satiety-faces.png?url";
 import maleSatietyFacesUrl from "../../assets/map/satiety-faces-male.png?url";
@@ -185,7 +186,8 @@ function move(direction: MapDirection) {
   setMessage(result.siteId === "yard" ? t("map.yardFound")
     : result.siteId === "lakeside" ? t("map.lakesideFound")
       : result.siteId === "campfire" ? t("map.campfireFound")
-        : "");
+        : result.siteId === "cairnfield" ? t("map.cairnfieldFound")
+          : "");
   persistAndRender();
 }
 
@@ -348,6 +350,9 @@ atlas.addEventListener("load", renderMap);
 const redHand = new Image();
 redHand.src = redHandUrl;
 redHand.addEventListener("load", renderMap);
+const cairnSite = new Image();
+cairnSite.src = cairnSiteUrl;
+cairnSite.addEventListener("load", renderMap);
 const femaleMapHero = new Image();
 femaleMapHero.src = femaleMapHeroUrl;
 femaleMapHero.addEventListener("load", renderMap);
@@ -406,6 +411,24 @@ function drawRedHand(ctx: CanvasRenderingContext2D, x: number, y: number) {
   ctx.restore();
 }
 
+function drawCairnSite(ctx: CanvasRenderingContext2D, x: number, y: number) {
+  if (cairnSite.complete && cairnSite.naturalWidth > 0) {
+    ctx.drawImage(cairnSite, x, y, TILE, TILE);
+    return;
+  }
+  // Varakuva: tumma kupukivi ja punainen hahmo kalpealla pohjalla.
+  ctx.save();
+  ctx.fillStyle = "#e8d6b0";
+  ctx.fillRect(x, y, TILE, TILE);
+  ctx.fillStyle = "#3c281e";
+  ctx.beginPath();
+  ctx.ellipse(x + 17, y + 34, 14, 9, 0, Math.PI, 0);
+  ctx.fill();
+  ctx.fillStyle = "#a7331d";
+  ctx.fillRect(x + 32, y + 12, 4, 22);
+  ctx.restore();
+}
+
 function renderMap() {
   const canvas = document.getElementById("mapCanvas") as HTMLCanvasElement | null;
   if (!canvas) return;
@@ -448,6 +471,7 @@ function renderMap() {
         if (cell.siteId === "yard") sprite(ctx, [2, 1], vx * TILE, vy * TILE);
         if (cell.siteId === "lakeside") sprite(ctx, [3, 1], vx * TILE, vy * TILE);
         if (cell.siteId === "campfire") drawRedHand(ctx, vx * TILE, vy * TILE);
+        if (cell.siteId === "cairnfield") drawCairnSite(ctx, vx * TILE, vy * TILE);
       }
       if (visibility === "remembered") {
         ctx.fillStyle = "rgba(20, 17, 13, 0.44)";
@@ -481,6 +505,7 @@ function currentSiteMessage() {
   if (siteId === "yard") return t("map.yardFound");
   if (siteId === "lakeside") return t("map.lakesideFound");
   if (siteId === "campfire") return t("map.campfireFound");
+  if (siteId === "cairnfield") return t("map.cairnfieldFound");
   return t("map.welcome");
 }
 
