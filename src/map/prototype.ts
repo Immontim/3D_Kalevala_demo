@@ -1,11 +1,12 @@
 import { MAP_HEIGHT, MAP_WIDTH, createWorldMap, type MapCell, type TerrainId } from "./domain";
+import { MAP_SITE_DEFINITIONS } from "./sites";
 
 export const PROTOTYPE_MAP_ID = "kalevala-prototype";
 export const PROTOTYPE_START = { x: 10, y: 14 } as const;
-export const YARD_POSITION = { x: 10, y: 11 } as const;
-export const CAMPFIRE_POSITION = { x: 13, y: 14 } as const;
+export const YARD_POSITION = MAP_SITE_DEFINITIONS.yard.position;
+export const CAMPFIRE_POSITION = MAP_SITE_DEFINITIONS.campfire.position;
 /** Niityn ja järven rajalla: tietäjän mökki rannalla (rauhallinen 3D-kohtaus). */
-export const LAKESIDE_POSITION = { x: 9, y: 6 } as const;
+export const LAKESIDE_POSITION = MAP_SITE_DEFINITIONS.lakeside.position;
 
 const LEGEND: Record<string, TerrainId> = {
   w: "water",

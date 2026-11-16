@@ -18,6 +18,7 @@ describe("kampanjatila", () => {
     expect(state.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
     expect(state.world).toMatchObject({ width: 20, height: 20, worldMinutes: 0 });
     expect(state.world.discovered).toHaveLength(400);
+    expect(state.world.knownSiteIds).toEqual([]);
     expect(state.player.inventory.capacity).toBe(8);
     expect(state.player.inventory.stacks).toEqual([
       { itemId: "barley_flatbread", quantity: 3 },
@@ -85,6 +86,7 @@ describe("kampanjatallennus", () => {
     expect(loaded).toEqual(state);
     expect(loaded).not.toBe(state);
     expect(loaded!.world.discovered).not.toBe(state.world.discovered);
+    expect(loaded!.world.knownSiteIds).not.toBe(state.world.knownSiteIds);
   });
 
   it("hylkää rikkinäisen JSONin, väärän version ja kartan koon", () => {
@@ -95,6 +97,25 @@ describe("kampanjatallennus", () => {
     expect(parseCampaign(state)).toBeNull();
   });
 
+  it("hylkää epäkelvon tai kahteen kertaan tallennetun paikkatiedon", () => {
+    const duplicate = createCampaign();
+    duplicate.world.knownSiteIds = ["yard", "yard"];
+    expect(parseCampaign(duplicate)).toBeNull();
+    const malformed = createCampaign();
+    malformed.world.knownSiteIds = [""];
+    expect(parseCampaign(malformed)).toBeNull();
+  });
+
+  it("migroi version 3 tallennuksen tyhjään paikkatietoon", () => {
+    const legacy = JSON.parse(serializeCampaign(createCampaign({ x: 8, y: 9 })));
+    legacy.schemaVersion = 3;
+    delete legacy.world.knownSiteIds;
+    const migrated = parseCampaign(legacy);
+    expect(migrated).not.toBeNull();
+    expect(migrated!.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
+    expect(migrated!.world.knownSiteIds).toEqual([]);
+  });
+
   it("migroi version 1 nälän version 2 kylläisyydeksi ja säilyttää etenemisen", () => {
     const current = createCampaign({ x: 7, y: 9 });
     current.world.worldMinutes = 345;
@@ -102,6 +123,7 @@ describe("kampanjatallennus", () => {
     const legacy = {
       ...current,
       schemaVersion: 1,
+      world: { ...current.world, knownSiteIds: undefined },
       player: { ...current.player, hunger: 73, satiety: undefined },
     };
     const migrated = parseCampaign(JSON.parse(JSON.stringify(legacy)));
@@ -119,6 +141,7 @@ describe("kampanjatallennus", () => {
     current.player.satiety = 42;
     const legacy = JSON.parse(serializeCampaign(current));
     legacy.schemaVersion = 2;
+    delete legacy.world.knownSiteIds;
     legacy.player.gender = "female";
     const migrated = parseCampaign(legacy);
     expect(migrated).not.toBeNull();
