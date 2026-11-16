@@ -23,10 +23,10 @@ function mapWith(overrides: { x: number; y: number; terrainId?: TerrainId; siteI
 }
 
 describe("maailmankartan määrittely", () => {
-  it("on 20 × 20 ruutua ja sisältää kuusi parametrisoitua maastoa", () => {
+  it("on 20 × 20 ruutua ja sisältää seitsemän parametrisoitua maastoa", () => {
     expect(MAP_WIDTH).toBe(20);
     expect(MAP_HEIGHT).toBe(20);
-    expect(TERRAIN_IDS).toHaveLength(6);
+    expect(TERRAIN_IDS).toHaveLength(7);
     expect(Object.keys(TERRAINS)).toEqual([...TERRAIN_IDS]);
     for (const terrain of Object.values(TERRAINS)) {
       expect(terrain.minuteCost).toBeGreaterThanOrEqual(0);
@@ -81,6 +81,14 @@ describe("karttaliike, aika ja kylläisyys", () => {
 
   it("estynyt liike ei muuta paikkaa, aikaa, kylläisyyttä tai paljastusta", () => {
     const map = mapWith([{ x: 11, y: 10, terrainId: "water" }]);
+    const start = createWorldMapState(map, { x: 10, y: 10 }, { worldMinutes: 50, satiety: 88 });
+    const result = moveOnMap(map, start, "right");
+    expect(result).toMatchObject({ moved: false, minutesSpent: 0 });
+    expect(result.state).toBe(start);
+  });
+
+  it("jokeen ei voi astua jalan", () => {
+    const map = mapWith([{ x: 11, y: 10, terrainId: "river" }]);
     const start = createWorldMapState(map, { x: 10, y: 10 }, { worldMinutes: 50, satiety: 88 });
     const result = moveOnMap(map, start, "right");
     expect(result).toMatchObject({ moved: false, minutesSpent: 0 });

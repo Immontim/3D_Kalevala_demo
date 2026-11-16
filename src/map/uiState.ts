@@ -14,6 +14,21 @@ export interface MapCalendarTime {
   phase: number;
 }
 
+export type MapCellVisibility = "unknown" | "remembered" | "visible";
+
+/** Erottelee pysyvän maastomuistin sankarin tämänhetkisestä 3 × 3 -näöstä. */
+export function mapCellVisibility(
+  discovered: boolean,
+  observer: { x: number; y: number },
+  target: { x: number; y: number },
+  radius = 1,
+): MapCellVisibility {
+  if (!discovered) return "unknown";
+  return Math.max(Math.abs(target.x - observer.x), Math.abs(target.y - observer.y)) <= radius
+    ? "visible"
+    : "remembered";
+}
+
 /** Muuntaa tallennuksen tausta-ajan pelilliseksi kuuksi ja päiväksi. */
 export function mapCalendarTime(worldMinutes: number): MapCalendarTime {
   const time = Math.max(0, Number.isFinite(worldMinutes) ? worldMinutes : 0);
