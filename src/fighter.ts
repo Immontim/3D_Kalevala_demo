@@ -462,6 +462,10 @@ export class Fighter {
       if (/^(sword|spear|shield_)/.test(n)) { equip[n] = child; child.removeFromParent(); }
       if (n.startsWith("helmet_") && n !== `helmet_${this.look.character}`) child.removeFromParent();
     }
+    // Naissankarin kypärä tuodaan luurankoon ennen kuin klooni liitetään pelimaailmaan: silloin molemmat
+    // kloonit ovat origossa, siirtymä lasketaan puhtaasti mallin koordinaateissa (ei riipu hahmon paikasta),
+    // ja kypärä saa saman varjo- ja ympäristökarttakäsittelyn kuin miehen kypärä.
+    if (female) this.attachFemaleGear(clone, gear, gearHelmet);
     clone.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
@@ -562,11 +566,11 @@ export class Fighter {
     }
     // Kypärä on oma kappaleensa: se kiinnitetään pääluuhun lepoasennossa, jolloin se istuu
     // kuten Blenderissä ja voidaan myöhemmin irrottaa lentämään.
-    if (female) this.attachFemaleGear(clone, gear, gearHelmet);
     const helmet = clone.getObjectByName(`helmet_${this.look.character}`);
     if (helmet) {
       this.root.updateMatrixWorld(true);
-      this.bones.get("head")!.bone.attach(helmet);
+      const headBone = this.bones.get("head")!.bone;
+      if (helmet.parent !== headBone) headBone.attach(helmet);
       this.helmet = helmet;
     }
     this.applySheath();
@@ -582,9 +586,16 @@ export class Fighter {
     if (!helmet) return;
     clone.updateMatrixWorld(true);
     gear.updateMatrixWorld(true);
-    const wp = (root: THREE.Object3D, name: string) => root.getObjectByName(name)!.getWorldPosition(new THREE.Vector3());
-    helmet.position.add(wp(clone, "head").sub(wp(gear, "head")));
-    clone.add(helmet);
+    const cHead = clone.getObjectByName("head")!;
+    const gHead = gear.getObjectByName("head")!;
+    // Kypärä siirretään naisen pään kohdalle (vain siirtymä, suunta pysyy kuten miehellä) ja
+    // liitetään suoraan pääluun lapseksi pelkillä paikallisilla matriiseilla.
+    helmet.position.add(cHead.getWorldPosition(new THREE.Vector3()).sub(gHead.getWorldPosition(new THREE.Vector3())));
+    helmet.updateMatrix();
+    const local = cHead.matrixWorld.clone().invert().multiply(helmet.matrix);
+    helmet.removeFromParent();
+    local.decompose(helmet.position, helmet.quaternion, helmet.scale);
+    cHead.add(helmet);
   }
 
   /**

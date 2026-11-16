@@ -31,7 +31,11 @@ Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `53b5bdc`)
   kiinnityspisteet (`mount_huotra_f`, `mount_kilpi_selka_f`) `villagers_f.glb`:stä
   (`char_jousineito`, jousi pois) sekä varusteet ja kypärän `characters.glb`:stä;
   kypärä siirretään luurankojen lepoasentojen erotuksen verran
-  (`attachFemaleGear`). Keihään otteessa käytetään naisen arvioitua kanavaa
+  (`attachFemaleGear`, kutsutaan ennen kuin klooni liitetään `body`yn; kypärä on
+  pääluun lapsi paikallisilla matriiseilla). **Avoin:** omistaja näki naishahmolla
+  leijuvan mustan kypärän aloitusvalikon aikana (Chrome ja Edge, ei miehellä);
+  syytä ei saatu toistumaan, v03.05.01 korjaa kypärän kiinnityksen mutta ei ole
+  vahvistettu hänen selaimessaan. Keihään otteessa käytetään naisen arvioitua kanavaa
   (`GRIP_CHANNEL_F`). Ei skaalausta (nainen miehen mittainen). Ulkonäkö, eleet,
   huotra ja hihna katsottu rannalla ja pihalla (rauha, miekkaisku); keihästä
   ja ilman kilpeä -asetta naisella ei ole katsottu.
