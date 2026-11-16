@@ -22,12 +22,11 @@ import { createWorldMapState, mapCell, moveOnMap, type MapDirection, type Terrai
 import { PROTOTYPE_MAP } from "./prototype";
 import { clearCampaign, loadCampaign, newCampaign, saveCampaign } from "./storage";
 import { consumeSceneReturn } from "./transition";
-import { satietyBand, sceneForMapSite } from "./uiState";
+import { mapCalendarTime, satietyBand, sceneForMapSite } from "./uiState";
 
 const TILE = 48;
 const VIEW_COLS = 17;
 const VIEW_ROWS = 13;
-const MOON_PHASE_MINUTES = 180;
 const SCENE_SHORTCUTS = ["yard", "lakeside", "clearing", "homestead"] as const satisfies readonly SceneId[];
 
 const TERRAIN_FRAME: Record<TerrainId, [number, number]> = {
@@ -179,7 +178,7 @@ function move(direction: MapDirection) {
   setMessage(result.siteId === "yard" ? t("map.yardFound")
     : result.siteId === "lakeside" ? t("map.lakesideFound")
       : result.siteId === "campfire" ? t("map.campfireFound")
-        : t("map.travelTime", { minutes: result.minutesSpent }));
+        : "");
   persistAndRender();
 }
 
@@ -265,7 +264,7 @@ function setMessage(next: string) {
 function drawMoon() {
   const canvas = document.getElementById("moonCanvas") as HTMLCanvasElement;
   const ctx = canvas.getContext("2d")!;
-  const phase = Math.floor(campaign.world.worldMinutes / MOON_PHASE_MINUTES) % 8;
+  const phase = mapCalendarTime(campaign.world.worldMinutes).phase;
   const waxing = phase <= 4;
   const light = phase <= 4 ? phase / 4 : (8 - phase) / 4;
   ctx.clearRect(0, 0, 72, 72);
@@ -299,9 +298,10 @@ function renderUi() {
   face.className = `satiety-face satiety-${band}`;
   face.setAttribute("aria-label", satietyLabel);
   document.getElementById("satietyText")!.textContent = satietyLabel;
-  const hours = Math.floor(campaign.world.worldMinutes / 60);
-  const minutes = campaign.world.worldMinutes % 60;
-  document.getElementById("mapTime")!.textContent = t("map.elapsed", { hours, minutes: String(minutes).padStart(2, "0") });
+  const calendar = mapCalendarTime(campaign.world.worldMinutes);
+  document.getElementById("mapTime")!.textContent = calendar.moon === 0
+    ? t("map.day", { day: calendar.day })
+    : t("map.moonDay", { moon: calendar.moon, day: calendar.day });
   drawMoon();
 
   const loadout = combatLoadout(campaign.player.equipment);

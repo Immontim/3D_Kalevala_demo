@@ -6,11 +6,11 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-15 (Claude, Windows; pohja `origin/main` `1353ea3`)
+Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `df7cf2e`)
 
-- **Branchin `claude/hero-calm-gestures` koodiversio on v03.03.00.** Koodi
-  valmis, ei deployattu, käsin testattu 3D:ssä (alla). Tarkista merge-tila
-  ennen jatkamista: `git merge-base --is-ancestor claude/hero-calm-gestures origin/main`.
+- **Branchin `codex/map-calendar` koodiversio on v03.03.01.** Koodi valmis,
+  ei deployattu, käsin testattu (alla). Tarkista merge-tila ennen jatkamista:
+  `git merge-base --is-ancestor codex/map-calendar origin/main`.
 - **Rauhan kävely ja eleet** (`src/fighter.ts`, `src/interact.ts`,
   `src/engine/{hero,melee,animate}.ts`). `POSES.rest` on rennompi (kädet
   hieman irti vartalosta, kyynärpää taipuu); `apply()` heiluttaa käsiä
@@ -82,10 +82,14 @@ Päivitetty: 2026-11-15 (Claude, Windows; pohja `origin/main` `1353ea3`)
   `minuteCost` lisää maailmanaikaa; estynyt liike ei kuluta aikaa. Vesi on
   kulkukelvoton. `prototype.ts` on käsin sommiteltu vertailukartta:
   aloitus (10,14), rauhallinen piha (10,11), punainen käsi (13,14).
-- **Aika ja kylläisyys.** Erillistä karttavoimaa ei ole. Kuluneet minuutit
-  vähentävät kylläisyyttä nopeudella 0,05 / min; 100 = kylläinen ja
-  0 = nääntynyt. Arvo ei tapa eikä estä liikkumista. UI näyttää matka-ajan,
-  180 minuutin kuunvaiheet ja viisi numerotonta kasvokuvaa:
+- **Aika ja kylläisyys.** Erillistä karttavoimaa ei ole. Tallennuksen
+  `worldMinutes` on nyt pelaajalta piilotettu tausta-aika: maastokustannukset
+  ja kylläisyyden kulumisnopeus 0,05 / yksikkö säilyivät ennallaan. Yksi
+  kuunkierto on 180 yksikköä ja 28 pelipäivää; kuun kuva näyttää kierron
+  kahdeksan vaihetta. Ensimmäisellä kierrolla UI näyttää ”Päivä x” ja sen
+  jälkeen ”Kuu x, päivä y”. Tavallinen liike ei tulosta siirron aikakustannusta.
+  Kylläisyys 100 = kylläinen ja 0 = nääntynyt; arvo ei tapa tai estä liikkumista.
+  Viisi numerotonta kasvokuvaa:
   80–100 oikein kylläinen, 60–alle 80 kylläinen, 40–alle 60 puolivatsainen,
   yli 20–alle 40 nälkäinen, 0–20 nääntynyt.
 - **Paperinukke ja inventaario.** Oikean reunan yhtenäinen näkymä korvaa
@@ -138,6 +142,10 @@ Päivitetty: 2026-11-15 (Claude, Windows; pohja `origin/main` `1353ea3`)
 - **UI ja kielituki.** Kartan pellavapohja, kirjontakehykset, paperinukke,
   kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
   tyypitetyissä FI/EN-sanakirjoissa.
+- **Käsin testattu 2026-11-16 Codexin in-app browserissa:**
+  - uusi matka alkoi tekstistä ”Päivä 1” ja niittyliike eteni päivään 2;
+  - 180 tausta-aikayksikössä teksti vaihtui muotoon ”Kuu 1, päivä 1”;
+  - tavallinen liike tyhjensi vasemman alareunan siirtokohtaisen aikaviestin;
 - **Käsin testattu 2026-11-15 Codexin in-app browserissa:**
   - mies oli uuden kampanjan oletus;
   - Esc näytti oikeat FI/GB-liput ja miehen/naisen täydet kasvot;
@@ -154,16 +162,16 @@ Päivitetty: 2026-11-15 (Claude, Windows; pohja `origin/main` `1353ea3`)
   - kylläisyys 0 rauhallisella pihalla jätti molemmat arvoon 100/100;
   - paluu 3D:stä säilytti saman karttaruudun ja kampanjatilan;
   - uusi puhdas selainlataus: ei konsolivirheitä tai -varoituksia, 60 FPS.
-- **Tarkistukset 2026-11-15 (v03.03.00):** `bun run test` 424/424 (38 tiedostoa),
-  `bunx tsc --noEmit`, `bun run lint`, `bun run build` läpäisty; FPS 50–60 pienessä
-  in-app-ikkunassa. Aiemmin (v03.02.00): `bun run test` 416/416 (37 tiedostoa),
+- **Tarkistukset 2026-11-16 (v03.03.01):** erillisessä worktreessä
+  `bun run test` 166/166 (14 versionhallittua testitiedostoa),
   `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja
-  `git diff --check` läpäisty.
+  `git diff --check` läpäisty. Pääkansion aiempi 416/37-lukema sisälsi
+  myös sen alle luotujen Claude-worktreeiden testit.
   Selaimessa: `?scene=lakeside` ja kartalta (9,6) → "Astu rannalle" toimivat,
   konsolissa ei virheitä, 56–60 FPS pienessä in-app-ikkunassa (suuremmalla
   näytöllä FPS mittaamatta); kävelytesti: laiturin päähän asti, rannalla pysähtyy
   nilkkaan, laiturin sivuille ei pääse; pihan ja nuotioaukion lataus ennallaan.
-  Build varoittaa edelleen 3D-chunkin ylittävän 500 kt (noin 792 kt).
+  Build varoittaa edelleen 3D-chunkin ylittävän 500 kt (noin 797 kt).
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
   3D:ssä `window.__game`. Selainpaneelin fokus voi pysäyttää 3D-pelin.
@@ -228,6 +236,8 @@ vielä täyttä karttaeditoria.
 - Karttaliike on nelisuuntainen. Paljastus on pysyvä 3 × 3 alue myös viistoon.
 - Kartalla ei ole erillistä liikevoimaa. Maaston aika vähentää kylläisyyttä;
   kylläisyys ei tapa. Kampanjatila on eri asia kuin 3D:n `Actor` ja aika.
+- Karttakalenterissa yksi kuunkierto on 180 tausta-aikayksikköä ja 28 päivää.
+  Tausta-aikaa tai yksittäisen siirron kustannusta ei näytetä pelaajalle.
 - Nälkäisen taistelurangaistus muuttaa HP:n ja staminan kattoa, ei vain
   hetkellistä nykyarvoa; ystävällisiä kohtauksia ei rangaista.
 - Three.js ladataan vain 3D-kohtauksiin. Kartta–3D-siirtymä saa prototyypissä
