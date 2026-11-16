@@ -16,6 +16,7 @@ import { interruptSong, songState } from "./song";
 import { fx, g, sfx } from "./state";
 import { scene, world } from "./view";
 import { takeLockedSceneItem } from "./sceneItems";
+import { talkTo } from "./dialogue";
 
 export function startAttack(a: Actor, kind: StrikeStyle | "bash", weight: StrikeWeight = "light", charging = false) {
   setState(a, "windup");
@@ -33,7 +34,7 @@ export function startGesture(a: Actor, kind: Gesture) {
 
 /**
  * Eleen vaikutus: kohde etsitään kantaman ja sektorin sisältä samoin kuin lyönnin kohde.
- * Puhe näyttää, kenelle puhuttiin; dialogia ei vielä ole. Käyttö ratkaisee katseella
+ * Puhe ilmoittaa maailmamoottorille `npc.talked` ja avaa dialogin, jos hahmolla on sellainen. Käyttö ratkaisee katseella
  * lukitun maailmanesineen tartuntaeleen vaikutushetkellä.
  */
 function gestureEffect(a: Actor, kind: Gesture) {
@@ -41,7 +42,8 @@ function gestureEffect(a: Actor, kind: Gesture) {
   if (kind === "talk") {
     const target = pickTarget(from, TALKABLES, TALK_ZONE);
     g.events.push(`pelaaja:puhe:${target ? target.id : "ei kohdetta"}`);
-    if (target) showMsg(target.name, t("talk.listens"), 1.4);
+    // Hahmolla, jolla on dialogi tässä kohtauksessa, puhe avaa sen; muille näytetään vain nimi.
+    if (target && !talkTo(target.id, target.name)) showMsg(target.name, t("talk.listens"), 1.4);
   } else {
     takeLockedSceneItem();
   }

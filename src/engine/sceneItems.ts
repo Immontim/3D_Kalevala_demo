@@ -6,28 +6,28 @@ import {
   ITEMS,
   sceneItemTakeMode,
   tryAddItem,
-  tryTakeSceneItem,
-  type CampaignState,
   type ItemId,
   type SceneItemDefinition,
 } from "../map/campaign";
-import { saveCampaign } from "../map/storage";
+import { GAME_WORLD } from "../world/content";
+import { takeSceneItemWithEvents, type TakeWithEventsResult } from "../world/take";
 import { ITEM_TAKE_RANGE, gazeDirection, gazeOrigin, pickGazeTarget, pointOnGaze, type GazeTarget } from "../sceneInteraction";
 import type { RuntimeSceneItem } from "../world";
 import { $ } from "./dom";
 import { showMsg } from "./hud";
 import { aim, g } from "./state";
+import { campaignStore } from "./store";
 import { camera, world } from "./view";
+import { ARENA } from "../world";
 
-let campaign: CampaignState | null = null;
 let focusedId: string | null = null;
 let lockedId: string | null = null;
 
-export function configureSceneItemCampaign(state: CampaignState) {
-  campaign = state;
+/** Kutsutaan, kun kampanjan tilanomistaja on alustettu: piilottaa jo otetut esineet. */
+export function configureSceneItems() {
   focusedId = null;
   lockedId = null;
-  world.setTakenSceneItemIds(state.world.sceneItems.takenInstanceIds);
+  world.setTakenSceneItemIds(campaignStore().get().world.sceneItems.takenInstanceIds);
 }
 
 function itemIdOf(item: RuntimeSceneItem): ItemId | null {
@@ -80,7 +80,8 @@ function hideFocus() {
 
 /** Päivittää katseesta projisoidun pisteen vasta kameran päivityksen jälkeen. */
 export function updateSceneItemFocus(active: boolean) {
-  if (!active || !campaign || aim.override) { hideFocus(); return; }
+  if (!active || aim.override) { hideFocus(); return; }
+  const campaign = campaignStore().get();
   const hero = g.player.pos;
   const origin = gazeOrigin(hero);
   const direction = gazeDirection(aim.yaw, aim.pitch);
@@ -130,7 +131,7 @@ export function lockFocusedSceneItem() {
 export function takeLockedSceneItem() {
   const id = lockedId;
   lockedId = null;
-  if (!id || !campaign) return;
+  if (!id) return;
   const item = world.sceneItem(id);
   const def = item ? definitionOf(item) : null;
   if (!item || !def || blockedByBuilding(item)) return;
@@ -138,23 +139,30 @@ export function takeLockedSceneItem() {
   // Kamera saa liikkua eleen aikana, mutta sankari ei: lukittu kohde tarkistetaan vielä kantamasta.
   const distance = Math.hypot(item.focusWorldPosition.x - g.player.pos.x, item.focusWorldPosition.z - g.player.pos.z);
   if (distance > ITEM_TAKE_RANGE) return;
-  const result = tryTakeSceneItem(campaign, def);
-  if (result.status === "inventory-full") {
+  // Otto, varkausloki ja `item.taken`-säännöt tallennetaan yhtenä päivityksenä: puolikasta tilaa ei synny.
+  let result!: TakeWithEventsResult;
+  const update = campaignStore().update((state) => {
+    result = takeSceneItemWithEvents(state, def, ARENA, GAME_WORLD);
+    return result.state;
+  });
+  if (result.take.status === "inventory-full") {
     showMsg(t("interact.inventoryFull"), "", 1.5);
     return;
   }
-  if (result.status !== "taken") return;
-  if (!saveCampaign(result.state)) {
+  if (result.take.status !== "taken") return;
+  if (!update.ok) {
     showMsg(t("interact.saveFailed"), "", 1.6);
     return;
   }
 
-  campaign = result.state;
   world.removeSceneItem(id);
   focusedId = null;
   const name = t(ITEMS[def.itemId].nameKey);
-  showMsg(t(result.takeMode === "theft" ? "interact.takenTheft" : "interact.taken", { item: name }), "", 1.6);
-  g.events.push(`pelaaja:otti:${id}:${result.takeMode}`);
+  // Sääntöjen viesti (esim. varkauden seuraus) näytetään oton ilmoituksen alarivinä.
+  const consequence = result.post?.messages[0];
+  const main = t(result.take.takeMode === "theft" ? "interact.takenTheft" : "interact.taken", { item: name });
+  showMsg(consequence ? t(consequence.text) : main, consequence ? (consequence.sub ? t(consequence.sub) : main) : "", consequence ? 3 : 1.6);
+  g.events.push(`pelaaja:otti:${id}:${result.take.takeMode}`);
   if (g.events.length > 30) g.events.shift();
 }
 

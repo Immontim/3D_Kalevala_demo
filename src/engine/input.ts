@@ -8,6 +8,7 @@ import { exitFreeCam, pause, paused, pausedAt, restart, resume, toStartMenu } fr
 import { freeCam } from "./freecam";
 import { lookFreeCam, scaleFreeCamSpeed } from "../freecam";
 import { choosing, songState } from "./song";
+import { closeDialogue, dialogueOpen } from "./dialogue";
 import { DEG, aim, bindUi, g, inputs, keys } from "./state";
 import { canvas } from "./view";
 
@@ -83,6 +84,7 @@ export function initInput() {
     if (typing(e) && e.code !== "Escape") return;
     if (e.code === "Escape") {
       if (freeCam.active) { exitFreeCam(); return; }
+      if (dialogueOpen && !paused) { closeDialogue(); return; }
       // Esc myös jatkaa peliä: sivuun raahatun taukoikkunan Jatka-nappi voi olla ruudun ulkopuolella.
       // Viive estää sen, että hiiren lukituksen vapauttava Esc sekä pysäyttäisi että jatkaisi.
       if (!paused) pause();
@@ -102,7 +104,7 @@ export function initInput() {
   });
   canvas.addEventListener("mousedown", (e) => {
     if (bindUi.capture) return;
-    if (g.running && !choosing && !document.pointerLockElement) lockPointer();
+    if (g.running && !choosing && !dialogueOpen && !document.pointerLockElement) lockPointer();
     if (freeCam.active) return;
     if (e.button === 0) inputs.beatQueued = true;
     pressCode(mouseCode(e.button));
@@ -112,7 +114,7 @@ export function initInput() {
   window.addEventListener("mousemove", (e) => {
     // Vapaa kamera: hiiri katsoo lukittuna tai nappi pohjassa (jos lukitus ei ole saatavilla).
     if (freeCam.active) { if (document.pointerLockElement === canvas || e.buttons) lookFreeCam(freeCam.cam, e.movementX, e.movementY); return; }
-    if (!g.running || paused || choosing || songState || document.pointerLockElement !== canvas) return;
+    if (!g.running || paused || choosing || dialogueOpen || songState || document.pointerLockElement !== canvas) return;
     const k = CONTROLS.mouseSens * DEG;
     if (!lockTarget()) aim.yaw -= e.movementX * k;
     aim.pitch = Math.max(CONTROLS.pitchMin * DEG, Math.min(CONTROLS.pitchMax * DEG, aim.pitch + e.movementY * k));
