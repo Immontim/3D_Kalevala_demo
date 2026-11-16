@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { mapCalendarTime, satietyBand, sceneForMapSite } from "./uiState";
+import { mapCalendarTime, mapCellVisibility, satietyBand, sceneForMapSite } from "./uiState";
+
+describe("karttaruudun näkyvyys", () => {
+  it("näyttää sankarin ruudun ja kaikki kahdeksan naapuria", () => {
+    for (let y = 9; y <= 11; y++) {
+      for (let x = 9; x <= 11; x++) {
+        expect(mapCellVisibility(true, { x: 10, y: 10 }, { x, y })).toBe("visible");
+      }
+    }
+  });
+
+  it("himmentää aiemmin löydetyn kaukoruudun mutta pitää löytämättömän pimeänä", () => {
+    expect(mapCellVisibility(true, { x: 10, y: 10 }, { x: 12, y: 10 })).toBe("remembered");
+    expect(mapCellVisibility(false, { x: 10, y: 10 }, { x: 10, y: 10 })).toBe("unknown");
+  });
+});
 
 describe("karttakalenteri", () => {
   it.each([

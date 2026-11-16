@@ -3,7 +3,7 @@
 export const MAP_WIDTH = 20;
 export const MAP_HEIGHT = 20;
 
-export const TERRAIN_IDS = ["meadow", "forest", "deepForest", "bog", "rock", "water"] as const;
+export const TERRAIN_IDS = ["meadow", "forest", "deepForest", "bog", "rock", "water", "river"] as const;
 export type TerrainId = (typeof TERRAIN_IDS)[number];
 
 export interface TerrainDefinition {
@@ -22,6 +22,7 @@ export const TERRAINS: Record<TerrainId, TerrainDefinition> = {
   bog: { id: "bog", passable: true, minuteCost: 35 },
   rock: { id: "rock", passable: true, minuteCost: 25 },
   water: { id: "water", passable: false, minuteCost: 0 },
+  river: { id: "river", passable: false, minuteCost: 0 },
 };
 
 export const MAP_RULES = {

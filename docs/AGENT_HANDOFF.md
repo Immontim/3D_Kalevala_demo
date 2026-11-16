@@ -6,11 +6,11 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `98c8c2a`)
+Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `53b5bdc`)
 
-- **Branchin `claude/hero-wrists-hands` koodiversio on v03.04.00.** Koodi
+- **Branchin `codex/map-visibility-river` koodiversio on v03.05.00.** Koodi
   valmis, ei deployattu, käsin testattu (alla). Tarkista merge-tila ennen
-  jatkamista: `git merge-base --is-ancestor claude/hero-wrists-hands origin/main`.
+  jatkamista: `git merge-base --is-ancestor codex/map-visibility-river origin/main`.
 - **Rauhan kävely ja eleet** (`src/fighter.ts`, `src/interact.ts`,
   `src/engine/{hero,melee,animate}.ts`). `POSES.rest` on rennompi (kädet
   hieman irti vartalosta, kyynärpää taipuu); `apply()` heiluttaa käsiä
@@ -86,12 +86,15 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `98c8c2a`)
 - **2D-maailmankartta** (`src/map/app.ts`) on Canvas 2D -näkymä: 20 × 20
   ruudun maailma, 48 × 48 px:n tiilet ja 17 × 13 ruudun kamera
   (816 × 624 px). 1135 px leveässä testinäkymässä canvas oli noin 798 px.
-  Sankarin ruutu ja kaikki kahdeksan naapuria paljastuvat pysyvästi.
-  WASD/nuolet liikuttavat vain neljään pääilmansuuntaan.
+  Sankarin ruutu ja kaikki kahdeksan naapuria paljastuvat pysyvästi. Vain tämä
+  nykyinen 3 × 3 -alue on kirkas; aiemmin löydetty terrain näkyy sumutettuna,
+  eikä sen paikka-/kohtaamisikoneita piirretä. WASD/nuolet liikuttavat vain
+  neljään pääilmansuuntaan.
 - **Karttadata ja säännöt** ovat puhtaassa `src/map/domain.ts`:ssä. Kuusi
-  maastoa: niitty, metsä, umpimetsä, suo, kallio ja vesi. Kohderuudun
-  `minuteCost` lisää maailmanaikaa; estynyt liike ei kuluta aikaa. Vesi on
-  kulkukelvoton. `prototype.ts` on käsin sommiteltu vertailukartta:
+  aiempaa maastoa (niitty, metsä, umpimetsä, suo, kallio ja vesi) sekä uusi
+  joki. Kohderuudun `minuteCost` lisää maailmanaikaa; estynyt liike ei kuluta
+  aikaa. Vesi ja joki ovat jalan kulkukelvottomia. Joki kiemurtelee keskisen
+  järven etelälaidasta itäiseen ulkoveteen. `prototype.ts` on vertailukartta:
   aloitus (10,14), rauhallinen piha (10,11), punainen käsi (13,14).
 - **Aika ja kylläisyys.** Erillistä karttavoimaa ei ole. Tallennuksen
   `worldMinutes` on nyt pelaajalta piilotettu tausta-aika: maastokustannukset
@@ -138,7 +141,12 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `98c8c2a`)
   tyypitetyn `SceneToMapTransition`-kuorman; kartta kuluttaa sen kerran.
   `rewards` on nyt aina tyhjä, mutta rakenne varaa paikan tuleville ruoka- ja
   esinepalkinnoille.
-- **Karttagrafiikka ja sankari.** `kalevala-map-atlas.png` on 4 × 4 atlas.
+- **Karttagrafiikka ja sankari.** `kalevala-map-atlas-v2.png` on 8 × 4 atlas;
+  sen vasen puolisko säilyttää vanhat ikonit ja hahmot ennallaan. Kuudella
+  aiemmalla terrainilla on kaksi deterministisesti valittavaa variaatiota.
+  Joella on kolme suora-, mutka- ja päätevariaatiota, joita kierretään
+  naapuriyhteyksien mukaan. Uusi grafiikka tehtiin ImageGenillä annetun
+  Kalevala-tyylioppaan ja vanhan atlaksen pohjalta sekä viimeisteltiin 48 px:iin.
   Naisella ovat `paper-doll-hero.png`, `satiety-faces.png` ja nelisuuntainen
   `map-hero-female.png`; sininen viitta erottaa hänet kartalla. Miehellä ovat
   `paper-doll-hero-male.png`, `satiety-faces-male.png` ja atlaksen nykyiset
@@ -154,6 +162,9 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `98c8c2a`)
   kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
   tyypitetyissä FI/EN-sanakirjoissa.
 - **Käsin testattu 2026-11-16 Codexin in-app browserissa:**
+  - vain nykyinen 3 × 3 näkyi kirkkaana ja vanha terrain jäi himmeäksi;
+  - pihapiirin ikoni katosi kahden ruudun päässä ja palasi lähinäössä;
+  - joen suorat ja mutkat liittyivät, reitti kiemurteli ja liike jokeen estyi;
   - uusi matka alkoi tekstistä ”Päivä 1” ja niittyliike eteni päivään 2;
   - 180 tausta-aikayksikössä teksti vaihtui muotoon ”Kuu 1, päivä 1”;
   - tavallinen liike tyhjensi vasemman alareunan siirtokohtaisen aikaviestin;
@@ -173,8 +184,8 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `98c8c2a`)
   - kylläisyys 0 rauhallisella pihalla jätti molemmat arvoon 100/100;
   - paluu 3D:stä säilytti saman karttaruudun ja kampanjatilan;
   - uusi puhdas selainlataus: ei konsolivirheitä tai -varoituksia, 60 FPS.
-- **Tarkistukset 2026-11-16 (v03.03.01):** erillisessä worktreessä
-  `bun run test` 166/166 (14 versionhallittua testitiedostoa),
+- **Tarkistukset 2026-11-16 (v03.05.00):** erillisessä worktreessä
+  `bun run test` 179/179 (15 versionhallittua testitiedostoa),
   `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja
   `git diff --check` läpäisty. Pääkansion aiempi 416/37-lukema sisälsi
   myös sen alle luotujen Claude-worktreeiden testit.
@@ -194,9 +205,11 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `98c8c2a`)
   laajasti pelitestattua tasapainoa.
 - Prototyyppikartta on käsin tehty ja kiinteä. Deterministinen
   siemenpohjainen generaattori, juonipaikkojen ehdot ja validaattori puuttuvat.
-- Terrain käyttää yhtä 48 px kuvaa maastoa kohti. Toisto näkyy etenkin
-  niityllä; ranta-/joki-/polkuautotilejä tai vesianimaatiota ei ole.
-- Tutkimussumu on kaksitilainen: löydetty terrain jää täysin näkyviin.
+- Jokigrafiikka tukee suoria, kaarteita ja päitä, mutta ei vielä haaroja,
+  siltoja, koskia, venettä tai vesianimaatiota.
+- Vanha v3-tallennus voi ensimmäisellä latauksella asettaa sankarin ruutuun,
+  joka on tässä karttaversiossa muuttunut joeksi. Sankari pääsee poistumaan
+  viereiseen maahan, mutta lataus ei vielä siirrä häntä automaattisesti.
 - Paperinuken viisi vaatepaikkaa ovat vasta visuaalisia varauksia. Vain
   pää- ja sivukäsi ovat toimivia; alkuvarusteet eivät vie tavarapaikkoja.
 - Sukupuolivalinta vaihtaa 2D-kartan spriten, paperinuken ja kylläisyyskasvot
@@ -245,6 +258,8 @@ vielä täyttä karttaeditoria.
   yksinkertainen, merkityspaikat kalliomaalaushenkisiä ja UI:n identiteetti
   tulee karjalaisesta kirjonta-/käspaikkageometriasta.
 - Karttaliike on nelisuuntainen. Paljastus on pysyvä 3 × 3 alue myös viistoon.
+- Vain sankarin nykyinen 3 × 3 on aktiivisesti näkyvä. Löydetty maasto jää
+  muistiksi sumun alle; paikat ja liikkuvat kohtaamiset eivät näy sumun läpi.
 - Kartalla ei ole erillistä liikevoimaa. Maaston aika vähentää kylläisyyttä;
   kylläisyys ei tapa. Kampanjatila on eri asia kuin 3D:n `Actor` ja aika.
 - Karttakalenterissa yksi kuunkierto on 180 tausta-aikayksikköä ja 28 päivää.

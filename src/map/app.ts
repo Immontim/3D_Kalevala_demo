@@ -1,4 +1,4 @@
-import atlasUrl from "../../assets/map/kalevala-map-atlas.png?url";
+import atlasUrl from "../../assets/map/kalevala-map-atlas-v2.png?url";
 import femaleMapHeroUrl from "../../assets/map/map-hero-female.png?url";
 import femalePaperDollUrl from "../../assets/map/paper-doll-hero.png?url";
 import malePaperDollUrl from "../../assets/map/paper-doll-hero-male.png?url";
@@ -18,25 +18,18 @@ import {
   type FoodId,
   type PlayerGender,
 } from "./campaign";
-import { createWorldMapState, mapCell, moveOnMap, type MapDirection, type TerrainId } from "./domain";
+import { createWorldMapState, mapCell, moveOnMap, type MapDirection } from "./domain";
 import { PROTOTYPE_MAP } from "./prototype";
 import { clearCampaign, loadCampaign, newCampaign, saveCampaign } from "./storage";
+import { riverTile, terrainFrame, type AtlasFrame } from "./tiles";
 import { consumeSceneReturn } from "./transition";
-import { mapCalendarTime, satietyBand, sceneForMapSite } from "./uiState";
+import { mapCalendarTime, mapCellVisibility, satietyBand, sceneForMapSite } from "./uiState";
 
 const TILE = 48;
 const VIEW_COLS = 17;
 const VIEW_ROWS = 13;
 const SCENE_SHORTCUTS = ["yard", "lakeside", "clearing", "homestead"] as const satisfies readonly SceneId[];
 
-const TERRAIN_FRAME: Record<TerrainId, [number, number]> = {
-  water: [0, 0],
-  deepForest: [1, 0],
-  forest: [2, 0],
-  meadow: [3, 0],
-  bog: [0, 1],
-  rock: [1, 1],
-};
 const HERO_FRAME: Record<MapDirection, [number, number]> = {
   up: [0, 2], right: [1, 2], down: [2, 2], left: [3, 2],
 };
@@ -345,8 +338,22 @@ const femaleMapHero = new Image();
 femaleMapHero.src = femaleMapHeroUrl;
 femaleMapHero.addEventListener("load", renderMap);
 
-function sprite(ctx: CanvasRenderingContext2D, frame: [number, number], x: number, y: number) {
-  ctx.drawImage(atlas, frame[0] * TILE, frame[1] * TILE, TILE, TILE, x, y, TILE, TILE);
+function sprite(
+  ctx: CanvasRenderingContext2D,
+  frame: AtlasFrame,
+  x: number,
+  y: number,
+  quarterTurns = 0,
+) {
+  if (quarterTurns === 0) {
+    ctx.drawImage(atlas, frame[0] * TILE, frame[1] * TILE, TILE, TILE, x, y, TILE, TILE);
+    return;
+  }
+  ctx.save();
+  ctx.translate(x + TILE / 2, y + TILE / 2);
+  ctx.rotate(quarterTurns * Math.PI / 2);
+  ctx.drawImage(atlas, frame[0] * TILE, frame[1] * TILE, TILE, TILE, -TILE / 2, -TILE / 2, TILE, TILE);
+  ctx.restore();
 }
 
 function drawHero(ctx: CanvasRenderingContext2D, x: number, y: number) {
@@ -401,15 +408,30 @@ function renderMap() {
       const x = originX + vx, y = originY + vy;
       const cell = mapCell(PROTOTYPE_MAP, x, y)!;
       const i = y * PROTOTYPE_MAP.width + x;
-      if (!campaign.world.discovered[i]) {
+      const visibility = mapCellVisibility(
+        campaign.world.discovered[i],
+        campaign.world,
+        { x, y },
+      );
+      if (visibility === "unknown") {
         ctx.fillStyle = (x + y) % 2 ? "#17140f" : "#1c1812";
         ctx.fillRect(vx * TILE, vy * TILE, TILE, TILE);
         continue;
       }
-      sprite(ctx, TERRAIN_FRAME[cell.terrainId], vx * TILE, vy * TILE);
-      if (cell.siteId === "yard") sprite(ctx, [2, 1], vx * TILE, vy * TILE);
-      if (cell.siteId === "lakeside") sprite(ctx, [3, 1], vx * TILE, vy * TILE);
-      if (cell.siteId === "campfire") drawRedHand(ctx, vx * TILE, vy * TILE);
+      if (cell.terrainId === "river") {
+        const tile = riverTile(PROTOTYPE_MAP, x, y);
+        sprite(ctx, tile.frame, vx * TILE, vy * TILE, tile.quarterTurns);
+      } else {
+        sprite(ctx, terrainFrame(cell.terrainId, x, y), vx * TILE, vy * TILE);
+      }
+      if (visibility === "visible") {
+        if (cell.siteId === "yard") sprite(ctx, [2, 1], vx * TILE, vy * TILE);
+        if (cell.siteId === "lakeside") sprite(ctx, [3, 1], vx * TILE, vy * TILE);
+        if (cell.siteId === "campfire") drawRedHand(ctx, vx * TILE, vy * TILE);
+      } else {
+        ctx.fillStyle = "rgba(20, 17, 13, 0.44)";
+        ctx.fillRect(vx * TILE, vy * TILE, TILE, TILE);
+      }
     }
   }
   drawHero(ctx, (campaign.world.x - originX) * TILE, (campaign.world.y - originY) * TILE);

@@ -14,7 +14,18 @@ const LEGEND: Record<string, TerrainId> = {
   m: "meadow",
   b: "bog",
   r: "rock",
+  j: "river",
 };
+
+/** Kiemurteleva uoma keskisen järven etelälaidasta itäiseen ulkoveteen. */
+export const RIVER_ROUTE = [
+  [11, 9], [12, 9], [13, 9], [14, 9],
+  [14, 10], [14, 11], [13, 11], [12, 11],
+  [12, 12], [12, 13], [13, 13], [14, 13],
+  [15, 13], [16, 13], [17, 13],
+] as const satisfies readonly (readonly [number, number])[];
+
+const RIVER_CELLS = new Set(RIVER_ROUTE.map(([x, y]) => `${x},${y}`));
 
 /** Käsin sommiteltu vertailukartta tulevan generaattorin laatutavoitteeksi. */
 const ROWS = [
@@ -45,7 +56,7 @@ if (ROWS.length !== MAP_HEIGHT || ROWS.some((row) => row.length !== MAP_WIDTH)) 
 }
 
 const cells: MapCell[] = ROWS.flatMap((row, y) => [...row].map((symbol, x) => ({
-  terrainId: LEGEND[symbol],
+  terrainId: RIVER_CELLS.has(`${x},${y}`) ? "river" : LEGEND[symbol],
   ...(x === YARD_POSITION.x && y === YARD_POSITION.y ? { siteId: "yard" } : {}),
   ...(x === CAMPFIRE_POSITION.x && y === CAMPFIRE_POSITION.y ? { siteId: "campfire" } : {}),
   ...(x === LAKESIDE_POSITION.x && y === LAKESIDE_POSITION.y ? { siteId: "lakeside" } : {}),
