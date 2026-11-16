@@ -6,13 +6,29 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `eed0b8c`)
+Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `c1083d5`)
 
-- **Origin/mainin koodiversio on v03.09.00** (järven laajennus, hävitetty ranta,
-  stamina- ja keihästasapaino). **Branchin `claude/cairn-birch-grove` koodiversio on
-  v03.10.00** (kalmisto). Koodi valmis, ei deployattu, käsin testattu (alla).
-  Tarkista merge-tila ennen jatkamista:
-  `git merge-base --is-ancestor claude/cairn-birch-grove origin/main`.
+- **Branchin `codex/scene-items` koodiversio on v03.11.00.** Koodi valmis,
+  ei deployattu, käsin testattu (alla). Tarkista merge-tila ennen jatkamista:
+  `git merge-base --is-ancestor codex/scene-items origin/main`.
+- **Rauhallisten 3D-kohtausten esineet.** `sceneInteraction.ts` valitsee
+  sankarin katseakselilta enintään 2,8 m:n päässä olevan esineen. HUDin pieni
+  piste projisoidaan maailmaan; osuva piste näyttää esineen nimen, varkauden ja
+  täyden inventaarion. Käytä-ele lukitsee painallushetken kohteen ja ratkaisee
+  oton eleen keskellä. Tallennus tehdään ennen 3D-juuren poistamista; epäonnistunut
+  tallennus jättää esineen paikalleen. `world.ts`:n dynaamiset esineet jakavat
+  GLB-prototyyppien geometrian ja materiaalit, eikä niillä ole liikecollidereita.
+  Instanssit: `lakeside.sage-pack` (sama myös `lakeruin`issa),
+  `yard.table-flatbread` (3 rieskaa) ja `yard.table-dried-fish` (3 kalaa).
+  Pöydän muut astiat jäävät paikoilleen ruoan ottamisen jälkeen.
+- **Esinedomain ja pysyvyys.** Kampanjaskeema 5 ja avain
+  `laulun-miekka.campaign.v5`; v4 migroidaan menettämättä etenemistä.
+  `CampaignWorld.sceneItems` tallentaa otetut instanssit, `allowed|theft`-
+  lupapoikkeamat, varkaustietueet sekä varauksen myöhemmille pudotetuille
+  esineille (paikka, kierto, määrä ja seuraava tunniste). `setSceneItemTakeMode`
+  on tulevan dialogin/tapahtuman kytkentä. Pudotus-UI:ta tai pudotettujen mallien
+  luontia ei vielä ole. Uusi matka alkaa kolmella ohrarieskalla ilman kalaa;
+  tuohikontti on tavallinen yhden kappaleen esine.
 - **Kalmisto `cairnfield` (v03.10.00)**, rauhallinen kohtaus (`SCENE_KINDS`:
   friendly). Esc-dialogin oikotie, aloitusvalikon paikanvalinta ja `?scene=cairnfield`;
   ei vielä karttapaikkaa (`sites.ts`:ään lisätään kuten rannalle, kun omistaja haluaa).
@@ -55,8 +71,8 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `eed0b8c`)
   asetetaan torjuntanapin painalluksesta). Eleet ovat `gesturePose()`
   -avainkehyksiä (`GESTURE_TIME` kestot), vaikutus ratkeaa `effectAt`-hetkellä
   `gestureEffect`issä: puhe etsii `pickTarget`illa kohteen `TALK_ZONE`sta
-  (= miekan kevyt sivallus, 2,3 m / ±60°) ja näyttää nimen; `USE_ZONE` (1,6 m /
-  ±60°) odottaa esineitä, kohteita ei vielä ole. Puhuteltava väki rekisteröidään
+  (= miekan kevyt sivallus, 2,3 m / ±60°) ja näyttää nimen; käyttö ratkaisee
+  `sceneItems.ts`:ssä painallushetkellä lukitun maailmanesineen. Puhuteltava väki rekisteröidään
   `world.ts`:n `solid()`ista (`addTalkable`). Puhuessa liike 50 %, tartunnassa 0;
   vastustajan ilmestyminen keskeyttää eleen. Keihäsmies kantaa keihästä
   `restSpear`-otteessa (vasen käsi vapaa, `spearLeftW`) ja vilkuttaa vasemmalla.
@@ -94,7 +110,7 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `eed0b8c`)
   n ruutua (kuvakaappaukset tarkasta hetkestä; kuvakaappaus voi laahata
   sekunnin). Dev-palvelimen moduulit voivat monistua monien muokkausten
   jälkeen (varusteet eivät vaihdu): käynnistä palvelin uudelleen. 3D lukee
-  varusteet ja sukupuolen kampanjatallennuksesta (`laulun-miekka.campaign.v4`).
+  varusteet ja sukupuolen kampanjatallennuksesta (`laulun-miekka.campaign.v5`).
 - **Uusi paikka `lakeside` (Järven ranta)**, rauhallinen kohtaus
   (`SCENE_KINDS`: friendly). Kartalla ruutu (9,6) niityn ja järven rajalla,
   Esc-dialogin oikotie ja `?scene=lakeside`. `world.ts` rakentaa sen samalla
@@ -171,16 +187,18 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `eed0b8c`)
 - **Paperinukke ja inventaario.** Oikean reunan yhtenäinen näkymä korvaa
   tuohikonttipaneelin. Siinä ovat ImageGenillä tehty sankari, viisi tulevaa
   vaatepaikkaa, toimivat pää- ja sivukäden valinnat sekä kahdeksan
-  tavarapaikkaa. Kolme ohrarieskaa ja kaksi kuivattua kalaa kasvattavat
+  tavarapaikkaa. Uusi matka alkaa kolmella ohrarieskalla; 3D-maailmasta voi
+  saada lisää rieskaa, kuivattua kalaa ja tuohikontin. Ruoat kasvattavat
   kylläisyyttä eivätkä kulu arvossa 100. Keihäs tyhjentää sivukäden.
   Vain 3D-moottorin tukemat `sword_shield`-, `sword`- ja `spear`-yhdistelmät
   hyväksytään.
-- **Kampanjatallennus** (`campaign.ts`, `storage.ts`) käyttää skeemaa 4 ja
-  avainta `laulun-miekka.campaign.v4`. Se säilyttää terrain-paljastusten lisäksi
+- **Kampanjatallennus** (`campaign.ts`, `storage.ts`) käyttää skeemaa 5 ja
+  avainta `laulun-miekka.campaign.v5`. Se säilyttää terrain-paljastusten lisäksi
   erilliset `knownSiteIds`-paikkatiedot. V1–v3-migraatio päättelee tunnetuiksi
   vain ne kolmesta vanhasta paikasta, joiden ruutu oli löydetty; tulevia paikkoja
   ei skannata rekisteristä. Skeeman 1 `hunger` muunnetaan kylläisyydeksi ja
-  v1/v2-tallennukset saavat miesoletuksen. Kelvollinen vanha tallennus ja sen
+  v1/v2-tallennukset saavat miesoletuksen; v4 saa tyhjän maailmanesinetilan.
+  Kelvollinen vanha tallennus ja sen
   päätelty paikkatieto palautetaan myös silloin, kun migraation kirjoitus estyy.
 - **Matkan asetukset.** Esc avaa saavutettavan dialogin. Siellä valitaan
   kieli fontista riippumattomilla FI/GB-lipuilla ja karttasankarin sukupuoli
@@ -230,6 +248,13 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `eed0b8c`)
 - **UI ja kielituki.** Kartan pellavapohja, kirjontakehykset, paperinukke,
   kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
   tyypitetyissä FI/EN-sanakirjoissa.
+- **Käsin testattu 2026-11-16 Codexin ohjaamassa paikallisessa Chromessa
+  (v03.11.00-työpuu):** järven rannalla katsepiste näkyi maailmassa ja
+  tuohikontti näytti punaisen tekstin ”Ota: Tuohikontti — varkaus”. Otto poisti
+  kontin heti 3D:stä; sivun uudelleenlataus ei palauttanut sitä. 2D-inventaario
+  näytti kolme ohrarieskaa ja yhden tuohikontin. Kohtaus pysyi 58–60 FPS:ssä.
+  Maatilan ruokien sijoittelu ja otto on varmennettu koodista ja domain-testeillä,
+  mutta pöydän lopullista ulkoasua ei katsottu tässä savutestissä.
 - **Käsin testattu 2026-11-16 Codexin in-app browserissa:**
   - punainen käsi ei näkynyt ennen lähestymistä, löytyi 3 × 3 -lähinäössä;
   - löydetty käsi jäi etääntymisen jälkeen sumuun himmeänä;
@@ -256,17 +281,12 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `eed0b8c`)
   - kylläisyys 0 rauhallisella pihalla jätti molemmat arvoon 100/100;
   - paluu 3D:stä säilytti saman karttaruudun ja kampanjatilan;
   - uusi puhdas selainlataus: ei konsolivirheitä tai -varoituksia, 60 FPS.
-- **Tarkistukset 2026-11-16 (v03.09.00):** erillisessä worktreessä
-  `bun run test` 194/194 (17 versionhallittua testitiedostoa),
-  `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja
-  `git diff --check` läpäisty. Pääkansion aiempi 416/37-lukema sisälsi
-  myös sen alle luotujen Claude-worktreeiden testit.
-  Selaimessa: `?scene=lakeside` ja kartalta (9,6) → "Astu rannalle" toimivat,
-  konsolissa ei virheitä, 56–60 FPS pienessä in-app-ikkunassa (suuremmalla
-  näytöllä FPS mittaamatta); kävelytesti: laiturin päähän asti, rannalla pysähtyy
-  nilkkaan, laiturin sivuille ei pääse; pihan ja nuotioaukion lataus ennallaan.
-  Build varoittaa edelleen 3D-chunkin ylittävän 500 kt (803,27 kt;
-  gzip 214,11 kt). Build sisältää myös uuden `lakeruin.glb`:n (1,88 Mt).
+- **Tarkistukset 2026-11-16 (v03.11.00):** `bun run test`,
+  `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja `git diff --check`
+  läpäisty (`vitest --exclude ".worktrees/**"`: 19 versionhallittua/uuden työn
+  testitiedostoa, 214 testiä). Build varoittaa edelleen 3D-chunkin
+  ylittävän 500 kt: 815,13 kt, gzip 218,21 kt; karttasovellus 19,06 kt,
+  gzip 9,08 kt.
 - **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
   3D:ssä `window.__game`. Selainpaneelin fokus voi pysäyttää 3D-pelin.
@@ -294,6 +314,11 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `eed0b8c`)
   Naissankarin kilpi on selässä jousineidon viinen päällä.
 - Paluusillan kuljetus toimii, mutta 3D ei vielä myönnä palkintoja eikä kartta
   lisää `rewards`-kentän esineitä inventaarioon.
+- Maailmanesineen `allowed|theft`-tila ja varkausloki ovat pysyviä, mutta
+  dialogi ei vielä muuta lupaa eikä kukaan reagoi varkauteen. Pudotetun esineen
+  tallennusmuoto on varattu, mutta inventaarion pudotus-UI ja 3D-instanssin luonti
+  puuttuvat. `sceneItems.ts`:n save-failure-, rakennuspeitto- ja eleen lukituspolut
+  ovat käsin/koodista tarkistettuja, eivät vielä automatisoituja integraatiotestejä.
 - Kartta–3D-siirtymä lataa sivun uudelleen. Samassa ajossa mount/dispose
   vaatisi scene/world-singletonien laajemman elinkaarirefaktoroinnin.
 - 3D-taistelun tasapainoa ei ole kattavasti pelitestattu. Suuntatorjunta,
@@ -308,12 +333,10 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `eed0b8c`)
 
 ## Seuraava tehtävä
 
-Toteuta deterministinen, siemenpohjainen karttageneraattori nykyisen käsin
-tehdyn kartan rinnalle. Ensimmäinen rajaus: kuusi terrainia, aloituspiha,
-punaisen käden taistelupaikka ja ehdollisesti sijoitettavat juonipaikat.
-Validaattorin pitää todistaa kaikkien pakollisten paikkojen saavutettavuus ja
-hylätä rikkinäinen siemen. Lisää kehittäjän siemen-/paljastusesikatselu, ei
-vielä täyttä karttaeditoria.
+Kytke ensimmäinen dialogi-/tapahtumapolku maailmanesineisiin: tietäjä voi antaa
+tuohikontin luvallisesti (`setSceneItemTakeMode`), ja luvaton otto käynnistää
+varkauslokiin perustuvan näkyvän seurauksen. Rajaa työ yhteen NPC:hen ja yhteen
+esineeseen; älä rakenna vielä yleistä quest-editoria tai pudotus-UI:ta.
 
 ## Ei vielä aloiteta
 
@@ -322,8 +345,8 @@ vielä täyttä karttaeditoria.
 - Täysi karttaeditori, satunnaiset matkakohtaamiset ja sivujuonigeneraattori.
 - Paperinuken vaate-esineiden datamalli ja 3D-ulkoasun vaihto.
 - 3D-palkintojen tai ruokien lisääminen paluukuormasta inventaarioon.
-- Dialogijärjestelmä (puhe vain vilkuttaa ja näyttää nimen) ja kyläläisten
-  liikkuminen tai vihamielistyminen. Käytä/tartu-toiminnolle esineet.
+- Yleinen quest-editori, laaja dialogipuu ja kyläläisten vapaa liikkuminen.
+- Inventaarion pudotus-UI ja pudotettujen esineiden 3D-instanssit.
 - 3D-kohtausten mount/dispose ilman sivun uudelleenlatausta.
 - Git LFS (omistajan päätös 2026-11-10: ei vielä).
 - Isojen skannattujen puiden lataus ja kevennys.

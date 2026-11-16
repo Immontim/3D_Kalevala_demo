@@ -447,10 +447,35 @@ export interface World {
   proto(name: string): { geometry: THREE.BufferGeometry; material: THREE.Material }[];
   /** Yhteinen hahmojen, eläinten, maailmanesteiden ja vaara-alueiden 2,5D-rekisteri. */
   collision: CollisionWorld;
+  /** Kohtauksen pienet, erikseen poistettavat esineet. Lista täyttyy ready-lupauksen aikana. */
+  sceneItems(): readonly RuntimeSceneItem[];
+  sceneItem(id: string): RuntimeSceneItem | undefined;
+  /** Piilottaa tallennuksessa jo otetut esineet. Turvallinen kutsua ennen ready-lupausta. */
+  setTakenSceneItemIds(ids: readonly string[]): void;
+  /** Poistaa yhden esineen näkymästä ja estää sen myöhäisen luonnin. */
+  removeSceneItem(id: string): boolean;
   /** Siirtää kameran paikan pois rakennusten sisältä (pihapiirissä kehän sisäpuolelle). */
   clearCamera(pos: THREE.Vector3): void;
   /** focus = kulkija (sankari), jota pihan väki katsoo. */
   update(t: number, dt: number, camera: THREE.Camera, focus?: THREE.Vector3): void;
+}
+
+export type SceneItemTakeMode = "allowed" | "theft";
+
+/** Renderöity, vuorovaikutettava maailmanesine. Inventaarion pysyvä tila on kampanjadomainissa. */
+export interface RuntimeSceneItem {
+  /** Vakaa paikkainstanssin sisäinen tunniste; sama ranta säilyttää tunnisteen myös raunioituneena. */
+  id: string;
+  siteId: string;
+  itemId: string;
+  quantity: number;
+  takeMode: SceneItemTakeMode;
+  ownerId?: string;
+  /** Poistettava juuri; geometria ja materiaalit jaetaan prototyypin kanssa. */
+  root: THREE.Group;
+  /** Kohdistuksen maailmanpiste ja salliva säde, jotta ohuisiin ruokiin ei tarvitse osua pikselintarkasti. */
+  focusWorldPosition: THREE.Vector3;
+  focusRadius: number;
 }
 
 export interface GroundTex { mossDiff: THREE.Texture; mossNor: THREE.Texture; dirtDiff: THREE.Texture; dirtNor: THREE.Texture; }
@@ -807,6 +832,23 @@ function buildFire(scene: THREE.Scene) {
 // ---------- Blender-mallien sijoittelu ----------
 type Proto = { geometry: THREE.BufferGeometry; material: THREE.Material }[];
 
+interface SceneItemPlacement {
+  id: string;
+  siteId: string;
+  itemId: string;
+  model: string;
+  quantity: number;
+  takeMode: SceneItemTakeMode;
+  ownerId?: string;
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+  scale?: number;
+  focusY: number;
+  focusRadius: number;
+}
+
 function prepareMaterials(protos: Map<string, Proto>, maxAniso: number) {
   const seen = new Set<THREE.Material>();
   for (const parts of protos.values()) {
@@ -866,10 +908,17 @@ function prepareMaterials(protos: Map<string, Proto>, maxAniso: number) {
   }
 }
 
-function populate(scene: THREE.Scene, protos: Map<string, Proto>, collision: CollisionWorld) {
+function populate(
+  scene: THREE.Scene,
+  protos: Map<string, Proto>,
+  collision: CollisionWorld,
+  sceneItems: Map<string, RuntimeSceneItem>,
+  takenSceneItems: ReadonlySet<string>,
+) {
   const r = rand(1849);
   const dummy = new THREE.Object3D();
   const batches = new Map<string, THREE.Matrix4[]>();
+  let dynamicTris = 0;
   let colliderId = 0;
   const put = (key: string, x: number, z: number, scale: number, yaw: number, sink = 0, tilt = 0, opts: { wetOk?: boolean; y?: number } = {}) => {
     if (!opts.wetOk && wet(x, z)) return;                     // ei puita, kiviä tai heinää veteen
@@ -881,6 +930,36 @@ function populate(scene: THREE.Scene, protos: Map<string, Proto>, collision: Col
     batches.get(key)!.push(dummy.matrix.clone());
     const name = key.split("@")[0];
     addPropCollider(collision, `prop:${name}:${colliderId++}`, name, x, z, scale, yaw);
+  };
+  const putSceneItem = (def: SceneItemPlacement) => {
+    if (takenSceneItems.has(def.id)) return;
+    const parts = protos.get(def.model);
+    if (!parts?.length) { console.warn("Esinemalli puuttuu:", def.model); return; }
+    const root = new THREE.Group();
+    root.name = `scene-item:${def.id}`;
+    root.position.set(def.x, def.y, def.z);
+    root.rotation.y = def.yaw;
+    root.scale.setScalar(def.scale ?? 1);
+    root.userData.sceneItemId = def.id;
+    for (const part of parts) {
+      const mesh = new THREE.Mesh(part.geometry, part.material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      root.add(mesh);
+      dynamicTris += (part.geometry.index?.count ?? part.geometry.attributes.position.count) / 3;
+    }
+    scene.add(root);
+    sceneItems.set(def.id, {
+      id: def.id,
+      siteId: def.siteId,
+      itemId: def.itemId,
+      quantity: def.quantity,
+      takeMode: def.takeMode,
+      ownerId: def.ownerId,
+      root,
+      focusWorldPosition: new THREE.Vector3(def.x, def.y + def.focusY * (def.scale ?? 1), def.z),
+      focusRadius: def.focusRadius * (def.scale ?? 1),
+    });
   };
   /** Rakennus paikalleen pohjansa mukaan, etusivu keskipisteeseen päin. */
   const place = (key: string, f: Footprint, sink = 0.03) => put(key, f.x, f.z, 1, f.yaw, sink);
@@ -1000,7 +1079,12 @@ function populate(scene: THREE.Scene, protos: Map<string, Proto>, collision: Col
     put("penkki@near", bx, bz, 1, CABIN.yaw, 0.01);
     put("kori@near", bx + 0.35, bz, 1, 0.9, 0, 0, { y: groundHeight(bx, bz) + 0.47 });
     const [tx, tz] = at(-1.9, 2.3);
-    put("tuohikontti@near", tx, tz, 1, CABIN.yaw + 2.6, 0.01);
+    putSceneItem({
+      id: "lakeside.sage-pack", siteId: "lakeside", itemId: "birch_bark_pack", model: "tuohikontti", quantity: 1,
+      takeMode: "theft", ownerId: "tietaja",
+      x: tx, y: groundHeight(tx, tz) - 0.01, z: tz, yaw: CABIN.yaw + 2.6,
+      focusY: 0.22, focusRadius: 0.34,
+    });
     if (RUIN) {
       // Verta: iso lammikko tietäjän rinnan kohdalla ja jälki mökin ovelta hänen luokseen.
       const f = ruinSagePos();
@@ -1036,7 +1120,35 @@ function populate(scene: THREE.Scene, protos: Map<string, Proto>, collision: Col
       // Katettu pöytä penkkeineen talon edessä, keittopata sen päädyssä, eväät ja lyhteet seinustoilla.
       const tb = { ...TABLE, hx: 0, front: 0, back: 0 };
       put("pukkipoyta@near", TABLE.x, TABLE.z, 1, TABLE.yaw, 0.01);
-      put("poyta_kattaus@near", TABLE.x, TABLE.z, 1, TABLE.yaw, 0.01);
+      // Blenderin poyta_kattaus yhdistää ruuat ja astiat yhdeksi verkoksi. Kootaan sama kattaus
+      // erillisistä prototyypeistä, jotta rieskat ja kalat voidaan poistaa muun kattauksen jäädessä.
+      const tableTopY = groundHeight(TABLE.x, TABLE.z) + 0.75;
+      const tablePoint = (lx: number, blenderY: number) => fromLocal(tb, lx, -blenderY);
+      const tableProp = (key: string, lx: number, blenderY: number, height = 0, yaw = 0) => {
+        const [x, z] = tablePoint(lx, blenderY);
+        put(`${key}@near`, x, z, 1, TABLE.yaw + yaw, 0, 0, { y: tableTopY + height });
+      };
+      tableProp("kulho", -0.62, 0.05, 0, 0.4);
+      tableProp("nauriit", -0.62, 0.05, 0.035, 1.0);
+      tableProp("lautanen", 0.42, 0.08);
+      tableProp("kuppi", -0.95, -0.2, 0, 0.3);
+      tableProp("kuppi", 0.1, 0.24, 0, 2.0);
+      tableProp("kuppi", 0.9, -0.16, 0, 4.0);
+      tableProp("kauha", -0.3, 0.22, 0, 1.2);
+      const [breadX, breadZ] = tablePoint(-0.12, -0.08);
+      putSceneItem({
+        id: "yard.table-flatbread", siteId: "yard", itemId: "barley_flatbread", model: "rieska", quantity: 3,
+        takeMode: "theft", ownerId: "household",
+        x: breadX, y: tableTopY, z: breadZ, yaw: TABLE.yaw,
+        focusY: 0.05, focusRadius: 0.28,
+      });
+      const [fishX, fishZ] = tablePoint(0.42, 0.08);
+      putSceneItem({
+        id: "yard.table-dried-fish", siteId: "yard", itemId: "dried_fish", model: "kuivakalat", quantity: 3,
+        takeMode: "theft", ownerId: "household",
+        x: fishX, y: tableTopY + 0.012, z: fishZ, yaw: TABLE.yaw + 0.5,
+        focusY: 0.04, focusRadius: 0.29,
+      });
       for (const s of [-1, 1]) {
         const [x, z] = fromLocal(tb, 0, s * 0.8);
         put("penkki@near", x, z, 1, TABLE.yaw, 0.01);
@@ -1078,7 +1190,7 @@ function populate(scene: THREE.Scene, protos: Map<string, Proto>, collision: Col
       tris += ((p.geometry.index?.count ?? p.geometry.attributes.position.count) / 3) * mats.length;
     }
   }
-  return { trees: trees.length, tris: Math.round(tris) };
+  return { trees: trees.length, tris: Math.round(tris + dynamicTris), sceneItems: sceneItems.size };
 }
 
 // Nyrkin otekanavat lepoasennossa (piste ja suunta mallin koordinaateissa). Miehen oikea käsi
@@ -1335,6 +1447,20 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   const loon = CAIRN ? buildLoon(scene) : null;
   if (CAIRN) buildDarkSoil(scene);
   const protos = new Map<string, Proto>();
+  const runtimeSceneItems = new Map<string, RuntimeSceneItem>();
+  // Kampanja voi asettaa nämä ennen GLB-latauksen valmistumista; populate ei silloin luo juuria lainkaan.
+  const takenSceneItemIds = new Set<string>();
+  const removeSceneItem = (id: string) => {
+    takenSceneItemIds.add(id);
+    const item = runtimeSceneItems.get(id);
+    if (!item) return false;
+    item.root.removeFromParent();
+    runtimeSceneItems.delete(id);
+    return true;
+  };
+  const setTakenSceneItemIds = (ids: readonly string[]) => {
+    for (const id of ids) removeSceneItem(id);
+  };
   const fire = buildFire(scene);
   const collision = new CollisionWorld();
   if (!CAIRN) collision.add({
@@ -1383,7 +1509,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
       }
     }
     prepareMaterials(protos, maxAniso);
-    const stats = populate(scene, protos, collision);
+    const stats = populate(scene, protos, collision, runtimeSceneItems, takenSceneItemIds);
     (window as unknown as { __world: unknown }).__world = { ...stats, collision: collision.stats() };
     if (ARENA === "yard") return populateYardLife(scene, collision);
     if (CAIRN) return populateCairnLife(scene, collision);
@@ -1398,6 +1524,10 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     groundTex,
     proto: (name) => protos.get(name) ?? [],
     collision,
+    sceneItems: () => [...runtimeSceneItems.values()],
+    sceneItem: (id) => runtimeSceneItems.get(id),
+    setTakenSceneItemIds,
+    removeSceneItem,
     clearCamera(pos) {
       const r = Math.hypot(pos.x, pos.z);
       if (r > SITE.camMaxR) { pos.x *= SITE.camMaxR / r; pos.z *= SITE.camMaxR / r; }

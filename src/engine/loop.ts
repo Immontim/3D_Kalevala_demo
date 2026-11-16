@@ -13,7 +13,7 @@ import { $, isTouch } from "./dom";
 import { freeCam, startFreeCam, stopFreeCam } from "./freecam";
 import { bog, updateRing, updateSparks } from "./effects";
 import { clearEnemies } from "./enemies";
-import { spawnHero, updatePlayer } from "./hero";
+import { heroAtPeace, spawnHero, updatePlayer } from "./hero";
 import { showMsg, tickMsg, updateHud } from "./hud";
 import { clearInputs, lockPointer } from "./input";
 import { keepApartAndInside, updateCombatant } from "./melee";
@@ -23,6 +23,7 @@ import { choosing, closeChoice, closeSong, songState, updateChoice, updateSong }
 import { aim, bindUi, fx, g, inputs, keys, sfx } from "./state";
 import { camera, canvas, composer, world } from "./view";
 import { createEmptySceneReturn, saveSceneReturn } from "../map/transition";
+import { updateSceneItemFocus } from "./sceneItems";
 
 export function onPlayerDeath() {
   g.gameOver = true;
@@ -141,6 +142,7 @@ export function simulate(realDt: number) {
   fx.shake = Math.max(0, fx.shake - realDt * 1.2);
   if (freeCam.active) stepFreeCam(freeCam.cam, (code) => keys.has(code), realDt);
   updateCamera(realDt);
+  updateSceneItemFocus(g.running && !paused && !choosing && songState === null && !freeCam.active && !g.gameOver && heroAtPeace());
   updateHud();
 
 

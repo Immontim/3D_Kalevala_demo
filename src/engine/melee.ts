@@ -4,7 +4,7 @@ import { ActionState, BASH, COMBAT, StrikeStyle, StrikeWeight, angleBetween, bas
 import { FALLEN, GESTURE_TIME, Gesture } from "../fighter";
 import { t } from "../i18n";
 import { effectiveStats } from "../stats";
-import { TALKABLES, TALK_ZONE, USE_ZONE, pickTarget } from "../interact";
+import { TALKABLES, TALK_ZONE, pickTarget } from "../interact";
 import { ARENA_RADIUS, groundHeight } from "../world";
 import { separateDiscBodies } from "../collision";
 import { Actor, setState } from "./actor";
@@ -15,6 +15,7 @@ import { enemyDown, lockTarget } from "./enemies";
 import { interruptSong, songState } from "./song";
 import { fx, g, sfx } from "./state";
 import { scene, world } from "./view";
+import { takeLockedSceneItem } from "./sceneItems";
 
 export function startAttack(a: Actor, kind: StrikeStyle | "bash", weight: StrikeWeight = "light", charging = false) {
   setState(a, "windup");
@@ -32,8 +33,8 @@ export function startGesture(a: Actor, kind: Gesture) {
 
 /**
  * Eleen vaikutus: kohde etsitään kantaman ja sektorin sisältä samoin kuin lyönnin kohde.
- * Puhe näyttää, kenelle puhuttiin; dialogia ei vielä ole. Käytölle ei vielä ole kohteita
- * (esineet ja tartuttavat tulevat myöhemmin), joten se vain näyttää eleen.
+ * Puhe näyttää, kenelle puhuttiin; dialogia ei vielä ole. Käyttö ratkaisee katseella
+ * lukitun maailmanesineen tartuntaeleen vaikutushetkellä.
  */
 function gestureEffect(a: Actor, kind: Gesture) {
   const from = { x: a.pos.x, z: a.pos.z, yaw: a.yaw };
@@ -42,8 +43,7 @@ function gestureEffect(a: Actor, kind: Gesture) {
     g.events.push(`pelaaja:puhe:${target ? target.id : "ei kohdetta"}`);
     if (target) showMsg(target.name, t("talk.listens"), 1.4);
   } else {
-    const target = pickTarget(from, [], USE_ZONE);
-    g.events.push(`pelaaja:käytä:${target ? "kohde" : "ei kohdetta"}`);
+    takeLockedSceneItem();
   }
   if (g.events.length > 30) g.events.shift();
 }
