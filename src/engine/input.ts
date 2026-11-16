@@ -36,7 +36,7 @@ export function setBindings(next: Bindings) {
 export function pressCode(code: string): boolean {
   const a = actionFor(bindings, code);
   if (!a) return false;
-  if (a === "block") inputs.blockHeld = true;
+  if (a === "block") { inputs.blockHeld = true; inputs.useQueued = true; }
   else if (a === "dodge") inputs.dodgeQueued = true;
   else if (a === "song") inputs.songQueued = true;
   else if (a === "lock") { aim.lockOn = !aim.lockOn; aim.target = null; }
@@ -56,6 +56,7 @@ export function typing(e: Event) { return e.target instanceof HTMLInputElement |
 export function clearInputs() {
   keys.clear();
   inputs.blockHeld = false;
+  inputs.useQueued = false;
   // Kesken jäänyt viritys perutaan, jottei isku laukea itsestään tauon jälkeen.
   if (g.player.state === "windup" && g.player.charging) setState(g.player, "idle");
   releaseStrikes();

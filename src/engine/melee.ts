@@ -1,9 +1,10 @@
 // Lähitaistelu: iskun kulku, osuman seuraukset ja törmäykset.
 import * as THREE from "three";
 import { ActionState, BASH, COMBAT, StrikeStyle, StrikeWeight, angleBetween, bashPushStep, graceAfter, graceCovers, inStrikeZone, attackPhase, enemyAttackTiming, lungeProgress, makeAttack, resolveHit, shieldWear, staminaAfterBlock, staminaTick, strikeCost, strikeDamage, strikeLands, strikeTier, styleFor, weakened } from "../combat";
-import { FALLEN } from "../fighter";
+import { FALLEN, GESTURE_TIME, Gesture } from "../fighter";
 import { t } from "../i18n";
 import { effectiveStats } from "../stats";
+import { TALKABLES, TALK_ZONE, USE_ZONE, pickTarget } from "../interact";
 import { ARENA_RADIUS, groundHeight } from "../world";
 import { separateDiscBodies } from "../collision";
 import { Actor, setState } from "./actor";
@@ -22,6 +23,29 @@ export function startAttack(a: Actor, kind: StrikeStyle | "bash", weight: Strike
   a.charging = charging;
   a.extraRecovery = 0;
   if (a === g.player) g.playerAttackId++;
+}
+
+/** Rauhan ele alkaa: puhe (vilkutus) tai käyttö (tartunta). Vaikutus ratkeaa eleen keskellä (gestureEffect). */
+export function startGesture(a: Actor, kind: Gesture) {
+  setState(a, kind);
+}
+
+/**
+ * Eleen vaikutus: kohde etsitään kantaman ja sektorin sisältä samoin kuin lyönnin kohde.
+ * Puhe näyttää, kenelle puhuttiin; dialogia ei vielä ole. Käytölle ei vielä ole kohteita
+ * (esineet ja tartuttavat tulevat myöhemmin), joten se vain näyttää eleen.
+ */
+function gestureEffect(a: Actor, kind: Gesture) {
+  const from = { x: a.pos.x, z: a.pos.z, yaw: a.yaw };
+  if (kind === "talk") {
+    const target = pickTarget(from, TALKABLES, TALK_ZONE);
+    g.events.push(`pelaaja:puhe:${target ? target.id : "ei kohdetta"}`);
+    if (target) showMsg(target.name, t("talk.listens"), 1.4);
+  } else {
+    const target = pickTarget(from, [], USE_ZONE);
+    g.events.push(`pelaaja:käytä:${target ? "kohde" : "ei kohdetta"}`);
+  }
+  if (g.events.length > 30) g.events.shift();
 }
 
 /** Kilpi hajoaa: palaset putoavat maahan, ja kantaja taistelee tästä eteenpäin ilman kilpeä. */
@@ -282,6 +306,13 @@ export function updateCombatant(a: Actor, dt: number) {
     }
     if (phase === "recovery") a.state = "recovery";
     if (phase === "done") setState(a, "idle");
+  } else if (a.state === "talk" || a.state === "use") {
+    const T = GESTURE_TIME[a.state];
+    if (!a.struck && a.stateTime >= T.effectAt) {
+      a.struck = true;
+      if (a === g.player) gestureEffect(a, a.state);
+    }
+    if (a.stateTime >= T.total) setState(a, "idle");
   } else if (a.state === "stagger") {
     if (a.stateTime >= COMBAT.staggerTime) setState(a, "idle");
   } else if (a.state === "dodge") {

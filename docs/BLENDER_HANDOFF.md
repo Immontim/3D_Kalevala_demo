@@ -181,7 +181,12 @@ Päivitetty: 2026-11-15 (Claude, Windows; pohja main 850e4cc)
 
 ## Seuraava Blender-tehtävä
 
-Ei avointa Blender-tehtävää. Mahdollinen: koiran kävelyleike
+Ei avointa Blender-tehtävää. Ehdotus omistajalle: miehen sankarin rennot
+avokädet (nyt suljetut nyrkit näkyvät kävelyssä ja vilkutuksessa; vaatii
+`char_hero`n käteen morph-targetin tai toisen käsiverkon, koska luurangossa ei
+ole sormiluita) sekä naissankarin oma huotra ja kantohihna (nyt huotra on
+koodilla tehty laatikoista `Fighter.attachFemaleGear`issa ja hihna puuttuu).
+Muuta mahdollista: koiran kävelyleike
 (`animals.py`, 191 luuta) ranta- ja pihakoiran käyskentelyyn.
 Tietäjällä on vain lepoasento, joten istuva tietäjä vaatisi uuden
 istumaleikkeen. Jos omistaja pitää jousineidon otetta

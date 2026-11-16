@@ -19,7 +19,8 @@ import dirtDiffUrl from "../assets/ground/dirt_diff.webp";
 import dirtNorUrl from "../assets/ground/dirt_nor.webp";
 import { COLLISION, CollisionWorld } from "./collision";
 import { spawnAnimal, spawnVillager, updateFolk } from "./folk";
-import { t } from "./i18n";
+import { t, type TextKey } from "./i18n";
+import { addTalkable } from "./interact";
 import { SCENE_IDS, type SceneId } from "./app/route";
 
 // Taistelualueet kangasmetsässä: maasto, männyt, kuuset, koivut, varvut ja kivet
@@ -927,8 +928,11 @@ const GRIP_FEMALE_L = { p: [0.385, 0.769, 0.058] as [number, number, number], d:
 function populateYardLife(scene: THREE.Scene, collision: CollisionWorld) {
   const tb = { ...TABLE, hx: 0, front: 0, back: 0 };
   const facing = (x: number, z: number, tx: number, tz: number) => Math.atan2(tx - x, tz - z);
-  const solid = (id: string, x: number, z: number, radius: number) =>
+  const solid = (id: string, x: number, z: number, radius: number) => {
     collision.add({ id: `folk:${id}`, kind: "circle", x, z, radius, blocksMovement: true, blocksMelee: false });
+    // Pihan ja rannan väelle voi puhua (src/interact.ts); kana_b on toinen kana.
+    addTalkable({ id, x, z, name: t(`folk.${id === "kana_b" ? "kana" : id}` as TextKey) });
+  };
   const jobs: Promise<void>[] = [];
 
   // Naiset on mallinnettu miehen pituisiksi; pelissä heidät skaalataan hieman pienemmiksi.
@@ -981,8 +985,11 @@ function populateYardLife(scene: THREE.Scene, collision: CollisionWorld) {
  *  tulen ja mökin välissä. */
 function populateLakeLife(scene: THREE.Scene, collision: CollisionWorld) {
   const facing = (x: number, z: number, tx: number, tz: number) => Math.atan2(tx - x, tz - z);
-  const solid = (id: string, x: number, z: number, radius: number) =>
+  const solid = (id: string, x: number, z: number, radius: number) => {
     collision.add({ id: `folk:${id}`, kind: "circle", x, z, radius, blocksMovement: true, blocksMelee: false });
+    // Pihan ja rannan väelle voi puhua (src/interact.ts); kana_b on toinen kana.
+    addTalkable({ id, x, z, name: t(`folk.${id === "kana_b" ? "kana" : id}` as TextKey) });
+  };
   const jobs: Promise<void>[] = [];
 
   const sx = FIRE.x + 1.45, sz = FIRE.z + 0.45;

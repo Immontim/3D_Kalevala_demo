@@ -36,6 +36,7 @@ export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   const loadout = combatLoadout(campaign.player.equipment);
   if (!loadout) throw new Error("Kampanjan varusteyhdistelmää ei voi tuoda 3D-kohtaukseen.");
   PLAYER_LOOK.loadout = loadout;
+  PLAYER_LOOK.female = campaign.player.gender === "female";
   loadSavedTuning(); // ennen kuin yhtään hahmoa luodaan
   initView();
   initEffects();

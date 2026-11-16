@@ -6,12 +6,39 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-15 (Codex, Windows)
+Päivitetty: 2026-11-15 (Claude, Windows; pohja `origin/main` `1353ea3`)
 
-- **Branchin `codex/hero-gender-settings` koodiversio on v03.02.00**
-  (pohjana `origin/main` `7463d61`). Koodi on valmis, ei deployattu, käsin
-  testattu. Tarkista merge-tila ennen jatkamista:
-  `git merge-base --is-ancestor codex/hero-gender-settings origin/main`.
+- **Branchin `claude/hero-calm-gestures` koodiversio on v03.03.00.** Koodi
+  valmis, ei deployattu, käsin testattu 3D:ssä (alla). Tarkista merge-tila
+  ennen jatkamista: `git merge-base --is-ancestor claude/hero-calm-gestures origin/main`.
+- **Rauhan kävely ja eleet** (`src/fighter.ts`, `src/interact.ts`,
+  `src/engine/{hero,melee,animate}.ts`). `POSES.rest` on rennompi (kädet
+  hieman irti vartalosta, kyynärpää taipuu); `apply()` heiluttaa käsiä
+  vastakkaisen jalan tahtiin, kun `relax` on 1 (target `rest`/`restSpear`,
+  vakiot `GAIT.armSwing*`). Rauhassa (`heroAtPeace`) iskunappi käynnistää
+  tilan `talk` ja torjuntanappi tilan `use` (`ActionState`; `inputs.useQueued`
+  asetetaan torjuntanapin painalluksesta). Eleet ovat `gesturePose()`
+  -avainkehyksiä (`GESTURE_TIME` kestot), vaikutus ratkeaa `effectAt`-hetkellä
+  `gestureEffect`issä: puhe etsii `pickTarget`illa kohteen `TALK_ZONE`sta
+  (= miekan kevyt sivallus, 2,3 m / ±60°) ja näyttää nimen; `USE_ZONE` (1,6 m /
+  ±60°) odottaa esineitä, kohteita ei vielä ole. Puhuteltava väki rekisteröidään
+  `world.ts`:n `solid()`ista (`addTalkable`). Puhuessa liike 50 %, tartunnassa 0;
+  vastustajan ilmestyminen keskeyttää eleen. Keihäsmies kantaa keihästä
+  `restSpear`-otteessa (vasen käsi vapaa, `spearLeftW`) ja vilkuttaa vasemmalla.
+- **Naissankari 3D:ssä.** `scene3d.ts` asettaa `PLAYER_LOOK.female` kampanjan
+  sukupuolesta. `Fighter.build` ottaa vartalon `villagers_f.glb`:stä
+  (`char_jousineito`, jousi pois), varusteet, kypärän ja kiinnityspisteet
+  `characters.glb`:stä ja siirtää ne luurankojen lepoasentojen erotuksen verran
+  (`attachFemaleGear`). Huotra on koodilla tehty kolmesta laatikosta; kilven
+  kantohihnaa ei ole. Keihään otteessa käytetään naisen arvioitua kanavaa
+  (`GRIP_CHANNEL_F`). Ei skaalausta (nainen miehen mittainen). Naisen ulkonäkö
+  ja eleet katsottu rannalla (rauha, kävely, vilkutus, miekkaisku); keihästä ja
+  ilman kilpeä -asetta naisella ei ole katsottu.
+- **Debug:** `__game.freeze()` pysäyttää pelin ajan ja `__game.step(n)` etenee
+  n ruutua (kuvakaappaukset tarkasta hetkestä; kuvakaappaus voi laahata
+  sekunnin). Dev-palvelimen moduulit voivat monistua monien muokkausten
+  jälkeen (varusteet eivät vaihdu): käynnistä palvelin uudelleen. 3D lukee
+  varusteet ja sukupuolen kampanjatallennuksesta (`laulun-miekka.campaign.v3`).
 - **Uusi paikka `lakeside` (Järven ranta)**, rauhallinen kohtaus
   (`SCENE_KINDS`: friendly). Kartalla ruutu (9,6) niityn ja järven rajalla,
   Esc-dialogin oikotie ja `?scene=lakeside`. `world.ts` rakentaa sen samalla
@@ -127,7 +154,9 @@ Päivitetty: 2026-11-15 (Codex, Windows)
   - kylläisyys 0 rauhallisella pihalla jätti molemmat arvoon 100/100;
   - paluu 3D:stä säilytti saman karttaruudun ja kampanjatilan;
   - uusi puhdas selainlataus: ei konsolivirheitä tai -varoituksia, 60 FPS.
-- **Tarkistukset 2026-11-15:** `bun run test` 416/416 (37 tiedostoa),
+- **Tarkistukset 2026-11-15 (v03.03.00):** `bun run test` 424/424 (38 tiedostoa),
+  `bunx tsc --noEmit`, `bun run lint`, `bun run build` läpäisty; FPS 50–60 pienessä
+  in-app-ikkunassa. Aiemmin (v03.02.00): `bun run test` 416/416 (37 tiedostoa),
   `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja
   `git diff --check` läpäisty.
   Selaimessa: `?scene=lakeside` ja kartalta (9,6) → "Astu rannalle" toimivat,
@@ -151,9 +180,10 @@ Päivitetty: 2026-11-15 (Codex, Windows)
 - Tutkimussumu on kaksitilainen: löydetty terrain jää täysin näkyviin.
 - Paperinuken viisi vaatepaikkaa ovat vasta visuaalisia varauksia. Vain
   pää- ja sivukäsi ovat toimivia; alkuvarusteet eivät vie tavarapaikkoja.
-- Sukupuolivalinta vaihtaa tässä vaiheessa vain 2D-kartan spriten,
-  paperinuken ja kylläisyyskasvot. Molemmat valinnat käyttävät 3D-kohtauksissa
-  vielä samaa nykyistä sankarimallia.
+- Sukupuolivalinta vaihtaa 2D-kartan spriten, paperinuken ja kylläisyyskasvot
+  sekä 3D-sankarin (jousineidon vartalo). Miehen nyrkit ovat suljetut (mallissa
+  ei ole sormiluita), joten vilkutus ja kävely näyttävät jäykiltä; naisen kädet
+  ovat avoimet. Jousineito-NPC pihalla on edelleen jousen kanssa.
 - Paluusillan kuljetus toimii, mutta 3D ei vielä myönnä palkintoja eikä kartta
   lisää `rewards`-kentän esineitä inventaarioon.
 - Kartta–3D-siirtymä lataa sivun uudelleen. Samassa ajossa mount/dispose
@@ -182,7 +212,8 @@ vielä täyttä karttaeditoria.
 - Täysi karttaeditori, satunnaiset matkakohtaamiset ja sivujuonigeneraattori.
 - Paperinuken vaate-esineiden datamalli ja 3D-ulkoasun vaihto.
 - 3D-palkintojen tai ruokien lisääminen paluukuormasta inventaarioon.
-- Dialogijärjestelmä ja kyläläisten liikkuminen tai vihamielistyminen.
+- Dialogijärjestelmä (puhe vain vilkuttaa ja näyttää nimen) ja kyläläisten
+  liikkuminen tai vihamielistyminen. Käytä/tartu-toiminnolle esineet.
 - 3D-kohtausten mount/dispose ilman sivun uudelleenlatausta.
 - Git LFS (omistajan päätös 2026-11-10: ei vielä).
 - Isojen skannattujen puiden lataus ja kevennys.

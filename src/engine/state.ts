@@ -55,6 +55,8 @@ export const aim = {
 export const inputs = {
   strikeQueued: null as StrikeStyle | null,
   blockHeld: false,
+  /** Torjuntanappi painettiin: rauhassa "käytä". Kulutetaan joka ruutu. */
+  useQueued: false,
   dodgeQueued: false,
   songQueued: false,
   beatQueued: false,

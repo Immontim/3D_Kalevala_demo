@@ -9,6 +9,8 @@ import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 
 const loader = new GLTFLoader();
 const cache = new Map<string, Promise<GLTF>>();
+/** Ladattu GLB jaettuna: sama tiedosto ladataan vain kerran (kyläläiset ja naissankari). */
+export function loadGltf(url: string): Promise<GLTF> { return load(url); }
 function load(url: string): Promise<GLTF> {
   if (!cache.has(url)) cache.set(url, loader.loadAsync(url));
   return cache.get(url)!;

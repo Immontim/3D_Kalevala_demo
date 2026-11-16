@@ -18,6 +18,8 @@ export type ActionState =
   | "stagger"
   | "dodge"
   | "rooted"
+  | "talk"
+  | "use"
   | "dead";
 
 export interface AttackTiming {
