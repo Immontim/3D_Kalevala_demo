@@ -6,11 +6,12 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `56d200a`)
+Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `bc3eb43`)
 
-- **Branchin `codex/map-site-knowledge` koodiversio on v03.07.00.** Koodi
-  valmis, ei deployattu, käsin testattu (alla). Tarkista merge-tila ennen
-  jatkamista: `git merge-base --is-ancestor codex/map-site-knowledge origin/main`.
+- **Branchin `codex/combat-stamina-tuning` koodiversio on v03.07.01.** Koodi
+  valmis, ei deployattu; arvomuutos on automaattitestattu mutta ei vielä käsin
+  pelitestattu. Tarkista merge-tila ennen jatkamista:
+  `git merge-base --is-ancestor codex/combat-stamina-tuning origin/main`.
 - **Rauhan kävely ja eleet** (`src/fighter.ts`, `src/interact.ts`,
   `src/engine/{hero,melee,animate}.ts`). `POSES.rest` on rennompi (kädet
   hieman irti vartalosta, kyynärpää taipuu); `apply()` heiluttaa käsiä
@@ -172,6 +173,10 @@ Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `56d200a`)
   Keihäs pysyy kädessä. Pihalla ovat emäntä, tietäjä, jousineito ja eläimet.
   Mallien, otteiden ja animaatioiden avoimet asiat ovat
   `docs/BLENDER_HANDOFF.md`:ssä.
+- **Taistelun stamina-arvot:** kevyt isku 6, raskas isku 12, toteutunut
+  torjunta 4 ja torjunta-asento 1,5/s. Tavallisella 1/s palautumisella
+  torjunta kuluttaa nettomääräisesti 0,5/s. Keihään vahinkokerroin on 1,1.
+  Samat stamina- ja asearvot koskevat sankaria ja vihollisia.
 - **UI ja kielituki.** Kartan pellavapohja, kirjontakehykset, paperinukke,
   kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
   tyypitetyissä FI/EN-sanakirjoissa.
@@ -201,8 +206,8 @@ Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `56d200a`)
   - kylläisyys 0 rauhallisella pihalla jätti molemmat arvoon 100/100;
   - paluu 3D:stä säilytti saman karttaruudun ja kampanjatilan;
   - uusi puhdas selainlataus: ei konsolivirheitä tai -varoituksia, 60 FPS.
-- **Tarkistukset 2026-11-16 (v03.07.00):** erillisessä worktreessä
-  `bun run test` 193/193 (17 versionhallittua testitiedostoa),
+- **Tarkistukset 2026-11-16 (v03.07.01):** erillisessä worktreessä
+  `bun run test` 194/194 (17 versionhallittua testitiedostoa),
   `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja
   `git diff --check` läpäisty. Pääkansion aiempi 416/37-lukema sisälsi
   myös sen alle luotujen Claude-worktreeiden testit.
