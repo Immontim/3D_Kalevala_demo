@@ -64,7 +64,7 @@ describe("säädettävät arvot", () => {
   it("uusi muutosjoukko korvaa edellisen kokonaan", () => {
     applyTuning({ stamina: { heavy: 12 } });
     applyTuning({ stamina: { light: 4 } });
-    expect(STAMINA.heavy).toBe(9);
+    expect(STAMINA.heavy).toBe(12);
     expect(STAMINA.light).toBe(4);
   });
   it("tuntematon polku ja muu kuin luku hylätään, ja arvo rajataan sallittuun väliin", () => {

@@ -69,36 +69,39 @@ describe("kestävyys", () => {
     expect(CHARACTERS.urho.stamina).toBe(60);
     expect(CHARACTERS.pohja.stamina).toBe(80);
   });
-  it("kevyt lyönti maksaa 3 ja raskas 9", () => {
-    expect(strikeCost(strikeTier(50, "light"))).toBe(3);
-    expect(strikeCost(strikeTier(50, "heavy"))).toBe(9);
+  it("kevyt lyönti maksaa 6 ja raskas 12", () => {
+    expect(strikeCost(strikeTier(50, "light"))).toBe(6);
+    expect(strikeCost(strikeTier(50, "heavy"))).toBe(12);
   });
   it("raskas lyönti jää kevyeksi, jos voimat eivät riitä siihen", () => {
-    expect(strikeTier(8.9, "heavy")).toBe("light");
-    expect(strikeTier(9, "heavy")).toBe("heavy");
+    expect(strikeTier(11.9, "heavy")).toBe("light");
+    expect(strikeTier(12, "heavy")).toBe("heavy");
   });
   it("uupunut lyö heikosti ja ilmaiseksi: neljännes vahingosta", () => {
-    expect(exhausted(2.9)).toBe(true);
-    expect(exhausted(3)).toBe(false);
-    expect(strikeTier(2.9, "heavy")).toBe("weak");
+    expect(exhausted(5.9)).toBe(true);
+    expect(exhausted(6)).toBe(false);
+    expect(strikeTier(5.9, "heavy")).toBe("weak");
     expect(strikeCost("weak")).toBe(0);
     const heavy = makeAttack(WEAPONS.sword, "slash", "heavy");
     const light = makeAttack(WEAPONS.sword, "slash", "light");
     expect(weakened(light).damage).toBeCloseTo(light.damage * 0.25);
     expect(weakened(heavy).weight).toBe("light");
   });
-  it("palautuu 1/s, mutta torjunta-asennossa ei lainkaan", () => {
+  it("palautuu 1/s, mutta torjunta-asento kuluttaa nettomääräisesti 0,5/s", () => {
     expect(staminaTick(10, 100, 1, false, 2)).toBeCloseTo(12);
-    expect(staminaTick(10, 100, 1, true, 2)).toBeCloseTo(10);
+    expect(staminaTick(10, 100, 1, true, 2)).toBeCloseTo(9);
     expect(staminaTick(99.5, 100, 1, false, 2)).toBe(100);
   });
   it("hahmon oma palautumisnopeus ratkaisee", () => {
     expect(staminaTick(10, 100, 3, false, 2)).toBeCloseTo(16);
-    expect(staminaTick(10, 100, 0.5, true, 2)).toBeCloseTo(9);
+    expect(staminaTick(10, 100, 0.5, true, 2)).toBeCloseTo(8);
   });
-  it("toteutunut torjunta vie 2 eikä mene alle nollan", () => {
-    expect(staminaAfterBlock(10)).toBe(8);
+  it("toteutunut torjunta vie 4 eikä mene alle nollan", () => {
+    expect(staminaAfterBlock(10)).toBe(6);
     expect(staminaAfterBlock(1)).toBe(0);
+  });
+  it("keihään vahinkokerroin on 1,1", () => {
+    expect(WEAPONS.spear.damage).toBe(1.1);
   });
 });
 

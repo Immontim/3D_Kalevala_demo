@@ -267,7 +267,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
   // Kantama on mitattu mallista: pistossa keihään kärki on 1,91 m hahmon keskeltä ja miekan
   // 1,25 m, ja syöksy on 0,3 m pidempi. Samalla pelivaralla kuin miekalla ero on 1,0 m.
   spear: {
-    id: "spear", name: t("weapon.spear"), damage: 1, reach: 1.0, lunge: 0.3, minRange: 1.3, slowness: 1.35,
+    id: "spear", name: t("weapon.spear"), damage: 1.1, reach: 1.0, lunge: 0.3, minRange: 1.3, slowness: 1.35,
     styles: { thrust: 1.3 }, blockArc: Math.PI / 4,
   },
 };
@@ -370,13 +370,13 @@ export function chargeLevel(held: number, heavy: AttackDef): number {
  */
 export const STAMINA = {
   /** Kevyen lyönnin (ja kilpityönnön) hinta. Tätä vähemmällä hahmo on uupunut. */
-  light: 3,
+  light: 6,
   /** Raskaan lyönnin hinta. */
-  heavy: 9,
+  heavy: 12,
   /** Toteutuneen torjunnan hinta osumahetkellä (myös täydellinen torjunta). */
-  blockHit: 2,
+  blockHit: 4,
   /** Torjunta-asennon ylläpito sekunnissa. Palautuminen (hahmon staminaRegen) jatkuu samalla. */
-  blockHold: 1,
+  blockHold: 1.5,
   /** Uupuneen lyönnin vahinkokerroin. */
   weakDamage: 0.25,
 };
