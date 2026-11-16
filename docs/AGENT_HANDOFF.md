@@ -6,11 +6,11 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `53b5bdc`)
+Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `56d200a`)
 
-- **Branchin `codex/map-visibility-river` koodiversio on v03.05.00.** Koodi
+- **Branchin `claude/lakeside-bay-ruin` koodiversio on v03.07.00.** Koodi
   valmis, ei deployattu, käsin testattu (alla). Tarkista merge-tila ennen
-  jatkamista: `git merge-base --is-ancestor codex/map-visibility-river origin/main`.
+  jatkamista: `git merge-base --is-ancestor claude/lakeside-bay-ruin origin/main`.
 - **Rauhan kävely ja eleet** (`src/fighter.ts`, `src/interact.ts`,
   `src/engine/{hero,melee,animate}.ts`). `POSES.rest` on rennompi (kädet
   hieman irti vartalosta, kyynärpää taipuu); `apply()` heiluttaa käsiä
@@ -69,7 +69,12 @@ Päivitetty: 2026-11-16 (Codex, Windows; pohja `origin/main` `53b5bdc`)
   Mallit tulevat `lakeside.glb`:stä (BLENDER_HANDOFF).
   - **Järvi.** `terrainHeight` sekoittaa maaston `lakeBed`iin
     (`lakeMix`, rantaviiva `shoreZ(x)`, vesi `WATER_LEVEL` −0,42, järvi +z-
-    puolella). `groundHeight` on kävelykorkeus: laiturin päällä sen kansi,
+    puolella). Lahti on kapea mökin kohdalla ja aukeaa laajaksi selkäväksi:
+    `bayHalf(d, puoli)` kasvattaa puolileveyttä etäisyyden mukaan, ja yli 125 m:n
+    päässä maa vajoaa veteen (`sea`). Maastoverkko on 360 m, vesitaso 1800 m,
+    kameran kantama 700 m. Vastaranta on kaksi matalaa harjua 330–480 m:n päässä
+    (`buildFarShore`, ei sumua, väri valmiiksi sekoitettu sumuun). Pelialue on edelleen
+    11 m:n säteellä (`ARENA_RADIUS`), loppu on vain maisemaa. `groundHeight` on kävelykorkeus: laiturin päällä sen kansi,
     muualla sama kuin maasto. Vesi on yksi taso (`buildWater`, heijastava,
     värähtelevä normaali); rantakaistan ja pohjan maa on tallattua. Vedessä ei
     sijoiteta puita, kiviä eikä heinää (`wet()` ja `put`in `wetOk`).
