@@ -1,6 +1,6 @@
 # Roadmap — 3D Kalevala
 
-Päivitetty: 2026-11-16 (Claude; pohja `origin/main` `568bdf2`, koodiversio v03.11.00).
+Päivitetty: 2026-11-16 (Claude; pohja `origin/main` `4a00026`, koodiversio v04.00.00 branchilla `claude/world-engine-v0`).
 
 Tämä on **suunta ja päätökset**, ei tehtävälista. Nykytila ja yksi seuraava
 tehtävä ovat `docs/AGENT_HANDOFF.md`:ssä, mallien ja assettien tila
@@ -44,44 +44,31 @@ ne ovat MVP:n jälkeen.
 
 | Tarve | Tila |
 |---|---|
-| Piha (`yard`), emäntä, tietäjä, jousineito, eläimet | Valmis kohtaus, ei dialogia (puhe näyttää vain nimen) |
-| Järven ranta (`lakeside`), tietäjä, laituri | Valmis kohtaus, kartalla |
+| Piha (`yard`), emäntä, tietäjä, jousineito, eläimet | Valmis kohtaus; puhe näyttää vain nimen (dialogi vain rannan tietäjällä) |
+| Järven ranta (`lakeside`), tietäjä, laituri | Valmis kohtaus, kartalla; tietäjällä dialogi ja tuohikontin lupa/varkaus (V1–V2) |
 | Hävitetty ranta (`lakeruin`) | Valmis, ei vielä käytössä seurauksena |
-| Kalmisto (`cairnfield`), Louhi NPC:nä, suoloitsun efekti | Valmis kohtaus; karttapaikka odottaa branchia `claude/cairn-map-site` |
+| Kalmisto (`cairnfield`), Louhi NPC:nä, suoloitsun efekti | Valmis kohtaus, kartalla |
 | Aaltotaistelu (`clearing`, `skirmish.ts`) | Valmis |
 | Laulut `bog`, `heal`, viisi laulupaikkaa, rytmimekaniikka | Valmis; kolmas laulu puuttuu |
 | Esineet, inventaario, otto 3D-kohtauksesta, varkausloki | Valmis (PR #56) |
 | Kylläisyys, kuukalenteri, 2D→3D→2D-silta | Valmis |
+| `CampaignStore`, maailmamoottori v0, dialogi v0 | Valmis (V1–V2, v04.00.00): liput, laskurit, ehdot, efektit, tapahtumat, `__world` |
 
-Puuttuu: dialogi, juonitila (liput), laulun opettelu, Louhen karkotus, leirin
-päätös ja loppuruutu, satunnaiset pihapiirit, taivaanrautamiekka.
+Puuttuu: laulun opettelu, Louhen karkotus, leirin päätös ja loppuruutu,
+satunnaiset pihapiirit, taivaanrautamiekka, laulu- ja paikkatapahtumat moottoriin.
 
 ## Vaiheet
 
 Järjestys on riippuvuusjärjestys. Jokaisella vaiheella on hyväksymiskriteeri;
 orkestroija tarkistaa sen itse (testit, selain) ennen seuraavaa (gauntlet-loop).
 
-**V1. Yksi tilan omistaja (`CampaignStore`).** Nyt `sceneItems.ts` pitää omaa
-`campaign`-kopiota moduulimuuttujassa ja tallentaa koko kampanjan jokaisesta
-otosta. Dialogi, laulut ja moottori tarvitsevat saman tilan, ja toinen kopio
-ylikirjoittaisi uudemman (esine ilmestyy takaisin tai monistuu). Valmis, kun
-kaikki 3D:n tilamuutokset kulkevat yhden `update(fn)`-rajapinnan kautta ja
-testi todistaa, ettei peräkkäinen otto + lippumuutos hävitä kumpaakaan.
-Sovitaan handoffin nykyisen "Seuraava tehtävä" (ensimmäinen dialogipolku) kanssa
-samaan työhön.
-
-**V2. Maailmamoottori v0 ja dialogi v0.** Liput ja laskurit, ehdot (all/any/not,
-lippu, laskuri, kuun vaihe), efektit (aseta lippu, anna/ota esine, aseta ottolupa,
-näytä viesti, avaa laulu, paljasta paikka), tapahtumat (`item.taken`,
-`npc.talked`, `scene.entered`, `song.performed`). Puhdas moduuli ilman Three.js:ää
-ja DOM:ia, tyypitetty, Vitest-testattu. Dialogi käyttää samoja ehtoja ja
-efektejä, ei omaa ehtojärjestelmää. Mukana: säännöistä generoitu
-suomenkielinen yhteenveto, jokaisella säännöllä yksi hyväksytty "suunnitteluaie"
--lause, ja konsoli `__world` (liput, `post`, `explain`). **Ei ajastimia, `unless`-
-peruutusta eikä alijuonigeneraattoria.** Valmis, kun yksi tarinakäänne
-("emäntä kertoo huhun") toimii testattuna ja ehdon epäonnistumisen syy näkyy
-`explain`illa. Tallennuksen moottoriosio on oma versioitu lohkonsa ja luetaan
-sallivasti (tuntematon lippu pudotetaan, ei koko tallennusta).
+**V1–V2 (valmis, v04.00.00).** `CampaignStore` on 3D:n yksi tilan omistaja
+(`update(fn)`), ja maailmamoottori v0 (`src/world/`: liput, laskurit, ehdot, efektit,
+tapahtumat `item.taken`/`npc.talked`/`scene.entered`, suomenkielinen yhteenveto,
+`intent`-lause jokaiselle säännölle, konsoli `__world`, salliva moottorilohko) ja
+dialogi v0 ovat käytössä; pelisisältö on tietäjä + tuohikontti. Moottoriin puuttuu
+vielä efektit "avaa laulu" ja "paljasta paikka" sekä tapahtuma `song.performed`:
+lisätään V4:ssä ja V5:ssä, kun niille on käyttäjä. Tilannetiedot: `AGENT_HANDOFF.md`.
 
 **V3. Paikkainstanssit ja satunnaiset pihapiirit.** Kampanjaan tulee `worldSeed`
 ja `siteInstances` (tallennetaan **konkretisoitu tulos**, ei vain siementä,
@@ -96,8 +83,8 @@ instanssin nimen (nyt `yard.table-flatbread` törmäisi kahdessa pihassa).
 Vanhan v5-tallennuksen siirtopolku suunnitellaan vaiheen alussa (ehdotus: vanha
 `yard` säilyy instanssina A, B arvotaan). Valmis, kun 1000 siementä läpäisee
 validaattorin Vitestissä ja pelissä molemmat pihat löytyvät ja ovat
-saavutettavissa. **Aloitetaan vasta, kun `claude/cairn-map-site` on mergattu**,
-koska molemmat muokkaavat `sites.ts`:ää ja tallennusskeemaa.
+saavutettavissa. **Aloitetaan vasta, kun omistaja on testannut V1–V2:n dialogipolun käsin**
+(`claude/cairn-map-site` on jo mergattu).
 
 **V4. Laulun opettelu ja kolmas laulu.** Tietäjä laulaa säkeen, ja pelaaja
 toistaa sen olemassa olevalla rytmimekaniikalla. Onnistuminen avaa uuden
@@ -178,9 +165,9 @@ Sepän paja ja kanteleen veistäjä vasta MVP:n jälkeen.
   virheen takia, ja `loadCampaign` aloittaa silloin hiljaa uuden pelin. Moottorin
   lohko luetaan sallivasti, ja rikkinäinen tallenne kopioidaan talteen
   ennen korvaamista.
-- **Skeemamuutosten päällekkäisyys.** V1, V3 ja `claude/cairn-map-site`
-  koskevat samoja tiedostoja (`campaign.ts`, `storage.ts`, `sites.ts`). Tee ne
-  yksi kerrallaan mergen jälkeen, älä rinnakkain.
+- **Skeemamuutosten päällekkäisyys.** V3 koskee samoja tiedostoja kuin V1
+  (`campaign.ts`, `storage.ts`, `sites.ts`). Tee skeemamuutokset yksi kerrallaan
+  mergen jälkeen, älä rinnakkain.
 - **Laulun kohteeksi rauhallinen NPC (V6)** on pienehkö mutta oikea
   muutos laulujärjestelmään (nyt vain vihollinen tai itse).
 - **Löydettävyys.** Satunnaiset pihat voivat jäädä löytämättä tai olla liian

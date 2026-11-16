@@ -2,6 +2,7 @@
 // Moduuli on selaimesta ja Three.js:stä riippumaton, jotta tallennus voidaan validoida testeissä.
 import type { Loadout } from "../combat";
 import type { TextKey } from "../i18n";
+import { createEngineState, parseEngineState, type EngineState } from "../world/state";
 
 export const CAMPAIGN_SCHEMA_VERSION = 5 as const;
 export const INVENTORY_CAPACITY = 8;
@@ -145,6 +146,8 @@ export interface CampaignState {
   schemaVersion: typeof CAMPAIGN_SCHEMA_VERSION;
   world: CampaignWorld;
   player: CampaignPlayer;
+  /** Maailmamoottorin liput ja laskurit: oma versioitu lohkonsa, luetaan sallivasti. */
+  engine: EngineState;
 }
 
 export interface CampaignStart {
@@ -192,6 +195,7 @@ export function createCampaign(start: CampaignStart = {}): CampaignState {
       },
       equipment: { mainHand: "sword", offHand: "round_shield" },
     },
+    engine: createEngineState(),
   };
 }
 
@@ -217,6 +221,24 @@ export function tryAddItem(inventory: Inventory, itemId: ItemId, quantity: numbe
     remaining -= add;
   }
   return remaining === 0 ? { capacity: INVENTORY_CAPACITY, stacks } : null;
+}
+
+/** Ottaa määrän pois inventaariosta atomisesti. null tarkoittaa, ettei sitä ole tarpeeksi. */
+export function tryRemoveItem(inventory: Inventory, itemId: ItemId, quantity: number): Inventory | null {
+  if (!Number.isInteger(quantity) || quantity < 1) return null;
+  const have = inventory.stacks.reduce((sum, stack) => sum + (stack.itemId === itemId ? stack.quantity : 0), 0);
+  if (have < quantity) return null;
+  let remaining = quantity;
+  const stacks: ItemStack[] = [];
+  // Tyhjennetään viimeisin pino ensin, jotta täydet pinot säilyvät.
+  for (let i = inventory.stacks.length - 1; i >= 0; i--) {
+    const stack = inventory.stacks[i];
+    if (stack.itemId !== itemId || remaining === 0) { stacks.unshift({ ...stack }); continue; }
+    const take = Math.min(remaining, stack.quantity);
+    remaining -= take;
+    if (stack.quantity - take > 0) stacks.unshift({ ...stack, quantity: stack.quantity - take });
+  }
+  return { capacity: INVENTORY_CAPACITY, stacks };
 }
 
 export function sceneItemTakeMode(state: CampaignState, item: Pick<SceneItemDefinition, "instanceId" | "takeMode">): TakeMode {
@@ -346,7 +368,7 @@ export function parseCampaign(value: unknown): CampaignState | null {
     && validKnownSiteIds(data.world.knownSiteIds)
     && validSceneItemState(data.world.sceneItems)
     && validPlayer(data.player)) {
-    return cloneCampaign(data as unknown as CampaignState);
+    return cloneCampaign(data as unknown as ParsedCampaign);
   }
   if (data.schemaVersion === 4
     && validKnownSiteIds(data.world.knownSiteIds)
@@ -355,6 +377,7 @@ export function parseCampaign(value: unknown): CampaignState | null {
       schemaVersion: CAMPAIGN_SCHEMA_VERSION,
       world: withEmptySceneItems(data.world as unknown as Version4CampaignWorld),
       player: data.player,
+      engine: data.engine,
     });
   }
   if (data.schemaVersion === 3 && validPlayer(data.player)) {
@@ -520,7 +543,10 @@ function validEquipment(value: unknown): value is Equipment {
   return combatLoadout({ mainHand: main, offHand: off }) !== null;
 }
 
-function cloneCampaign(state: CampaignState): CampaignState {
+/** Jäsennetty kampanja ennen moottoriosion sallivaa lukua: vanhoissa tallennuksissa sitä ei ole. */
+type ParsedCampaign = Omit<CampaignState, "engine"> & { engine?: unknown };
+
+function cloneCampaign(state: ParsedCampaign): CampaignState {
   return {
     schemaVersion: CAMPAIGN_SCHEMA_VERSION,
     world: {
@@ -541,6 +567,8 @@ function cloneCampaign(state: CampaignState): CampaignState {
       inventory: { capacity: INVENTORY_CAPACITY, stacks: state.player.inventory.stacks.map((stack) => ({ ...stack })) },
       equipment: { ...state.player.equipment },
     },
+    // Moottoriosio luetaan aina sallivasti: tuntematon lippu pudotetaan, tallennus säilyy.
+    engine: parseEngineState(state.engine),
   };
 }
 

@@ -301,3 +301,50 @@ describe("kampanjatallennus", () => {
     expect(parseCampaign(state)).toBeNull();
   });
 });
+
+describe("moottoriosio (engine)", () => {
+  it("uusi kampanja alkaa tyhjällä, versioidulla lohkolla", () => {
+    expect(createCampaign().engine).toEqual({ version: 1, flags: {}, counters: {} });
+  });
+
+  it("liput ja laskurit säilyvät tallennuksen läpi", () => {
+    const state = createCampaign();
+    state.engine = { version: 1, flags: { "sage.robbed": true }, counters: { "thefts.noticed": 2 } };
+    expect(parseCampaign(serializeCampaign(state))?.engine).toEqual(state.engine);
+  });
+
+  it("salliva luku: tuntematon lippu ja roskakentät pudotetaan, mutta kampanja ja kelvolliset liput säilyvät", () => {
+    const raw = JSON.parse(serializeCampaign(createCampaign()));
+    raw.engine = {
+      version: 99,
+      flags: { "sage.robbed": true, "poistettu.lippu": true, "sage.permission": "kyllä", "rumor.heard": false },
+      counters: { "thefts.noticed": 5000, "tuntematon": 3, "thefts.noticed2": 1 },
+      extra: "ei tunneta",
+    };
+    const parsed = parseCampaign(raw);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.engine).toEqual({ version: 1, flags: { "sage.robbed": true }, counters: { "thefts.noticed": 999 } });
+    expect(parsed?.player.inventory.stacks).toEqual([{ itemId: "barley_flatbread", quantity: 3 }]);
+  });
+
+  it("puuttuva tai rikkinäinen lohko ei hylkää tallennusta (vanha v5 ennen moottoria)", () => {
+    for (const engine of [undefined, null, "roska", 7, [], { flags: "x", counters: [] }]) {
+      const raw = JSON.parse(serializeCampaign(createCampaign()));
+      if (engine === undefined) delete raw.engine; else raw.engine = engine;
+      expect(parseCampaign(raw)?.engine).toEqual({ version: 1, flags: {}, counters: {} });
+    }
+  });
+});
+
+describe("tryRemoveItem", () => {
+  it("ottaa määrän useasta pinosta ja poistaa tyhjät pinot", async () => {
+    const { tryRemoveItem } = await import("./campaign");
+    const inv = { capacity: 8 as const, stacks: [{ itemId: "dried_fish" as const, quantity: 4 }, { itemId: "barley_flatbread" as const, quantity: 3 }, { itemId: "dried_fish" as const, quantity: 2 }] };
+    expect(tryRemoveItem(inv, "dried_fish", 3)?.stacks).toEqual([
+      { itemId: "dried_fish", quantity: 3 }, { itemId: "barley_flatbread", quantity: 3 },
+    ]);
+    expect(tryRemoveItem(inv, "dried_fish", 6)?.stacks).toEqual([{ itemId: "barley_flatbread", quantity: 3 }]);
+    expect(tryRemoveItem(inv, "dried_fish", 7)).toBeNull();
+    expect(tryRemoveItem(inv, "dried_fish", 0)).toBeNull();
+  });
+});

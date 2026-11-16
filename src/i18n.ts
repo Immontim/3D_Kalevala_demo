@@ -24,6 +24,21 @@ const FI = {
   "interact.takenTheft": "Otit luvatta: {item}",
   "interact.inventoryFull": "Tavarat eivät mahdu mukaan",
   "interact.saveFailed": "Esinettä ei voitu tallentaa",
+  "dialogue.hint": "Valitse numerolla tai klikkaamalla · Esc sulkee",
+  "dialogue.inventoryFull": "Tavarat eivät mahdu mukaan",
+  "dialogue.missingItem": "Tarvittavaa esinettä ei ole mukana",
+  "dialogue.saveFailed": "Valintaa ei voitu tallentaa",
+  "dialogue.sage.greet": "Tietäjä nostaa katseensa tulesta. »Rauha tulellemme, vieras. Pöydällä lepää tuohikonttini. En kysy, mikä tuuli sinut tänne toi.»",
+  "dialogue.sage.askPack": "Saanko ottaa pöydällä olevan tuohikontin?",
+  "dialogue.sage.leave": "Hyvästi",
+  "dialogue.sage.granted": "»Ota vain. Tuohi on kevyt ja kantaa kauas.» Tietäjä nyökkää pöydän suuntaan.",
+  "dialogue.sage.thanks": "Kiitos",
+  "dialogue.sage.afterTaken": "»Tuohi kantakoon sinua. Tuli palaa täällä, kun palaat.»",
+  "dialogue.sage.robbed": "Tietäjä ei korota ääntään. »Kätesi vei tuohikonttini kysymättä. Tuohi muistaa, kenen se on.»",
+  "dialogue.sage.apologize": "Pyydän anteeksi",
+  "dialogue.sage.forgiven": "»Olkoon. Pidä kontti, mutta toista kertaa et ota luvatta.»",
+  "world.sage.theftNoticed": "Tietäjä huomasi varkauden",
+  "world.sage.theftNoticedSub": "Hän ei sano mitään. Vielä.",
   "block.overhead": "ylä",
   "block.slash": "sivu",
   "block.thrust": "pisto",
@@ -352,6 +367,21 @@ const EN = {
   "interact.takenTheft": "Taken without permission: {item}",
   "interact.inventoryFull": "There is no room for the item",
   "interact.saveFailed": "The item could not be saved",
+  "dialogue.hint": "Choose with a number or by clicking · Esc closes",
+  "dialogue.inventoryFull": "There is no room for the item",
+  "dialogue.missingItem": "You do not have the required item",
+  "dialogue.saveFailed": "The choice could not be saved",
+  "dialogue.sage.greet": "The sage lifts their gaze from the fire. \"Peace to our fire, stranger. My birch-bark pack rests on the table. I will not ask what wind brought you.\"",
+  "dialogue.sage.askPack": "May I take the birch-bark pack from the table?",
+  "dialogue.sage.leave": "Farewell",
+  "dialogue.sage.granted": "\"Take it. Birch bark is light and carries far.\" The sage nods toward the table.",
+  "dialogue.sage.thanks": "Thank you",
+  "dialogue.sage.afterTaken": "\"May the bark carry you. The fire will burn here when you return.\"",
+  "dialogue.sage.robbed": "The sage does not raise their voice. \"Your hand took my pack without asking. Birch bark remembers whose it is.\"",
+  "dialogue.sage.apologize": "I am sorry",
+  "dialogue.sage.forgiven": "\"So be it. Keep the pack, but you will not take without leave a second time.\"",
+  "world.sage.theftNoticed": "The sage noticed the theft",
+  "world.sage.theftNoticedSub": "They say nothing. For now.",
   "block.overhead": "high",
   "block.slash": "side",
   "block.thrust": "thrust",
@@ -671,6 +701,9 @@ function storedLanguage(): Language {
 let language: Language = storedLanguage();
 
 export function getLanguage(): Language { return language; }
+
+/** Teksti aina suomeksi riippumatta valitusta kielestä (omistajalle tulostettavat yhteenvedot). */
+export function finnishText(key: TextKey): string { return FI[key]; }
 
 export function setLanguage(next: Language) {
   language = next;

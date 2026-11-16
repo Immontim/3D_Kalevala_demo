@@ -1510,7 +1510,9 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     }
     prepareMaterials(protos, maxAniso);
     const stats = populate(scene, protos, collision, runtimeSceneItems, takenSceneItemIds);
-    (window as unknown as { __world: unknown }).__world = { ...stats, collision: collision.stats() };
+    // Liitetään tilastot samaan `__world`-olioon, jossa on maailmamoottorin konsoli (engine/worldConsole.ts).
+    const host = window as unknown as { __world?: object };
+    Object.assign(host.__world ??= {}, { ...stats, collision: collision.stats() });
     if (ARENA === "yard") return populateYardLife(scene, collision);
     if (CAIRN) return populateCairnLife(scene, collision);
     if (LAKESIDE) return populateLakeLife(scene, collision);

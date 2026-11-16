@@ -6,13 +6,58 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `568bdf2`)
+Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `4a00026`)
 
-- **Branchin `claude/cairn-map-site` koodiversio on v03.12.00** (kalmisto
-  kartalla, alla). Koodi valmis, ei deployattu, käsin testattu selaimessa
-  (kartta → Enter → kohtaus). Tarkista merge-tila ennen jatkamista:
-  `git merge-base --is-ancestor claude/cairn-map-site origin/main`.
-  `codex/scene-items` (v03.11.00) on mergattu.
+- **Branchin `claude/world-engine-v0` koodiversio on v04.00.00** (CampaignStore,
+  maailmamoottori v0 ja tietäjän dialogi, alla). Koodi valmis, ei deployattu.
+  Käsin testattu Clauden in-app-selaimessa (alla), **omistaja ei vielä testannut**.
+  Tarkista merge-tila ennen jatkamista:
+  `git merge-base --is-ancestor claude/world-engine-v0 origin/main`.
+- **CampaignStore (V1).** `src/map/campaignStore.ts` (puhdas) on 3D-puolen yksi
+  tilan omistaja: `update(fn)` laskee uuden tilan, tallentaa sen ja ottaa sen
+  käyttöön vasta onnistumisen jälkeen (epäonnistunut tallennus jättää tilan ja
+  3D-esineen ennalleen), `subscribe` ilmoittaa muutoksista. 3D:ssä sen luo
+  `engine/store.ts` (`initCampaignStore`, `campaignStore()`, `worldRuntime()`).
+  `engine/sceneItems.ts` ei pidä enää omaa kopiota. Kartta (`map/app.ts`) on
+  erillinen sivu ja lataa kampanjan omaan muuttujaansa; sitä ei siirretty storeen.
+- **Maailmamoottori v0 (V2), `src/world/`**, Three.js- ja DOM-vapaa. `registry.ts`
+  (tunnetut liput, laskurit, esineiden nimet; **uusi lippu lisätään tänne**),
+  `state.ts` (`EngineState`: versioitu lohko `campaign.engine`, luetaan sallivasti:
+  tuntematon lippu/laskuri ja väärän tyyppiset pudotetaan, tallennus säilyy),
+  `types.ts`, `conditions.ts` (all/any/not, flag, counter, moonPhase, itemTaken;
+  jokainen tulos kertoo syyn suomeksi), `effects.ts` (setFlag, addCounter, giveItem,
+  takeItem, setSceneItemTakeMode, message; efektilista on **atominen**, eivät koske
+  `worldMinutes`iä), `engine.ts` (`postEvent`: säännöt määrittelyjärjestyksessä, efekti
+  ei synnytä uusia tapahtumia, ei ajastimia eikä `unless`ia), `take.ts` (esineen otto +
+  `item.taken`-säännöt yhtenä päivityksenä), `dialogue.ts` (sama ehto/efektijärjestelmä),
+  `summary.ts` (suomenkielinen yhteenveto), `runtime.ts` (store + moottori),
+  `content.ts` (**pelin oikea data**: `RULES`, `SAGE_DIALOGUE`, `GAME_WORLD`).
+  Tapahtumat: `item.taken`, `npc.talked`, `scene.entered` (3D lähettää kaikki).
+  Jokaisella säännöllä ja dialogilla on pakollinen `intent` (suunnitteluaie-lause;
+  testi vaatii). ROADMAPin hyväksymiskriteeri "emäntä kertoo huhun" on testattu
+  testimaailmalla (`engine.test.ts`), ei pelisääntönä: pelin oikea sisältö on vain
+  tietäjä + tuohikontti (omistajan rajaus).
+- **Konsoli `__world`** (3D): `flags`, `counters`, `post(event)`, `explain(ruleId?)`,
+  `describe()` (kaikki säännöt ja dialogit proosana omistajan hyväksyttäväksi),
+  `last`, `items` (poimittavat esineet ja katseen kohde), `scene`. Sama olio sisältää
+  `world.ts`:n tilastot (puut, kolmiot, törmäykset), jotka `world.ts` liittää siihen.
+- **Dialogi 3D:ssä** (`engine/dialogue.ts`, `#dialogue` index.html:ssä): puhe-ele
+  (`melee.ts` `gestureEffect`) lähettää `npc.talked`in ja avaa dialogin, jos
+  `findDialogue(ARENA, npcId)` löytyy; muille hahmoille näytetään vain nimi.
+  Dialogin ajan pelilogiikka ja pelin aika ovat pysähdyksissä (maisema liikkuu),
+  hiiren lukitus vapautuu, valinta numerolla 1-9 tai klikkauksella, Esc sulkee.
+  **Ensimmäinen polku (`lakeside`, tietäjä `tietaja`, esine `lakeside.sage-pack`):**
+  pyyntö asettaa lipun `sage.permission` ja `setSceneItemTakeMode(allowed)`, jolloin
+  otto ei ole varkaus. Luvaton otto (`item.taken`, theft, kohtaus `lakeside`) jättää
+  varkausloki-tietueen **ja** sääntö `sage.theft-noticed` asettaa `sage.robbed`,
+  kasvattaa laskuria `thefts.noticed` ja näyttää viestin; tietäjän dialogi vaihtuu
+  (`robbed` → anteeksipyyntö → `forgiven`, loki säilyy). Hävitetyllä rannalla
+  (`lakeruin`) ja pihalla tietäjällä ei ole dialogia eikä varkaus laukaise seurausta.
+- **Käsin testattu 2026-11-16 Clauden in-app-selaimessa (dev-palvelin):** dialogi avautui
+  puheesta, klikkaus/numero valitsi, Esc sulki ilman taukoa; lupa säilyi uudelleenlatauksen
+  yli; luvaton otto antoi viestin, liput, lokin ja `explain`in; pihalla puhe näytti vain
+  nimen; ei konsolivirheitä. **Ei testattu:** oikea hiiren lukitus dialogissa, ruudunlukija,
+  englanninkieliset tekstit.
 - **Rauhallisten 3D-kohtausten esineet.** `sceneInteraction.ts` valitsee
   sankarin katseakselilta enintään 2,8 m:n päässä olevan esineen. HUDin pieni
   piste projisoidaan maailmaan; osuva piste näyttää esineen nimen, varkauden ja
@@ -28,7 +73,7 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `568bdf2`)
   `CampaignWorld.sceneItems` tallentaa otetut instanssit, `allowed|theft`-
   lupapoikkeamat, varkaustietueet sekä varauksen myöhemmille pudotetuille
   esineille (paikka, kierto, määrä ja seuraava tunniste). `setSceneItemTakeMode`
-  on tulevan dialogin/tapahtuman kytkentä. Pudotus-UI:ta tai pudotettujen mallien
+  on nyt kytketty tietäjän dialogiin (yllä). Pudotus-UI:ta tai pudotettujen mallien
   luontia ei vielä ole. Uusi matka alkaa kolmella ohrarieskalla ilman kalaa;
   tuohikontti on tavallinen yhden kappaleen esine.
 - **Kalmisto `cairnfield` (v03.10.00)**, rauhallinen kohtaus (`SCENE_KINDS`:
@@ -155,9 +200,8 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `568bdf2`)
     Pihan koiralla tassu on nyt myös kierrossa.
   - **Kartta.** `LAKESIDE_POSITION`, atlaksen ruutu (3,1) (kalliomaalausikoni:
     mökki, tietäjä, koira, aallot; piirretty koodilla PIL:llä, ei ImageGen).
-- **Dev-palvelin työpuusta.** Clauden `preview_start` käynnistää palvelimen
-  pääkansiosta, ei työpuusta. Työpuun testi: `bun run dev --port 5174
-  --strictPort` työpuusta; sulje palvelin lopuksi.
+- **Dev-palvelin työpuusta:** `preview_start` käynnistää pääkansiosta; työpuusta
+  `bun run dev --port 5174 --strictPort`. Sulje palvelin lopuksi.
 - **Sovellusrakenne.** `src/main.ts` on kevyt sovelluskuori. URL ilman
   `scene`-parametria käynnistää 2D-kartan. `?scene=<id>&return=map` lataa
   dynaamisesti `src/scene3d.ts`:n ja nykyisen Three.js-moottorin. Kartta
@@ -252,46 +296,13 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `568bdf2`)
 - **UI ja kielituki.** Kartan pellavapohja, kirjontakehykset, paperinukke,
   kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
   tyypitetyissä FI/EN-sanakirjoissa.
-- **Käsin testattu 2026-11-16 Codexin ohjaamassa paikallisessa Chromessa
-  (v03.11.00-työpuu):** järven rannalla katsepiste näkyi maailmassa ja
-  tuohikontti näytti punaisen tekstin ”Ota: Tuohikontti — varkaus”. Otto poisti
-  kontin heti 3D:stä; sivun uudelleenlataus ei palauttanut sitä. 2D-inventaario
-  näytti kolme ohrarieskaa ja yhden tuohikontin. Kohtaus pysyi 58–60 FPS:ssä.
-  Maatilan ruokien sijoittelu ja otto on varmennettu koodista ja domain-testeillä,
-  mutta pöydän lopullista ulkoasua ei katsottu tässä savutestissä.
-- **Käsin testattu 2026-11-16 Codexin in-app browserissa:**
-  - punainen käsi ei näkynyt ennen lähestymistä, löytyi 3 × 3 -lähinäössä;
-  - löydetty käsi jäi etääntymisen jälkeen sumuun himmeänä;
-  - himmennetty ikoni ja paikkatieto säilyivät sivun uudelleenlatauksen yli;
-  - vain nykyinen 3 × 3 näkyi kirkkaana ja vanha terrain jäi himmeäksi;
-  - pihapiirin ikoni katosi kahden ruudun päässä ja palasi lähinäössä;
-  - joen suorat ja mutkat liittyivät, reitti kiemurteli ja liike jokeen estyi;
-  - uusi matka alkoi tekstistä ”Päivä 1” ja niittyliike eteni päivään 2;
-  - 180 tausta-aikayksikössä teksti vaihtui muotoon ”Kuu 1, päivä 1”;
-  - tavallinen liike tyhjensi vasemman alareunan siirtokohtaisen aikaviestin;
-- **Käsin testattu 2026-11-15 Codexin in-app browserissa:**
-  - mies oli uuden kampanjan oletus;
-  - Esc näytti oikeat FI/GB-liput ja miehen/naisen täydet kasvot;
-  - naisen valinta vaihtoi paperinuken, kylläisyyskasvot ja siniviittaisen
-    karttaspriten sekä säilyi sivulatauksen yli;
-  - FI/EN-kielenvaihto latasi kartan oikealla kielellä;
-  - Järven ranta säilyi ystävällisenä 3D-oikotienä;
-  - 1135 px leveässä näkymässä kartta pysyi noin 798 px leveänä;
-  - paperinuken selectin nuoli ei liikuttanut karttaa tai kuluttanut aikaa;
-  - Esc-dialogin fokus siirtyi sulkunappiin ja palasi lähtöelementtiin;
-  - punainen käsi näkyi ja avasi `clearing`-taistelun;
-  - kylläisyys 49 tuotti HUDiin 80/80 HP ja stamina;
-  - kylläisyys 0 tuotti HUDiin 60/60 HP ja stamina;
-  - kylläisyys 0 rauhallisella pihalla jätti molemmat arvoon 100/100;
-  - paluu 3D:stä säilytti saman karttaruudun ja kampanjatilan;
-  - uusi puhdas selainlataus: ei konsolivirheitä tai -varoituksia, 60 FPS.
-- **Tarkistukset 2026-11-16 (v03.11.00):** `bun run test`,
-  `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja `git diff --check`
-  läpäisty (`vitest --exclude ".worktrees/**"`: 19 versionhallittua/uuden työn
-  testitiedostoa, 214 testiä). Build varoittaa edelleen 3D-chunkin
-  ylittävän 500 kt: 815,13 kt, gzip 218,21 kt; karttasovellus 19,06 kt,
-  gzip 9,08 kt.
-- **Riippuvuustarkistus:** 2026-11-10, ei mitään odottamassa.
+- **Tarkistukset 2026-11-16 (v04.00.00):** `bun run test` (22 versionhallittua
+  testitiedostoa, 253 testiä; `vitest run` ottaa mukaan myös `.worktrees/`-kopiot:
+  65 tiedostoa/732 testiä), `bun run lint`, `bun run build` ja `git diff --check`
+  läpäisty. Build varoittaa edelleen 3D-chunkin ylittävän 500 kt: 828,66 kt, gzip
+  223,10 kt; karttasovellus 20,43 kt, gzip 10,02 kt.
+- **Riippuvuustarkistus:** 2026-11-16: `bun audit` puhdas; `bun outdated`: vite 8.3.7 → 8.3.8
+  (rajojen sisäinen; **päivitysajoa ehdotettu omana branchinaan, odottaa omistajan lupaa**).
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
   3D:ssä `window.__game`. Selainpaneelin fokus voi pysäyttää 3D-pelin.
 
@@ -318,8 +329,8 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `568bdf2`)
   Naissankarin kilpi on selässä jousineidon viinen päällä.
 - Paluusillan kuljetus toimii, mutta 3D ei vielä myönnä palkintoja eikä kartta
   lisää `rewards`-kentän esineitä inventaarioon.
-- Maailmanesineen `allowed|theft`-tila ja varkausloki ovat pysyviä, mutta
-  dialogi ei vielä muuta lupaa eikä kukaan reagoi varkauteen. Pudotetun esineen
+- Varkaudelle reagoi vain tietäjä rannalla (viesti, lippu, dialogi); muut
+  esineet (pihan ruoka) eivät vielä laukaise mitään. Pudotetun esineen
   tallennusmuoto on varattu, mutta inventaarion pudotus-UI ja 3D-instanssin luonti
   puuttuvat. `sceneItems.ts`:n save-failure-, rakennuspeitto- ja eleen lukituspolut
   ovat käsin/koodista tarkistettuja, eivät vielä automatisoituja integraatiotestejä.
@@ -335,12 +346,20 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `568bdf2`)
 - 3D-chunk on noin 803 kt ja metsä noin 2 milj. kolmiota. LOD-malleja tai
   laatuasetusta ei ole; 60 FPS on mitattu tehokoneella.
 
+- Moottori on v0: ei ajastimia, `unless`-peruutusta, ketjureaktioita (efekti ei
+  lähetä tapahtumaa), laulu- tai paikkatapahtumia (`song.performed`) eikä efektejä
+  "avaa laulu"/"paljasta paikka". Engine-lohkon tuntematon `version` luetaan
+  silti (flags/counters poimitaan); jos semantiikka muuttuu, lisää versiohaara
+  `parseEngineState`en. `npc.talked` lähtee jokaiselle puhutulle hahmolle.
+- Rikkinäistä tallennetta ei kopioida talteen ennen korvaamista (ROADMAPin riski);
+  moottorilohkossa salliva luku vain pudottaa tuntemattoman.
+
 ## Seuraava tehtävä
 
-Kytke ensimmäinen dialogi-/tapahtumapolku maailmanesineisiin: tietäjä voi antaa
-tuohikontin luvallisesti (`setSceneItemTakeMode`), ja luvaton otto käynnistää
-varkauslokiin perustuvan näkyvän seurauksen. Rajaa työ yhteen NPC:hen ja yhteen
-esineeseen; älä rakenna vielä yleistä quest-editoria tai pudotus-UI:ta.
+Omistaja pelaa dialogipolun käsin (tietäjä rannalla: luvallinen ja luvaton otto) ja
+hyväksyy `__world.describe()`-tulosteen sääntöjen aikeet. Sen jälkeen ROADMAPin
+**V3: paikkainstanssit ja satunnaiset pihapiirit** (`claude/cairn-map-site` on mergattu).
+Älä aloita V3:a ennen omistajan palautetta, jos hän muuttaa dialogin tai sääntöjen muotoa.
 
 ## Ei vielä aloiteta
 
@@ -349,7 +368,7 @@ esineeseen; älä rakenna vielä yleistä quest-editoria tai pudotus-UI:ta.
 - Täysi karttaeditori, satunnaiset matkakohtaamiset ja sivujuonigeneraattori.
 - Paperinuken vaate-esineiden datamalli ja 3D-ulkoasun vaihto.
 - 3D-palkintojen tai ruokien lisääminen paluukuormasta inventaarioon.
-- Yleinen quest-editori, laaja dialogipuu ja kyläläisten vapaa liikkuminen.
+- Yleinen quest-editori, laaja dialogipuu, ajastimet, `unless` ja kyläläisten vapaa liikkuminen.
 - Inventaarion pudotus-UI ja pudotettujen esineiden 3D-instanssit.
 - 3D-kohtausten mount/dispose ilman sivun uudelleenlatausta.
 - Git LFS (omistajan päätös 2026-11-10: ei vielä).

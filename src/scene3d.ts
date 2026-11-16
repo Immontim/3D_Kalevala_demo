@@ -22,7 +22,10 @@ import {
   configureMapToSceneTransition,
   createMapToSceneTransition,
 } from "./map/transition";
-import { configureSceneItemCampaign } from "./engine/sceneItems";
+import { configureSceneItems } from "./engine/sceneItems";
+import { initCampaignStore, worldRuntime } from "./engine/store";
+import { initWorldConsole } from "./engine/worldConsole";
+import { initDialogue } from "./engine/dialogue";
 
 export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   document.body.classList.add("mode-scene");
@@ -40,14 +43,18 @@ export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   PLAYER_LOOK.female = campaign.player.gender === "female";
   loadSavedTuning(); // ennen kuin yhtään hahmoa luodaan
   initView();
-  configureSceneItemCampaign(campaign);
+  initCampaignStore(campaign);
+  configureSceneItems();
   initEffects();
   spawnHero();
   g.encounter = !ARENA_PEACEFUL ? skirmish : ARENA === "lakeside" ? lakesideVisit : ARENA === "lakeruin" ? lakeruinVisit : ARENA === "cairnfield" ? cairnfieldVisit : visit;
   initInput();
+  initDialogue();
   initPauseMenu();
   initLoop();
   initStartMenu({ returnToMap: route.returnToMap, scene: route.scene });
   initDebug();
+  initWorldConsole();
+  worldRuntime().post({ type: "scene.entered", sceneId: ARENA });
   requestAnimationFrame(frame);
 }

@@ -24,6 +24,7 @@ import { aim, bindUi, fx, g, inputs, keys, sfx } from "./state";
 import { camera, canvas, composer, world } from "./view";
 import { createEmptySceneReturn, saveSceneReturn } from "../map/transition";
 import { updateSceneItemFocus } from "./sceneItems";
+import { closeDialogue, dialogueOpen } from "./dialogue";
 
 export function onPlayerDeath() {
   g.gameOver = true;
@@ -42,6 +43,7 @@ function resetField() {
   g.songPower = 0;
   if (songState) closeSong(true);
   if (choosing) closeChoice();
+  closeDialogue(true);
   g.gameOver = false;
 }
 
@@ -96,8 +98,11 @@ export function simulate(realDt: number) {
   if (fx.hitstop > 0) { fx.hitstop -= realDt; dt = 0; }
 
   // Laulun valinta pysäyttää maailman kokonaan; vain laulaja ottaa asentonsa.
-  if (paused || choosing) dt = 0;
+  // Dialogi pysäyttää pelilogiikan (ei taistelua eikä pelin aikaa) mutta ei maisemaa.
+  const talking = dialogueOpen && !paused;
+  if (paused || choosing || talking) dt = 0;
   if (g.running && !paused && choosing) updateChoice();
+  else if (g.running && talking) { /* hahmo seisoo ja kuuntelee: päivitetään vain visuaalit alla */ }
   else if (g.running && !paused) {
     g.gameTime += dt;
     updateSong();
@@ -121,7 +126,7 @@ export function simulate(realDt: number) {
   }
 
   // Laulaja liikkuu omassa ajassaan, vaikka maailma on hidastettu.
-  syncVisual(g.player, (songState || choosing) && !paused ? realDt : dt);
+  syncVisual(g.player, (songState || choosing || talking) && !paused ? realDt : dt);
   for (const e of g.enemies) syncVisual(e, dt);
   for (const c of g.corpses) syncVisual(c.actor, dt);
   updateShowcase(realDt);
@@ -136,13 +141,13 @@ export function simulate(realDt: number) {
   updateRing(realDt);
 
 
-  world.update(g.realTime, dt, camera, g.player.pos);
+  world.update(g.realTime, talking ? realDt : dt, camera, g.player.pos);
   if (g.running && !paused) sfx.birds(realDt, birdSongLevel(g.player.pos.x, g.player.pos.z));
   updateSparks(dt);
   fx.shake = Math.max(0, fx.shake - realDt * 1.2);
   if (freeCam.active) stepFreeCam(freeCam.cam, (code) => keys.has(code), realDt);
   updateCamera(realDt);
-  updateSceneItemFocus(g.running && !paused && !choosing && songState === null && !freeCam.active && !g.gameOver && heroAtPeace());
+  updateSceneItemFocus(g.running && !paused && !choosing && !dialogueOpen && songState === null && !freeCam.active && !g.gameOver && heroAtPeace());
   updateHud();
 
 
@@ -181,7 +186,7 @@ export function resume() {
   $("pause").classList.add("hidden");
   $("hud").classList.remove("arrange");
   last = performance.now();
-  if (!choosing) lockPointer();
+  if (!choosing && !dialogueOpen) lockPointer();
 }
 
 /** Tauon tarkastelu: valikko piiloon ja kamera vapaaksi. Peli pysyy pysäytettynä. */
