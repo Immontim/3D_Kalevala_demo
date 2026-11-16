@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { satietyBand, sceneForMapSite } from "./uiState";
+import { mapCalendarTime, satietyBand, sceneForMapSite } from "./uiState";
+
+describe("karttakalenteri", () => {
+  it.each([
+    [0, { moon: 0, day: 1, phase: 0 }],
+    [10, { moon: 0, day: 2, phase: 0 }],
+    [179, { moon: 0, day: 28, phase: 7 }],
+    [180, { moon: 1, day: 1, phase: 0 }],
+    [359, { moon: 1, day: 28, phase: 7 }],
+    [360, { moon: 2, day: 1, phase: 0 }],
+  ] as const)("muuntaa tausta-ajan %s kuuksi, päiväksi ja vaiheeksi", (time, expected) => {
+    expect(mapCalendarTime(time)).toEqual(expected);
+  });
+
+  it("rajaa virheellisen ajan ensimmäiseen päivään", () => {
+    expect(mapCalendarTime(-10)).toEqual({ moon: 0, day: 1, phase: 0 });
+    expect(mapCalendarTime(Number.NaN)).toEqual({ moon: 0, day: 1, phase: 0 });
+  });
+});
 
 describe("kylläisyyden viisi kasvokuvaa", () => {
   it.each([
