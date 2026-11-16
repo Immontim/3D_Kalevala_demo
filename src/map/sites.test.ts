@@ -19,14 +19,15 @@ function siteMap(overrides: { x: number; y: number; siteId: string }[]) {
 }
 
 describe("2D-kohtaamisrekisteri", () => {
-  it("luokittelee nykyiset kolme paikkaa kiinteiksi ja pysyviksi", () => {
-    expect(Object.keys(MAP_SITE_DEFINITIONS).sort()).toEqual(["campfire", "lakeside", "yard"]);
+  it("luokittelee nykyiset neljä paikkaa kiinteiksi ja pysyviksi", () => {
+    expect(Object.keys(MAP_SITE_DEFINITIONS).sort()).toEqual(["cairnfield", "campfire", "lakeside", "yard"]);
     for (const site of Object.values(MAP_SITE_DEFINITIONS)) {
       expect(site).toMatchObject({ movement: "fixed", lifetime: "persistent" });
     }
     expect(sceneForMapSite("yard")).toBe("yard");
     expect(sceneForMapSite("lakeside")).toBe("lakeside");
     expect(sceneForMapSite("campfire")).toBe("clearing");
+    expect(sceneForMapSite("cairnfield")).toBe("cairnfield");
     expect(sceneForMapSite("unknown")).toBeNull();
   });
 

@@ -126,6 +126,12 @@ kivipinta on Poly Havenin `mossy_rock`-tekstuurista (CC0), josta sammal on poist
 ja karsikon kaarna `pine_bark` (CC0) sekä oksakorttiatlas (`assets-src/cards`, oma).
 Ei uusia ulkopuolisia lähteitä. `louhi.glb` on kuvattu aiemmin.
 
+## `map/cairn-site.png`
+
+Kalmiston karttaikoni (48 × 48). Johdettu omistajan ImageGen-kuvasta
+(kuppikivi ja Louhi), pienennetty ja värikvantisoitu kartan ikonipalettiin.
+Ei ulkopuolisia lähteitä.
+
 ## `household.glb`
 
 | Pelin malli | Lähde (Poly Haven -tunniste, CC0) | Käyttö |
