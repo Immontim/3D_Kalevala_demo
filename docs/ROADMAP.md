@@ -1,6 +1,6 @@
 # Roadmap — 3D Kalevala
 
-Päivitetty: 2026-11-16 (Claude; pohja `origin/main` `4a00026`, koodiversio v04.00.00 branchilla `claude/world-engine-v0`).
+Päivitetty: 2026-11-17 (Claude; pohja `origin/main` `9339675`, koodiversio v04.02.00 branchilla `claude/site-instances`).
 
 Tämä on **suunta ja päätökset**, ei tehtävälista. Nykytila ja yksi seuraava
 tehtävä ovat `docs/AGENT_HANDOFF.md`:ssä, mallien ja assettien tila
@@ -44,7 +44,7 @@ ne ovat MVP:n jälkeen.
 
 | Tarve | Tila |
 |---|---|
-| Piha (`yard`), emäntä, tietäjä, jousineito, eläimet | Valmis kohtaus; puhe näyttää vain nimen (dialogi vain rannan tietäjällä) |
+| Piha (`yard`), emäntä, tietäjä, jousineito, eläimet | Valmis kohtaus, kartalla kahtena satunnaisena instanssina (V3); puhe näyttää vain nimen (dialogi vain rannan tietäjällä) |
 | Järven ranta (`lakeside`), tietäjä, laituri | Valmis kohtaus, kartalla; tietäjällä dialogi ja tuohikontin lupa/varkaus (V1–V2) |
 | Hävitetty ranta (`lakeruin`) | Valmis, ei vielä käytössä seurauksena |
 | Kalmisto (`cairnfield`), Louhi NPC:nä, suoloitsun efekti | Valmis kohtaus, kartalla |
@@ -70,21 +70,11 @@ dialogi v0 ovat käytössä; pelisisältö on tietäjä + tuohikontti. Moottorii
 vielä efektit "avaa laulu" ja "paljasta paikka" sekä tapahtuma `song.performed`:
 lisätään V4:ssä ja V5:ssä, kun niille on käyttäjä. Tilannetiedot: `AGENT_HANDOFF.md`.
 
-**V3. Paikkainstanssit ja satunnaiset pihapiirit.** Kampanjaan tulee `worldSeed`
-ja `siteInstances` (tallennetaan **konkretisoitu tulos**, ei vain siementä,
-koska generaattori muuttuu versioiden välillä). Sijoitusfunktio arpoo kaksi
-pihapiiriä ja valitsee niistä jousineidon talon. Säännöt: kartan keskialueella,
-kulkukelpoisella maastolla, kulkukelpoisen reitin päässä aloituksesta, riittävä
-etäisyys toisistaan ja kiinteistä paikoista (`lakeside`, kalmisto, leiri), ja
-kohtuullinen matka ennen löytymistä. Validaattori hylkää siemenen, jos jokin
-ehto ei täyty. Sama `yard`-kohtaus ajetaan kahtena instanssina: instanssin
-parametri määrää, onko jousineito paikalla. Esineiden tunnisteet saavat
-instanssin nimen (nyt `yard.table-flatbread` törmäisi kahdessa pihassa).
-Vanhan v5-tallennuksen siirtopolku suunnitellaan vaiheen alussa (ehdotus: vanha
-`yard` säilyy instanssina A, B arvotaan). Valmis, kun 1000 siementä läpäisee
-validaattorin Vitestissä ja pelissä molemmat pihat löytyvät ja ovat
-saavutettavissa. **Aloitetaan vasta, kun omistaja on testannut V1–V2:n dialogipolun käsin**
-(`claude/cairn-map-site` on jo mergattu).
+**V3 (valmis, v04.02.00).** Kampanjassa on `worldSeed` ja konkretisoidut `siteInstances`;
+kaksi pihaa arvotaan säännöillä ja validaattorilla, ja jousineito on vain toisessa.
+Sama `yard`-kohtaus ajetaan kahtena instanssina (`yard`, `yard-b`), esine-ID:t
+saavat instanssin nimen. Vanha tallennus säilyttää pihansa tunnisteella `yard`.
+Tilannetiedot: `AGENT_HANDOFF.md`. Löydettävyys ja etäisyydet säädetään V8:ssa.
 
 **V4. Laulun opettelu ja kolmas laulu.** Tietäjä laulaa säkeen, ja pelaaja
 toistaa sen olemassa olevalla rytmimekaniikalla. Onnistuminen avaa uuden
@@ -165,9 +155,9 @@ Sepän paja ja kanteleen veistäjä vasta MVP:n jälkeen.
   virheen takia, ja `loadCampaign` aloittaa silloin hiljaa uuden pelin. Moottorin
   lohko luetaan sallivasti, ja rikkinäinen tallenne kopioidaan talteen
   ennen korvaamista.
-- **Skeemamuutosten päällekkäisyys.** V3 koskee samoja tiedostoja kuin V1
-  (`campaign.ts`, `storage.ts`, `sites.ts`). Tee skeemamuutokset yksi kerrallaan
-  mergen jälkeen, älä rinnakkain.
+- **Skeemamuutosten päällekkäisyys.** Kampanjan kentät (`campaign.ts`, `storage.ts`,
+  `sites.ts`) muuttuvat usein; tee ne yksi kerrallaan mergen jälkeen, älä rinnakkain.
+  V1–V3 lisäsivät kenttiä ilman skeemanumeron nostoa (sallivasti luettuina).
 - **Laulun kohteeksi rauhallinen NPC (V6)** on pienehkö mutta oikea
   muutos laulujärjestelmään (nyt vain vihollinen tai itse).
 - **Löydettävyys.** Satunnaiset pihat voivat jäädä löytämättä tai olla liian

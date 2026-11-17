@@ -20,7 +20,8 @@ export function sceneKind(scene: SceneId): SceneKind {
 
 export type AppRoute =
   | { mode: "map" }
-  | { mode: "scene"; scene: SceneId; returnToMap: boolean };
+  /** `site` on kartan paikkainstanssin tunniste (esim. "yard-b"); puuttuu, kun kohtaus avataan suoraan. */
+  | { mode: "scene"; scene: SceneId; returnToMap: boolean; site: string | null };
 
 const FALLBACK_BASE = "https://kalevala.invalid/";
 
@@ -32,21 +33,31 @@ function isSceneId(value: string | null): value is SceneId {
   return value !== null && (SCENE_IDS as readonly string[]).includes(value);
 }
 
+const SITE_PATTERN = /^[a-z][a-z0-9-]{0,39}$/;
+
 /** Tuntematon tai puuttuva scene-parametri vie turvallisesti kartalle. */
 export function parseAppRoute(value: URL | string): AppRoute {
   const url = asUrl(value);
   const scene = url.searchParams.get("scene");
   if (!isSceneId(scene)) return { mode: "map" };
-  return { mode: "scene", scene, returnToMap: url.searchParams.get("return") === "map" };
+  const site = url.searchParams.get("site");
+  return {
+    mode: "scene",
+    scene,
+    returnToMap: url.searchParams.get("return") === "map",
+    site: site !== null && SITE_PATTERN.test(site) ? site : null,
+  };
 }
 
 /** Rakentaa 3D-kohtauksen URL:n muuttamatta annettua URL-oliota. */
-export function sceneUrl(value: URL | string, scene: SceneId, returnToMap: boolean): URL {
+export function sceneUrl(value: URL | string, scene: SceneId, returnToMap: boolean, site?: string | null): URL {
   const url = asUrl(value);
   url.searchParams.delete("scene");
   url.searchParams.delete("return");
+  url.searchParams.delete("site");
   url.searchParams.set("scene", scene);
   if (returnToMap) url.searchParams.set("return", "map");
+  if (site && SITE_PATTERN.test(site)) url.searchParams.set("site", site);
   return url;
 }
 
@@ -55,5 +66,6 @@ export function mapUrl(value: URL | string): URL {
   const url = asUrl(value);
   url.searchParams.delete("scene");
   url.searchParams.delete("return");
+  url.searchParams.delete("site");
   return url;
 }

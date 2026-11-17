@@ -11,7 +11,7 @@ import {
   type CampaignStorage,
 } from "./storage";
 import { CAMPAIGN_SCHEMA_VERSION } from "./campaign";
-import { MAP_SITE_DEFINITIONS } from "./sites";
+import { LEGACY_YARD_POSITION } from "./sites";
 
 function memoryStorage(initial?: string): CampaignStorage & { data: Map<string, string> } {
   const data = new Map<string, string>();
@@ -55,7 +55,17 @@ describe("kampanjan selainvarasto", () => {
     storage.data.set(EARLIEST_CAMPAIGN_STORE, JSON.stringify(legacy));
 
     const migrated = loadCampaign(storage);
-    expect(migrated.world).toEqual(current.world);
+    // Vanha tallennus ei tunne pihainstansseja: kiinteä piha "yard" säilyy, "yard-b" arvotaan kerran.
+    expect(migrated.world.siteInstances.map((i) => i.id)).toEqual(["yard", "yard-b"]);
+    expect(migrated.world.siteInstances[0]).toMatchObject({ x: LEGACY_YARD_POSITION.x, y: LEGACY_YARD_POSITION.y, archer: true });
+    expect(migrated.world.worldSeed).toBeGreaterThan(0);
+    expect(migrated.world).toEqual({
+      ...current.world,
+      worldSeed: migrated.world.worldSeed,
+      siteInstances: migrated.world.siteInstances,
+    });
+    // Arvonta tallentui: seuraava lataus ei muuta pihoja.
+    expect(loadCampaign(storage).world.siteInstances).toEqual(migrated.world.siteInstances);
     expect(migrated.player.satiety).toBe(35);
     expect(migrated.player.gender).toBe("male");
     expect(storage.data.has(CAMPAIGN_STORE)).toBe(true);
@@ -85,7 +95,7 @@ describe("kampanjan selainvarasto", () => {
     const legacy = JSON.parse(JSON.stringify(loadCampaign(storage)));
     legacy.schemaVersion = 3;
     delete legacy.world.knownSiteIds;
-    const yard = MAP_SITE_DEFINITIONS.yard.position;
+    const yard = LEGACY_YARD_POSITION;
     legacy.world.discovered[yard.y * legacy.world.width + yard.x] = true;
     storage.data.delete(CAMPAIGN_STORE);
     storage.data.set(VERSION3_CAMPAIGN_STORE, JSON.stringify(legacy));
@@ -116,7 +126,7 @@ describe("kampanjan selainvarasto", () => {
   it("palauttaa kelvollisen v1-tallennuksen vaikka migraation kirjoitus estetään", () => {
     const source = loadCampaign(memoryStorage());
     source.world.x = 7;
-    const yard = MAP_SITE_DEFINITIONS.yard.position;
+    const yard = LEGACY_YARD_POSITION;
     source.world.discovered[yard.y * source.world.width + yard.x] = true;
     const legacy = JSON.parse(JSON.stringify(source));
     legacy.schemaVersion = 1;

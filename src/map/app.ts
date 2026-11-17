@@ -23,7 +23,7 @@ import {
 } from "./campaign";
 import { createWorldMapState, mapCell, moveOnMap, type MapDirection } from "./domain";
 import { PROTOTYPE_MAP } from "./prototype";
-import { discoverVisibleSites, mapSiteDisplay, sceneForMapSite } from "./sites";
+import { discoverVisibleSites, mapSiteDefinition, mapSiteDisplay, sceneForMapSite, siteIdAt } from "./sites";
 import { clearCampaign, loadCampaign, newCampaign, saveCampaign } from "./storage";
 import { riverTile, shoreEdgeTurns, terrainFrame, waterShoreMask, type AtlasFrame } from "./tiles";
 import { consumeSceneReturn } from "./transition";
@@ -147,6 +147,7 @@ function ensureRevealed() {
         PROTOTYPE_MAP,
         campaign.world.knownSiteIds,
         state,
+        campaign.world.siteInstances,
       ),
     },
     player: { ...campaign.player, satiety: state.satiety },
@@ -181,32 +182,41 @@ function move(direction: MapDirection) {
         PROTOTYPE_MAP,
         campaign.world.knownSiteIds,
         result.state,
+        campaign.world.siteInstances,
       ),
     },
     player: { ...campaign.player, satiety: result.state.satiety },
   };
-  setMessage(result.siteId === "yard" ? t("map.yardFound")
-    : result.siteId === "lakeside" ? t("map.lakesideFound")
-      : result.siteId === "campfire" ? t("map.campfireFound")
-        : result.siteId === "cairnfield" ? t("map.cairnfieldFound")
-          : "");
+  setMessage(siteMessage(siteIdAt(PROTOTYPE_MAP, campaign.world.siteInstances, result.state.x, result.state.y), ""));
   persistAndRender();
 }
 
-function enterSite() {
-  const siteId = mapCell(PROTOTYPE_MAP, campaign.world.x, campaign.world.y)?.siteId;
-  const scene = sceneForMapSite(siteId);
-  if (scene) openScene(scene);
+/** Paikan ilmoitus kartan alareunassa; kaikki pihainstanssit ovat "pihapiiri". */
+function siteMessage(siteId: string | undefined, fallback: string) {
+  const scene = sceneForMapSite(siteId, campaign.world.siteInstances);
+  if (scene === "yard") return t("map.yardFound");
+  if (scene === "lakeside") return t("map.lakesideFound");
+  if (scene === "clearing") return t("map.campfireFound");
+  if (scene === "cairnfield") return t("map.cairnfieldFound");
+  return fallback;
 }
 
-function openScene(scene: SceneId) {
+function enterSite() {
+  const siteId = siteIdAt(PROTOTYPE_MAP, campaign.world.siteInstances, campaign.world.x, campaign.world.y);
+  const scene = sceneForMapSite(siteId, campaign.world.siteInstances);
+  // Instanssin tunniste välitetään 3D:lle, jotta sama pihakohtaus saa instanssin omat parametrit.
+  const instance = campaign.world.siteInstances.find((entry) => entry.id === siteId);
+  if (scene) openScene(scene, instance?.id);
+}
+
+function openScene(scene: SceneId, site?: string) {
   if (!saveCampaign(campaign)) {
     const error = t("map.saveFailed");
     setMessage(error);
     document.getElementById("mapSettingsError")!.textContent = settingsOpen ? error : "";
     return;
   }
-  location.href = sceneUrl(location.href, scene, true).href;
+  location.href = sceneUrl(location.href, scene, true, site).href;
 }
 
 function toggleSettings(open = !settingsOpen) {
@@ -493,16 +503,18 @@ function renderMap() {
           }
         }
       }
-      const siteDisplay = mapSiteDisplay(cell.siteId, {
+      const siteId = siteIdAt(PROTOTYPE_MAP, campaign.world.siteInstances, x, y);
+      const siteDisplay = mapSiteDisplay(siteId, {
         active: true,
-        known: cell.siteId !== undefined && knownSiteIds.has(cell.siteId),
+        known: siteId !== undefined && knownSiteIds.has(siteId),
         cellVisibility: visibility,
-      });
+      }, campaign.world.siteInstances);
       if (siteDisplay !== "hidden") {
-        if (cell.siteId === "yard") sprite(ctx, [2, 1], vx * TILE, vy * TILE);
-        if (cell.siteId === "lakeside") sprite(ctx, [3, 1], vx * TILE, vy * TILE);
-        if (cell.siteId === "campfire") drawRedHand(ctx, vx * TILE, vy * TILE);
-        if (cell.siteId === "cairnfield") drawCairnSite(ctx, vx * TILE, vy * TILE);
+        const sceneId = mapSiteDefinition(siteId, campaign.world.siteInstances)?.sceneId;
+        if (sceneId === "yard") sprite(ctx, [2, 1], vx * TILE, vy * TILE);
+        if (sceneId === "lakeside") sprite(ctx, [3, 1], vx * TILE, vy * TILE);
+        if (sceneId === "clearing") drawRedHand(ctx, vx * TILE, vy * TILE);
+        if (sceneId === "cairnfield") drawCairnSite(ctx, vx * TILE, vy * TILE);
       }
       if (visibility === "remembered") {
         ctx.fillStyle = "rgba(20, 17, 13, 0.44)";
@@ -532,12 +544,8 @@ function onKeyDown(event: KeyboardEvent) {
 }
 
 function currentSiteMessage() {
-  const siteId = mapCell(PROTOTYPE_MAP, campaign.world.x, campaign.world.y)?.siteId;
-  if (siteId === "yard") return t("map.yardFound");
-  if (siteId === "lakeside") return t("map.lakesideFound");
-  if (siteId === "campfire") return t("map.campfireFound");
-  if (siteId === "cairnfield") return t("map.cairnfieldFound");
-  return t("map.welcome");
+  const siteId = siteIdAt(PROTOTYPE_MAP, campaign.world.siteInstances, campaign.world.x, campaign.world.y);
+  return siteMessage(siteId, t("map.welcome"));
 }
 
 export function initMap() {

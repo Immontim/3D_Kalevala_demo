@@ -81,9 +81,10 @@ describe("prototyyppikartta", () => {
     }
   });
 
-  it("aloitusruutu on kuljettava ja rauhallinen piha on omana paikkanaan", () => {
+  it("aloitusruutu on kuljettava, ja kartassa ei ole kiinteää pihaa (pihat ovat kampanjan instansseja)", () => {
     expect(mapCell(PROTOTYPE_MAP, PROTOTYPE_START.x, PROTOTYPE_START.y)?.terrainId).not.toBe("water");
-    expect(mapCell(PROTOTYPE_MAP, YARD_POSITION.x, YARD_POSITION.y)?.siteId).toBe("yard");
+    expect(PROTOTYPE_MAP.cells.some((cell) => cell.siteId === "yard")).toBe(false);
+    expect(mapCellTravel(mapCell(PROTOTYPE_MAP, YARD_POSITION.x, YARD_POSITION.y)!).passable).toBe(true);
   });
 
   it("sijoittaa tietäjän rantamökin kuljettavalle ruudulle järven viereen", () => {
