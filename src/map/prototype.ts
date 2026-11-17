@@ -9,6 +9,8 @@ export const CAMPFIRE_POSITION = MAP_SITE_DEFINITIONS.campfire.position;
 export const LAKESIDE_POSITION = MAP_SITE_DEFINITIONS.lakeside.position;
 /** Kaakon vaaran kalliokumpu veden rannalla: kalmisto (rauhallinen 3D-kohtaus). */
 export const CAIRNFIELD_POSITION = MAP_SITE_DEFINITIONS.cairnfield.position;
+/** Kivinen kahlaamo ylittää vaakasuoran uoman pohjois–eteläsuunnassa. */
+export const FORD_POSITION = { x: 13, y: 11 } as const;
 
 const LEGEND: Record<string, TerrainId> = {
   w: "water",
@@ -60,6 +62,7 @@ if (ROWS.length !== MAP_HEIGHT || ROWS.some((row) => row.length !== MAP_WIDTH)) 
 
 const cells: MapCell[] = ROWS.flatMap((row, y) => [...row].map((symbol, x) => ({
   terrainId: RIVER_CELLS.has(`${x},${y}`) ? "river" : LEGEND[symbol],
+  ...(x === FORD_POSITION.x && y === FORD_POSITION.y ? { crossingId: "ford" as const } : {}),
   ...(x === YARD_POSITION.x && y === YARD_POSITION.y ? { siteId: "yard" } : {}),
   ...(x === CAMPFIRE_POSITION.x && y === CAMPFIRE_POSITION.y ? { siteId: "campfire" } : {}),
   ...(x === LAKESIDE_POSITION.x && y === LAKESIDE_POSITION.y ? { siteId: "lakeside" } : {}),

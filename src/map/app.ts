@@ -1,4 +1,6 @@
 import atlasUrl from "../../assets/map/kalevala-map-atlas-v2.png?url";
+import lakeShoreEdgeUrl from "../../assets/map/lake-shore-edge.png?url";
+import riverFordOverlayUrl from "../../assets/map/river-ford-overlay.png?url";
 import femaleMapHeroUrl from "../../assets/map/map-hero-female.png?url";
 import femalePaperDollUrl from "../../assets/map/paper-doll-hero.png?url";
 import malePaperDollUrl from "../../assets/map/paper-doll-hero-male.png?url";
@@ -23,7 +25,7 @@ import { createWorldMapState, mapCell, moveOnMap, type MapDirection } from "./do
 import { PROTOTYPE_MAP } from "./prototype";
 import { discoverVisibleSites, mapSiteDisplay, sceneForMapSite } from "./sites";
 import { clearCampaign, loadCampaign, newCampaign, saveCampaign } from "./storage";
-import { riverTile, terrainFrame, type AtlasFrame } from "./tiles";
+import { riverTile, shoreEdgeTurns, terrainFrame, waterShoreMask, type AtlasFrame } from "./tiles";
 import { consumeSceneReturn } from "./transition";
 import { mapCalendarTime, mapCellVisibility, satietyBand } from "./uiState";
 
@@ -347,6 +349,12 @@ function renderUi() {
 const atlas = new Image();
 atlas.src = atlasUrl;
 atlas.addEventListener("load", renderMap);
+const lakeShoreEdge = new Image();
+lakeShoreEdge.src = lakeShoreEdgeUrl;
+lakeShoreEdge.addEventListener("load", renderMap);
+const riverFordOverlay = new Image();
+riverFordOverlay.src = riverFordOverlayUrl;
+riverFordOverlay.addEventListener("load", renderMap);
 const redHand = new Image();
 redHand.src = redHandUrl;
 redHand.addEventListener("load", renderMap);
@@ -372,6 +380,21 @@ function sprite(
   ctx.translate(x + TILE / 2, y + TILE / 2);
   ctx.rotate(quarterTurns * Math.PI / 2);
   ctx.drawImage(atlas, frame[0] * TILE, frame[1] * TILE, TILE, TILE, -TILE / 2, -TILE / 2, TILE, TILE);
+  ctx.restore();
+}
+
+function imageTile(
+  ctx: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  x: number,
+  y: number,
+  quarterTurns = 0,
+) {
+  if (!image.complete || image.naturalWidth <= 0) return;
+  ctx.save();
+  ctx.translate(x + TILE / 2, y + TILE / 2);
+  ctx.rotate(quarterTurns * Math.PI / 2);
+  ctx.drawImage(image, -TILE / 2, -TILE / 2, TILE, TILE);
   ctx.restore();
 }
 
@@ -459,8 +482,16 @@ function renderMap() {
       if (cell.terrainId === "river") {
         const tile = riverTile(PROTOTYPE_MAP, x, y);
         sprite(ctx, tile.frame, vx * TILE, vy * TILE, tile.quarterTurns);
+        if (cell.crossingId === "ford") {
+          imageTile(ctx, riverFordOverlay, vx * TILE, vy * TILE, tile.quarterTurns);
+        }
       } else {
         sprite(ctx, terrainFrame(cell.terrainId, x, y), vx * TILE, vy * TILE);
+        if (cell.terrainId === "water") {
+          for (const turns of shoreEdgeTurns(waterShoreMask(PROTOTYPE_MAP, x, y))) {
+            imageTile(ctx, lakeShoreEdge, vx * TILE, vy * TILE, turns);
+          }
+        }
       }
       const siteDisplay = mapSiteDisplay(cell.siteId, {
         active: true,

@@ -6,15 +6,11 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b695ff7`)
+Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b675df9`)
 
-- **Branchin `codex/deps-vite-8-3-8` koodiversio on v04.00.01.** Vite on
-  päivitetty 8.3.7 → 8.3.8; pelilogiikka ja assetit eivät muuttuneet. Koodi
-  valmis, ei deployattu. Selainkoe jäi ajamatta, koska in-app-selain ei tavoittanut
-  työpuun localhost-previewta ja Windowsin UI-ohjaus ei voinut varmistaa Chrome-
-  ikkunan URL:ia; omistaja hyväksyi 2026-11-17 commitin ilman selainkoetta.
-  Tarkista merge-tila ennen jatkamista:
-  `git merge-base --is-ancestor codex/deps-vite-8-3-8 origin/main`.
+- **Branchin `codex/map-ford-shore-tiles` koodiversio on v04.01.00.** Kartalla
+  on yksi kivinen kahlaamo ja järvillä pyöristetyt rantareunat. Koodi valmis,
+  ei deployattu; varsinaista selainkoetta ei saatu auki (tarkistus alla).
 - **CampaignStore (V1).** `src/map/campaignStore.ts` (puhdas) on 3D-puolen yksi
   tilan omistaja: `update(fn)` laskee uuden tilan, tallentaa sen ja ottaa sen
   käyttöön vasta onnistumisen jälkeen (epäonnistunut tallennus jättää tilan ja
@@ -202,13 +198,10 @@ Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b695ff7`)
     Pihan koiralla tassu on nyt myös kierrossa.
   - **Kartta.** `LAKESIDE_POSITION`, atlaksen ruutu (3,1) (kalliomaalausikoni:
     mökki, tietäjä, koira, aallot; piirretty koodilla PIL:llä, ei ImageGen).
-- **Dev-palvelin työpuusta:** `preview_start` käynnistää pääkansiosta; työpuusta
-  `bun run dev --port 5174 --strictPort`. Sulje palvelin lopuksi.
-- **Sovellusrakenne.** `src/main.ts` on kevyt sovelluskuori. URL ilman
-  `scene`-parametria käynnistää 2D-kartan. `?scene=<id>&return=map` lataa
-  dynaamisesti `src/scene3d.ts`:n ja nykyisen Three.js-moottorin. Kartta
-  ei pyydä GLB-tiedostoja eikä aja 3D-silmukkaa. Tuotantobuildin kartta-UI
-  on noin 19 kt JS; 3D-chunk noin 803 kt.
+- **Dev-palvelin työpuusta:** `bun run dev --port 5174 --strictPort`; sulje lopuksi.
+- **Sovellusrakenne.** URL ilman `scene`-parametria käynnistää 2D-kartan;
+  `?scene=<id>&return=map` lataa dynaamisesti `src/scene3d.ts`:n ja Three.js-
+  moottorin. Kartta ei pyydä GLB-tiedostoja eikä aja 3D-silmukkaa.
 - **2D-maailmankartta** (`src/map/app.ts`) on Canvas 2D -näkymä: 20 × 20
   ruudun maailma, 48 × 48 px:n tiilet ja 17 × 13 ruudun kamera
   (816 × 624 px). 1135 px leveässä testinäkymässä canvas oli noin 798 px.
@@ -220,10 +213,11 @@ Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b695ff7`)
 - **Karttadata ja säännöt** ovat puhtaassa `src/map/domain.ts`:ssä. Kuusi
   aiempaa maastoa (niitty, metsä, umpimetsä, suo, kallio ja vesi) sekä uusi
   joki. Kohderuudun `minuteCost` lisää maailmanaikaa; estynyt liike ei kuluta
-  aikaa. Vesi ja joki ovat jalan kulkukelvottomia. Joki kiemurtelee keskisen
-  järven etelälaidasta itäiseen ulkoveteen. `prototype.ts` on vertailukartta:
-  aloitus (10,14), rauhallinen piha (10,11), punainen käsi (13,14), rantamökki
-  (9,6) ja kalmisto (16,16).
+  aikaa. Vesi ja joki ovat jalan kulkukelvottomia paitsi joen kivinen kahlaamo
+  (13,11), joka maksaa 20 aikayksikköä. `crossingId` on terrainista erillinen,
+  joten myöhempi silta voi käyttää samaa sääntöä. Joki kiemurtelee keskisen
+  järven etelälaidasta itäiseen ulkoveteen. Paikat: aloitus (10,14), piha
+  (10,11), punainen käsi (13,14), rantamökki (9,6), kalmisto (16,16).
 - **Aika ja kylläisyys.** Erillistä karttavoimaa ei ole. Tallennuksen
   `worldMinutes` on nyt pelaajalta piilotettu tausta-aika: maastokustannukset
   ja kylläisyyden kulumisnopeus 0,05 / yksikkö säilyivät ennallaan. Yksi
@@ -278,8 +272,10 @@ Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b695ff7`)
   sen vasen puolisko säilyttää vanhat ikonit ja hahmot ennallaan. Kuudella
   aiemmalla terrainilla on kaksi deterministisesti valittavaa variaatiota.
   Joella on kolme suora-, mutka- ja päätevariaatiota, joita kierretään
-  naapuriyhteyksien mukaan. Uusi grafiikka tehtiin ImageGenillä annetun
-  Kalevala-tyylioppaan ja vanhan atlaksen pohjalta sekä viimeisteltiin 48 px:iin.
+  naapuriyhteyksien mukaan. `lake-shore-edge.png` muodostaa vesiruudun viereisen
+  maan mukaan kierretyt, pyöristetyt rannat; joki lasketaan vedeksi joensuissa.
+  `river-ford-overlay.png` piirtää kahlaamon joen päälle. Molemmat ovat 48 px:n
+  läpinäkyviä ImageGen-päällysteitä Kalevala-tyylioppaan ja atlaksen pohjalta.
   Naisella ovat `paper-doll-hero.png`, `satiety-faces.png` ja nelisuuntainen
   `map-hero-female.png`; sininen viitta erottaa hänet kartalla. Miehellä ovat
   `paper-doll-hero-male.png`, `satiety-faces-male.png` ja atlaksen nykyiset
@@ -298,11 +294,13 @@ Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b695ff7`)
 - **UI ja kielituki.** Kartan pellavapohja, kirjontakehykset, paperinukke,
   kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
   tyypitetyissä FI/EN-sanakirjoissa.
-- **Tarkistukset 2026-11-17 (v04.00.01):** `bun ci`, `bun audit`,
-  `bun outdated --no-cache`, `bun run test` (22 versionhallittua testitiedostoa,
-  253 testiä), `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja
-  `git diff --check` läpäisty. Build varoittaa edelleen 3D-chunkin ylittävän
-  500 kt: 828,66 kt, gzip 223,10 kt; karttasovellus 20,43 kt, gzip 10,02 kt.
+- **Tarkistukset 2026-11-17 (v04.01.00):** `bun run test` (22 tiedostoa,
+  258 testiä), `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja
+  `git diff --check` läpäisty. Buildin ainoa varoitus on ennestään suuri
+  3D-chunk: 828,66 kt, gzip 223,10 kt; karttasovellus 25,59 kt, gzip 13,53 kt.
+  Kaikki 16 rantamaskia ja kahlaamo tarkastettiin staattisesta renderikoosteesta:
+  saumat sulkeutuvat. In-app-selain ei tavoittanut localhostia, joten oikeaa
+  karttanäkymää ei tarkastettu selaimessa.
 - **Riippuvuustarkistus:** 2026-11-17, ei mitään odottamassa; audit puhdas.
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
   3D:ssä `window.__game`. Selainpaneelin fokus voi pysäyttää 3D-pelin.
@@ -317,8 +315,8 @@ Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b695ff7`)
 - Liikkuvien ja väliaikaisten kohtaamisten luokitus sekä piirron piilotussääntö
   ovat valmiina, mutta niiden instanssilistaa, liikeratoja tai poistumistiloja
   ei ole vielä toteutettu.
-- Jokigrafiikka tukee suoria, kaarteita ja päitä, mutta ei vielä haaroja,
-  siltoja, koskia, venettä tai vesianimaatiota.
+- Jokigrafiikka tukee suoria, kaarteita, päitä ja yhtä kahlaamoa, mutta ei
+  vielä haaroja, siltoja, koskia, venettä tai vesianimaatiota.
 - Vanha v3-tallennus voi ensimmäisellä latauksella asettaa sankarin ruutuun,
   joka on tässä karttaversiossa muuttunut joeksi. Sankari pääsee poistumaan
   viereiseen maahan, mutta lataus ei vielä siirrä häntä automaattisesti.
@@ -344,9 +342,8 @@ Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b695ff7`)
 - Järven rannan vesi on yksinkertainen: ei rantavaahtoa, syvyysväriä eikä
   aaltoja laiturin kohdalla. Kaukorannalla ei ole kasvillisuutta kaukaa
   nähtynä; rantakohtauksen koira ei käyskentele (ei kävelyleikettä).
-- 3D-chunk on noin 803 kt ja metsä noin 2 milj. kolmiota. LOD-malleja tai
+- 3D-chunk on noin 829 kt ja metsä noin 2 milj. kolmiota. LOD-malleja tai
   laatuasetusta ei ole; 60 FPS on mitattu tehokoneella.
-
 - Moottori on v0: ei ajastimia, `unless`-peruutusta, ketjureaktioita (efekti ei
   lähetä tapahtumaa), laulu- tai paikkatapahtumia (`song.performed`) eikä efektejä
   "avaa laulu"/"paljasta paikka". Engine-lohkon tuntematon `version` luetaan
