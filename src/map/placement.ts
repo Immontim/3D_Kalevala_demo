@@ -1,0 +1,175 @@
+// Pihapiirien sijoittelu kartalle siemenestä. Puhdas moduuli: ei DOM:ia, ei Math.random-kutsuja.
+//
+// Sijoitus generoidaan rakentamalla (ehdokasruudut suodatetaan säännöillä), joten se onnistuu
+// aina, ja riippumaton validaattori tarkistaa tuloksen. Tulos tallennetaan kampanjaan
+// konkretisoituna (`siteInstances`): generaattori saa muuttua versioiden välillä ilman, että
+// jo tallennettu maailma siirtyy.
+import { mapCell, mapCellTravel, mapIndex, type MapPosition, type TerrainId, type WorldMapDefinition } from "./domain";
+import type { SiteInstance } from "./campaign";
+
+/** Pihapiirien sijoittelusäännöt. Luvut ovat ensimmäinen arvio; pelitesti säätää löydettävyyden (V8). */
+export const YARD_PLACEMENT = {
+  /** Kartan keskialue, sisältäen rajat. */
+  centre: { minX: 4, maxX: 15, minY: 4, maxY: 15 },
+  /** Sallitut maastot: niitty ja metsä (ei suota, kalliota, umpimetsää eikä vettä). */
+  terrains: ["meadow", "forest"] as readonly TerrainId[],
+  /** Vähintään näin kaukana aloituksesta (Chebyshev), ettei piha paljastu heti. */
+  minStartDistance: 3,
+  /** Enintään näin monta maailmaminuuttia kulkureittiä aloituksesta ("kohtuullinen matka"). */
+  maxStartMinutes: 150,
+  /** Kahden pihan väli (Chebyshev), jotta yksi lähinäkö ei paljasta molempia. */
+  minMutualDistance: 5,
+  /** Etäisyys kiinteistä paikoista (lakeside, kalmisto, leiri). */
+  minFixedDistance: 3,
+} as const;
+
+export const YARD_INSTANCE_IDS = ["yard", "yard-b"] as const;
+
+/** Siemenestä ja nimestä johdettu oma satunnaisvirta (mulberry32), jotta virrat eivät sekoita toisiaan. */
+export function rngStream(seed: number, name: string): () => number {
+  let h = 2166136261 ^ (seed >>> 0);
+  for (let i = 0; i < name.length; i++) h = Math.imul(h ^ name.charCodeAt(i), 16777619);
+  let a = h >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function chebyshev(a: MapPosition, b: MapPosition): number {
+  return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+}
+
+const travelCache = new WeakMap<WorldMapDefinition, Map<string, number[]>>();
+
+/** Pienin matka-aika (maailmaminuutteina) aloituksesta jokaiseen kulkukelpoiseen ruutuun; Infinity = ei saavuteta. */
+export function travelMinutes(map: WorldMapDefinition, start: MapPosition): number[] {
+  // Kartta on muuttumaton, joten tulos välimuistitetaan (validointi kutsuu tätä jokaiselle ehdokkaalle).
+  const key = `${start.x},${start.y}`;
+  let perStart = travelCache.get(map);
+  if (!perStart) { perStart = new Map(); travelCache.set(map, perStart); }
+  const cached = perStart.get(key);
+  if (cached) return cached;
+  const computed = computeTravelMinutes(map, start);
+  perStart.set(key, computed);
+  return computed;
+}
+
+function computeTravelMinutes(map: WorldMapDefinition, start: MapPosition): number[] {
+  const cost = Array<number>(map.cells.length).fill(Infinity);
+  if (!mapCell(map, start.x, start.y)) return cost;
+  cost[mapIndex(map, start.x, start.y)] = 0;
+  const open: MapPosition[] = [{ ...start }];
+  while (open.length > 0) {
+    // Kartta on pieni (400 ruutua): lineaarinen haku riittää eikä vaadi kekoa.
+    let best = 0;
+    for (let i = 1; i < open.length; i++) {
+      if (cost[mapIndex(map, open[i].x, open[i].y)] < cost[mapIndex(map, open[best].x, open[best].y)]) best = i;
+    }
+    const current = open.splice(best, 1)[0];
+    const base = cost[mapIndex(map, current.x, current.y)];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const x = current.x + dx, y = current.y + dy;
+      const cell = mapCell(map, x, y);
+      if (!cell) continue;
+      const travel = mapCellTravel(cell);
+      if (!travel.passable) continue;
+      const next = base + travel.minuteCost;
+      const i = mapIndex(map, x, y);
+      if (next < cost[i]) {
+        cost[i] = next;
+        open.push({ x, y });
+      }
+    }
+  }
+  return cost;
+}
+
+export interface PlacementContext {
+  map: WorldMapDefinition;
+  start: MapPosition;
+  /** Kiinteät paikat, joiden päälle tai lähelle ei sijoiteta. */
+  fixedSites: readonly MapPosition[];
+}
+
+/** Rikkomukset suomeksi; tyhjä lista = sijoittelu kelpaa. Riippumaton generaattorista. */
+export function validateYardPlacement(instances: readonly SiteInstance[], context: PlacementContext): string[] {
+  const rules = YARD_PLACEMENT;
+  const problems: string[] = [];
+  const minutes = travelMinutes(context.map, context.start);
+  const ids = new Set<string>();
+  for (const instance of instances) {
+    const label = `piha ${instance.id} (${instance.x},${instance.y})`;
+    if (ids.has(instance.id)) problems.push(`${label}: tunniste esiintyy kahdesti`);
+    ids.add(instance.id);
+    const cell = mapCell(context.map, instance.x, instance.y);
+    if (!cell) { problems.push(`${label}: ruutu on kartan ulkopuolella`); continue; }
+    const c = rules.centre;
+    if (instance.x < c.minX || instance.x > c.maxX || instance.y < c.minY || instance.y > c.maxY) {
+      problems.push(`${label}: ei ole kartan keskialueella`);
+    }
+    if (!(rules.terrains as readonly string[]).includes(cell.terrainId) || cell.crossingId) {
+      problems.push(`${label}: maasto ${cell.terrainId} ei kelpaa pihalle`);
+    }
+    if (cell.siteId) problems.push(`${label}: ruudussa on jo paikka ${cell.siteId}`);
+    if (chebyshev(instance, context.start) < rules.minStartDistance) problems.push(`${label}: liian lähellä aloitusta`);
+    const cost = minutes[mapIndex(context.map, instance.x, instance.y)];
+    if (!Number.isFinite(cost)) problems.push(`${label}: ei saavuteta aloituksesta`);
+    else if (cost > rules.maxStartMinutes) problems.push(`${label}: matka ${cost} min ylittää rajan ${rules.maxStartMinutes}`);
+    for (const fixed of context.fixedSites) {
+      if (chebyshev(instance, fixed) < rules.minFixedDistance) problems.push(`${label}: liian lähellä kiinteää paikkaa (${fixed.x},${fixed.y})`);
+    }
+  }
+  for (let i = 0; i < instances.length; i++) {
+    for (let j = i + 1; j < instances.length; j++) {
+      if (chebyshev(instances[i], instances[j]) < rules.minMutualDistance) {
+        problems.push(`pihat ${instances[i].id} ja ${instances[j].id} ovat liian lähellä toisiaan`);
+      }
+    }
+  }
+  return problems;
+}
+
+/**
+ * Valitsee kelvolliset ruudut kahden uuden pihan paikoiksi ja arpoo jousineidon talon.
+ * `existing` on jo sijoitetut (esim. vanhan tallennuksen piha), jotka säilyvät ja jotka uudet välttävät.
+ * Palauttaa vain uudet instanssit. Heittää, jos kelvollista ruutua ei ole (kartta ei sovi sääntöihin).
+ */
+export function placeYardInstances(
+  seed: number,
+  context: PlacementContext,
+  options: { ids?: readonly string[]; existing?: readonly SiteInstance[] } = {},
+): SiteInstance[] {
+  const ids = options.ids ?? YARD_INSTANCE_IDS;
+  const existing = options.existing ?? [];
+  const rules = YARD_PLACEMENT;
+  const minutes = travelMinutes(context.map, context.start);
+  const rng = rngStream(seed, "placement");
+  const placed: SiteInstance[] = [];
+  const all = () => [...existing, ...placed];
+
+  for (const id of ids) {
+    const candidates: MapPosition[] = [];
+    for (let y = rules.centre.minY; y <= rules.centre.maxY; y++) {
+      for (let x = rules.centre.minX; x <= rules.centre.maxX; x++) {
+        const candidate: SiteInstance = { id, kind: "yard", x, y, archer: false };
+        if (validateYardPlacement([candidate], context).length > 0) continue;
+        if (!Number.isFinite(minutes[mapIndex(context.map, x, y)])) continue;
+        if (all().some((other) => chebyshev(other, candidate) < rules.minMutualDistance)) continue;
+        candidates.push({ x, y });
+      }
+    }
+    if (candidates.length === 0) throw new Error(`Pihalle ${id} ei löydy kelvollista ruutua siemenellä ${seed}`);
+    const pick = candidates[Math.floor(rng() * candidates.length)];
+    placed.push({ id, kind: "yard", x: pick.x, y: pick.y, archer: false });
+  }
+
+  // Jousineidon talo arvotaan omasta virrastaan, jotta sijoittelusääntöjen muutos ei vaihda sitä.
+  if (placed.length > 0 && !all().some((instance) => instance.archer)) {
+    placed[Math.floor(rngStream(seed, "archer")() * placed.length)].archer = true;
+  }
+  return placed;
+}

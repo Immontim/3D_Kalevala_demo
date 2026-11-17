@@ -1,5 +1,6 @@
 import { createCampaign, parseCampaign, serializeCampaign, type CampaignState } from "./campaign";
 import { PROTOTYPE_MAP_ID, PROTOTYPE_START } from "./prototype";
+import { completeYardInstances, newYardInstances } from "./siteInstances";
 import { legacyKnownSiteIds } from "./sites";
 
 export const CAMPAIGN_STORE = "laulun-miekka.campaign.v5";
@@ -14,8 +15,23 @@ export interface CampaignStorage {
   removeItem(key: string): void;
 }
 
-export function newCampaign(): CampaignState {
-  return createCampaign({ mapId: PROTOTYPE_MAP_ID, ...PROTOTYPE_START });
+/** Uusi siemen sijoittelulle. Satunnaisuuden lähde on tässä, ei puhtaissa moduuleissa. */
+export function randomSeed(): number {
+  try {
+    const value = crypto.getRandomValues(new Uint32Array(1))[0];
+    if (value) return value;
+  } catch { /* crypto ei käytössä: varasiemen alla */ }
+  return Math.floor(Math.random() * 0xfffffffe) + 1;
+}
+
+/** Uusi matka: pihapiirit arvotaan siemenestä ja tallennetaan konkretisoituina. */
+export function newCampaign(seed: number = randomSeed()): CampaignState {
+  return createCampaign({
+    mapId: PROTOTYPE_MAP_ID,
+    ...PROTOTYPE_START,
+    worldSeed: seed,
+    siteInstances: newYardInstances(seed),
+  });
 }
 
 function compatible(state: CampaignState): boolean {
@@ -32,7 +48,7 @@ export function loadCampaign(storage?: CampaignStorage): CampaignState {
     for (const store of stores) {
       const parsed = parseCampaign(target.getItem(store));
       if (!parsed || !compatible(parsed)) continue;
-      const campaign = store === CAMPAIGN_STORE ? parsed : {
+      let campaign = store === CAMPAIGN_STORE ? parsed : {
         ...parsed,
         world: {
           ...parsed.world,
@@ -42,6 +58,13 @@ export function loadCampaign(storage?: CampaignStorage): CampaignState {
           ])],
         },
       };
+      // Vanha tallennus tai puuttuva paikkainstanssi täydennetään kerran ja tallennetaan, ettei
+      // arvonta toistu seuraavalla latauksella.
+      const completed = completeYardInstances(campaign, randomSeed());
+      if (completed !== campaign) {
+        try { target.setItem(CAMPAIGN_STORE, serializeCampaign(completed)); } catch { /* yritetään uudelleen */ }
+        campaign = completed;
+      }
       if (store !== CAMPAIGN_STORE) {
         // Kelvollinen vanha tallennus on arvokkaampi kuin migraation kirjoitus.
         // Yksityisessä selaustilassa set/remove voi epäonnistua, mutta peli saa silti jatkua.

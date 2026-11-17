@@ -6,11 +6,37 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b675df9`)
+Päivitetty: 2026-11-17 (Claude, Windows; pohja `origin/main` `9339675`)
 
-- **Branch `codex/map-ford-shore-tiles`, v04.01.00, toteutuscommit `6d62e54`.**
-  Yksi kivinen kahlaamo ja pyöristetyt järvenrannat; koodi valmis, ei deployattu,
-  selainkoe ei onnistunut (tarkistus alla).
+- **Branchin `claude/site-instances` koodiversio on v04.02.00** (V3: satunnaiset
+  pihapiirit, alla). Koodi valmis, ei deployattu, käsin testattu selaimessa mutta
+  omistaja ei vielä pelannut. Tarkista merge-tila ennen jatkamista:
+  `git merge-base --is-ancestor claude/site-instances origin/main`. V1–V2 (store,
+  moottori, tietäjän dialogi) ja Codexin kahlaamo (v04.01.00) ovat mergattu; omistaja
+  hyväksyi dialogin sävyn (muut hahmot puhuvat vähemmän kalevalamittaisesti, mutta
+  vanhahtavaan poljentoon pyritään).
+- **Paikkainstanssit ja satunnaiset pihapiirit (V3).** Kartassa ei ole kiinteää
+  pihaa: pihat ovat kampanjan `world.siteInstances` (`id`, `kind: "yard"`, `x`, `y`,
+  `archer`) ja `world.worldSeed`. **Skeema ja avain pysyvät 5/v5:ssä**: kentät luetaan
+  sallivasti (`parseSiteInstances` pudottaa virheelliset, kampanja säilyy). Tunnisteet
+  `yard` ja `yard-b`; vanhan tallennuksen piha säilyy tunnisteella `yard` (esine-ID:t
+  `yard.table-*` ennallaan), toinen on `yard-b.table-*`.
+  `src/map/placement.ts` (puhdas): omat satunnaisvirrat `rngStream(siemen, nimi)`
+  (`placement`, `archer`), säännöt `YARD_PLACEMENT` (keskialue x/y 4-15, niitty tai
+  metsä, ei kahlaamoa tai paikkaruutua, Chebyshev ≥ 3 aloituksesta ja kiinteistä
+  paikoista, ≥ 5 pihojen välillä, reitti ≤ 150 min), `placeYardInstances` (rakentaa
+  ehdokkaista, onnistuu aina) ja riippumaton `validateYardPlacement`.
+  `src/map/siteInstances.ts`: `newYardInstances`, `completeYardInstances` (vanha
+  tallennus: `yard` = vanha paikka (10,11) jousineidolla + arvottu `yard-b` ilman;
+  täydennys tallennetaan kerran, ettei arvonta toistu). `storage.ts`:
+  `newCampaign(siemen)`, `loadCampaign` täydentää puuttuvat pihat. `sites.ts`:
+  `siteIdAt`, `LEGACY_YARD_POSITION`. Kartta välittää instanssin 3D:lle parametrilla
+  `site` (`route.ts`); `scene3d.ts` kutsuu `setSiteInstance` ennen rakennusta, ja
+  `world.ts` käyttää sitä esine-ID:ihin ja jousineitoon. `?scene=yard` ilman `site`a
+  = instanssi `yard`. **Testattu:** 1000 siementä validaattorissa, determinismi,
+  migraatio; selaimessa pihat tallentuvat, `yard-b` löytyy, Enter vie `site=yard-b`,
+  esine-ID:t ja jousineito täsmäävät. **Ei testattu:** kartan ulkoasu kuvakaappauksella
+  (aikakatkesi), löydettävyys pelaten, naissankari pihoilla.
 - **CampaignStore (V1).** `src/map/campaignStore.ts` (puhdas) on 3D-puolen yksi
   tilan omistaja: `update(fn)` laskee uuden tilan, tallentaa sen ja ottaa sen
   käyttöön vasta onnistumisen jälkeen (epäonnistunut tallennus jättää tilan ja
@@ -18,44 +44,30 @@ Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b675df9`)
   `engine/store.ts` (`initCampaignStore`, `campaignStore()`, `worldRuntime()`).
   `engine/sceneItems.ts` ei pidä enää omaa kopiota. Kartta (`map/app.ts`) on
   erillinen sivu ja lataa kampanjan omaan muuttujaansa; sitä ei siirretty storeen.
-- **Maailmamoottori v0 (V2), `src/world/`**, Three.js- ja DOM-vapaa. `registry.ts`
-  (tunnetut liput, laskurit, esineiden nimet; **uusi lippu lisätään tänne**),
-  `state.ts` (`EngineState`: versioitu lohko `campaign.engine`, luetaan sallivasti:
-  tuntematon lippu/laskuri ja väärän tyyppiset pudotetaan, tallennus säilyy),
-  `types.ts`, `conditions.ts` (all/any/not, flag, counter, moonPhase, itemTaken;
-  jokainen tulos kertoo syyn suomeksi), `effects.ts` (setFlag, addCounter, giveItem,
-  takeItem, setSceneItemTakeMode, message; efektilista on **atominen**, eivät koske
-  `worldMinutes`iä), `engine.ts` (`postEvent`: säännöt määrittelyjärjestyksessä, efekti
-  ei synnytä uusia tapahtumia, ei ajastimia eikä `unless`ia), `take.ts` (esineen otto +
-  `item.taken`-säännöt yhtenä päivityksenä), `dialogue.ts` (sama ehto/efektijärjestelmä),
-  `summary.ts` (suomenkielinen yhteenveto), `runtime.ts` (store + moottori),
-  `content.ts` (**pelin oikea data**: `RULES`, `SAGE_DIALOGUE`, `GAME_WORLD`).
-  Tapahtumat: `item.taken`, `npc.talked`, `scene.entered` (3D lähettää kaikki).
-  Jokaisella säännöllä ja dialogilla on pakollinen `intent` (suunnitteluaie-lause;
-  testi vaatii). ROADMAPin hyväksymiskriteeri "emäntä kertoo huhun" on testattu
-  testimaailmalla (`engine.test.ts`), ei pelisääntönä: pelin oikea sisältö on vain
-  tietäjä + tuohikontti (omistajan rajaus).
+- **Maailmamoottori v0 (V2), `src/world/`**, Three.js- ja DOM-vapaa:
+  `registry.ts` (tunnetut liput, laskurit, esineiden nimet; **uusi lippu lisätään
+  tänne**), `state.ts` (`campaign.engine`, versioitu lohko, luetaan sallivasti),
+  `conditions.ts` (all/any/not, flag, counter, moonPhase, itemTaken; syy suomeksi),
+  `effects.ts` (setFlag, addCounter, giveItem, takeItem, setSceneItemTakeMode,
+  message; efektilista **atominen**, ei koske `worldMinutes`iä), `engine.ts`
+  (`postEvent`: säännöt määrittelyjärjestyksessä; ei ajastimia, `unless`ia eikä
+  ketjureaktioita), `take.ts` (esineen otto + `item.taken` yhtenä päivityksenä),
+  `dialogue.ts`, `summary.ts`, `runtime.ts`, `content.ts` (**pelin oikea data**:
+  `RULES`, `SAGE_DIALOGUE`, `GAME_WORLD`). Tapahtumat `item.taken`, `npc.talked`,
+  `scene.entered`. Jokaisella säännöllä ja dialogilla pakollinen `intent`-lause
+  (testi vaatii). "Emäntä kertoo huhun" on testattu testimaailmalla, ei pelisääntönä.
 - **Konsoli `__world`** (3D): `flags`, `counters`, `post(event)`, `explain(ruleId?)`,
   `describe()` (kaikki säännöt ja dialogit proosana omistajan hyväksyttäväksi),
   `last`, `items` (poimittavat esineet ja katseen kohde), `scene`. Sama olio sisältää
   `world.ts`:n tilastot (puut, kolmiot, törmäykset), jotka `world.ts` liittää siihen.
-- **Dialogi 3D:ssä** (`engine/dialogue.ts`, `#dialogue` index.html:ssä): puhe-ele
-  (`melee.ts` `gestureEffect`) lähettää `npc.talked`in ja avaa dialogin, jos
-  `findDialogue(ARENA, npcId)` löytyy; muille hahmoille näytetään vain nimi.
-  Dialogin ajan pelilogiikka ja pelin aika ovat pysähdyksissä (maisema liikkuu),
-  hiiren lukitus vapautuu, valinta numerolla 1-9 tai klikkauksella, Esc sulkee.
-  **Ensimmäinen polku (`lakeside`, tietäjä `tietaja`, esine `lakeside.sage-pack`):**
-  pyyntö asettaa lipun `sage.permission` ja `setSceneItemTakeMode(allowed)`, jolloin
-  otto ei ole varkaus. Luvaton otto (`item.taken`, theft, kohtaus `lakeside`) jättää
-  varkausloki-tietueen **ja** sääntö `sage.theft-noticed` asettaa `sage.robbed`,
-  kasvattaa laskuria `thefts.noticed` ja näyttää viestin; tietäjän dialogi vaihtuu
-  (`robbed` → anteeksipyyntö → `forgiven`, loki säilyy). Hävitetyllä rannalla
-  (`lakeruin`) ja pihalla tietäjällä ei ole dialogia eikä varkaus laukaise seurausta.
-- **Käsin testattu 2026-11-16 Clauden in-app-selaimessa (dev-palvelin):** dialogi avautui
-  puheesta, klikkaus/numero valitsi, Esc sulki ilman taukoa; lupa säilyi uudelleenlatauksen
-  yli; luvaton otto antoi viestin, liput, lokin ja `explain`in; pihalla puhe näytti vain
-  nimen; ei konsolivirheitä. **Ei testattu:** oikea hiiren lukitus dialogissa, ruudunlukija,
-  englanninkieliset tekstit.
+- **Dialogi 3D:ssä** (`engine/dialogue.ts`, `#dialogue`): puhe-ele (`melee.ts`
+  `gestureEffect`) lähettää `npc.talked`in ja avaa dialogin, jos `findDialogue(ARENA,
+  npcId)` löytyy, muuten näyttää vain nimen. Pelilogiikka ja aika seisovat, valinta
+  numerolla 1-9 tai klikkauksella, Esc sulkee. **Ensimmäinen polku** (`lakeside`,
+  `tietaja`, `lakeside.sage-pack`): pyyntö antaa luvan (`sage.permission`,
+  `setSceneItemTakeMode`); luvaton otto kirjaa varkauden ja sääntö `sage.theft-noticed`
+  asettaa `sage.robbed`, laskurin `thefts.noticed` ja viestin; dialogi vaihtuu
+  (anteeksipyyntö → `forgiven`, loki säilyy). `lakeruin`issa ja pihalla ei seurausta.
 - **Rauhallisten 3D-kohtausten esineet.** `sceneInteraction.ts` valitsee
   sankarin katseakselilta enintään 2,8 m:n päässä olevan esineen. HUDin pieni
   piste projisoidaan maailmaan; osuva piste näyttää esineen nimen, varkauden ja
@@ -63,8 +75,8 @@ Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b675df9`)
   oton eleen keskellä. Tallennus tehdään ennen 3D-juuren poistamista; epäonnistunut
   tallennus jättää esineen paikalleen. `world.ts`:n dynaamiset esineet jakavat
   GLB-prototyyppien geometrian ja materiaalit, eikä niillä ole liikecollidereita.
-  Instanssit: `lakeside.sage-pack` (sama myös `lakeruin`issa),
-  `yard.table-flatbread` (3 rieskaa) ja `yard.table-dried-fish` (3 kalaa).
+  Instanssit: `lakeside.sage-pack` (sama myös `lakeruin`issa) sekä pihassa
+  `<pihan tunniste>.table-flatbread` (3 rieskaa) ja `.table-dried-fish` (3 kalaa).
   Pöydän muut astiat jäävät paikoilleen ruoan ottamisen jälkeen.
 - **Esinedomain ja pysyvyys.** Kampanjaskeema 5 ja avain
   `laulun-miekka.campaign.v5`; v4 migroidaan menettämättä etenemistä.
@@ -216,8 +228,8 @@ Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b675df9`)
   aikaa. Vesi ja joki ovat jalan kulkukelvottomia paitsi joen kivinen kahlaamo
   (13,11), joka maksaa 20 aikayksikköä. `crossingId` on terrainista erillinen,
   joten myöhempi silta voi käyttää samaa sääntöä. Joki kiemurtelee keskisen
-  järven etelälaidasta itäiseen ulkoveteen. Paikat: aloitus (10,14), piha
-  (10,11), punainen käsi (13,14), rantamökki (9,6), kalmisto (16,16).
+  järven etelälaidasta itäiseen ulkoveteen. Kiinteät paikat: aloitus (10,14),
+  punainen käsi (13,14), rantamökki (9,6), kalmisto (16,16); pihat ovat instansseja.
 - **Aika ja kylläisyys.** Erillistä karttavoimaa ei ole. Tallennuksen
   `worldMinutes` on nyt pelaajalta piilotettu tausta-aika: maastokustannukset
   ja kylläisyyden kulumisnopeus 0,05 / yksikkö säilyivät ennallaan. Yksi
@@ -253,9 +265,9 @@ Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b675df9`)
   tavaranapit eivät vuoda kartan näppäinohjaukseen.
 - **Paikat.** `src/map/sites.ts` omistaa 2D-instanssin liikkumisen
   (`fixed|mobile`), elinkaaren (`persistent|temporary`), sijainnin ja erillisen
-  `sceneId`-kytkennän. Piha, järven ranta, nuotioaukio ja kalmisto ovat `fixed+persistent`:
-  ne löytyvät lähinäössä ja jäävät sen jälkeen sumuun himmeinä. Sama 3D-scene
-  voidaan myöhemmin kytkeä moneen eri 2D-instanssiin. Enter tai välilyönti
+  `sceneId`-kytkennän. Pihat (instanssit), järven ranta, nuotioaukio ja kalmisto ovat
+  `fixed+persistent`: ne löytyvät lähinäössä ja jäävät sen jälkeen sumuun himmeinä.
+  Sama 3D-scene on kytketty kahteen 2D-instanssiin (`yard`, `yard-b`). Enter tai välilyönti
   aktivoi sankarin ruudun paikan kuten ennen.
 - **Yleinen 2D→3D-silta** on `src/map/transition.ts`. Kohtaukset luokitellaan
   `src/app/route.ts`:ssä. `SCENE_TRANSITION_BALANCE` säätää vaikutuksen:
@@ -294,14 +306,13 @@ Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b675df9`)
 - **UI ja kielituki.** Kartan pellavapohja, kirjontakehykset, paperinukke,
   kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
   tyypitetyissä FI/EN-sanakirjoissa.
-- **Tarkistukset 2026-11-17 (v04.01.00):** `bun run test` (22 tiedostoa,
-  258 testiä), `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja
-  `git diff --check` läpäisty. Buildin ainoa varoitus on ennestään suuri
-  3D-chunk: 828,66 kt, gzip 223,10 kt; karttasovellus 25,59 kt, gzip 13,53 kt.
-  Kaikki 16 rantamaskia ja kahlaamo tarkastettiin staattisesta renderikoosteesta:
-  saumat sulkeutuvat. In-app-selain ei tavoittanut localhostia, joten oikeaa
-  karttanäkymää ei tarkastettu selaimessa.
-- **Riippuvuustarkistus:** 2026-11-17, ei mitään odottamassa; audit puhdas.
+- **Tarkistukset 2026-11-17 (v04.02.00):** `bun run test` (23 tiedostoa, 272
+  testiä; `vitest run` ottaa mukaan myös `.worktrees/`-kopiot), `bun run lint`,
+  `bun run build` ja `git diff --check` läpäisty. Build varoittaa vain
+  ennestään suuresta 3D-chunkista. Rantamaskit ja kahlaamo (Codex) on tarkastettu
+  vain staattisesta renderikoosteesta.
+- **Riippuvuustarkistus:** 2026-11-17, ei mitään odottamassa; audit puhdas (viimeksi ajettu
+  tässä sessiossa: vite 8.3.8 jo päivitetty).
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
   3D:ssä `window.__game`. Selainpaneelin fokus voi pysäyttää 3D-pelin.
 
@@ -310,8 +321,10 @@ Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b675df9`)
 - Maastokustannukset, kylläisyyden kulumisnopeus, ruokien arvot, 50/0-rajat
   ja 20/40-rangaistukset ovat omistajan ensimmäinen päätös, eivät vielä
   laajasti pelitestattua tasapainoa.
-- Prototyyppikartta on käsin tehty ja kiinteä. Deterministinen
-  siemenpohjainen generaattori, juonipaikkojen ehdot ja validaattori puuttuvat.
+- Prototyyppikartta on käsin tehty; vain pihojen paikat ja jousineidon talo
+  arvotaan. Tallennettu piha jää paikalleen, vaikka Codex muuttaisi karttamaastoa
+  myöhemmin: jos pihan ruutu muuttuu kulkukelvottomaksi, sille ei ole korjausta.
+  Sijoitteluluvut (etäisyydet, 150 min) ovat arvio; löydettävyys selviää pelaamalla.
 - Liikkuvien ja väliaikaisten kohtaamisten luokitus sekä piirron piilotussääntö
   ovat valmiina, mutta niiden instanssilistaa, liikeratoja tai poistumistiloja
   ei ole vielä toteutettu.
@@ -323,7 +336,7 @@ Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b675df9`)
 - Paperinuken viisi vaatepaikkaa ovat vasta visuaalisia varauksia. Vain
   pää- ja sivukäsi ovat toimivia; alkuvarusteet eivät vie tavarapaikkoja.
 - Sukupuolivalinta vaihtaa 2D-kartan spriten, paperinuken ja kylläisyyskasvot
-  sekä 3D-sankarin (jousineidon vartalo). Jousineito-NPC pihalla on edelleen
+  sekä 3D-sankarin (jousineidon vartalo). Jousineito-NPC pihalla (vain `archer`-talossa) on
   jousen kanssa, joten naissankarin rinnalla on kaksi samannäköistä hahmoa.
   Naissankarin kilpi on selässä jousineidon viinen päällä.
 - Paluusillan kuljetus toimii, mutta 3D ei vielä myönnä palkintoja eikä kartta
@@ -354,10 +367,11 @@ Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b675df9`)
 
 ## Seuraava tehtävä
 
-Omistaja pelaa dialogipolun käsin (tietäjä rannalla: luvallinen ja luvaton otto) ja
-hyväksyy `__world.describe()`-tulosteen sääntöjen aikeet. Sen jälkeen ROADMAPin
-**V3: paikkainstanssit ja satunnaiset pihapiirit** (`claude/cairn-map-site` on mergattu).
-Älä aloita V3:a ennen omistajan palautetta, jos hän muuttaa dialogin tai sääntöjen muotoa.
+Omistaja pelaa V3:n (kaksi pihaa löytyy ja on saavutettavissa; jousineito vain toisessa)
+ja kertoo, ovatko etäisyydet sopivat. Sen jälkeen ROADMAPin **V4: laulun opettelu**:
+**esitä ensin omistajalle ehdokkaat kolmannen laulun sanoiksi Kalevalasta (1849) ja odota
+valintaa**; älä toteuta opettelua ennen sitä. Älä aloita V4:ää ennen V3:n palautetta,
+jos omistaja muuttaa pihojen sijoittelua.
 
 ## Ei vielä aloiteta
 

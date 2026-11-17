@@ -72,6 +72,17 @@ export function saveArena(id: ArenaId): boolean {
 
 /** Tällä latauksella käytössä oleva alue. */
 export const ARENA: ArenaId = requestedArena() ?? savedArena();
+/**
+ * Pihakohtauksen instanssi (V3): sama `yard`-kohtaus ajetaan usealle kartan pihalle, ja instanssi
+ * määrää esineiden tunnisteiden etuliitteen ("yard", "yard-b") sekä sen, onko jousineito paikalla.
+ * `scene3d.ts` asettaa arvon kampanjan paikkainstanssista ennen maailman rakentamista.
+ */
+export const siteInstance = { id: "yard", archer: true };
+export function setSiteInstance(next: { id: string; archer: boolean }) {
+  siteInstance.id = next.id;
+  siteInstance.archer = next.archer;
+}
+
 /** Rauhallinen paikka: kohtaus alkaa ilman vastustajia. Paikka voi silti muuttua vihamieliseksi,
  *  koska vastustajat tuo kohtaus (Encounter), ei paikka. */
 export const ARENA_PEACEFUL = ARENA === "yard" || ARENA === "lakeside" || ARENA === "lakeruin" || ARENA === "cairnfield";
@@ -1137,14 +1148,14 @@ function populate(
       tableProp("kauha", -0.3, 0.22, 0, 1.2);
       const [breadX, breadZ] = tablePoint(-0.12, -0.08);
       putSceneItem({
-        id: "yard.table-flatbread", siteId: "yard", itemId: "barley_flatbread", model: "rieska", quantity: 3,
+        id: `${siteInstance.id}.table-flatbread`, siteId: siteInstance.id, itemId: "barley_flatbread", model: "rieska", quantity: 3,
         takeMode: "theft", ownerId: "household",
         x: breadX, y: tableTopY, z: breadZ, yaw: TABLE.yaw,
         focusY: 0.05, focusRadius: 0.28,
       });
       const [fishX, fishZ] = tablePoint(0.42, 0.08);
       putSceneItem({
-        id: "yard.table-dried-fish", siteId: "yard", itemId: "dried_fish", model: "kuivakalat", quantity: 3,
+        id: `${siteInstance.id}.table-dried-fish`, siteId: siteInstance.id, itemId: "dried_fish", model: "kuivakalat", quantity: 3,
         takeMode: "theft", ownerId: "household",
         x: fishX, y: tableTopY + 0.012, z: fishZ, yaw: TABLE.yaw + 0.5,
         focusY: 0.04, focusRadius: 0.29,
@@ -1226,13 +1237,16 @@ function populateYardLife(scene: THREE.Scene, collision: CollisionWorld) {
   }));
   solid("tietaja", tx, tz, 0.4);
 
-  const jx = 2.3, jz = 8.9;
-  jobs.push(spawnVillager(scene, {
-    url: villagersFUrl, character: "jousineito", x: jx, y: groundHeight(jx, jz), z: jz, yaw: facing(jx, jz, -1, 0), scale: 0.95,
-    armL: { upper: [0.16, -1, 0.06], fore: [0.12, -0.25, 1] },
-    prop: { name: "jousi", hand: "L", kind: "bow", grip: GRIP_FEMALE_L },
-  }));
-  solid("jousineito", jx, jz, 0.38);
+  // Jousineito on vain siinä pihassa, jonka instanssi niin määrää (satunnaisesti valittu talo).
+  if (siteInstance.archer) {
+    const jx = 2.3, jz = 8.9;
+    jobs.push(spawnVillager(scene, {
+      url: villagersFUrl, character: "jousineito", x: jx, y: groundHeight(jx, jz), z: jz, yaw: facing(jx, jz, -1, 0), scale: 0.95,
+      armL: { upper: [0.16, -1, 0.06], fore: [0.12, -0.25, 1] },
+      prop: { name: "jousi", hand: "L", kind: "bow", grip: GRIP_FEMALE_L },
+    }));
+    solid("jousineito", jx, jz, 0.38);
+  }
 
   const dx = -1.7, dz = -3.9;
   jobs.push(spawnAnimal(scene, { url: dogUrl, x: dx, y: groundHeight(dx, dz), z: dz, yaw: facing(dx, dz, 1, 3), behavior: "dog" }));

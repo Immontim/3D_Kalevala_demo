@@ -10,7 +10,7 @@ import { frame, initLoop } from "./engine/loop";
 import { initPauseMenu, loadSavedTuning } from "./ui/pauseMenu";
 import { skirmish } from "./engine/skirmish";
 import { cairnfieldVisit, lakeruinVisit, lakesideVisit, visit } from "./engine/encounter";
-import { ARENA, ARENA_PEACEFUL } from "./world";
+import { ARENA, ARENA_PEACEFUL, setSiteInstance } from "./world";
 import { g } from "./engine/state";
 import { initStartMenu } from "./ui/startMenu";
 import { initDebug } from "./debug";
@@ -42,6 +42,11 @@ export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   PLAYER_LOOK.loadout = loadout;
   PLAYER_LOOK.female = campaign.player.gender === "female";
   loadSavedTuning(); // ennen kuin yhtään hahmoa luodaan
+  // Pihakohtaus saa instanssinsa parametrit (esinetunnisteet, jousineito) kampanjasta ennen rakentamista.
+  if (route.scene === "yard") {
+    const instance = campaign.world.siteInstances.find((entry) => entry.id === (route.site ?? "yard"));
+    setSiteInstance(instance ? { id: instance.id, archer: instance.archer } : { id: "yard", archer: true });
+  }
   initView();
   initCampaignStore(campaign);
   configureSceneItems();

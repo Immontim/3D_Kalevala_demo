@@ -111,6 +111,21 @@ export interface SceneItemState {
   nextDroppedItemId: number;
 }
 
+/** Kartalle konkretisoitu paikkainstanssi. Tallennetaan tulos eikä vain siementä (generaattori muuttuu). */
+export type SiteInstanceKind = "yard";
+
+export interface SiteInstance {
+  /** Pysyvä tunniste, myös 3D-esineiden etuliite: "yard" (vanhan tallennuksen piha) ja "yard-b". */
+  id: string;
+  kind: SiteInstanceKind;
+  x: number;
+  y: number;
+  /** Pihan parametri: onko jousineito paikalla (V6: hän antaa taivaanrautamiekan). */
+  archer: boolean;
+}
+
+export const SITE_INSTANCE_ID_PATTERN = /^[a-z][a-z0-9-]{0,39}$/;
+
 export interface CampaignWorld {
   mapId: string;
   width: number;
@@ -122,6 +137,10 @@ export interface CampaignWorld {
   knownSiteIds: string[];
   worldMinutes: number;
   sceneItems: SceneItemState;
+  /** Paikkojen sijoittelun siemen (0 = ei vielä arvottu, vanha tallennus). Satunnaisuus ei arvota uudelleen latauksessa. */
+  worldSeed: number;
+  /** Konkretisoidut satunnaiset paikat. Tyhjä lista = vielä sijoittamatta (täydennetään latauksessa). */
+  siteInstances: SiteInstance[];
 }
 
 export function createSceneItemState(): SceneItemState {
@@ -158,6 +177,8 @@ export interface CampaignStart {
   y?: number;
   discovered?: readonly boolean[];
   knownSiteIds?: readonly string[];
+  worldSeed?: number;
+  siteInstances?: readonly SiteInstance[];
 }
 
 /** Uusi kampanja alkaa kolmella rieskalla ja nykyistä 3D-oletusta vastaavilla varusteilla. */
@@ -183,6 +204,8 @@ export function createCampaign(start: CampaignStart = {}): CampaignState {
       knownSiteIds,
       worldMinutes: 0,
       sceneItems: createSceneItemState(),
+      worldSeed: start.worldSeed ?? 0,
+      siteInstances: (start.siteInstances ?? []).map((instance) => ({ ...instance })),
     },
     player: {
       gender: "male",
@@ -409,8 +432,9 @@ export function parseCampaign(value: unknown): CampaignState | null {
   return null;
 }
 
-type Version4CampaignWorld = Omit<CampaignWorld, "sceneItems">;
-type LegacyCampaignWorld = Omit<CampaignWorld, "knownSiteIds" | "sceneItems">;
+type SiteGenerationFields = "worldSeed" | "siteInstances";
+type Version4CampaignWorld = Omit<CampaignWorld, "sceneItems" | SiteGenerationFields>;
+type LegacyCampaignWorld = Omit<CampaignWorld, "knownSiteIds" | "sceneItems" | SiteGenerationFields>;
 type ParsedCampaignWorld = LegacyCampaignWorld & { knownSiteIds?: unknown; sceneItems?: unknown };
 
 function validLegacyWorld(value: unknown): value is ParsedCampaignWorld {
@@ -440,11 +464,13 @@ function withEmptySceneItems(world: Version4CampaignWorld): CampaignWorld {
     discovered: [...world.discovered],
     knownSiteIds: [...world.knownSiteIds],
     sceneItems: createSceneItemState(),
+    worldSeed: 0,
+    siteInstances: [],
   };
 }
 
 function withEmptySiteKnowledge(world: LegacyCampaignWorld): CampaignWorld {
-  return { ...world, discovered: [...world.discovered], knownSiteIds: [], sceneItems: createSceneItemState() };
+  return { ...world, discovered: [...world.discovered], knownSiteIds: [], sceneItems: createSceneItemState(), worldSeed: 0, siteInstances: [] };
 }
 
 function validSceneItemState(value: unknown): value is SceneItemState {
@@ -543,8 +569,32 @@ function validEquipment(value: unknown): value is Equipment {
   return combatLoadout({ mainHand: main, offHand: off }) !== null;
 }
 
-/** Jäsennetty kampanja ennen moottoriosion sallivaa lukua: vanhoissa tallennuksissa sitä ei ole. */
-type ParsedCampaign = Omit<CampaignState, "engine"> & { engine?: unknown };
+/**
+ * Jäsennetty kampanja ennen sallivaa lukua: moottoriosiota ja paikkainstansseja ei ole vanhoissa
+ * tallennuksissa, ja ne luetaan aina sallivasti (virheellinen osa pudotetaan, tallennus säilyy).
+ */
+type ParsedCampaign = Omit<CampaignState, "engine" | "world"> & {
+  engine?: unknown;
+  world: Omit<CampaignWorld, SiteGenerationFields> & { worldSeed?: unknown; siteInstances?: unknown };
+};
+
+/** Pudottaa virheelliset ja päällekkäiset instanssit; ei koskaan hylkää koko kampanjaa. */
+export function parseSiteInstances(value: unknown, width: number, height: number): SiteInstance[] {
+  if (!Array.isArray(value)) return [];
+  const result: SiteInstance[] = [];
+  const ids = new Set<string>();
+  const cells = new Set<string>();
+  for (const entry of value.slice(0, 32)) {
+    if (!isRecord(entry) || entry.kind !== "yard" || typeof entry.id !== "string"
+      || !SITE_INSTANCE_ID_PATTERN.test(entry.id) || ids.has(entry.id)
+      || !integerBetween(entry.x, 0, width - 1) || !integerBetween(entry.y, 0, height - 1)
+      || cells.has(`${entry.x},${entry.y}`) || typeof entry.archer !== "boolean") continue;
+    ids.add(entry.id);
+    cells.add(`${entry.x},${entry.y}`);
+    result.push({ id: entry.id, kind: "yard", x: entry.x as number, y: entry.y as number, archer: entry.archer });
+  }
+  return result;
+}
 
 function cloneCampaign(state: ParsedCampaign): CampaignState {
   return {
@@ -553,6 +603,8 @@ function cloneCampaign(state: ParsedCampaign): CampaignState {
       ...state.world,
       discovered: [...state.world.discovered],
       knownSiteIds: [...state.world.knownSiteIds],
+      worldSeed: integerBetween(state.world.worldSeed, 0, 0xffffffff) ? state.world.worldSeed as number : 0,
+      siteInstances: parseSiteInstances(state.world.siteInstances, state.world.width, state.world.height),
       sceneItems: {
         takenInstanceIds: [...state.world.sceneItems.takenInstanceIds],
         takeModeOverrides: state.world.sceneItems.takeModeOverrides.map((entry) => ({ ...entry })),
