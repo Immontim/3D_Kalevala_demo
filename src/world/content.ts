@@ -27,6 +27,18 @@ export const RULES: Rule[] = [
       { kind: "message", text: "song.lesson.learned", sub: "song.lesson.learnedSub" },
     ],
   },
+  {
+    id: "louhi.banished",
+    intent: "Kun pelaaja laulaa Pohjolan unen onnistuneesti kalmistolla Louhen kuuluvilla, Louhi vaipuu uneen ja poistuu, ja vainolaisten leiri paljastuu kartalle. Epäonnistunut yritys ei rankaise.",
+    on: { type: "song.performed", songId: "sleep", context: "cast", success: true, sceneId: "cairnfield", nearNpcId: "louhi" },
+    when: { kind: "flag", flag: "louhi.banished", value: false },
+    then: [
+      { kind: "setFlag", flag: "louhi.banished" },
+      { kind: "revealSite", siteId: "campfire" },
+      { kind: "removeNpc", npcId: "louhi" },
+      { kind: "message", text: "world.louhi.banished", sub: "world.louhi.banishedSub" },
+    ],
+  },
 ];
 
 /** Laulun opettelun valinta (V4): näkyy, kunnes Pohjolan uni on opittu. */

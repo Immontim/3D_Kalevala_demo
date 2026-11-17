@@ -10,7 +10,7 @@ import { frame, initLoop } from "./engine/loop";
 import { initPauseMenu, loadSavedTuning } from "./ui/pauseMenu";
 import { skirmish } from "./engine/skirmish";
 import { cairnfieldVisit, lakeruinVisit, lakesideVisit, visit } from "./engine/encounter";
-import { ARENA, ARENA_PEACEFUL, setSiteInstance } from "./world";
+import { ARENA, ARENA_PEACEFUL, cairnState, setSiteInstance } from "./world";
 import { g } from "./engine/state";
 import { initStartMenu } from "./ui/startMenu";
 import { initDebug } from "./debug";
@@ -47,6 +47,7 @@ export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
     const instance = campaign.world.siteInstances.find((entry) => entry.id === (route.site ?? "yard"));
     setSiteInstance(instance ? { id: instance.id, archer: instance.archer } : { id: "yard", archer: true });
   }
+  cairnState.louhiBanished = campaign.engine.flags["louhi.banished"] === true;
   initView();
   initCampaignStore(campaign);
   configureSceneItems();

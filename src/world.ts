@@ -21,9 +21,9 @@ import mossNorUrl from "../assets/ground/moss_nor.webp";
 import dirtDiffUrl from "../assets/ground/dirt_diff.webp";
 import dirtNorUrl from "../assets/ground/dirt_nor.webp";
 import { COLLISION, CollisionWorld } from "./collision";
-import { spawnAnimal, spawnVillager, updateFolk } from "./folk";
+import { spawnAnimal, spawnVillager, updateFolk, vanishVillager } from "./folk";
 import { t, type TextKey } from "./i18n";
-import { addTalkable } from "./interact";
+import { addTalkable, removeTalkable } from "./interact";
 import { birdLevelAtDistance } from "./ambience";
 import { SCENE_IDS, type SceneId } from "./app/route";
 
@@ -81,6 +81,20 @@ export const siteInstance = { id: "yard", archer: true };
 export function setSiteInstance(next: { id: string; archer: boolean }) {
   siteInstance.id = next.id;
   siteInstance.archer = next.archer;
+}
+
+/** Kalmiston pysyvä tila: Louhi on karkotettu (`louhi.banished`), eikä häntä luoda. `scene3d.ts` asettaa ennen rakennusta. */
+export const cairnState = { louhiBanished: false };
+
+/**
+ * Poistaa hahmon kesken kohtauksen (moottorin `removeNpc`-toimi): kyläläinen vaipuu näkyvistä,
+ * este poistuu käytöstä ja hahmolle ei voi enää puhua. Palauttaa true, jos jokin poistettiin.
+ */
+export function removeNpcFromScene(npcId: string, collision: CollisionWorld): boolean {
+  const gone = vanishVillager(npcId);
+  const blocked = collision.disable(`folk:${npcId}`);
+  const talk = removeTalkable(npcId);
+  return gone || blocked || talk;
 }
 
 /** Rauhallinen paikka: kohtaus alkaa ilman vastustajia. Paikka voi silti muuttua vihamieliseksi,
@@ -465,6 +479,8 @@ export interface World {
   setTakenSceneItemIds(ids: readonly string[]): void;
   /** Poistaa yhden esineen näkymästä ja estää sen myöhäisen luonnin. */
   removeSceneItem(id: string): boolean;
+  /** Poistaa hahmon (esim. "louhi") kesken kohtauksen; false, jos häntä ei ole. */
+  removeNpc(npcId: string): boolean;
   /** Siirtää kameran paikan pois rakennusten sisältä (pihapiirissä kehän sisäpuolelle). */
   clearCamera(pos: THREE.Vector3): void;
   /** focus = kulkija (sankari), jota pihan väki katsoo. */
@@ -1318,13 +1334,14 @@ export function birdSongLevel(x: number, z: number): number {
 
 /** Kalmiston väki: Louhi seisoo karsikkomännyn vieressä ja katsoo kuppikiveä kohti, rauhassa ja liikkumatta. */
 function populateCairnLife(scene: THREE.Scene, collision: CollisionWorld) {
+  if (cairnState.louhiBanished) return Promise.resolve();      // karkotettu: tallennus muistaa
   const { x, z } = LOUHI_AT;
   const yaw = Math.atan2(CUPSTONE.x - x, CUPSTONE.z - z);
   collision.add({ id: "folk:louhi", kind: "circle", x, z, radius: 0.4, blocksMovement: true, blocksMelee: false });
   addTalkable({ id: "louhi", x, z, name: t("folk.louhi") });
   // Naishahmon käsivarret kuten emännällä: kädet edessä rennosti yhdessä.
   return spawnVillager(scene, {
-    url: louhiUrl, character: "louhi", x, y: groundHeight(x, z), z, yaw,
+    id: "louhi", url: louhiUrl, character: "louhi", x, y: groundHeight(x, z), z, yaw,
     armL: { upper: [0.1, -1, 0.1], fore: [-0.25, -0.75, 0.6] }, armR: { upper: [0.1, -1, 0.1], fore: [-0.25, -0.75, 0.6] },
   });
 }
@@ -1544,6 +1561,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     sceneItem: (id) => runtimeSceneItems.get(id),
     setTakenSceneItemIds,
     removeSceneItem,
+    removeNpc: (npcId) => removeNpcFromScene(npcId, collision),
     clearCamera(pos) {
       const r = Math.hypot(pos.x, pos.z);
       if (r > SITE.camMaxR) { pos.x *= SITE.camMaxR / r; pos.z *= SITE.camMaxR / r; }

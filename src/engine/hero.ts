@@ -8,7 +8,7 @@ import { bearing } from "./camera";
 import { lockTarget } from "./enemies";
 import { strikeHeld } from "./input";
 import { lerpAngle, moveActor, startAttack, startGesture } from "./melee";
-import { openChoice, songState } from "./song";
+import { canSingAtPeace, openChoice, songState } from "./song";
 import { DEG, aim, g, inputs, keys, sfx } from "./state";
 import { t } from "../i18n";
 import { ARENA_PEACEFUL, SPAWN, groundHeight } from "../world";
@@ -95,7 +95,8 @@ export function updatePlayer(dt: number) {
   }
 
   if (p.state === "idle" || p.state === "block") {
-    if (inputs.songQueued && g.songPower >= COMBAT.songMax) {
+    // Rauhassa laulunappi avaa renkaan ilman voimaa: siellä voi laulaa vain rauhan laulun (songAvailable).
+    if (inputs.songQueued && (g.songPower >= COMBAT.songMax || (calm && canSingAtPeace()))) {
       openChoice();
       return;
     }

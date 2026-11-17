@@ -6,41 +6,46 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-17 (Claude, Windows; pohja `origin/main` `809398a`)
+Päivitetty: 2026-11-17 (Claude, Windows; pohja `origin/main` `6504b2c`)
 
-- **Branchin `claude/song-learning` koodiversio on v04.03.00** (V4: laulun opettelu,
-  alla). Koodi valmis, ei deployattu, käsin testattu selaimessa, omistaja ei vielä
-  pelannut. Tarkista merge-tila ennen jatkamista:
-  `git merge-base --is-ancestor claude/song-learning origin/main`. V1-V3 ja Codexin
-  kahlaamo on mergattu; omistaja hyväksyi dialogin sävyn (muut hahmot puhuvat vähemmän
-  kalevalamittaisesti, vanhahtavaan poljentoon pyritään) ja testasi V3:n (toimii).
-- **Laulun opettelu (V4).** Kolmas laulu **Pohjolan uni** (`SONGS.sleep`, rune ᛋ,
-  Kalevala runo 42: poimittu 8 säettä kahdesta peräkkäisestä kohdasta, omistajan valinta C).
-  Rannan tietäjän dialogissa "Opeta minulle laulu" -> `songIntro` -> "Olen valmis" ->
-  efekti `startSongLesson`, jonka moottori palauttaa `OutAction`ina (`actions`; moottori
-  ei tee UI-toimia itse). `engine/dialogue.ts` sulkee dialogin ja kutsuu
-  `engine/song.ts` `startLesson`: sama rytmipeli, mutta `SongState.lesson` -> maailma
-  ei hidastu (`loop.ts`), seuraava säe näytetään etukäteen ja vihjeteksti vaihtuu.
-  Päätyttyä `endLesson` lähettää tapahtuman `song.performed {songId, context:
-  "lesson", success, hits, sceneId}`; sääntö `sage.song-learned` (vain `lakeside`,
-  `context: lesson`, `success`) asettaa lipun `song.sleep.learned` ja viestin, ja
-  dialogi avataan uudelleen (solmu `taught`). Epäonnistuminen ei rankaise: opettelun
-  voi toistaa. Onnistumisraja on sama `SONG.minHits` (4/8). Loukattu tietäjä
-  (`sage.robbed`) ei opeta; anteeksiannon jälkeen opettaa. `songLogic.songSlots(flags)`
-  sijoittaa opitun laulun ensimmäiseen vapaaseen paikkaan (F3); `engine/song.ts`
-  päivittää paikat `refreshSlots`illa valintarenkaan avautuessa, joten laulu on
-  käytettävissä myös taistelukohtauksissa. **Laulun vaikutus puuttuu**: taistelussa
-  laulettu Pohjolan uni vain näyttää viestin ja lähettää `song.performed`
-  (`context: "cast"`); V5 käyttää sitä Louhen karkotukseen. Kielet FI/EN.
-  **Testattu:** Vitest (säkeet, paikat, opettelupolut, väärä konteksti/kohtaus,
-  anteeksianto) ja selaimessa onnistunut ja epäonnistunut harjoitus, flagin tallentuminen,
-  laulu kehässä rannalla ja nuotioaukiolla, ei konsolivirheitä. **Ei testattu:** oikea
-  näppäimistö/hiirirytmi ihmiskäsin, ääni, kuvakaappaus (aikakatkaisut).
-- **Satunnaiset pihapiirit (V3, mergattu).** Pihat ovat kampanjan `world.siteInstances`
-  (`yard`/`yard-b`, `x`, `y`, `archer`) ja `world.worldSeed`; skeema/avain 5/v5 (luku
-  sallivaa). Vanha piha = `yard` (esine-ID:t `yard.table-*`), toinen `yard-b.table-*`.
-  Koodi: `map/placement.ts`, `map/siteInstances.ts`, `sites.ts` `siteIdAt`; kartta välittää
-  `?site=<id>`, `scene3d.ts` `setSiteInstance`, `world.ts` jousineito vain `archer`-pihaan.
+- **Branchin `claude/louhi-banish` koodiversio on v04.04.00** (V5: Louhen karkotus,
+  alla). Koodi valmis, ei deployattu, käsin testattu selaimessa; omistaja ei testaa V5:ttä
+  erikseen vaan pelaa MVP:tä kokonaisuutena. Tarkista merge-tila ennen jatkamista:
+  `git merge-base --is-ancestor claude/louhi-banish origin/main`. V1-V4 ja Codexin kahlaamo
+  on mergattu; omistaja hyväksyi dialogin sävyn ja testasi V3:n (toimii).
+- **Louhen karkotus (V5).** Laulun Pohjolan uni onnistunut laulaminen kalmistolla (`cairnfield`)
+  enintään 6 m (`SONG_AUDIENCE_RANGE`) Louhesta: `engine/song.ts` `endSong` lähettää
+  `song.performed` (cast) kentällä `nearNpcId` (lähin puhuteltava, `interact.ts`
+  `nearestTalkable`), ja sääntö `louhi.banished` (`world/content.ts`) asettaa lipun
+  `louhi.banished`, efektin `revealSite campfire` (`map/reveal.ts`: tunnetuksi + ruudun
+  3x3 näkyviin) ja `removeNpc louhi` (`OutAction`, 3D tekee: `world.removeNpc` ->
+  `folk.ts` `vanishVillager` pienentää ja painaa hahmon maahan 2,2 s, `CollisionWorld.disable`,
+  `removeTalkable`) sekä viestin. Pysyvyys: `cairnState.louhiBanished` luetaan
+  lipusta `scene3d.ts`:ssä ennen rakennusta, eikä Louhea luoda. Epäonnistunut tai liian
+  kaukainen laulu ei muuta tilaa eikä rankaise. **Rauhassa laulaminen:** laulurengas avautuu
+  rauhallisessa kohtauksessa (ilman taistelun voimaa) vain, jos pelaajalla on rauhassa
+  laulettava laulu (`SongDef.peaceful`, nyt vain `sleep`; `canSingAtPeace`); suo ja
+  parannus ovat rauhassa harmaina. **Leiri (`campfire`, punainen käsi) on lukossa:**
+  `MapSiteDefinition.requiresFlag = "louhi.banished"`; `siteUnlocked` piilottaa sen,
+  estää löytämisen, Enterin ja viestin kartalla (`discoverVisibleSites`/`mapSiteDisplay`/
+  `sceneForMapSite` ottavat `flags`). Esc-valikon oikotie `clearing`iin on silti auki
+  (kehittäjän oikotie). **Testattu:** Vitest (sääntö, epäonnistumiset, yksi kerta,
+  tallennus, paljastus, lukitus, estojen poisto) ja selaimessa koko polku (leiri piilossa,
+  liian kaukaa kaikuu, läheltä Louhi katoaa, uudelleenlatauksessa poissa, leiri avautuu).
+  **Ei testattu:** ihmiskäsin rytmi, ääni (`sfx.swamp`), katoamisen ulkoasu liikkeessä.
+- **Laulun opettelu (V4, mergattu).** Laulu **Pohjolan uni** (`SONGS.sleep`, rune ᛋ,
+  Kalevala runo 42, omistajan valinta C). Tietäjän dialogi "Opeta minulle laulu" ->
+  `songIntro` -> "Olen valmis" -> efekti `startSongLesson` (`OutAction`; moottori ei tee
+  UI-toimia) -> `engine/song.ts` `startLesson`: sama rytmipeli, `SongState.lesson` (maailma
+  ei hidastu, seuraava säe näkyy etukäteen). `endLesson` lähettää `song.performed`
+  (lesson); sääntö `sage.song-learned` (vain `lakeside`) asettaa `song.sleep.learned` ja
+  dialogi avautuu (`taught`). Epäonnistuminen ei rankaise; raja `SONG.minHits` (4/8).
+  Loukattu tietäjä ei opeta ennen anteeksiantoa. `songLogic.songSlots(flags)` sijoittaa
+  opitun laulun paikkaan F3; `refreshSlots` päivittää renkaan avautuessa.
+- **Satunnaiset pihapiirit (V3, mergattu).** Kampanjan `world.siteInstances` (`yard`/`yard-b`,
+  `archer`) ja `worldSeed`; skeema 5/v5. Vanha piha = `yard` (`yard.table-*`), toinen
+  `yard-b.table-*`. `map/placement.ts`, `map/siteInstances.ts`, `sites.ts` `siteIdAt`;
+  kartta välittää `?site=<id>`, `scene3d.ts` `setSiteInstance`, jousineito vain `archer`-pihaan.
 - **CampaignStore (V1).** `map/campaignStore.ts`: 3D:n yksi tilan omistaja, `update(fn)`
   tallentaa ennen käyttöönottoa; 3D:ssä `engine/store.ts` (`campaignStore()`,
   `worldRuntime()`). Kartta (`map/app.ts`) lataa kampanjan omaan muuttujaansa.
@@ -306,12 +311,14 @@ Päivitetty: 2026-11-17 (Claude, Windows; pohja `origin/main` `809398a`)
 - **UI ja kielituki.** Kartan pellavapohja, kirjontakehykset, paperinukke,
   kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
   tyypitetyissä FI/EN-sanakirjoissa.
-- **Tarkistukset 2026-11-17 (v04.03.00):** `bunx vitest run --exclude ".worktrees/**"` (23
-  tiedostoa, 278 testiä; pelkkä `bun run test` ottaa mukaan `.worktrees/`-kopiot), `bun run
-  lint`, `bun run build`, `git diff --check` läpäisty. Build varoittaa vain ennestään
-  suuresta 3D-chunkista (832 kt, gzip 224 kt). Rantamaskit ja kahlaamo (Codex) on tarkastettu
-  vain staattisesta renderikoosteesta.
-- **Riippuvuustarkistus:** 2026-11-17, ei mitään odottamassa; `bun audit` puhdas ja `bun outdated` tyhjä.
+- **Tarkistukset 2026-11-17 (v04.04.00):** `bunx vitest run --exclude ".worktrees/**"` (24
+  tiedostoa, 288 testiä), `bun run lint`, `bun run build`, `git diff --check` läpäisty;
+  build varoittaa vain suuresta 3D-chunkista (835 kt, gzip 225 kt).
+- **Riippuvuustarkistus:** 2026-11-17: `bun outdated` tyhjä, mutta **`bun audit` löysi 1 korkean
+  löydöksen: picomatch 4.0.7 (ReDoS, GHSA-fc5q-39xc-vjpf) vite/vitest-kehitystyökalujen
+  kautta**. Vain kehitysaikainen, ei kulje pelaajalle. **Päivitysajoa ehdotettu omana
+  branchinaan, odottaa omistajan lupaa** (`bun audit fix` tai lockfilen uusinta; ei apupaketin
+  `bun update`).
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
   3D:ssä `window.__game`. Selainpaneelin fokus voi pysäyttää 3D-pelin.
 
@@ -366,13 +373,13 @@ Päivitetty: 2026-11-17 (Claude, Windows; pohja `origin/main` `809398a`)
 
 ## Seuraava tehtävä
 
-Omistaja pelaa V4:n (tietäjä opettaa Pohjolan unen; laulu F3-paikkaan). Sen jälkeen
-ROADMAPin **V5: Louhen karkotus laululla** (`song.performed` `cast` kalmistolla Louhen
-läheisyydessä; moottoriin tarvitaan efekti "paljasta paikka" ja Louhen poistuminen
-kohtauksesta). **Omistajan jonossa oleva pihojen väen viilaus** (tee V5:n kanssa tai heti
-sen jälkeen, omistaja päättää): tietäjät pois pihoista (MVP:ssä yksi tietäjä, rannalla),
-nuori urho tietäjän paikalle `archer`-vapaassa pihassa (urho on vain taistelija
-`characters.glb`:ssä, rauhan asento/kyläläistuki puuttuu), emäntien ja jousineidon dialogit.
+ROADMAPin **V6: jousineidon haara** (loukkaantunut jousineito `archer`-pihassa; parannuslaulu
+rauhalliseen NPC:hen antaa taivaanrautamiekan; tarvitsee laulun kohteeksi NPC:n, uuden
+esinemäärittelyn, `combatLoadout`-kartoituksen ja Blender-mallin). **Omistajan jonossa oleva
+pihojen väen viilaus** (voidaan tehdä V6:n yhteydessä, koska se koskee samaa pihaa):
+tietäjät pois pihoista (MVP:ssä yksi tietäjä, rannalla), nuori urho tietäjän paikalle
+`archer`-vapaassa pihassa (urho on vain taistelija `characters.glb`:ssä, rauhan
+asento/kyläläistuki puuttuu), emäntien ja jousineidon dialogit. Pidä tähtäin MVP:ssä.
 
 ## Ei vielä aloiteta
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { STRIKES } from "./combat";
-import { TALK_ZONE, USE_ZONE, pickTarget } from "./interact";
+import { TALKABLES, TALK_ZONE, USE_ZONE, addTalkable, clearTalkables, nearestTalkable, pickTarget, removeTalkable } from "./interact";
 
 const at = (x: number, z: number, id = "x") => ({ id, name: id, x, z });
 const hero = (yaw = 0) => ({ x: 0, z: 0, yaw });
@@ -46,5 +46,21 @@ describe("puheen kantama ja sektori", () => {
     expect(USE_ZONE.range).toBeLessThan(TALK_ZONE.range);
     expect(pickTarget(hero(), [at(0, 2)], USE_ZONE)).toBeNull();
     expect(pickTarget(hero(), [at(0, 1.2)], USE_ZONE)).not.toBeNull();
+  });
+});
+
+describe("puhuteltavat ja laulun kuulija", () => {
+  it("lähin kuulija annetun matkan sisällä, ja poistettu hahmo ei enää kuulu", () => {
+    clearTalkables();
+    addTalkable({ id: "louhi", name: "Louhi", x: -9, z: 7 });
+    addTalkable({ id: "tietaja", name: "Tietäjä", x: 0, z: 0 });
+    expect(nearestTalkable({ x: -6, z: 7 }, 6)?.id).toBe("louhi");
+    expect(nearestTalkable({ x: -2, z: 7 }, 6)).toBeNull();             // liian kaukana: 6 m raja
+    expect(nearestTalkable({ x: -9, z: 6 }, 6)?.id).toBe("louhi");
+    expect(removeTalkable("louhi")).toBe(true);
+    expect(removeTalkable("louhi")).toBe(false);
+    expect(nearestTalkable({ x: -9, z: 7 }, 6)).toBeNull();
+    expect(TALKABLES).toHaveLength(1);
+    clearTalkables();
   });
 });
