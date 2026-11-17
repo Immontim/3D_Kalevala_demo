@@ -196,7 +196,7 @@ export const ENEMY_AI = {
 };
 
 export type Loadout = "sword" | "sword_shield" | "spear";
-export type WeaponId = "sword" | "spear";
+export type WeaponId = "sword" | "spear" | "sky_iron_sword";
 /** Iskun suunta: ylälyönti, sivallus sivulta tai pisto suoraan eteen. */
 export type StrikeStyle = "overhead" | "slash" | "thrust";
 export type StrikeWeight = "light" | "heavy";
@@ -270,6 +270,12 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     id: "spear", name: t("weapon.spear"), damage: 1.1, reach: 1.0, lunge: 0.3, minRange: 1.3, slowness: 1.35,
     styles: { thrust: 1.3 }, blockArc: Math.PI / 4,
   },
+  // Taivaanrautamiekka: sama miekka (sama malli, iskut ja kantama), mutta taivaan raudasta takoen
+  // 30 % tehokkaampi. Mitattava ero perusmiekkaan on vain vahingossa (ks. combat.test.ts).
+  sky_iron_sword: {
+    id: "sky_iron_sword", name: t("weapon.skyIronSword"), damage: 1.3, reach: 0, lunge: 0, minRange: 0, slowness: 1,
+    styles: { overhead: 1, slash: 1, thrust: 1 }, blockArc: Math.PI / 4,
+  },
 };
 
 export interface ShieldDef {
@@ -286,8 +292,10 @@ export const SHIELDS: Record<"round", ShieldDef> = {
   round: { durability: 10, blockArc: Math.PI / 3, notchAt: 0.5 },
 };
 
-export function weaponOf(loadout: Loadout): WeaponDef {
-  return loadout === "spear" ? WEAPONS.spear : WEAPONS.sword;
+/** Aseen määrittely varustuksesta. `skyIron` vaihtaa miekan taivaanrautamiekaksi (keihäs ei muutu). */
+export function weaponOf(loadout: Loadout, skyIron = false): WeaponDef {
+  if (loadout === "spear") return WEAPONS.spear;
+  return skyIron ? WEAPONS.sky_iron_sword : WEAPONS.sword;
 }
 
 /** Valmiiksi laskettu isku: iskun ja aseen arvot yhdistettynä. */

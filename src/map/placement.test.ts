@@ -2,15 +2,18 @@ import { describe, expect, it } from "vitest";
 import { createCampaign, parseCampaign, parseSiteInstances, serializeCampaign, type SiteInstance } from "./campaign";
 import { mapCellTravel, mapCell } from "./domain";
 import {
+  CAMP_PLACEMENT,
   YARD_PLACEMENT,
   chebyshev,
   placeYardInstances,
   rngStream,
+  placeCampInstance,
   travelMinutes,
+  validateCampPlacement,
   validateYardPlacement,
 } from "./placement";
 import { PROTOTYPE_START } from "./prototype";
-import { PROTOTYPE_PLACEMENT, completeYardInstances, newYardInstances } from "./siteInstances";
+import { PROTOTYPE_PLACEMENT, completeSiteInstances, newSiteInstances, newYardInstances } from "./siteInstances";
 import { LEGACY_YARD_POSITION } from "./sites";
 import { newCampaign } from "./storage";
 
@@ -99,7 +102,8 @@ describe("paikkainstanssit kampanjassa", () => {
   it("uusi matka tallentaa siemenen ja konkretisoidut pihat, jotka säilyvät tallennuksen läpi", () => {
     const state = newCampaign(777);
     expect(state.world.worldSeed).toBe(777);
-    expect(state.world.siteInstances).toEqual(newYardInstances(777));
+    expect(state.world.siteInstances).toEqual(newSiteInstances(777));
+    expect(state.world.siteInstances.map((i) => i.kind)).toEqual(["yard", "yard", "camp"]);
     expect(parseCampaign(serializeCampaign(state))?.world.siteInstances).toEqual(state.world.siteInstances);
     expect(parseCampaign(serializeCampaign(state))?.world.worldSeed).toBe(777);
   });
@@ -125,24 +129,63 @@ describe("paikkainstanssit kampanjassa", () => {
 
   it("vanha tallennus ilman instansseja saa kiinteän pihansa 'yard' ja arvotun 'yard-b'", () => {
     const old = createCampaign();                              // ei instansseja, siemen 0
-    const done = completeYardInstances(old, 4242);
+    const done = completeSiteInstances(old, 4242);
     const [a, b] = done.world.siteInstances;
+    expect(done.world.siteInstances.map((i) => i.id)).toEqual(["yard", "yard-b", "camp"]);
     expect(a).toEqual({ id: "yard", kind: "yard", x: LEGACY_YARD_POSITION.x, y: LEGACY_YARD_POSITION.y, archer: true });
     expect(b).toMatchObject({ id: "yard-b", archer: false });
     expect(done.world.worldSeed).toBe(4242);
     expect(validateYardPlacement([b], PROTOTYPE_PLACEMENT).filter((p) => !p.includes("kahdesti"))).toEqual([]);
     expect(chebyshev(a, b)).toBeGreaterThanOrEqual(YARD_PLACEMENT.minMutualDistance);
     // Täydennys on idempotentti: valmis maailma ei arvota uudelleen.
-    expect(completeYardInstances(done, 999)).toBe(done);
+    expect(completeSiteInstances(done, 999)).toBe(done);
   });
 
   it("täydennys ei muuta olemassa olevaa siementä ja arpoo vain puuttuvan pihan", () => {
     const partial = createCampaign({ worldSeed: 31, siteInstances: [{ id: "yard-b", kind: "yard", x: 8, y: 9, archer: true }] });
-    const done = completeYardInstances(partial, 1);
+    const done = completeSiteInstances(partial, 1);
     expect(done.world.worldSeed).toBe(31);
-    expect(done.world.siteInstances.map((i) => i.id).sort()).toEqual(["yard", "yard-b"]);
+    expect(done.world.siteInstances.map((i) => i.id).sort()).toEqual(["camp", "yard", "yard-b"]);
     expect(done.world.siteInstances.find((i) => i.id === "yard-b")).toEqual({ id: "yard-b", kind: "yard", x: 8, y: 9, archer: true });
     expect(done.world.siteInstances.filter((i) => i.archer)).toHaveLength(1);
     expect(PROTOTYPE_START).toBeDefined();
+  });
+});
+
+describe("vainolaisten leirin sijoittelu", () => {
+  it("1000 siementä: leiri on kartan reunalla, kaukana aloituksesta, saavutettavissa ja pihoista etäällä", () => {
+    const minutes = travelMinutes(PROTOTYPE_PLACEMENT.map, PROTOTYPE_START);
+    for (let seed = 1; seed <= 1000; seed++) {
+      const all = newSiteInstances(seed);
+      const camp = all.find((i) => i.kind === "camp")!;
+      expect(all).toHaveLength(3);
+      expect(validateCampPlacement(camp, PROTOTYPE_PLACEMENT, all), `siemen ${seed}`).toEqual([]);
+      expect(validateYardPlacement(all.filter((i) => i.kind === "yard"), PROTOTYPE_PLACEMENT), `siemen ${seed}`).toEqual([]);
+      expect(chebyshev(camp, PROTOTYPE_START)).toBeGreaterThanOrEqual(CAMP_PLACEMENT.minStartDistance);
+      expect(minutes[camp.y * 20 + camp.x]).toBeLessThanOrEqual(CAMP_PLACEMENT.maxStartMinutes);
+    }
+  });
+
+  it("leiri vaihtelee siemenestä ja on riippumaton pihojen virrasta", () => {
+    const spots = new Set<string>();
+    for (let seed = 1; seed <= 300; seed++) {
+      const camp = newSiteInstances(seed).find((i) => i.kind === "camp")!;
+      spots.add(`${camp.x},${camp.y}`);
+    }
+    expect(spots.size).toBeGreaterThan(8);
+    expect(newSiteInstances(99)).toEqual(newSiteInstances(99));
+  });
+
+  it("validaattori hylkää leirin, joka on keskellä, lähellä aloitusta, väärällä maastolla tai pihan vieressä", () => {
+    const camp = placeCampInstance(5, PROTOTYPE_PLACEMENT, []);
+    const bad = (over: Partial<SiteInstance>, others: SiteInstance[] = []) =>
+      validateCampPlacement({ ...camp, ...over }, PROTOTYPE_PLACEMENT, others).join(" | ");
+    expect(bad({})).toBe("");
+    expect(bad({ x: 10, y: 10 })).toContain("ei ole kartan reunalla");
+    expect(bad({ x: 8, y: 17 })).toContain("liian lähellä aloitusta");
+    expect(bad({ x: 0, y: 0 })).toContain("maasto water");
+    expect(bad({}, [{ id: "yard", kind: "yard", x: camp.x, y: camp.y, archer: false }])).toContain("liian lähellä paikkaa yard");
+    expect(bad({ x: 99 })).toContain("kartan ulkopuolella");
+    expect(CAMP_PLACEMENT.edgeBand).toBeGreaterThan(0);
   });
 });

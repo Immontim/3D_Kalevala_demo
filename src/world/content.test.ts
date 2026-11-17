@@ -4,6 +4,7 @@ import { finnishText } from "../i18n";
 import { createCampaign, parseCampaign, serializeCampaign, type SceneItemDefinition } from "../map/campaign";
 import { createCampaignStore } from "../map/campaignStore";
 import { PROTOTYPE_MAP_ID } from "../map/prototype";
+import { newSiteInstances } from "../map/siteInstances";
 import { conditionRefs } from "./conditions";
 import { GAME_WORLD } from "./content";
 import { effectRefs } from "./effects";
@@ -17,7 +18,7 @@ const PACK: SceneItemDefinition = {
 };
 
 function setup() {
-  const store = createCampaignStore(createCampaign({ mapId: PROTOTYPE_MAP_ID }), () => true);
+  const store = createCampaignStore(createCampaign({ mapId: PROTOTYPE_MAP_ID, siteInstances: newSiteInstances(1) }), () => true);
   const runtime = createWorldRuntime(store, GAME_WORLD);
   return { store, runtime };
 }
@@ -208,7 +209,7 @@ describe("Louhen karkotus (V5)", () => {
     expect(out.result.messages).toHaveLength(1);
     const state = store.get();
     expect(state.engine.flags["louhi.banished"]).toBe(true);
-    expect(state.world.knownSiteIds).toContain("campfire");
+    expect(state.world.knownSiteIds).toContain("camp");
     expect(state.world.worldMinutes).toBe(0);                    // 3D ei kuluta maailma-aikaa
   });
 
@@ -241,7 +242,7 @@ describe("Louhen karkotus (V5)", () => {
     runtime.post(cast());
     const reloaded = parseCampaign(serializeCampaign(store.get()))!;
     expect(reloaded.engine.flags["louhi.banished"]).toBe(true);
-    expect(reloaded.world.knownSiteIds).toContain("campfire");
+    expect(reloaded.world.knownSiteIds).toContain("camp");
   });
 
   it("säännöstä generoitu yhteenveto kertoo karkotuksen suomeksi", () => {
@@ -250,5 +251,87 @@ describe("Louhen karkotus (V5)", () => {
     expect(text).toContain("louhi.banished");
     expect(text).toContain("poistuu kohtauksesta");
     expect(text).toContain("paljastuu kartalle");
+  });
+});
+
+describe("jousineito, emäntä ja nuori urho (V6)", () => {
+  const heal = (over: Record<string, unknown> = {}) => ({
+    type: "song.performed", songId: "heal", context: "cast", success: true, hits: 6,
+    sceneId: "yard", nearNpcId: "jousineito", ...over,
+  }) as import("./types").GameEvent;
+
+  it("onnistunut parannuslaulu jousineidon kuuluvilla parantaa hänet ja pyytää 3D:tä nostamaan hänet seisomaan", () => {
+    const { store, runtime } = setup();
+    const out = runtime.post(heal());
+    expect(out.result.fired.map((f) => f.ruleId)).toEqual(["archer.healed"]);
+    expect(out.result.actions).toEqual([{ kind: "npcState", npcId: "jousineito", state: "healed" }]);
+    expect(out.result.messages).toHaveLength(1);
+    expect(store.get().engine.flags["archer.healed"]).toBe(true);
+    expect(store.get().player.inventory.stacks.some((s) => s.itemId === "sky_iron_sword")).toBe(false);   // miekka vasta dialogissa
+  });
+
+  it("epäonnistunut, kaukainen tai väärän kohtauksen parannus ei paranna eikä rankaise; toistuva ei tee mitään", () => {
+    for (const event of [heal({ success: false }), heal({ nearNpcId: undefined }), heal({ nearNpcId: "emanta" }), heal({ sceneId: "lakeside" }), heal({ context: "lesson" })]) {
+      const { store, runtime } = setup();
+      const before = store.get();
+      expect(runtime.post(event).result.fired, JSON.stringify(event)).toEqual([]);
+      expect(store.get()).toBe(before);
+    }
+    const { runtime } = setup();
+    runtime.post(heal());
+    expect(runtime.post(heal()).result.fired).toEqual([]);
+  });
+
+  it("jousineito antaa taivaanrautamiekan vain parannettuna, vain kerran ja vain laulamalla", () => {
+    const { store, runtime } = setup();
+    const wounded = runtime.startDialogue("yard", "jousineito")!;
+    expect(wounded.view.nodeId).toBe("wounded");
+    expect(wounded.view.choices.map((c) => c.id)).toEqual(["ask-story", "leave"]);    // ei miekkaa tarjolla
+    runtime.post(heal());
+    const reward = runtime.startDialogue("yard", "jousineito")!;
+    expect(reward.view.nodeId).toBe("reward");
+    const take = runtime.choose(reward, "take");
+    expect(take.saved && take.messages).toHaveLength(1);
+    const state = store.get();
+    expect(state.player.inventory.stacks.some((s) => s.itemId === "sky_iron_sword")).toBe(true);
+    expect(state.engine.flags["archer.gaveSword"]).toBe(true);
+    expect(runtime.startDialogue("yard", "jousineito")!.view.nodeId).toBe("after");   // ei toista kertaa
+  });
+
+  it("täysi inventaario ei hävitä miekkaa: valinta epäonnistuu ja sen voi toistaa", () => {
+    const { store, runtime } = setup();
+    store.update((s) => ({
+      ...s,
+      player: { ...s.player, inventory: { ...s.player.inventory, stacks: Array.from({ length: 8 }, () => ({ itemId: "birch_bark_pack" as const, quantity: 1 })) } },
+    }));
+    runtime.post(heal());
+    const reward = runtime.startDialogue("yard", "jousineito")!;
+    const failed = runtime.choose(reward, "take");
+    expect(failed.saved).toBe(false);
+    expect(store.get().engine.flags["archer.gaveSword"]).toBeUndefined();
+    expect(runtime.startDialogue("yard", "jousineito")!.view.nodeId).toBe("reward");
+  });
+
+  it("emäntä kertoo huhun, asettaa lipun ja merkitsee tietäjän rannan kartalle (kaikissa pihoissa)", () => {
+    const { store, runtime } = setup();
+    const talk = runtime.startDialogue("yard", "emanta")!;
+    expect(talk.view.nodeId).toBe("greet");
+    const asked = runtime.choose(talk, "ask-news");
+    expect(asked.saved && asked.next?.view.nodeId).toBe("rumor");
+    expect(store.get().engine.flags["rumor.heard"]).toBe(true);
+    expect(store.get().world.knownSiteIds).toContain("lakeside");
+    expect(runtime.startDialogue("yard", "emanta")!.view.nodeId).toBe("again");
+  });
+
+  it("nuorella urholla on dialogi pihassa, mutta tietäjällä ei enää ole (yksi tietäjä, rannalla)", () => {
+    const { runtime } = setup();
+    expect(runtime.startDialogue("yard", "urho")?.view.nodeId).toBe("greet");
+    expect(runtime.startDialogue("yard", "tietaja")).toBeNull();
+  });
+
+  it("tietäjän opetus merkitsee kalmiston kartalle", () => {
+    const { store, runtime } = setup();
+    runtime.post({ type: "song.performed", songId: "sleep", context: "lesson", success: true, hits: 7, sceneId: "lakeside" });
+    expect(store.get().world.knownSiteIds).toContain("cairnfield");
   });
 });

@@ -1,6 +1,6 @@
 # Roadmap — 3D Kalevala
 
-Päivitetty: 2026-11-17 (Claude; pohja `origin/main` `6504b2c`, koodiversio v04.04.00 branchilla `claude/louhi-banish`).
+Päivitetty: 2026-11-17 (Claude; pohja `origin/main` `0123847`, koodiversio v04.05.00 branchilla `claude/archer-sword`).
 
 Tämä on **suunta ja päätökset**, ei tehtävälista. Nykytila ja yksi seuraava
 tehtävä ovat `docs/AGENT_HANDOFF.md`:ssä, mallien ja assettien tila
@@ -54,8 +54,8 @@ ne ovat MVP:n jälkeen.
 | Kylläisyys, kuukalenteri, 2D→3D→2D-silta | Valmis |
 | `CampaignStore`, maailmamoottori v0, dialogi v0 | Valmis (V1–V2, v04.00.00): liput, laskurit, ehdot, efektit, tapahtumat, `__world` |
 
-Puuttuu: leirin päätös ja loppuruutu,
-satunnaiset pihapiirit, taivaanrautamiekka, laulu- ja paikkatapahtumat moottoriin.
+Puuttuu: aaltotaistelun voitto ja loppuruutu,
+taivaanrautamiekan oma malli.
 
 ## Vaiheet
 
@@ -86,15 +86,14 @@ asettaa lipun `louhi.banished`, Louhi vaipuu pois ja vainolaisten leiri paljastu
 (leiri on lukossa ennen sitä). Epäonnistuminen ei rankaise. Moottoriin tulivat efektit
 `revealSite` ja `removeNpc`.
 
-**V6. Jousineidon haara.** Song-järjestelmään tarvitaan laulun kohteeksi
-rauhallinen NPC (`heal` on nyt itseen vaikuttava ja `needsEnemy: false`).
-Jousineito on loukkaantunut (istuu tai makaa olemassa olevalla asennolla);
-onnistuneesta parannuslaulusta hän antaa uuden esineen `sky_iron_sword`.
-Mukaan: esinedefinitio, aseen arvot `tuning.ts`:ssä, `combatLoadout`-kartoitus,
-taivaanrautamiekan malli (Blender). Valmis, kun miekka voidaan ottaa vain
-laulamalla, se näkyy kädessä 3D:ssä ja sillä on mitattava ero perusmiekkaan.
+**V6 (valmis, v04.05.00).** Jousineito makaa loukkaantuneena `archer`-pihassa; parannuslaulu
+rauhassa hänen kuuluvillaan parantaa hänet, ja dialogista saa `sky_iron_sword`in (vahinko 1,3,
+valittavissa kartan paperinuken pääkädeksi). Mukana: vainolaisten leiri arvotaan jokaiseen
+uuteen matkaan kartan reunalle kauas aloituksesta (instanssi `camp`), tietäjät pois pihoista,
+nuori urho `archer`-vapaaseen pihaan ja emännän huhu-dialogi. Taivaanrautamiekan oma Blender-malli
+puuttuu (väliaikainen sävytys).
 
-**V7. Leiri ja loppu.** Leiri on kartalla vasta V5:n jälkeen. Aaltotaistelun
+**V7. Leiri ja loppu.** Leiri on arvottu reunalle ja kartalla vasta V5:n jälkeen. Aaltotaistelun
 voitto päättää kampanjan: loppuruutu ja "jatka / aloita alusta". Valmis, kun
 koko peli pelataan alusta loppuun yhdellä tallennuksella ja uuden matkan voi
 aloittaa.

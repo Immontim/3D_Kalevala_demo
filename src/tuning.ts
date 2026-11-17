@@ -108,6 +108,7 @@ export const FIELDS: readonly Field[] = [
   { group: t("tune.group.stamina"), label: t("tune.field.weakDamage"), path: "stamina.weakDamage", min: 0, max: 1, step: 0.05 },
   { group: t("tune.group.weapons"), label: t("tune.field.swordDamage"), path: "weapons.sword.damage", min: 0, max: 10, step: 0.05 },
   { group: t("tune.group.weapons"), label: t("tune.field.spearDamage"), path: "weapons.spear.damage", min: 0, max: 10, step: 0.05 },
+  { group: t("tune.group.weapons"), label: t("tune.field.skyIronDamage"), path: "weapons.sky_iron_sword.damage", min: 0, max: 10, step: 0.05 },
   { group: t("tune.group.weapons"), label: t("tune.field.windup"), path: "combat.windupScale", min: 0.2, max: 5, step: 0.05 },
   { group: t("tune.group.weapons"), label: t("tune.field.strikePoint"), path: "combat.strikePoint", min: 0.1, max: 1, step: 0.05 },
   { group: t("tune.group.weapons"), label: t("tune.field.recovery"), path: "combat.recoveryScale", min: 0.2, max: 5, step: 0.05 },

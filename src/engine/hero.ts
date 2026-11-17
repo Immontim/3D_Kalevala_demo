@@ -29,7 +29,7 @@ export function savedLoadout(): Loadout {
   } catch { /* muisti ei käytössä */ }
   return "sword_shield";
 }
-export const PLAYER_LOOK: FighterLook = { character: "hero", loadout: savedLoadout() };
+export const PLAYER_LOOK: FighterLook = { character: "hero", loadout: savedLoadout(), skyIron: false };
 
 /** Uusi ehjä kilpi pelaajalle jokaiseen aaltoon. */
 export function renewPlayerShield() {

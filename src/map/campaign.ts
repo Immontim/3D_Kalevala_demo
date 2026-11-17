@@ -10,7 +10,7 @@ export const SATIETY_MAX = 100;
 
 export type PlayerGender = "male" | "female";
 export type FoodId = "barley_flatbread" | "dried_fish";
-export type EquipmentItemId = "sword" | "spear" | "round_shield";
+export type EquipmentItemId = "sword" | "sky_iron_sword" | "spear" | "round_shield";
 export type ItemId = FoodId | EquipmentItemId | "birch_bark_pack";
 
 export interface ItemDefinition {
@@ -40,6 +40,7 @@ export const ITEMS: Record<ItemId, ItemDefinition> = {
     stackMax: 1,
   },
   sword: { id: "sword", nameKey: "map.item.sword", stackMax: 1, equipmentSlot: "mainHand" },
+  sky_iron_sword: { id: "sky_iron_sword", nameKey: "map.item.skyIronSword", stackMax: 1, equipmentSlot: "mainHand" },
   spear: { id: "spear", nameKey: "map.item.spear", stackMax: 1, equipmentSlot: "mainHand" },
   round_shield: { id: "round_shield", nameKey: "map.item.roundShield", stackMax: 1, equipmentSlot: "offHand" },
 };
@@ -55,7 +56,7 @@ export interface Inventory {
 }
 
 export interface Equipment {
-  mainHand: Extract<EquipmentItemId, "sword" | "spear"> | null;
+  mainHand: Extract<EquipmentItemId, "sword" | "sky_iron_sword" | "spear"> | null;
   offHand: Extract<EquipmentItemId, "round_shield"> | null;
 }
 
@@ -112,10 +113,11 @@ export interface SceneItemState {
 }
 
 /** Kartalle konkretisoitu paikkainstanssi. Tallennetaan tulos eikä vain siementä (generaattori muuttuu). */
-export type SiteInstanceKind = "yard";
+export type SiteInstanceKind = "yard" | "camp";
+export const SITE_INSTANCE_KINDS: readonly SiteInstanceKind[] = ["yard", "camp"];
 
 export interface SiteInstance {
-  /** Pysyvä tunniste, myös 3D-esineiden etuliite: "yard" (vanhan tallennuksen piha) ja "yard-b". */
+  /** Pysyvä tunniste, myös 3D-esineiden etuliite: "yard" (vanhan tallennuksen piha), "yard-b" ja vainolaisten leiri "camp". */
   id: string;
   kind: SiteInstanceKind;
   x: number;
@@ -368,10 +370,25 @@ export function setEquipped(state: CampaignState, slot: keyof Equipment, itemId:
   } as CampaignState;
 }
 
+function isSwordMain(item: Equipment["mainHand"]): boolean {
+  return item === "sword" || item === "sky_iron_sword";
+}
+
+/** Onko pääkädessä taivaanrautamiekka? */
+export function isSkyIron(equipment: Equipment): boolean {
+  return equipment.mainHand === "sky_iron_sword";
+}
+
+/** Voiko pelaaja valita pääkätensä esineeksi (onko hänellä se)? Perusmiekka ja keihäs ovat aina käytössä. */
+export function ownsMainHand(state: CampaignState, item: NonNullable<Equipment["mainHand"]>): boolean {
+  return item !== "sky_iron_sword" || state.player.inventory.stacks.some((stack) => stack.itemId === "sky_iron_sword");
+}
+
 /** Muuntaa vain nykyisen 3D-moottorin tukemat käsi-varusteyhdistelmät Loadoutiksi. */
 export function combatLoadout(equipment: Equipment): Loadout | null {
-  if (equipment.mainHand === "sword" && equipment.offHand === "round_shield") return "sword_shield";
-  if (equipment.mainHand === "sword" && equipment.offHand === null) return "sword";
+  // Taivaanrautamiekka käyttää samaa miekan mallia ja otetta; ero on aseen arvoissa (`isSkyIron`).
+  if (isSwordMain(equipment.mainHand) && equipment.offHand === "round_shield") return "sword_shield";
+  if (isSwordMain(equipment.mainHand) && equipment.offHand === null) return "sword";
   if (equipment.mainHand === "spear" && equipment.offHand === null) return "spear";
   return null;
 }
@@ -564,7 +581,7 @@ function validEquipment(value: unknown): value is Equipment {
   if (!isRecord(value)) return false;
   const main = value.mainHand;
   const off = value.offHand;
-  if (!(main === null || main === "sword" || main === "spear")
+  if (!(main === null || main === "sword" || main === "sky_iron_sword" || main === "spear")
     || !(off === null || off === "round_shield")) return false;
   return combatLoadout({ mainHand: main, offHand: off }) !== null;
 }
@@ -585,13 +602,13 @@ export function parseSiteInstances(value: unknown, width: number, height: number
   const ids = new Set<string>();
   const cells = new Set<string>();
   for (const entry of value.slice(0, 32)) {
-    if (!isRecord(entry) || entry.kind !== "yard" || typeof entry.id !== "string"
+    if (!isRecord(entry) || !SITE_INSTANCE_KINDS.includes(entry.kind as SiteInstanceKind) || typeof entry.id !== "string"
       || !SITE_INSTANCE_ID_PATTERN.test(entry.id) || ids.has(entry.id)
       || !integerBetween(entry.x, 0, width - 1) || !integerBetween(entry.y, 0, height - 1)
       || cells.has(`${entry.x},${entry.y}`) || typeof entry.archer !== "boolean") continue;
     ids.add(entry.id);
     cells.add(`${entry.x},${entry.y}`);
-    result.push({ id: entry.id, kind: "yard", x: entry.x as number, y: entry.y as number, archer: entry.archer });
+    result.push({ id: entry.id, kind: entry.kind as SiteInstanceKind, x: entry.x as number, y: entry.y as number, archer: entry.archer });
   }
   return result;
 }

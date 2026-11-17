@@ -113,10 +113,12 @@ export interface SongDef {
   needsEnemy: boolean;
   /** Voiko laulun laulaa rauhassa (ilman taistelun voimaa), esim. tietäjän opettama laulu. */
   peaceful?: boolean;
+  /** Rauhassa laulu on käytettävissä vain, kun jokin näistä hahmoista on kuuluvilla (esim. loukkaantunut jousineito). */
+  peaceTargets?: readonly string[];
 }
 export const SONGS: Record<SongId, SongDef> = {
   bog: { id: "bog", name: t("song.bog.name"), rune: "ᛚ", verses: SONG_VERSES, needsEnemy: true },
-  heal: { id: "heal", name: t("song.heal.name"), rune: "ᛒ", verses: HEAL_VERSES, needsEnemy: false },
+  heal: { id: "heal", name: t("song.heal.name"), rune: "ᛒ", verses: HEAL_VERSES, needsEnemy: false, peaceTargets: ["jousineito"] },
   // Tietäjä opettaa; vaikutus (Louhen karkotus) tulee V5:ssä, joten laulu ei vaadi vastustajaa.
   sleep: { id: "sleep", name: t("song.sleep.name"), rune: "ᛋ", verses: SLEEP_VERSES, needsEnemy: false, peaceful: true },
 };

@@ -56,7 +56,7 @@ describe("kampanjan selainvarasto", () => {
 
     const migrated = loadCampaign(storage);
     // Vanha tallennus ei tunne pihainstansseja: kiinteä piha "yard" säilyy, "yard-b" arvotaan kerran.
-    expect(migrated.world.siteInstances.map((i) => i.id)).toEqual(["yard", "yard-b"]);
+    expect(migrated.world.siteInstances.map((i) => i.id)).toEqual(["yard", "yard-b", "camp"]);
     expect(migrated.world.siteInstances[0]).toMatchObject({ x: LEGACY_YARD_POSITION.x, y: LEGACY_YARD_POSITION.y, archer: true });
     expect(migrated.world.worldSeed).toBeGreaterThan(0);
     expect(migrated.world).toEqual({

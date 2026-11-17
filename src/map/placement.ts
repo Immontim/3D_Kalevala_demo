@@ -24,6 +24,23 @@ export const YARD_PLACEMENT = {
 } as const;
 
 export const YARD_INSTANCE_IDS = ["yard", "yard-b"] as const;
+export const CAMP_INSTANCE_ID = "camp";
+
+/**
+ * Vainolaisten leirin sijoittelusäännöt: kartan reunalla, kaukana aloituksesta. Kartan uloin
+ * kehä on vettä, joten "reuna" tarkoittaa maata aivan rannan tuntumassa.
+ */
+export const CAMP_PLACEMENT = {
+  /** Ruudun etäisyys lähimmästä kartan reunasta (0 = uloin ruutu) on enintään tämä. */
+  edgeBand: 4,
+  terrains: ["meadow", "forest", "deepForest", "rock"] as readonly TerrainId[],
+  /** Vähintään näin kaukana aloituksesta (Chebyshev): leiri on retken päässä, ei lähellä. */
+  minStartDistance: 8,
+  /** Enintään näin monta maailmaminuuttia reittiä aloituksesta (kampanjan pitää olla läpäistävissä). */
+  maxStartMinutes: 600,
+  /** Etäisyys pihoista ja kiinteistä paikoista (Chebyshev). */
+  minOtherDistance: 4,
+} as const;
 
 /** Siemenestä ja nimestä johdettu oma satunnaisvirta (mulberry32), jotta virrat eivät sekoita toisiaan. */
 export function rngStream(seed: number, name: string): () => number {
@@ -172,4 +189,52 @@ export function placeYardInstances(
     placed[Math.floor(rngStream(seed, "archer")() * placed.length)].archer = true;
   }
   return placed;
+}
+
+function edgeDistance(map: WorldMapDefinition, x: number, y: number): number {
+  return Math.min(x, y, map.width - 1 - x, map.height - 1 - y);
+}
+
+/** Leirin sijoittelun rikkomukset suomeksi (tyhjä = kelpaa). `others` = pihat ym. muut instanssit. */
+export function validateCampPlacement(camp: SiteInstance, context: PlacementContext, others: readonly SiteInstance[]): string[] {
+  const rules = CAMP_PLACEMENT;
+  const problems: string[] = [];
+  const label = `leiri ${camp.id} (${camp.x},${camp.y})`;
+  const cell = mapCell(context.map, camp.x, camp.y);
+  if (!cell) return [`${label}: ruutu on kartan ulkopuolella`];
+  if (edgeDistance(context.map, camp.x, camp.y) > rules.edgeBand) problems.push(`${label}: ei ole kartan reunalla`);
+  if (!(rules.terrains as readonly string[]).includes(cell.terrainId) || cell.crossingId) {
+    problems.push(`${label}: maasto ${cell.terrainId} ei kelpaa leirille`);
+  }
+  if (cell.siteId) problems.push(`${label}: ruudussa on jo paikka ${cell.siteId}`);
+  if (chebyshev(camp, context.start) < rules.minStartDistance) problems.push(`${label}: liian lähellä aloitusta`);
+  const cost = travelMinutes(context.map, context.start)[mapIndex(context.map, camp.x, camp.y)];
+  if (!Number.isFinite(cost)) problems.push(`${label}: ei saavuteta aloituksesta`);
+  else if (cost > rules.maxStartMinutes) problems.push(`${label}: matka ${cost} min ylittää rajan ${rules.maxStartMinutes}`);
+  for (const fixed of context.fixedSites) {
+    if (chebyshev(camp, fixed) < rules.minOtherDistance) problems.push(`${label}: liian lähellä kiinteää paikkaa (${fixed.x},${fixed.y})`);
+  }
+  for (const other of others) {
+    if (other.id !== camp.id && chebyshev(camp, other) < rules.minOtherDistance) problems.push(`${label}: liian lähellä paikkaa ${other.id}`);
+  }
+  return problems;
+}
+
+/**
+ * Arpoo vainolaisten leirin kartan reunalle kauas aloituksesta omasta satunnaisvirrastaan ("camp"),
+ * joten pihojen sijoittelun muutos ei siirrä leiriä. `others` ovat jo sijoitetut pihat.
+ */
+export function placeCampInstance(seed: number, context: PlacementContext, others: readonly SiteInstance[]): SiteInstance {
+  const rules = CAMP_PLACEMENT;
+  const candidates: MapPosition[] = [];
+  for (let y = 0; y < context.map.height; y++) {
+    for (let x = 0; x < context.map.width; x++) {
+      const candidate: SiteInstance = { id: CAMP_INSTANCE_ID, kind: "camp", x, y, archer: false };
+      if (edgeDistance(context.map, x, y) > rules.edgeBand) continue;
+      if (validateCampPlacement(candidate, context, others).length === 0) candidates.push({ x, y });
+    }
+  }
+  if (candidates.length === 0) throw new Error(`Leirille ei löydy kelvollista ruutua siemenellä ${seed}`);
+  const pick = candidates[Math.floor(rngStream(seed, "camp")() * candidates.length)];
+  return { id: CAMP_INSTANCE_ID, kind: "camp", x: pick.x, y: pick.y, archer: false };
 }

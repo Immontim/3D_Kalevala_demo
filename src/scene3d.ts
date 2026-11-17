@@ -10,11 +10,11 @@ import { frame, initLoop } from "./engine/loop";
 import { initPauseMenu, loadSavedTuning } from "./ui/pauseMenu";
 import { skirmish } from "./engine/skirmish";
 import { cairnfieldVisit, lakeruinVisit, lakesideVisit, visit } from "./engine/encounter";
-import { ARENA, ARENA_PEACEFUL, cairnState, setSiteInstance } from "./world";
+import { ARENA, ARENA_PEACEFUL, cairnState, setSiteInstance, yardState } from "./world";
 import { g } from "./engine/state";
 import { initStartMenu } from "./ui/startMenu";
 import { initDebug } from "./debug";
-import { combatLoadout } from "./map/campaign";
+import { combatLoadout, isSkyIron } from "./map/campaign";
 import { loadCampaign } from "./map/storage";
 import { sceneKind } from "./app/route";
 import {
@@ -40,6 +40,7 @@ export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   const loadout = combatLoadout(campaign.player.equipment);
   if (!loadout) throw new Error("Kampanjan varusteyhdistelmää ei voi tuoda 3D-kohtaukseen.");
   PLAYER_LOOK.loadout = loadout;
+  PLAYER_LOOK.skyIron = isSkyIron(campaign.player.equipment);
   PLAYER_LOOK.female = campaign.player.gender === "female";
   loadSavedTuning(); // ennen kuin yhtään hahmoa luodaan
   // Pihakohtaus saa instanssinsa parametrit (esinetunnisteet, jousineito) kampanjasta ennen rakentamista.
@@ -48,6 +49,7 @@ export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
     setSiteInstance(instance ? { id: instance.id, archer: instance.archer } : { id: "yard", archer: true });
   }
   cairnState.louhiBanished = campaign.engine.flags["louhi.banished"] === true;
+  yardState.archerHealed = campaign.engine.flags["archer.healed"] === true;
   initView();
   initCampaignStore(campaign);
   configureSceneItems();

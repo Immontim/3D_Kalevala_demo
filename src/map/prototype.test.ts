@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { TERRAIN_IDS, mapCell, mapCellTravel } from "./domain";
 import {
   CAIRNFIELD_POSITION,
-  CAMPFIRE_POSITION,
   FORD_POSITION,
   LAKESIDE_POSITION,
   PROTOTYPE_MAP,
@@ -36,7 +35,7 @@ describe("prototyyppikartta", () => {
         expect(Math.abs(x - previousX) + Math.abs(y - previousY)).toBe(1);
       }
     }
-    for (const position of [PROTOTYPE_START, YARD_POSITION, LAKESIDE_POSITION, CAMPFIRE_POSITION, CAIRNFIELD_POSITION]) {
+    for (const position of [PROTOTYPE_START, YARD_POSITION, LAKESIDE_POSITION, CAIRNFIELD_POSITION]) {
       expect(occupied.has(`${position.x},${position.y}`)).toBe(false);
     }
     const [firstX, firstY] = RIVER_ROUTE[0];
@@ -46,7 +45,7 @@ describe("prototyyppikartta", () => {
   });
 
   it("säilyttää kaikki pakolliset paikat saavutettavina aloituksesta", () => {
-    const targets = new Set([YARD_POSITION, LAKESIDE_POSITION, CAMPFIRE_POSITION, CAIRNFIELD_POSITION]
+    const targets = new Set([YARD_POSITION, LAKESIDE_POSITION, CAIRNFIELD_POSITION]
       .map(({ x, y }) => `${x},${y}`));
     const visited = new Set([`${PROTOTYPE_START.x},${PROTOTYPE_START.y}`]);
     const queue: { x: number; y: number }[] = [{ ...PROTOTYPE_START }];
@@ -105,11 +104,4 @@ describe("prototyyppikartta", () => {
     expect(neighbours).toContain("water");
   });
 
-  it("sijoittaa saavutettavan punaisen käden nuotioaukion taistelulle", () => {
-    const cell = mapCell(PROTOTYPE_MAP, CAMPFIRE_POSITION.x, CAMPFIRE_POSITION.y);
-    expect(cell?.terrainId).not.toBe("water");
-    expect(cell?.siteId).toBe("campfire");
-    expect(Math.abs(CAMPFIRE_POSITION.x - PROTOTYPE_START.x)
-      + Math.abs(CAMPFIRE_POSITION.y - PROTOTYPE_START.y)).toBeLessThanOrEqual(4);
-  });
 });

@@ -35,14 +35,17 @@ export type Effect =
   /** Paljastaa kartalle paikan: lisää sen tunnetuksi ja paljastaa ruudun ympäristöineen. */
   | { kind: "revealSite"; siteId: string }
   /** Pyytää 3D:tä poistamaan hahmon kohtauksesta heti (pysyvyys tulee lipusta, jonka sääntö asettaa). */
-  | { kind: "removeNpc"; npcId: string };
+  | { kind: "removeNpc"; npcId: string }
+  /** Pyytää 3D:tä vaihtamaan hahmon tilan heti (esim. jousineito "healed": nousee seisomaan). Pysyvyys tulee lipusta. */
+  | { kind: "setNpcState"; npcId: string; state: string };
 
 export interface OutMessage { text: TextKey; sub?: TextKey }
 
 /** Efektin pyyntö kutsujalle (UI tekee sen tilanmuutoksen jälkeen). Moottori ei tee sitä itse. */
 export type OutAction =
   | { kind: "songLesson"; songId: string }
-  | { kind: "removeNpc"; npcId: string };
+  | { kind: "removeNpc"; npcId: string }
+  | { kind: "npcState"; npcId: string; state: string };
 
 // ---------- Tapahtumat ----------
 

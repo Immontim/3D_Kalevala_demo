@@ -348,3 +348,25 @@ describe("tryRemoveItem", () => {
     expect(tryRemoveItem(inv, "dried_fish", 0)).toBeNull();
   });
 });
+
+describe("taivaanrautamiekka varusteena (V6)", () => {
+  it("käyttää miekan mallia ja kilpeä, ja se tunnistetaan omaksi aseekseen", async () => {
+    const { isSkyIron, ownsMainHand } = await import("./campaign");
+    expect(combatLoadout({ mainHand: "sky_iron_sword", offHand: "round_shield" })).toBe("sword_shield");
+    expect(combatLoadout({ mainHand: "sky_iron_sword", offHand: null })).toBe("sword");
+    expect(isSkyIron({ mainHand: "sky_iron_sword", offHand: null })).toBe(true);
+    expect(isSkyIron({ mainHand: "sword", offHand: null })).toBe(false);
+    const state = createCampaign();
+    expect(ownsMainHand(state, "sky_iron_sword")).toBe(false);          // ei vielä saatu
+    expect(ownsMainHand(state, "sword")).toBe(true);
+    const given = tryAddItem(state.player.inventory, "sky_iron_sword", 1)!;
+    expect(ownsMainHand({ ...state, player: { ...state.player, inventory: given } }, "sky_iron_sword")).toBe(true);
+    expect(ITEMS.sky_iron_sword).toMatchObject({ stackMax: 1, equipmentSlot: "mainHand" });
+  });
+
+  it("varustus säilyy tallennuksen läpi ja valinta onnistuu paperinuken tapaan", () => {
+    const state = setEquipped(createCampaign(), "mainHand", "sky_iron_sword");
+    expect(state.player.equipment.mainHand).toBe("sky_iron_sword");
+    expect(parseCampaign(serializeCampaign(state))?.player.equipment.mainHand).toBe("sky_iron_sword");
+  });
+});

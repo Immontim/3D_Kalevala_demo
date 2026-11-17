@@ -1,6 +1,6 @@
 import { createCampaign, parseCampaign, serializeCampaign, type CampaignState } from "./campaign";
 import { PROTOTYPE_MAP_ID, PROTOTYPE_START } from "./prototype";
-import { completeYardInstances, newYardInstances } from "./siteInstances";
+import { completeSiteInstances, newSiteInstances } from "./siteInstances";
 import { legacyKnownSiteIds } from "./sites";
 
 export const CAMPAIGN_STORE = "laulun-miekka.campaign.v5";
@@ -30,7 +30,7 @@ export function newCampaign(seed: number = randomSeed()): CampaignState {
     mapId: PROTOTYPE_MAP_ID,
     ...PROTOTYPE_START,
     worldSeed: seed,
-    siteInstances: newYardInstances(seed),
+    siteInstances: newSiteInstances(seed),
   });
 }
 
@@ -60,7 +60,7 @@ export function loadCampaign(storage?: CampaignStorage): CampaignState {
       };
       // Vanha tallennus tai puuttuva paikkainstanssi täydennetään kerran ja tallennetaan, ettei
       // arvonta toistu seuraavalla latauksella.
-      const completed = completeYardInstances(campaign, randomSeed());
+      const completed = completeSiteInstances(campaign, randomSeed());
       if (completed !== campaign) {
         try { target.setItem(CAMPAIGN_STORE, serializeCampaign(completed)); } catch { /* yritetään uudelleen */ }
         campaign = completed;

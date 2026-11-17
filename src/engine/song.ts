@@ -75,14 +75,19 @@ export const slotEls: HTMLDivElement[] = SONG_SLOTS.map((id, i) => {
 });
 export function songAvailable(id: SongId | null): id is SongId {
   if (id === null) return false;
-  // Rauhassa laulaa voi vain laulun, jonka vaikutus ei vaadi vastustajaa eikä taistelua (Pohjolan uni).
-  if (heroAtPeace() && !SONGS[id].peaceful) return false;
+  if (heroAtPeace()) {
+    // Rauhassa laulaa voi vain rauhan laulun (Pohjolan uni) tai laulun, jonka kohde on kuuluvilla (parannus jousineidolle).
+    const def = SONGS[id];
+    if (def.peaceful) return true;
+    const listener = nearestTalkable(g.player.pos, SONG_AUDIENCE_RANGE);
+    return !!def.peaceTargets && !!listener && def.peaceTargets.includes(listener.id);
+  }
   return !SONGS[id].needsEnemy || focusEnemy() !== null;
 }
 
 /** Onko pelaajalla opittu laulu, jonka voi laulaa rauhassa? Muuten rauhassa ei avata laulurengasta turhaan. */
 export function canSingAtPeace(): boolean {
-  return songSlots(campaignStore().get().engine.flags).some((id) => id !== null && !!SONGS[id].peaceful);
+  return songSlots(campaignStore().get().engine.flags).some((id) => id !== null && songAvailable(id));
 }
 
 /** Kuinka kaukaa hahmo kuulee laulun (m). Louhen karkotus vaatii, että laulaja on tämän matkan sisällä. */
@@ -273,11 +278,15 @@ export function endSong(id: SongId, success: boolean, rootTime: number, hits: nu
   // Sääntöjen pyytämät toimet: hahmo poistuu kohtauksesta heti (pysyvyys tulee säännön asettamasta lipusta).
   for (const action of posted.result.actions) {
     if (action.kind === "removeNpc") world.removeNpc(action.npcId);
+    else if (action.kind === "npcState") world.setNpcState(action.npcId, action.state);
   }
   // Suo lauletaan lukitun tai lähimmän vastustajan alle.
   const target = id === "heal" ? null : focusEnemy();
   if (id === "heal") {
-    if (hits > 0) showMsg(t("song.healSuccess"), t("song.healed", { hits, total, healed: Math.round(healed) }), 2.4);
+    // Sääntöjen seuraus (loukkaantunut jousineito paranee) menee laulun oman viestin edelle.
+    const consequence = posted.saved ? posted.result.messages[0] : undefined;
+    if (success && consequence) showMsg(t(consequence.text), consequence.sub ? t(consequence.sub) : "", 3.6);
+    else if (hits > 0) showMsg(t("song.healSuccess"), t("song.healed", { hits, total, healed: Math.round(healed) }), 2.4);
     else showMsg(t("song.failed"), t("song.rhythmFailed"), 1.6);
   } else if (id === "sleep") {
     // Vaikutus tulee sääntöjen kautta (Louhen karkotus); ilman kuulijaa laulu vain kaikuu.

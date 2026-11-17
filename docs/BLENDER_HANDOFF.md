@@ -235,6 +235,13 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja main eed0b8c)
   kulkee selässä kilven alla, ei kiinnity kilpeen.
 - Blender-skriptien polut on kovakoodattu (`C:\Data\3D Kalevala`).
 
+## Koodin väliaikaiset korvikkeet (odottavat malleja)
+
+- **Taivaanrautamiekka** (V6): perusmiekan malli, terä sävytetty (`fighter.ts`, `look.skyIron`). Tarvitaan
+  oma malli samoilla kiinnityspisteillä kuin `sword`illa.
+- **Loukkaantunut jousineito**: `lying`-asento (kuin kuollut tietäjä), ei jousta. Tarvitaan istuva/kyljellään-asento.
+- **Nuori urho kyläläisenä**: `char_urho` ilman aseita (`spawnVillager`); anna tarvittaessa oma rauhan asento.
+
 ## Seuraava Blender-tehtävä
 
 Ei avointa Blender-tehtävää. Ehdotus omistajalle: sormien viimeistely
