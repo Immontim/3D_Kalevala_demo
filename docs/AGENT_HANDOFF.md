@@ -6,13 +6,15 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `4a00026`)
+Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b695ff7`)
 
-- **Branchin `claude/world-engine-v0` koodiversio on v04.00.00** (CampaignStore,
-  maailmamoottori v0 ja tietäjän dialogi, alla). Koodi valmis, ei deployattu.
-  Käsin testattu Clauden in-app-selaimessa (alla), **omistaja ei vielä testannut**.
+- **Branchin `codex/deps-vite-8-3-8` koodiversio on v04.00.01.** Vite on
+  päivitetty 8.3.7 → 8.3.8; pelilogiikka ja assetit eivät muuttuneet. Koodi
+  valmis, ei deployattu. Selainkoe jäi ajamatta, koska in-app-selain ei tavoittanut
+  työpuun localhost-previewta ja Windowsin UI-ohjaus ei voinut varmistaa Chrome-
+  ikkunan URL:ia; omistaja hyväksyi 2026-11-17 commitin ilman selainkoetta.
   Tarkista merge-tila ennen jatkamista:
-  `git merge-base --is-ancestor claude/world-engine-v0 origin/main`.
+  `git merge-base --is-ancestor codex/deps-vite-8-3-8 origin/main`.
 - **CampaignStore (V1).** `src/map/campaignStore.ts` (puhdas) on 3D-puolen yksi
   tilan omistaja: `update(fn)` laskee uuden tilan, tallentaa sen ja ottaa sen
   käyttöön vasta onnistumisen jälkeen (epäonnistunut tallennus jättää tilan ja
@@ -296,13 +298,12 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja `origin/main` `4a00026`)
 - **UI ja kielituki.** Kartan pellavapohja, kirjontakehykset, paperinukke,
   kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
   tyypitetyissä FI/EN-sanakirjoissa.
-- **Tarkistukset 2026-11-16 (v04.00.00):** `bun run test` (22 versionhallittua
-  testitiedostoa, 253 testiä; `vitest run` ottaa mukaan myös `.worktrees/`-kopiot:
-  65 tiedostoa/732 testiä), `bun run lint`, `bun run build` ja `git diff --check`
-  läpäisty. Build varoittaa edelleen 3D-chunkin ylittävän 500 kt: 828,66 kt, gzip
-  223,10 kt; karttasovellus 20,43 kt, gzip 10,02 kt.
-- **Riippuvuustarkistus:** 2026-11-16: `bun audit` puhdas; `bun outdated`: vite 8.3.7 → 8.3.8
-  (rajojen sisäinen; **päivitysajoa ehdotettu omana branchinaan, odottaa omistajan lupaa**).
+- **Tarkistukset 2026-11-17 (v04.00.01):** `bun ci`, `bun audit`,
+  `bun outdated --no-cache`, `bun run test` (22 versionhallittua testitiedostoa,
+  253 testiä), `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja
+  `git diff --check` läpäisty. Build varoittaa edelleen 3D-chunkin ylittävän
+  500 kt: 828,66 kt, gzip 223,10 kt; karttasovellus 20,43 kt, gzip 10,02 kt.
+- **Riippuvuustarkistus:** 2026-11-17, ei mitään odottamassa; audit puhdas.
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
   3D:ssä `window.__game`. Selainpaneelin fokus voi pysäyttää 3D-pelin.
 
