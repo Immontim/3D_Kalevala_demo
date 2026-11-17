@@ -12,7 +12,9 @@ import { bindings, clearInputs, lockPointer } from "./input";
 import { paused } from "./loop";
 import { fx, g, inputs, sfx } from "./state";
 import { campaignStore, worldRuntime } from "./store";
-import { camera, canvas } from "./view";
+import { heroAtPeace } from "./hero";
+import { nearestTalkable } from "../interact";
+import { camera, canvas, world } from "./view";
 
 // ---------- Laulu ----------
 // Kulku: 1) maailma hidastuu, 2) pelaaja ottaa lauluasennon normaalinopeudella,
@@ -72,8 +74,19 @@ export const slotEls: HTMLDivElement[] = SONG_SLOTS.map((id, i) => {
   return d;
 });
 export function songAvailable(id: SongId | null): id is SongId {
-  return id !== null && (!SONGS[id].needsEnemy || focusEnemy() !== null);
+  if (id === null) return false;
+  // Rauhassa laulaa voi vain laulun, jonka vaikutus ei vaadi vastustajaa eikä taistelua (Pohjolan uni).
+  if (heroAtPeace() && !SONGS[id].peaceful) return false;
+  return !SONGS[id].needsEnemy || focusEnemy() !== null;
 }
+
+/** Onko pelaajalla opittu laulu, jonka voi laulaa rauhassa? Muuten rauhassa ei avata laulurengasta turhaan. */
+export function canSingAtPeace(): boolean {
+  return songSlots(campaignStore().get().engine.flags).some((id) => id !== null && !!SONGS[id].peaceful);
+}
+
+/** Kuinka kaukaa hahmo kuulee laulun (m). Louhen karkotus vaatii, että laulaja on tämän matkan sisällä. */
+export const SONG_AUDIENCE_RANGE = 6;
 export function openChoice() {
   choosing = true;
   clearInputs();
@@ -250,16 +263,27 @@ export function endLesson(id: SongId, lesson: SongLesson, success: boolean, hits
 export function endSong(id: SongId, success: boolean, rootTime: number, hits: number, healed: number) {
   closeSong();
   const total = SONGS[id].verses.length;
-  // Laulu taistelussa kerrotaan moottorille (V5: Louhen karkotus laulamalla kalmistolla).
-  worldRuntime().post({ type: "song.performed", songId: id, context: "cast", success, hits, sceneId: ARENA });
+  // Laulu kerrotaan moottorille. Lähin kuulija (esim. Louhi kalmistolla) kulkee mukana: sääntö
+  // `louhi.banished` vaatii hänen olevan kuuluvilla.
+  const listener = nearestTalkable(g.player.pos, SONG_AUDIENCE_RANGE);
+  const posted = worldRuntime().post({
+    type: "song.performed", songId: id, context: "cast", success, hits, sceneId: ARENA,
+    ...(listener ? { nearNpcId: listener.id } : {}),
+  });
+  // Sääntöjen pyytämät toimet: hahmo poistuu kohtauksesta heti (pysyvyys tulee säännön asettamasta lipusta).
+  for (const action of posted.result.actions) {
+    if (action.kind === "removeNpc") world.removeNpc(action.npcId);
+  }
   // Suo lauletaan lukitun tai lähimmän vastustajan alle.
   const target = id === "heal" ? null : focusEnemy();
   if (id === "heal") {
     if (hits > 0) showMsg(t("song.healSuccess"), t("song.healed", { hits, total, healed: Math.round(healed) }), 2.4);
     else showMsg(t("song.failed"), t("song.rhythmFailed"), 1.6);
   } else if (id === "sleep") {
-    // Vaikutus (Louhen karkotus) tulee V5:ssä; toistaiseksi laulu vain kaikuu.
-    if (success) showMsg(t("song.sleepSuccess"), t("song.sleepNoListener"), 2.4);
+    // Vaikutus tulee sääntöjen kautta (Louhen karkotus); ilman kuulijaa laulu vain kaikuu.
+    const consequence = posted.saved ? posted.result.messages[0] : undefined;
+    if (success && consequence) { sfx.swamp(); fx.shake = 0.2; showMsg(t(consequence.text), consequence.sub ? t(consequence.sub) : "", 3.6); }
+    else if (success) showMsg(t("song.sleepSuccess"), t("song.sleepNoListener"), 2.4);
     else showMsg(t("song.failed"), t("song.rhythmFailed"), 1.6);
   } else if (success && target) {
     target.state = "rooted";

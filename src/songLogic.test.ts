@@ -63,6 +63,9 @@ describe("laulut ja laulupaikat", () => {
     ]);
     for (const verse of SLEEP_VERSES) expect(verse).toMatchObject({ kind: "verbatim", lang: "fi", source: "Kalevala, runo 42" });
     expect(SONGS.sleep.needsEnemy).toBe(false);
+    expect(SONGS.sleep.peaceful).toBe(true);                       // vain tämän voi laulaa rauhassa
+    expect(SONGS.bog.peaceful).toBeUndefined();
+    expect(SONGS.heal.peaceful).toBeUndefined();
   });
   it("opeteltu laulu ilmestyy laulupaikkaan vasta lipun jälkeen ja vie ensimmäisen vapaan paikan", () => {
     expect(songSlots({})).toEqual(["bog", "heal", null, null, null]);

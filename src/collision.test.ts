@@ -70,3 +70,15 @@ describe("2,5D-törmäykset", () => {
     expect(defender.x - attacker.x).toBeGreaterThan(0.98);
   });
 });
+
+describe("esteen poisto käytöstä", () => {
+  it("poistettu hahmoeste ei enää työnnä eikä estä lyöntiä, ja tuntematon tunniste palauttaa false", () => {
+    const world = new CollisionWorld();
+    world.add({ id: "folk:louhi", kind: "circle", x: 0, z: 0, radius: 0.4, blocksMovement: true, blocksMelee: true });
+    expect(world.depenetrateDisc(0.1, 0, 0.5).x).not.toBeCloseTo(0.1, 2);       // työntää ulos
+    expect(world.disable("folk:louhi")).toBe(true);
+    expect(world.depenetrateDisc(0.1, 0, 0.5).x).toBeCloseTo(0.1, 5);           // ei enää estä
+    expect(world.firstMeleeHit(-2, 0, 2, 0)).toBeNull();
+    expect(world.disable("folk:ei-ole")).toBe(false);
+  });
+});

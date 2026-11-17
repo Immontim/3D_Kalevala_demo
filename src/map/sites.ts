@@ -17,6 +17,15 @@ export interface MapSiteDefinition {
   sceneId: SceneId;
   movement: MapSiteMovement;
   lifetime: MapSiteLifetime;
+  /** Paikka on piilossa ja sisäänpääsemätön, kunnes tämä moottorin lippu on asetettu. */
+  requiresFlag?: string;
+}
+
+export type SiteFlags = Readonly<Record<string, boolean>>;
+
+/** Onko paikka pelaajan käytettävissä (ei lipulla lukittu)? */
+export function siteUnlocked(definition: Pick<MapSiteDefinition, "requiresFlag"> | undefined, flags: SiteFlags): boolean {
+  return !!definition && (!definition.requiresFlag || flags[definition.requiresFlag] === true);
 }
 
 /** Vanhan tallennuksen kiinteä piha (instanssi "yard") ennen satunnaisia pihapiirejä. */
@@ -32,6 +41,7 @@ export const MAP_SITE_DEFINITIONS: Record<FixedSiteId, MapSiteDefinition> = {
     movement: "fixed",
     lifetime: "persistent",
   },
+  /** Vainolaisten leiri (punainen käsi): paljastuu vasta, kun Louhi on karkotettu (V5). */
   campfire: {
     id: "campfire",
     mapId: "kalevala-prototype",
@@ -39,6 +49,7 @@ export const MAP_SITE_DEFINITIONS: Record<FixedSiteId, MapSiteDefinition> = {
     sceneId: "clearing",
     movement: "fixed",
     lifetime: "persistent",
+    requiresFlag: "louhi.banished",
   },
   /** Kaakon vaaran kalliokumpu veden rannalla: rauhallinen kalmisto kuppikivineen. */
   cairnfield: {
@@ -73,8 +84,13 @@ export function mapSiteDefinition(
   return instance ? instanceSiteDefinition(instance) : undefined;
 }
 
-export function sceneForMapSite(siteId: string | undefined, instances: readonly SiteInstance[] = []): SceneId | null {
-  return mapSiteDefinition(siteId, instances)?.sceneId ?? null;
+export function sceneForMapSite(
+  siteId: string | undefined,
+  instances: readonly SiteInstance[] = [],
+  flags: SiteFlags = {},
+): SceneId | null {
+  const definition = mapSiteDefinition(siteId, instances);
+  return siteUnlocked(definition, flags) ? definition!.sceneId : null;
 }
 
 /** Ruudun paikka: kartan kiinteä paikka tai kampanjan paikkainstanssi. */
@@ -94,12 +110,14 @@ export function discoverVisibleSites(
   observer: MapPosition,
   instances: readonly SiteInstance[] = [],
   radius = MAP_RULES.revealRadius,
+  flags: SiteFlags = {},
 ): string[] {
   const known = new Set(knownSiteIds);
   for (let y = observer.y - radius; y <= observer.y + radius; y++) {
     for (let x = observer.x - radius; x <= observer.x + radius; x++) {
       const siteId = siteIdAt(map, instances, x, y);
-      if (mapSiteDefinition(siteId, instances)) known.add(siteId!);
+      const definition = mapSiteDefinition(siteId, instances);
+      if (definition && siteUnlocked(definition, flags)) known.add(siteId!);
     }
   }
   return [...known];
@@ -109,8 +127,11 @@ export function mapSiteDisplay(
   siteId: string | undefined,
   options: { active: boolean; known: boolean; cellVisibility: MapCellVisibility },
   instances: readonly SiteInstance[] = [],
+  flags: SiteFlags = {},
 ): MapSiteDisplay {
-  return siteDisplayForDefinition(mapSiteDefinition(siteId, instances), options);
+  const definition = mapSiteDefinition(siteId, instances);
+  if (!siteUnlocked(definition, flags)) return "hidden";
+  return siteDisplayForDefinition(definition, options);
 }
 
 export function siteDisplayForDefinition(

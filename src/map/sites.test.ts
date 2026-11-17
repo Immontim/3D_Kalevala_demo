@@ -9,6 +9,7 @@ import {
   sceneForMapSite,
   siteDisplayForDefinition,
   siteIdAt,
+  siteUnlocked,
 } from "./sites";
 import type { SiteInstance } from "./campaign";
 
@@ -37,7 +38,8 @@ describe("2D-kohtaamisrekisteri", () => {
     expect(sceneForMapSite("yard-b", instances)).toBe("yard");
     expect(sceneForMapSite("yard-c", instances)).toBeNull();
     expect(sceneForMapSite("lakeside")).toBe("lakeside");
-    expect(sceneForMapSite("campfire")).toBe("clearing");
+    expect(sceneForMapSite("campfire")).toBeNull();                       // leiri on lukossa, kunnes Louhi on karkotettu
+    expect(sceneForMapSite("campfire", [], { "louhi.banished": true })).toBe("clearing");
     expect(sceneForMapSite("cairnfield")).toBe("cairnfield");
     expect(sceneForMapSite("unknown")).toBeNull();
   });
@@ -49,6 +51,20 @@ describe("2D-kohtaamisrekisteri", () => {
       { x: 12, y: 10, siteId: "campfire" },
     ]);
     expect(discoverVisibleSites(map, ["lakeside"], { x: 10, y: 10 }).sort()).toEqual(["cairnfield", "lakeside"]);
+  });
+
+  it("vainolaisten leiri on piilossa ja sisäänpääsemätön ennen Louhen karkotusta, sen jälkeen tavallinen paikka", () => {
+    const map = siteMap([{ x: 10, y: 10, siteId: "campfire" }]);
+    const visible = { active: true, known: true, cellVisibility: "visible" } as const;
+    expect(discoverVisibleSites(map, [], { x: 10, y: 10 })).toEqual([]);
+    expect(mapSiteDisplay("campfire", visible)).toBe("hidden");
+    expect(sceneForMapSite("campfire")).toBeNull();
+    const flags = { "louhi.banished": true };
+    expect(discoverVisibleSites(map, [], { x: 10, y: 10 }, [], 1, flags)).toEqual(["campfire"]);
+    expect(mapSiteDisplay("campfire", visible, [], flags)).toBe("normal");
+    expect(mapSiteDisplay("campfire", { ...visible, cellVisibility: "remembered" }, [], flags)).toBe("dimmed");
+    expect(sceneForMapSite("campfire", [], flags)).toBe("clearing");
+    expect(siteUnlocked(MAP_SITE_DEFINITIONS.lakeside, {})).toBe(true);        // muut paikat eivät ole lukossa
   });
 
   it("löytää myös pihainstanssit lähinäössä ja siirtää saman ruudun paikan instanssista", () => {

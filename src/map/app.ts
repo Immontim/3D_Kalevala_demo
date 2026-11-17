@@ -148,6 +148,8 @@ function ensureRevealed() {
         campaign.world.knownSiteIds,
         state,
         campaign.world.siteInstances,
+        undefined,
+        campaign.engine.flags,
       ),
     },
     player: { ...campaign.player, satiety: state.satiety },
@@ -183,6 +185,8 @@ function move(direction: MapDirection) {
         campaign.world.knownSiteIds,
         result.state,
         campaign.world.siteInstances,
+        undefined,
+        campaign.engine.flags,
       ),
     },
     player: { ...campaign.player, satiety: result.state.satiety },
@@ -193,7 +197,7 @@ function move(direction: MapDirection) {
 
 /** Paikan ilmoitus kartan alareunassa; kaikki pihainstanssit ovat "pihapiiri". */
 function siteMessage(siteId: string | undefined, fallback: string) {
-  const scene = sceneForMapSite(siteId, campaign.world.siteInstances);
+  const scene = sceneForMapSite(siteId, campaign.world.siteInstances, campaign.engine.flags);
   if (scene === "yard") return t("map.yardFound");
   if (scene === "lakeside") return t("map.lakesideFound");
   if (scene === "clearing") return t("map.campfireFound");
@@ -203,7 +207,7 @@ function siteMessage(siteId: string | undefined, fallback: string) {
 
 function enterSite() {
   const siteId = siteIdAt(PROTOTYPE_MAP, campaign.world.siteInstances, campaign.world.x, campaign.world.y);
-  const scene = sceneForMapSite(siteId, campaign.world.siteInstances);
+  const scene = sceneForMapSite(siteId, campaign.world.siteInstances, campaign.engine.flags);
   // Instanssin tunniste välitetään 3D:lle, jotta sama pihakohtaus saa instanssin omat parametrit.
   const instance = campaign.world.siteInstances.find((entry) => entry.id === siteId);
   if (scene) openScene(scene, instance?.id);
@@ -508,7 +512,7 @@ function renderMap() {
         active: true,
         known: siteId !== undefined && knownSiteIds.has(siteId),
         cellVisibility: visibility,
-      }, campaign.world.siteInstances);
+      }, campaign.world.siteInstances, campaign.engine.flags);
       if (siteDisplay !== "hidden") {
         const sceneId = mapSiteDefinition(siteId, campaign.world.siteInstances)?.sceneId;
         if (sceneId === "yard") sprite(ctx, [2, 1], vx * TILE, vy * TILE);

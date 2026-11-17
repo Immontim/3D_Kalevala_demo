@@ -111,12 +111,14 @@ export interface SongDef {
   verses: readonly VerbatimText[];
   /** Tarvitseeko laulu elävän vastustajan. */
   needsEnemy: boolean;
+  /** Voiko laulun laulaa rauhassa (ilman taistelun voimaa), esim. tietäjän opettama laulu. */
+  peaceful?: boolean;
 }
 export const SONGS: Record<SongId, SongDef> = {
   bog: { id: "bog", name: t("song.bog.name"), rune: "ᛚ", verses: SONG_VERSES, needsEnemy: true },
   heal: { id: "heal", name: t("song.heal.name"), rune: "ᛒ", verses: HEAL_VERSES, needsEnemy: false },
   // Tietäjä opettaa; vaikutus (Louhen karkotus) tulee V5:ssä, joten laulu ei vaadi vastustajaa.
-  sleep: { id: "sleep", name: t("song.sleep.name"), rune: "ᛋ", verses: SLEEP_VERSES, needsEnemy: false },
+  sleep: { id: "sleep", name: t("song.sleep.name"), rune: "ᛋ", verses: SLEEP_VERSES, needsEnemy: false, peaceful: true },
 };
 
 /** Laulu, joka avautuu laulupaikkaan vasta, kun moottorin lippu on asetettu (opeteltu). */

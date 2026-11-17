@@ -30,6 +30,23 @@ export const USE_ZONE: Zone = { range: 1.6, arc: Math.PI / 3 };
 export const TALKABLES: Talkable[] = [];
 export function addTalkable(t: Talkable) { TALKABLES.push(t); }
 export function clearTalkables() { TALKABLES.length = 0; }
+export function removeTalkable(id: string): boolean {
+  const i = TALKABLES.findIndex((t) => t.id === id);
+  if (i < 0) return false;
+  TALKABLES.splice(i, 1);
+  return true;
+}
+
+/** Lähin puhuteltava hahmo annetun etäisyyden sisällä (esim. laulun kuulija), tai null. */
+export function nearestTalkable(from: { x: number; z: number }, range: number, list: readonly Talkable[] = TALKABLES): Talkable | null {
+  let best: Talkable | null = null;
+  let bestD = range;
+  for (const t of list) {
+    const d = Math.hypot(t.x - from.x, t.z - from.z);
+    if (d <= bestD) { best = t; bestD = d; }
+  }
+  return best;
+}
 
 /** Lähin kohde kantaman ja sektorin sisällä, tai null. yaw on katse (0 = +z, kasvaa kohti +x). */
 export function pickTarget(from: { x: number; z: number; yaw: number }, list: readonly Talkable[], zone: Zone): Talkable | null {

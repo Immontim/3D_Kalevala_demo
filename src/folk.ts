@@ -34,6 +34,8 @@ export interface ArmPose { upper: Dir; fore: Dir; }
 const ARM_DOWN: ArmPose = { upper: [0.14, -1, 0.02], fore: [0.08, -1, 0.16] };
 
 export interface VillagerDef {
+  /** Tunniste, jolla hahmo voidaan poistaa kesken kohtauksen (`vanishVillager`). */
+  id?: string;
   url: string;
   /** Hahmon nimi tiedostossa ilman etuliitettä `char_`. */
   character: string;
@@ -68,6 +70,17 @@ function aimBone(bone: THREE.Object3D, dir: THREE.Vector3, axis?: THREE.Vector3)
 
 interface Living { update(dt: number, focus: THREE.Vector3 | null): void; }
 const living: Living[] = [];
+const villagers = new Map<string, Villager>();
+/** Kesto, jonka kuluessa poistuva hahmo pienenee ja vaipuu maahan (s). */
+const VANISH_SECONDS = 2.2;
+
+/** Hahmo vaipuu näkyvistä hitaasti ja poistuu sitten kokonaan. Palauttaa false, jos tunnistetta ei ole. */
+export function vanishVillager(id: string): boolean {
+  const v = villagers.get(id);
+  if (!v || v.vanishing) return false;
+  v.startVanish();
+  return true;
+}
 
 /** Päivittää kaikki kyläläiset ja eläimet. focus = kulkija, jota kyläläiset katsovat. */
 export function updateFolk(dt: number, focus: THREE.Vector3 | null) {
@@ -83,6 +96,18 @@ class Villager implements Living {
   private spineRest = new THREE.Quaternion();
   private look = 0;
   private t = Math.random() * 50;
+  vanishing = false;
+  private vanishT = 0;
+  private baseScale = 1;
+  private baseY = 0;
+  onGone: (() => void) | null = null;
+
+  startVanish() {
+    this.vanishing = true;
+    this.vanishT = 0;
+    this.baseScale = this.root.scale.x;
+    this.baseY = this.root.position.y;
+  }
 
   constructor(private def: VillagerDef, source: THREE.Object3D) {
     const clone = SkeletonUtils.clone(source);
@@ -187,6 +212,16 @@ class Villager implements Living {
   }
 
   update(dt: number, focus: THREE.Vector3 | null) {
+    if (this.vanishing) {
+      // Louhi vaipuu uneen: hahmo pienenee ja painuu maahan, kunnes se poistuu.
+      this.vanishT += dt;
+      const k = Math.min(1, this.vanishT / VANISH_SECONDS);
+      const ease = k * k;
+      this.root.scale.setScalar(Math.max(0.001, this.baseScale * (1 - ease)));
+      this.root.position.y = this.baseY - ease * 0.5;
+      if (k >= 1) this.onGone?.();
+      return;
+    }
     if (this.def.lying) return;        // kuollut ei hengitä eikä katso
     this.t += dt;
     // Katse seuraa kulkijaa, kun tämä on lähellä ja edessä; muuten pää palaa hitaasti eteen.
@@ -219,6 +254,15 @@ export function spawnVillager(scene: THREE.Scene, def: VillagerDef): Promise<voi
     const v = new Villager(def, gltf.scene);
     scene.add(v.root);
     living.push(v);
+    if (def.id) {
+      villagers.set(def.id, v);
+      v.onGone = () => {
+        v.root.removeFromParent();
+        const i = living.indexOf(v);
+        if (i >= 0) living.splice(i, 1);
+        villagers.delete(def.id!);
+      };
+    }
   });
 }
 

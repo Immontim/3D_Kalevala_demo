@@ -1,6 +1,6 @@
 # Roadmap — 3D Kalevala
 
-Päivitetty: 2026-11-17 (Claude; pohja `origin/main` `809398a`, koodiversio v04.03.00 branchilla `claude/song-learning`).
+Päivitetty: 2026-11-17 (Claude; pohja `origin/main` `6504b2c`, koodiversio v04.04.00 branchilla `claude/louhi-banish`).
 
 Tämä on **suunta ja päätökset**, ei tehtävälista. Nykytila ja yksi seuraava
 tehtävä ovat `docs/AGENT_HANDOFF.md`:ssä, mallien ja assettien tila
@@ -54,7 +54,7 @@ ne ovat MVP:n jälkeen.
 | Kylläisyys, kuukalenteri, 2D→3D→2D-silta | Valmis |
 | `CampaignStore`, maailmamoottori v0, dialogi v0 | Valmis (V1–V2, v04.00.00): liput, laskurit, ehdot, efektit, tapahtumat, `__world` |
 
-Puuttuu: laulun opettelu, Louhen karkotus, leirin päätös ja loppuruutu,
+Puuttuu: leirin päätös ja loppuruutu,
 satunnaiset pihapiirit, taivaanrautamiekka, laulu- ja paikkatapahtumat moottoriin.
 
 ## Vaiheet
@@ -67,8 +67,8 @@ orkestroija tarkistaa sen itse (testit, selain) ennen seuraavaa (gauntlet-loop).
 tapahtumat `item.taken`/`npc.talked`/`scene.entered`, suomenkielinen yhteenveto,
 `intent`-lause jokaiselle säännölle, konsoli `__world`, salliva moottorilohko) ja
 dialogi v0 ovat käytössä; pelisisältö on tietäjä + tuohikontti. Moottoriin puuttuu
-vielä efektit "avaa laulu" ja "paljasta paikka" sekä tapahtuma `song.performed`:
-lisätään V5:ssä, kun sille on käyttäjä (`song.performed` on jo olemassa). Tilannetiedot: `AGENT_HANDOFF.md`.
+vielä efekti "avaa laulu":
+efektit `revealSite` ja `removeNpc` sekä tapahtuma `song.performed` ovat jo olemassa. Tilannetiedot: `AGENT_HANDOFF.md`.
 
 **V3 (valmis, v04.02.00).** Kampanjassa on `worldSeed` ja konkretisoidut `siteInstances`;
 kaksi pihaa arvotaan säännöillä ja validaattorilla, ja jousineito on vain toisessa.
@@ -81,11 +81,10 @@ harjoitus käyttää olemassa olevaa rytmimekaniikkaa, onnistuminen asettaa lipu
 `song.sleep.learned`, ja laulu ilmestyy laulupaikkaan (F3). Moottoriin tuli tapahtuma
 `song.performed` ja efekti `startSongLesson`. Laulun vaikutus tulee V5:ssä.
 
-**V5. Louhen karkotus laululla.** Laulun onnistunut suoritus kalmistolla
-Louhen läheisyydessä asettaa lipun, Louhi poistuu kohtauksesta ja leirin
-karttapaikka paljastuu (`knownSiteIds`). Epäonnistuminen ei estä uutta yritystä
-eikä rankaise. Valmis, kun karkotus toimii kerran ja pysyy tallennettuna sivun
-uudelleenlatauksen yli.
+**V5 (valmis, v04.04.00).** Pohjolan unen onnistunut laulu Louhen kuuluvilla kalmistolla
+asettaa lipun `louhi.banished`, Louhi vaipuu pois ja vainolaisten leiri paljastuu kartalle
+(leiri on lukossa ennen sitä). Epäonnistuminen ei rankaise. Moottoriin tulivat efektit
+`revealSite` ja `removeNpc`.
 
 **V6. Jousineidon haara.** Song-järjestelmään tarvitaan laulun kohteeksi
 rauhallinen NPC (`heal` on nyt itseen vaikuttava ja `needsEnemy: false`).

@@ -1,8 +1,9 @@
 // Pelin oikean maailmadatan tarkistukset ja ensimmäinen dialogipolku: tietäjä ja tuohikontti.
 import { describe, expect, it } from "vitest";
 import { finnishText } from "../i18n";
-import { createCampaign, type SceneItemDefinition } from "../map/campaign";
+import { createCampaign, parseCampaign, serializeCampaign, type SceneItemDefinition } from "../map/campaign";
 import { createCampaignStore } from "../map/campaignStore";
+import { PROTOTYPE_MAP_ID } from "../map/prototype";
 import { conditionRefs } from "./conditions";
 import { GAME_WORLD } from "./content";
 import { effectRefs } from "./effects";
@@ -16,7 +17,7 @@ const PACK: SceneItemDefinition = {
 };
 
 function setup() {
-  const store = createCampaignStore(createCampaign(), () => true);
+  const store = createCampaignStore(createCampaign({ mapId: PROTOTYPE_MAP_ID }), () => true);
   const runtime = createWorldRuntime(store, GAME_WORLD);
   return { store, runtime };
 }
@@ -188,5 +189,66 @@ describe("tietäjä ja tuohikontti", () => {
     expect(robbed.view.choices.map((c) => c.id)).toEqual(["apologize", "leave"]);   // ei ask-song
     const forgiven = runtime.choose(robbed, "apologize");
     expect(forgiven.saved && forgiven.next?.view.choices.map((c) => c.id)).toEqual(["ask-song", "thanks"]);
+  });
+
+});
+
+describe("Louhen karkotus (V5)", () => {
+  const cast = (over: Record<string, unknown> = {}) => ({
+    type: "song.performed", songId: "sleep", context: "cast", success: true, hits: 6,
+    sceneId: "cairnfield", nearNpcId: "louhi", ...over,
+  }) as import("./types").GameEvent;
+
+  it("onnistunut laulu Louhen kuuluvilla asettaa lipun, paljastaa leirin ja pyytää poistamaan Louhen", () => {
+    const { store, runtime } = setup();
+    const out = runtime.post(cast());
+    expect(out.saved).toBe(true);
+    expect(out.result.fired.map((f) => f.ruleId)).toEqual(["louhi.banished"]);
+    expect(out.result.actions).toEqual([{ kind: "removeNpc", npcId: "louhi" }]);
+    expect(out.result.messages).toHaveLength(1);
+    const state = store.get();
+    expect(state.engine.flags["louhi.banished"]).toBe(true);
+    expect(state.world.knownSiteIds).toContain("campfire");
+    expect(state.world.worldMinutes).toBe(0);                    // 3D ei kuluta maailma-aikaa
+  });
+
+  it("epäonnistunut yritys, kaukainen laulu, väärä kohtaus tai konteksti eivät karkota eivätkä rankaise", () => {
+    for (const event of [
+      cast({ success: false }), cast({ nearNpcId: undefined }), cast({ nearNpcId: "tietaja" }),
+      cast({ sceneId: "lakeside" }), cast({ context: "lesson" }), cast({ songId: "bog" }),
+    ]) {
+      const { store, runtime } = setup();
+      const before = store.get();
+      const out = runtime.post(event);
+      expect(out.result.fired, JSON.stringify(event)).toEqual([]);
+      expect(out.result.actions).toEqual([]);
+      expect(store.get(), JSON.stringify(event)).toBe(before);   // tila ei muutu lainkaan
+    }
+  });
+
+  it("karkotus toimii vain kerran, ja uusi yritys onnistuneen jälkeen on harmiton", () => {
+    const { runtime } = setup();
+    runtime.post(cast({ success: false }));                       // epäonnistuminen ensin
+    expect(runtime.post(cast()).result.fired).toHaveLength(1);
+    const again = runtime.post(cast());
+    expect(again.result.fired).toEqual([]);
+    expect(again.result.skipped[0]).toMatchObject({ ruleId: "louhi.banished", why: "condition" });
+    expect(again.result.actions).toEqual([]);
+  });
+
+  it("liput ja leiri säilyvät tallennuksen läpi (sivun uudelleenlataus)", () => {
+    const { store, runtime } = setup();
+    runtime.post(cast());
+    const reloaded = parseCampaign(serializeCampaign(store.get()))!;
+    expect(reloaded.engine.flags["louhi.banished"]).toBe(true);
+    expect(reloaded.world.knownSiteIds).toContain("campfire");
+  });
+
+  it("säännöstä generoitu yhteenveto kertoo karkotuksen suomeksi", () => {
+    const { runtime } = setup();
+    const text = runtime.describe(finnishText);
+    expect(text).toContain("louhi.banished");
+    expect(text).toContain("poistuu kohtauksesta");
+    expect(text).toContain("paljastuu kartalle");
   });
 });

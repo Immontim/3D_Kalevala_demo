@@ -176,6 +176,15 @@ export class CollisionWorld {
 
   addHazard(zone: HazardZone) { this.hazards.push(zone); return zone; }
 
+  /** Poistaa esteen käytöstä (ei liiku- eikä lyöntiestettä); ruudukon indeksit säilyvät ehjinä. */
+  disable(id: string): boolean {
+    const found = this.colliders.find((c) => c.id === id);
+    if (!found) return false;
+    found.blocksMovement = false;
+    found.blocksMelee = false;
+    return true;
+  }
+
   private nearby(x: number, z: number, radius: number, movementOnly = false) {
     const found = new Set<number>();
     for (let gx = Math.floor((x - radius) / GRID_SIZE); gx <= Math.floor((x + radius) / GRID_SIZE); gx++) {

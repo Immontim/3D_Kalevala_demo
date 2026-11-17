@@ -46,6 +46,8 @@ export function describeEffect(effect: Effect, data: WorldData, text: TextLookup
     case "takeItem": return `pelaajalta otetaan: ${itemName(effect.itemId, text)} ×${effect.quantity}`;
     case "setSceneItemTakeMode": return `${itemLabel(effect.instanceId)} muuttuu ${TAKE_MODE_TEXT[effect.takeMode]} otettavaksi`;
     case "message": return `näytetään viesti "${text(effect.text)}"${effect.sub ? ` / "${text(effect.sub)}"` : ""}`;
+    case "revealSite": return `karttapaikka "${effect.siteId}" paljastuu kartalle`;
+    case "removeNpc": return `hahmo "${effect.npcId}" poistuu kohtauksesta`;
     case "startSongLesson": return `aloitetaan laulun "${effect.songId}" opettelu (rytmiharjoitus)`;
   }
 }
@@ -72,6 +74,7 @@ export function describePattern(on: EventPattern): string {
     }
     case "song.performed": {
       detail("songId", "laulu");
+      detail("nearNpcId", "lähellä hahmo");
       detail("context", "yhteys");
       detail("success", "onnistui");
       detail("sceneId", "kohtaus");

@@ -31,12 +31,18 @@ export type Effect =
   /** Viesti pelaajalle. Ei muuta tilaa; moottori palauttaa sen kutsujalle näytettäväksi. */
   | { kind: "message"; text: TextKey; sub?: TextKey }
   /** Pyytää 3D:tä aloittamaan laulun opettelun (rytmiharjoitus). Ei muuta tilaa itse. */
-  | { kind: "startSongLesson"; songId: string };
+  | { kind: "startSongLesson"; songId: string }
+  /** Paljastaa kartalle paikan: lisää sen tunnetuksi ja paljastaa ruudun ympäristöineen. */
+  | { kind: "revealSite"; siteId: string }
+  /** Pyytää 3D:tä poistamaan hahmon kohtauksesta heti (pysyvyys tulee lipusta, jonka sääntö asettaa). */
+  | { kind: "removeNpc"; npcId: string };
 
 export interface OutMessage { text: TextKey; sub?: TextKey }
 
 /** Efektin pyyntö kutsujalle (UI tekee sen tilanmuutoksen jälkeen). Moottori ei tee sitä itse. */
-export type OutAction = { kind: "songLesson"; songId: string };
+export type OutAction =
+  | { kind: "songLesson"; songId: string }
+  | { kind: "removeNpc"; npcId: string };
 
 // ---------- Tapahtumat ----------
 
@@ -45,7 +51,11 @@ export type GameEvent =
   | { type: "npc.talked"; npcId: string; sceneId: string }
   | { type: "scene.entered"; sceneId: string }
   /** Laulu laulettu: `lesson` = tietäjän opetus, `cast` = laulu taistelussa. */
-  | { type: "song.performed"; songId: string; context: "lesson" | "cast"; success: boolean; hits: number; sceneId: string };
+  | {
+    type: "song.performed"; songId: string; context: "lesson" | "cast"; success: boolean; hits: number; sceneId: string;
+    /** Lähin puhuteltava hahmo laulajan lähellä (esim. "louhi"), jos sellainen on kuuluvilla. */
+    nearNpcId?: string;
+  };
 
 type PatternFor<E extends GameEvent> = { type: E["type"] } & Partial<Omit<E, "type">>;
 /** Tapahtumatyyppi ja valinnaisia kenttiä, joiden pitää täsmätä tapahtumaan. */

@@ -2,10 +2,11 @@
 // mahdu mukaan), mikään sen vaikutus ei tule voimaan. Efektit eivät kosketa maailma-aikaa
 // (`worldMinutes`): 3D-kohtaus ei kuluta aikaa.
 import { setSceneItemTakeMode, tryAddItem, tryRemoveItem, type CampaignState } from "../map/campaign";
+import { revealSiteOnMap } from "../map/reveal";
 import { withCounterAdded, withFlag } from "./state";
 import type { Effect, OutAction, OutMessage, WorldData } from "./types";
 
-export type EffectFailure = "inventory-full" | "missing-item" | "unknown-flag" | "unknown-counter";
+export type EffectFailure = "inventory-full" | "missing-item" | "unknown-flag" | "unknown-counter" | "unknown-site";
 
 export type ApplyResult =
   | { ok: true; state: CampaignState; messages: OutMessage[]; actions: OutAction[] }
@@ -49,6 +50,15 @@ export function applyEffects(state: CampaignState, effects: readonly Effect[], d
         break;
       case "startSongLesson":
         actions.push({ kind: "songLesson", songId: effect.songId });
+        break;
+      case "revealSite": {
+        const revealed = revealSiteOnMap(current, effect.siteId);
+        if (!revealed) return fail(state, "unknown-site", `tuntematon karttapaikka ${effect.siteId}`);
+        current = revealed;
+        break;
+      }
+      case "removeNpc":
+        actions.push({ kind: "removeNpc", npcId: effect.npcId });
         break;
     }
   }
