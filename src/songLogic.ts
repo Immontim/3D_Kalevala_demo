@@ -90,7 +90,19 @@ export const HEAL_VERSES: readonly VerbatimText[] = [
   verbatim("saraheinä sammalessa!", "fi", "Kalevala, runo 9"),
 ];
 
-export type SongId = "bog" | "heal";
+/** Kalevalan 42. runo (1849, vapaa käyttää): Väinämöinen soittaa ja Pohjolan väki nukahtaa. Poimittu kahdesta peräkkäisestä kohdasta. */
+export const SLEEP_VERSES: readonly VerbatimText[] = [
+  verbatim("Väkeä väsyttelevi,", "fi", "Kalevala, runo 42"),
+  verbatim("rahvahaista raukaisevi:", "fi", "Kalevala, runo 42"),
+  verbatim("kaikki nukkui kuuntelijat", "fi", "Kalevala, runo 42"),
+  verbatim("sekä vaipui katselijat;", "fi", "Kalevala, runo 42"),
+  verbatim("pani pitkähän unehen,", "fi", "Kalevala, runo 42"),
+  verbatim("viikommaksi nukkumahan", "fi", "Kalevala, runo 42"),
+  verbatim("koko Pohjolan perehen", "fi", "Kalevala, runo 42"),
+  verbatim("ja kaiken kyläisen kansan.", "fi", "Kalevala, runo 42"),
+];
+
+export type SongId = "bog" | "heal" | "sleep";
 export interface SongDef {
   id: SongId;
   name: string;
@@ -103,10 +115,27 @@ export interface SongDef {
 export const SONGS: Record<SongId, SongDef> = {
   bog: { id: "bog", name: t("song.bog.name"), rune: "ᛚ", verses: SONG_VERSES, needsEnemy: true },
   heal: { id: "heal", name: t("song.heal.name"), rune: "ᛒ", verses: HEAL_VERSES, needsEnemy: false },
+  // Tietäjä opettaa; vaikutus (Louhen karkotus) tulee V5:ssä, joten laulu ei vaadi vastustajaa.
+  sleep: { id: "sleep", name: t("song.sleep.name"), rune: "ᛋ", verses: SLEEP_VERSES, needsEnemy: false },
 };
+
+/** Laulu, joka avautuu laulupaikkaan vasta, kun moottorin lippu on asetettu (opeteltu). */
+export const SONG_UNLOCK_FLAG: Partial<Record<SongId, string>> = { sleep: "song.sleep.learned" };
 
 /** Laulupaikat valintaringissä. null = tyhjä paikka. */
 export const SONG_SLOTS: readonly (SongId | null)[] = ["bog", "heal", null, null, null];
+
+/** Laulupaikat kampanjan lippujen mukaan: opeteltu laulu ilmestyy ensimmäiseen vapaaseen paikkaan. */
+export function songSlots(flags: Readonly<Record<string, boolean>>): (SongId | null)[] {
+  const slots: (SongId | null)[] = [...SONG_SLOTS];
+  for (const id of Object.keys(SONG_UNLOCK_FLAG) as SongId[]) {
+    const flag = SONG_UNLOCK_FLAG[id];
+    if (!flag || flags[flag] !== true || slots.includes(id)) continue;
+    const free = slots.indexOf(null);
+    if (free >= 0) slots[free] = id;
+  }
+  return slots;
+}
 
 /** Parannuslaulun yhden osuman vaikutus: palauttaa uuden elämän, enintään maksimin. */
 export function healOnHit(hp: number, maxHp: number): number {

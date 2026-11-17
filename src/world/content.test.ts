@@ -139,4 +139,54 @@ describe("tietäjä ja tuohikontti", () => {
     expect(text).toContain("aie:");
     expect(text).toContain("Kun esine otetaan");
   });
+
+  it("laulun opettelu: valinta näkyy kunnes laulu on opittu ja pyytää harjoituksen UI:lta", () => {
+    const { store, runtime } = setup();
+    const start = runtime.startDialogue("lakeside", "tietaja")!;
+    expect(start.view.choices.map((c) => c.id)).toEqual(["ask-pack", "ask-song", "leave"]);
+    const intro = runtime.choose(start, "ask-song");
+    expect(intro.saved && intro.next?.view.nodeId).toBe("songIntro");
+    if (!intro.saved || !intro.next) return;
+    const ready = runtime.choose(intro.next, "ready");
+    expect(ready.saved && ready.actions).toEqual([{ kind: "songLesson", songId: "sleep" }]);
+    expect(ready.saved && ready.next).toBeNull();
+    // Valinta ei vielä opeta: lippu tulee vasta onnistuneesta harjoituksesta.
+    expect(store.get().engine.flags["song.sleep.learned"]).toBeUndefined();
+  });
+
+  it("onnistunut harjoitus antaa laulun lipulla ja viestin; epäonnistunut, taisteluyhteys ja väärä paikka eivät", () => {
+    const lesson = (success: boolean, context: "lesson" | "cast" = "lesson", sceneId = "lakeside", songId = "sleep") =>
+      ({ type: "song.performed", songId, context, success, hits: success ? 6 : 2, sceneId }) as const;
+    for (const event of [lesson(false), lesson(true, "cast"), lesson(true, "lesson", "yard"), lesson(true, "lesson", "lakeside", "bog")]) {
+      const { store, runtime } = setup();
+      runtime.post(event);
+      expect(store.get().engine.flags["song.sleep.learned"], JSON.stringify(event)).toBeUndefined();
+    }
+    const { store, runtime } = setup();
+    const first = runtime.post(lesson(true));
+    expect(first.saved).toBe(true);
+    expect(first.result.messages).toHaveLength(1);
+    expect(store.get().engine.flags["song.sleep.learned"]).toBe(true);
+    // Toinen onnistuminen ei toista viestiä.
+    expect(runtime.post(lesson(true)).result.messages).toHaveLength(0);
+  });
+
+  it("opetuksen jälkeen tietäjä puhuu opetetusta laulusta, eikä opettelua enää tarjota", () => {
+    const { runtime } = setup();
+    runtime.post({ type: "song.performed", songId: "sleep", context: "lesson", success: true, hits: 7, sceneId: "lakeside" });
+    const talk = runtime.startDialogue("lakeside", "tietaja")!;
+    expect(talk.view.nodeId).toBe("taught");
+    expect(talk.view.choices.map((c) => c.id)).toEqual(["ask-pack", "leave"]);   // tuohikonttia voi vielä pyytää
+    const ask = runtime.choose(talk, "ask-pack");
+    expect(ask.saved && ask.next?.view.choices.map((c) => c.id)).not.toContain("ask-song");
+  });
+
+  it("varas voi oppia laulun vasta anteeksiannon jälkeen, ja loukattu tietäjä ei opeta", () => {
+    const { store, runtime } = setup();
+    takePack(store);                                              // luvaton otto
+    const robbed = runtime.startDialogue("lakeside", "tietaja")!;
+    expect(robbed.view.choices.map((c) => c.id)).toEqual(["apologize", "leave"]);   // ei ask-song
+    const forgiven = runtime.choose(robbed, "apologize");
+    expect(forgiven.saved && forgiven.next?.view.choices.map((c) => c.id)).toEqual(["ask-song", "thanks"]);
+  });
 });

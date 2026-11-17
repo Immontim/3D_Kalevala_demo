@@ -1,7 +1,7 @@
 // Pelin varsinainen maailmadata: säännöt ja dialogit. Tyypitettyä dataa, ei skriptiä.
 // Tällä hetkellä sisältö on yksi NPC (tietäjä rannalla) ja yksi esine (tuohikontti).
 import { COUNTERS, FLAGS } from "./registry";
-import type { Dialogue, Rule, WorldData } from "./types";
+import type { Dialogue, DialogueChoice, Rule, WorldData } from "./types";
 
 const SAGE_PACK = "lakeside.sage-pack";
 
@@ -17,15 +17,43 @@ export const RULES: Rule[] = [
       { kind: "message", text: "world.sage.theftNoticed", sub: "world.sage.theftNoticedSub" },
     ],
   },
+  {
+    id: "sage.song-learned",
+    intent: "Kun pelaaja laulaa tietäjän opettaman laulun onnistuneesti harjoituksessa, hän oppii sen: laulu ilmestyy laulupaikkaan.",
+    on: { type: "song.performed", songId: "sleep", context: "lesson", success: true, sceneId: "lakeside" },
+    when: { kind: "flag", flag: "song.sleep.learned", value: false },
+    then: [
+      { kind: "setFlag", flag: "song.sleep.learned" },
+      { kind: "message", text: "song.lesson.learned", sub: "song.lesson.learnedSub" },
+    ],
+  },
 ];
+
+/** Laulun opettelun valinta (V4): näkyy, kunnes Pohjolan uni on opittu. */
+const ASK_SONG: DialogueChoice = {
+  id: "ask-song",
+  text: "dialogue.sage.askSong",
+  when: { kind: "flag", flag: "song.sleep.learned", value: false },
+  next: "songIntro",
+};
+const ASK_PACK: DialogueChoice = {
+  id: "ask-pack",
+  text: "dialogue.sage.askPack",
+  effects: [
+    { kind: "setFlag", flag: "sage.permission" },
+    { kind: "setSceneItemTakeMode", instanceId: SAGE_PACK, takeMode: "allowed" },
+  ],
+  next: "granted",
+};
 
 export const SAGE_DIALOGUE: Dialogue = {
   id: "sage.lakeside",
   sceneId: "lakeside",
   npcId: "tietaja",
-  intent: "Tietäjä antaa tuohikontin luvallisesti pyydettäessä; luvaton ottaja saa kuulla siitä ja voi pyytää anteeksi.",
+  intent: "Tietäjä antaa tuohikontin luvallisesti pyydettäessä ja opettaa Pohjolan unen; luvaton ottaja saa kuulla varkaudesta ja voi pyytää anteeksi.",
   entries: [
     { when: { kind: "flag", flag: "sage.robbed" }, node: "robbed" },
+    { when: { kind: "flag", flag: "song.sleep.learned" }, node: "taught" },
     { when: { kind: "flag", flag: "sage.forgiven" }, node: "forgiven" },
     {
       when: { kind: "all", of: [{ kind: "flag", flag: "sage.permission" }, { kind: "not", of: { kind: "itemTaken", instanceId: SAGE_PACK } }] },
@@ -37,21 +65,27 @@ export const SAGE_DIALOGUE: Dialogue = {
   nodes: {
     greet: {
       text: "dialogue.sage.greet",
+      choices: [ASK_PACK, ASK_SONG, { id: "leave", text: "dialogue.sage.leave" }],
+    },
+    granted: { text: "dialogue.sage.granted", choices: [ASK_SONG, { id: "thanks", text: "dialogue.sage.thanks" }] },
+    afterTaken: { text: "dialogue.sage.afterTaken", choices: [ASK_SONG, { id: "leave", text: "dialogue.sage.leave" }] },
+    songIntro: {
+      text: "dialogue.sage.songIntro",
+      choices: [
+        { id: "ready", text: "dialogue.sage.ready", effects: [{ kind: "startSongLesson", songId: "sleep" }] },
+        { id: "leave", text: "dialogue.sage.leave" },
+      ],
+    },
+    taught: {
+      text: "dialogue.sage.taught",
       choices: [
         {
-          id: "ask-pack",
-          text: "dialogue.sage.askPack",
-          effects: [
-            { kind: "setFlag", flag: "sage.permission" },
-            { kind: "setSceneItemTakeMode", instanceId: SAGE_PACK, takeMode: "allowed" },
-          ],
-          next: "granted",
+          ...ASK_PACK,
+          when: { kind: "all", of: [{ kind: "flag", flag: "sage.permission", value: false }, { kind: "not", of: { kind: "itemTaken", instanceId: SAGE_PACK } }] },
         },
         { id: "leave", text: "dialogue.sage.leave" },
       ],
     },
-    granted: { text: "dialogue.sage.granted", choices: [{ id: "thanks", text: "dialogue.sage.thanks" }] },
-    afterTaken: { text: "dialogue.sage.afterTaken", choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
     robbed: {
       text: "dialogue.sage.robbed",
       choices: [
@@ -67,7 +101,7 @@ export const SAGE_DIALOGUE: Dialogue = {
         { id: "leave", text: "dialogue.sage.leave" },
       ],
     },
-    forgiven: { text: "dialogue.sage.forgiven", choices: [{ id: "thanks", text: "dialogue.sage.thanks" }] },
+    forgiven: { text: "dialogue.sage.forgiven", choices: [ASK_SONG, { id: "thanks", text: "dialogue.sage.thanks" }] },
   },
 };
 

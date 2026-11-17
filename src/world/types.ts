@@ -29,16 +29,23 @@ export type Effect =
   | { kind: "takeItem"; itemId: ItemId; quantity: number }
   | { kind: "setSceneItemTakeMode"; instanceId: string; takeMode: TakeMode }
   /** Viesti pelaajalle. Ei muuta tilaa; moottori palauttaa sen kutsujalle näytettäväksi. */
-  | { kind: "message"; text: TextKey; sub?: TextKey };
+  | { kind: "message"; text: TextKey; sub?: TextKey }
+  /** Pyytää 3D:tä aloittamaan laulun opettelun (rytmiharjoitus). Ei muuta tilaa itse. */
+  | { kind: "startSongLesson"; songId: string };
 
 export interface OutMessage { text: TextKey; sub?: TextKey }
+
+/** Efektin pyyntö kutsujalle (UI tekee sen tilanmuutoksen jälkeen). Moottori ei tee sitä itse. */
+export type OutAction = { kind: "songLesson"; songId: string };
 
 // ---------- Tapahtumat ----------
 
 export type GameEvent =
   | { type: "item.taken"; instanceId: string; itemId: ItemId; siteId: string; sceneId: string; takeMode: TakeMode; ownerId?: string }
   | { type: "npc.talked"; npcId: string; sceneId: string }
-  | { type: "scene.entered"; sceneId: string };
+  | { type: "scene.entered"; sceneId: string }
+  /** Laulu laulettu: `lesson` = tietäjän opetus, `cast` = laulu taistelussa. */
+  | { type: "song.performed"; songId: string; context: "lesson" | "cast"; success: boolean; hits: number; sceneId: string };
 
 type PatternFor<E extends GameEvent> = { type: E["type"] } & Partial<Omit<E, "type">>;
 /** Tapahtumatyyppi ja valinnaisia kenttiä, joiden pitää täsmätä tapahtumaan. */

@@ -92,8 +92,8 @@ export function simulate(realDt: number) {
   if (g.gameOver && isTouch && inputs.beatQueued) restart();
 
   // Laulu hidastaa maailman nopeasti; paluu normaaliin on pehmeämpi.
-  const targetScale = songState ? SONG.slowmo : 1;
-  g.timeScale += (targetScale - g.timeScale) * (1 - Math.exp(-(songState ? 16 : 6) * realDt));
+  const targetScale = songState && !songState.lesson ? SONG.slowmo : 1;
+  g.timeScale += (targetScale - g.timeScale) * (1 - Math.exp(-(songState && !songState.lesson ? 16 : 6) * realDt));
   let dt = realDt * g.timeScale;
   if (fx.hitstop > 0) { fx.hitstop -= realDt; dt = 0; }
 

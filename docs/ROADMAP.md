@@ -1,6 +1,6 @@
 # Roadmap — 3D Kalevala
 
-Päivitetty: 2026-11-17 (Claude; pohja `origin/main` `9339675`, koodiversio v04.02.00 branchilla `claude/site-instances`).
+Päivitetty: 2026-11-17 (Claude; pohja `origin/main` `809398a`, koodiversio v04.03.00 branchilla `claude/song-learning`).
 
 Tämä on **suunta ja päätökset**, ei tehtävälista. Nykytila ja yksi seuraava
 tehtävä ovat `docs/AGENT_HANDOFF.md`:ssä, mallien ja assettien tila
@@ -68,7 +68,7 @@ tapahtumat `item.taken`/`npc.talked`/`scene.entered`, suomenkielinen yhteenveto,
 `intent`-lause jokaiselle säännölle, konsoli `__world`, salliva moottorilohko) ja
 dialogi v0 ovat käytössä; pelisisältö on tietäjä + tuohikontti. Moottoriin puuttuu
 vielä efektit "avaa laulu" ja "paljasta paikka" sekä tapahtuma `song.performed`:
-lisätään V4:ssä ja V5:ssä, kun niille on käyttäjä. Tilannetiedot: `AGENT_HANDOFF.md`.
+lisätään V5:ssä, kun sille on käyttäjä (`song.performed` on jo olemassa). Tilannetiedot: `AGENT_HANDOFF.md`.
 
 **V3 (valmis, v04.02.00).** Kampanjassa on `worldSeed` ja konkretisoidut `siteInstances`;
 kaksi pihaa arvotaan säännöillä ja validaattorilla, ja jousineito on vain toisessa.
@@ -76,11 +76,10 @@ Sama `yard`-kohtaus ajetaan kahtena instanssina (`yard`, `yard-b`), esine-ID:t
 saavat instanssin nimen. Vanha tallennus säilyttää pihansa tunnisteella `yard`.
 Tilannetiedot: `AGENT_HANDOFF.md`. Löydettävyys ja etäisyydet säädetään V8:ssa.
 
-**V4. Laulun opettelu ja kolmas laulu.** Tietäjä laulaa säkeen, ja pelaaja
-toistaa sen olemassa olevalla rytmimekaniikalla. Onnistuminen avaa uuden
-laulun laulupaikkaan lipulla. Laulun sanat otetaan Kalevalasta (1849);
-ehdokkaat esitetään omistajalle ennen toteutusta. Valmis, kun uusi laulu
-ilmestyy paikkaan vasta opettelun jälkeen ja pysyy tallennuksessa.
+**V4 (valmis, v04.03.00).** Tietäjä opettaa laulun **Pohjolan uni** (Kalevala runo 42);
+harjoitus käyttää olemassa olevaa rytmimekaniikkaa, onnistuminen asettaa lipun
+`song.sleep.learned`, ja laulu ilmestyy laulupaikkaan (F3). Moottoriin tuli tapahtuma
+`song.performed` ja efekti `startSongLesson`. Laulun vaikutus tulee V5:ssä.
 
 **V5. Louhen karkotus laululla.** Laulun onnistunut suoritus kalmistolla
 Louhen läheisyydessä asettaa lipun, Louhi poistuu kohtauksesta ja leirin
@@ -170,7 +169,6 @@ Sepän paja ja kanteleen veistäjä vasta MVP:n jälkeen.
 - **Tietäjän ehto.** Ehdotus: laulun saa opettelemalla (rytmiharjoitus),
   ei lisätehtävällä. Uhraus Ahdille tai muu tehtävä lisätään MVP:n jälkeen.
   **Omistaja vahvistaa.**
-- **Kolmannen laulun sanat.** Kalevala-lähde valitaan yhdessä (V4).
 - **Louhi-taistelu on suurin yksittäinen työ** (malli, animaatiot,
   Encounter). Tästä syystä se on tarkoituksella MVP:n ulkopuolella.
 - **Bundle-koko.** 3D-chunk on noin 803 kt ja varoittaa buildissa. Uudet
