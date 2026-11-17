@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { TERRAIN_IDS, TERRAINS, mapCell } from "./domain";
+import { TERRAIN_IDS, mapCell, mapCellTravel } from "./domain";
 import {
   CAIRNFIELD_POSITION,
   CAMPFIRE_POSITION,
+  FORD_POSITION,
   LAKESIDE_POSITION,
   PROTOTYPE_MAP,
   PROTOTYPE_START,
@@ -55,13 +56,29 @@ describe("prototyyppikartta", () => {
         const x = current.x + dx, y = current.y + dy;
         const key = `${x},${y}`;
         const cell = mapCell(PROTOTYPE_MAP, x, y);
-        if (cell && TERRAINS[cell.terrainId].passable && !visited.has(key)) {
+        if (cell && mapCellTravel(cell).passable && !visited.has(key)) {
           visited.add(key);
           queue.push({ x, y });
         }
       }
     }
     for (const target of targets) expect(visited.has(target)).toBe(true);
+  });
+
+  it("sijoittaa yhden kivisen kahlaamon vaakasuoraan jokiosuuteen", () => {
+    const fords = PROTOTYPE_MAP.cells.filter((cell) => cell.crossingId === "ford");
+    expect(fords).toHaveLength(1);
+    expect(mapCell(PROTOTYPE_MAP, FORD_POSITION.x, FORD_POSITION.y)).toMatchObject({
+      terrainId: "river",
+      crossingId: "ford",
+    });
+    expect(RIVER_ROUTE).toContainEqual([FORD_POSITION.x, FORD_POSITION.y]);
+    expect(mapCellTravel(mapCell(PROTOTYPE_MAP, FORD_POSITION.x, FORD_POSITION.y - 1)!).passable).toBe(true);
+    expect(mapCellTravel(mapCell(PROTOTYPE_MAP, FORD_POSITION.x, FORD_POSITION.y + 1)!).passable).toBe(true);
+    for (const [x, y] of RIVER_ROUTE) {
+      const cell = mapCell(PROTOTYPE_MAP, x, y)!;
+      expect(mapCellTravel(cell).passable).toBe(x === FORD_POSITION.x && y === FORD_POSITION.y);
+    }
   });
 
   it("aloitusruutu on kuljettava ja rauhallinen piha on omana paikkanaan", () => {

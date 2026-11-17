@@ -3,6 +3,7 @@ import {
   MAP_HEIGHT,
   MAP_RULES,
   MAP_WIDTH,
+  CROSSINGS,
   TERRAINS,
   TERRAIN_IDS,
   createWorldMap,
@@ -10,13 +11,15 @@ import {
   mapIndex,
   moveOnMap,
   type MapCell,
+  type CrossingId,
   type TerrainId,
 } from "./domain";
 
-function mapWith(overrides: { x: number; y: number; terrainId?: TerrainId; siteId?: string }[] = []) {
+function mapWith(overrides: { x: number; y: number; terrainId?: TerrainId; crossingId?: CrossingId; siteId?: string }[] = []) {
   const cells: MapCell[] = Array.from({ length: MAP_WIDTH * MAP_HEIGHT }, () => ({ terrainId: "meadow" }));
   for (const value of overrides) cells[value.y * MAP_WIDTH + value.x] = {
     terrainId: value.terrainId ?? "meadow",
+    crossingId: value.crossingId,
     siteId: value.siteId,
   };
   return createWorldMap(cells);
@@ -93,6 +96,14 @@ describe("karttaliike, aika ja kylläisyys", () => {
     const result = moveOnMap(map, start, "right");
     expect(result).toMatchObject({ moved: false, minutesSpent: 0 });
     expect(result.state).toBe(start);
+  });
+
+  it("kivinen kahlaamo tekee vain oman jokiruutunsa kuljettavaksi", () => {
+    const map = mapWith([{ x: 11, y: 10, terrainId: "river", crossingId: "ford" }]);
+    const start = createWorldMapState(map, { x: 10, y: 10 }, { worldMinutes: 50, satiety: 88 });
+    const result = moveOnMap(map, start, "right");
+    expect(result).toMatchObject({ moved: true, minutesSpent: CROSSINGS.ford.minuteCost });
+    expect(result.state).toMatchObject({ x: 11, y: 10, worldMinutes: 70, satiety: 87 });
   });
 
   it("kohdetiilin aika kasvattaa maailmanaikaa ja vähentää kylläisyyttä", () => {

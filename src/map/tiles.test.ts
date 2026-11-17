@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MAP_HEIGHT, MAP_WIDTH, createWorldMap, type MapCell } from "./domain";
-import { riverTile, terrainFrame, terrainVariant } from "./tiles";
+import { EAST, NORTH, SOUTH, WEST, riverTile, shoreEdgeTurns, terrainFrame, terrainVariant, waterShoreMask } from "./tiles";
 
 function riverMap(
   points: readonly (readonly [number, number])[],
@@ -36,5 +36,23 @@ describe("jokilaattojen yhteydet", () => {
   it("liittää joen päässä olevan veden osaksi uomaa", () => {
     const tile = riverTile(riverMap([[10, 10], [11, 10]], [[9, 10]]), 10, 10);
     expect(tile).toMatchObject({ quarterTurns: 1, connections: 10 });
+  });
+});
+
+describe("järven saumattomat rantareunat", () => {
+  it("merkitsee vain veden vieressä olevat maanpuoleiset reunat", () => {
+    const map = riverMap([], [[10, 10], [10, 9], [11, 10]]);
+    expect(waterShoreMask(map, 10, 10)).toBe(SOUTH | WEST);
+  });
+
+  it("käsittelee joen veden jatkumona eikä piirrä joensuuhun poikkirantaa", () => {
+    const map = riverMap([[10, 9]], [[10, 10]]);
+    expect(waterShoreMask(map, 10, 10) & NORTH).toBe(0);
+  });
+
+  it("palauttaa jokaiselle reunamaskille oikeat kierrettävät päällysteet", () => {
+    expect(shoreEdgeTurns(0)).toEqual([]);
+    expect(shoreEdgeTurns(NORTH | EAST | SOUTH | WEST)).toEqual([0, 1, 2, 3]);
+    expect(shoreEdgeTurns(EAST | WEST)).toEqual([1, 3]);
   });
 });

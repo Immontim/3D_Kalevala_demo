@@ -15,10 +15,10 @@ const RIVER_STRAIGHT_FRAMES = [[6, 1], [7, 1], [4, 2]] as const satisfies readon
 const RIVER_BEND_FRAMES = [[5, 2], [6, 2], [7, 2]] as const satisfies readonly AtlasFrame[];
 const RIVER_END_FRAMES = [[4, 3], [5, 3], [6, 3]] as const satisfies readonly AtlasFrame[];
 
-const NORTH = 1;
-const EAST = 2;
-const SOUTH = 4;
-const WEST = 8;
+export const NORTH = 1;
+export const EAST = 2;
+export const SOUTH = 4;
+export const WEST = 8;
 
 export interface RiverTile {
   frame: AtlasFrame;
@@ -45,6 +45,30 @@ export function terrainFrame(terrainId: Exclude<TerrainId, "river">, x: number, 
 function connectsToRiver(map: WorldMapDefinition, x: number, y: number): boolean {
   const terrainId = mapCell(map, x, y)?.terrainId;
   return terrainId === "river" || terrainId === "water";
+}
+
+function isWaterLike(map: WorldMapDefinition, x: number, y: number): boolean {
+  const terrainId = mapCell(map, x, y)?.terrainId;
+  return terrainId === "water" || terrainId === "river";
+}
+
+/** Vesiruudun maanpuoleiset N/E/S/W-reunat; kartan ulkopuoli jatkaa vettä. */
+export function waterShoreMask(map: WorldMapDefinition, x: number, y: number): number {
+  const land = (tx: number, ty: number) => !!mapCell(map, tx, ty) && !isWaterLike(map, tx, ty);
+  return (land(x, y - 1) ? NORTH : 0)
+    | (land(x + 1, y) ? EAST : 0)
+    | (land(x, y + 1) ? SOUTH : 0)
+    | (land(x - 1, y) ? WEST : 0);
+}
+
+/** Yhden kierrettävän rantareunan vaatimat myötäpäiväiset neljänneskierrot. */
+export function shoreEdgeTurns(mask: number): number[] {
+  const turns: number[] = [];
+  if (mask & NORTH) turns.push(0);
+  if (mask & EAST) turns.push(1);
+  if (mask & SOUTH) turns.push(2);
+  if (mask & WEST) turns.push(3);
+  return turns;
 }
 
 export function riverConnections(map: WorldMapDefinition, x: number, y: number): number {

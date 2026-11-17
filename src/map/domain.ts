@@ -5,6 +5,8 @@ export const MAP_HEIGHT = 20;
 
 export const TERRAIN_IDS = ["meadow", "forest", "deepForest", "bog", "rock", "water", "river"] as const;
 export type TerrainId = (typeof TERRAIN_IDS)[number];
+export const CROSSING_IDS = ["ford"] as const;
+export type CrossingId = (typeof CROSSING_IDS)[number];
 
 export interface TerrainDefinition {
   id: TerrainId;
@@ -25,6 +27,11 @@ export const TERRAINS: Record<TerrainId, TerrainDefinition> = {
   river: { id: "river", passable: false, minuteCost: 0 },
 };
 
+/** Joen tai muun esteen paikallinen ylitystapa ilman uutta maastolajia. */
+export const CROSSINGS: Record<CrossingId, Pick<TerrainDefinition, "passable" | "minuteCost">> = {
+  ford: { passable: true, minuteCost: 20 },
+};
+
 export const MAP_RULES = {
   /** Menetettyä kylläisyyttä per maailmassa kulunut minuutti. */
   satietyLossPerMinute: 0.05,
@@ -33,6 +40,8 @@ export const MAP_RULES = {
 
 export interface MapCell {
   terrainId: TerrainId;
+  /** Maaston kulkusäännön korvaava paikallinen ylitys, esimerkiksi kivinen kahlaamo. */
+  crossingId?: CrossingId;
   /** Maastosta erillinen merkityspaikka, esimerkiksi rauhallinen pihapiiri. */
   siteId?: string;
 }
@@ -90,6 +99,11 @@ export function mapCell(map: WorldMapDefinition, x: number, y: number): MapCell 
   return map.cells[mapIndex(map, x, y)];
 }
 
+/** Ruudun todellinen kulkukelpoisuus ja aikakustannus mahdollinen ylitys huomioiden. */
+export function mapCellTravel(cell: MapCell): Pick<TerrainDefinition, "passable" | "minuteCost"> {
+  return cell.crossingId ? CROSSINGS[cell.crossingId] : TERRAINS[cell.terrainId];
+}
+
 /** Paljastaa sijainnin ympäriltä Chebyshev-säteen eli myös viistot naapurit. */
 export function revealAround(
   map: WorldMapDefinition,
@@ -139,10 +153,10 @@ export function moveOnMap(
   const y = state.y + delta.y;
   const cell = mapCell(map, x, y);
   if (!cell) return { state, moved: false, minutesSpent: 0 };
-  const terrain = TERRAINS[cell.terrainId];
-  if (!terrain.passable) return { state, moved: false, minutesSpent: 0 };
+  const travel = mapCellTravel(cell);
+  if (!travel.passable) return { state, moved: false, minutesSpent: 0 };
 
-  const minutesSpent = terrain.minuteCost;
+  const minutesSpent = travel.minuteCost;
   const next: WorldMapState = {
     x,
     y,
