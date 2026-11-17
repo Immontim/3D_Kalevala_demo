@@ -8,9 +8,9 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-17 (Codex, Windows; pohja `origin/main` `b675df9`)
 
-- **Branchin `codex/map-ford-shore-tiles` koodiversio on v04.01.00.** Kartalla
-  on yksi kivinen kahlaamo ja järvillä pyöristetyt rantareunat. Koodi valmis,
-  ei deployattu; varsinaista selainkoetta ei saatu auki (tarkistus alla).
+- **Branch `codex/map-ford-shore-tiles`, v04.01.00, toteutuscommit `6d62e54`.**
+  Yksi kivinen kahlaamo ja pyöristetyt järvenrannat; koodi valmis, ei deployattu,
+  selainkoe ei onnistunut (tarkistus alla).
 - **CampaignStore (V1).** `src/map/campaignStore.ts` (puhdas) on 3D-puolen yksi
   tilan omistaja: `update(fn)` laskee uuden tilan, tallentaa sen ja ottaa sen
   käyttöön vasta onnistumisen jälkeen (epäonnistunut tallennus jättää tilan ja
