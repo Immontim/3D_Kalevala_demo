@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HEAL_VERSES, SONG, SONGS, SONG_SLOTS, SONG_VERSES, beatGap, healOnHit, inZone, slotPositions, songOutcome, zoneHalf } from "./songLogic";
+import { HEAL_VERSES, SLEEP_VERSES, SONG, SONGS, SONG_SLOTS, SONG_UNLOCK_FLAG, SONG_VERSES, beatGap, healOnHit, inZone, slotPositions, songOutcome, songSlots, zoneHalf } from "./songLogic";
 
 describe("laulun osuma-alueet", () => {
   it("jokainen alue on edellistä lyhyempi", () => {
@@ -51,8 +51,25 @@ describe("laulut ja laulupaikat", () => {
     expect(HEAL_VERSES[0]).toMatchObject({ kind: "verbatim", lang: "fi", source: "Kalevala, runo 9" });
     expect(SONG_VERSES[0].text).toBe("Lauloi vanha Väinämöinen:");
   });
-  it("paikkoja on viisi: kaksi laulua ja kolme tyhjää", () => {
+  it("paikkoja on viisi: kaksi alkulaulua ja kolme tyhjää", () => {
     expect(SONG_SLOTS).toEqual(["bog", "heal", null, null, null]);
+  });
+  it("Pohjolan uni: kahdeksan Kalevalan 42. runon säettä, sama rytmipeli", () => {
+    expect(SLEEP_VERSES).toHaveLength(SONG_VERSES.length);
+    expect(SONGS.sleep.verses).toBe(SLEEP_VERSES);
+    expect(SLEEP_VERSES.map((v) => v.text)).toEqual([
+      "Väkeä väsyttelevi,", "rahvahaista raukaisevi:", "kaikki nukkui kuuntelijat", "sekä vaipui katselijat;",
+      "pani pitkähän unehen,", "viikommaksi nukkumahan", "koko Pohjolan perehen", "ja kaiken kyläisen kansan.",
+    ]);
+    for (const verse of SLEEP_VERSES) expect(verse).toMatchObject({ kind: "verbatim", lang: "fi", source: "Kalevala, runo 42" });
+    expect(SONGS.sleep.needsEnemy).toBe(false);
+  });
+  it("opeteltu laulu ilmestyy laulupaikkaan vasta lipun jälkeen ja vie ensimmäisen vapaan paikan", () => {
+    expect(songSlots({})).toEqual(["bog", "heal", null, null, null]);
+    expect(songSlots({ "song.sleep.learned": false })).toEqual(["bog", "heal", null, null, null]);
+    expect(songSlots({ "song.sleep.learned": true })).toEqual(["bog", "heal", "sleep", null, null]);
+    expect(SONG_UNLOCK_FLAG.sleep).toBe("song.sleep.learned");
+    expect(songSlots({ "muu.lippu": true })).toEqual([...SONG_SLOTS]);
   });
   it("parannuslaulu antaa viisi elämää osumasta eikä ylitä enimmäismäärää", () => {
     expect(SONG.healPerHit).toBe(5);

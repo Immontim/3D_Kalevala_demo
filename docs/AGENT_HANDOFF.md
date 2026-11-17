@@ -6,44 +6,44 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-17 (Claude, Windows; pohja `origin/main` `9339675`)
+Päivitetty: 2026-11-17 (Claude, Windows; pohja `origin/main` `809398a`)
 
-- **Branchin `claude/site-instances` koodiversio on v04.02.00** (V3: satunnaiset
-  pihapiirit, alla). Koodi valmis, ei deployattu, käsin testattu selaimessa mutta
-  omistaja ei vielä pelannut. Tarkista merge-tila ennen jatkamista:
-  `git merge-base --is-ancestor claude/site-instances origin/main`. V1–V2 (store,
-  moottori, tietäjän dialogi) ja Codexin kahlaamo (v04.01.00) ovat mergattu; omistaja
-  hyväksyi dialogin sävyn (muut hahmot puhuvat vähemmän kalevalamittaisesti, mutta
-  vanhahtavaan poljentoon pyritään).
-- **Paikkainstanssit ja satunnaiset pihapiirit (V3).** Kartassa ei ole kiinteää
-  pihaa: pihat ovat kampanjan `world.siteInstances` (`id`, `kind: "yard"`, `x`, `y`,
-  `archer`) ja `world.worldSeed`. **Skeema ja avain pysyvät 5/v5:ssä**: kentät luetaan
-  sallivasti (`parseSiteInstances` pudottaa virheelliset, kampanja säilyy). Tunnisteet
-  `yard` ja `yard-b`; vanhan tallennuksen piha säilyy tunnisteella `yard` (esine-ID:t
-  `yard.table-*` ennallaan), toinen on `yard-b.table-*`.
-  `src/map/placement.ts` (puhdas): omat satunnaisvirrat `rngStream(siemen, nimi)`
-  (`placement`, `archer`), säännöt `YARD_PLACEMENT` (keskialue x/y 4-15, niitty tai
-  metsä, ei kahlaamoa tai paikkaruutua, Chebyshev ≥ 3 aloituksesta ja kiinteistä
-  paikoista, ≥ 5 pihojen välillä, reitti ≤ 150 min), `placeYardInstances` (rakentaa
-  ehdokkaista, onnistuu aina) ja riippumaton `validateYardPlacement`.
-  `src/map/siteInstances.ts`: `newYardInstances`, `completeYardInstances` (vanha
-  tallennus: `yard` = vanha paikka (10,11) jousineidolla + arvottu `yard-b` ilman;
-  täydennys tallennetaan kerran, ettei arvonta toistu). `storage.ts`:
-  `newCampaign(siemen)`, `loadCampaign` täydentää puuttuvat pihat. `sites.ts`:
-  `siteIdAt`, `LEGACY_YARD_POSITION`. Kartta välittää instanssin 3D:lle parametrilla
-  `site` (`route.ts`); `scene3d.ts` kutsuu `setSiteInstance` ennen rakennusta, ja
-  `world.ts` käyttää sitä esine-ID:ihin ja jousineitoon. `?scene=yard` ilman `site`a
-  = instanssi `yard`. **Testattu:** 1000 siementä validaattorissa, determinismi,
-  migraatio; selaimessa pihat tallentuvat, `yard-b` löytyy, Enter vie `site=yard-b`,
-  esine-ID:t ja jousineito täsmäävät. **Ei testattu:** kartan ulkoasu kuvakaappauksella
-  (aikakatkesi), löydettävyys pelaten, naissankari pihoilla.
-- **CampaignStore (V1).** `src/map/campaignStore.ts` (puhdas) on 3D-puolen yksi
-  tilan omistaja: `update(fn)` laskee uuden tilan, tallentaa sen ja ottaa sen
-  käyttöön vasta onnistumisen jälkeen (epäonnistunut tallennus jättää tilan ja
-  3D-esineen ennalleen), `subscribe` ilmoittaa muutoksista. 3D:ssä sen luo
-  `engine/store.ts` (`initCampaignStore`, `campaignStore()`, `worldRuntime()`).
-  `engine/sceneItems.ts` ei pidä enää omaa kopiota. Kartta (`map/app.ts`) on
-  erillinen sivu ja lataa kampanjan omaan muuttujaansa; sitä ei siirretty storeen.
+- **Branchin `claude/song-learning` koodiversio on v04.03.00** (V4: laulun opettelu,
+  alla). Koodi valmis, ei deployattu, käsin testattu selaimessa, omistaja ei vielä
+  pelannut. Tarkista merge-tila ennen jatkamista:
+  `git merge-base --is-ancestor claude/song-learning origin/main`. V1-V3 ja Codexin
+  kahlaamo on mergattu; omistaja hyväksyi dialogin sävyn (muut hahmot puhuvat vähemmän
+  kalevalamittaisesti, vanhahtavaan poljentoon pyritään) ja testasi V3:n (toimii).
+- **Laulun opettelu (V4).** Kolmas laulu **Pohjolan uni** (`SONGS.sleep`, rune ᛋ,
+  Kalevala runo 42: poimittu 8 säettä kahdesta peräkkäisestä kohdasta, omistajan valinta C).
+  Rannan tietäjän dialogissa "Opeta minulle laulu" -> `songIntro` -> "Olen valmis" ->
+  efekti `startSongLesson`, jonka moottori palauttaa `OutAction`ina (`actions`; moottori
+  ei tee UI-toimia itse). `engine/dialogue.ts` sulkee dialogin ja kutsuu
+  `engine/song.ts` `startLesson`: sama rytmipeli, mutta `SongState.lesson` -> maailma
+  ei hidastu (`loop.ts`), seuraava säe näytetään etukäteen ja vihjeteksti vaihtuu.
+  Päätyttyä `endLesson` lähettää tapahtuman `song.performed {songId, context:
+  "lesson", success, hits, sceneId}`; sääntö `sage.song-learned` (vain `lakeside`,
+  `context: lesson`, `success`) asettaa lipun `song.sleep.learned` ja viestin, ja
+  dialogi avataan uudelleen (solmu `taught`). Epäonnistuminen ei rankaise: opettelun
+  voi toistaa. Onnistumisraja on sama `SONG.minHits` (4/8). Loukattu tietäjä
+  (`sage.robbed`) ei opeta; anteeksiannon jälkeen opettaa. `songLogic.songSlots(flags)`
+  sijoittaa opitun laulun ensimmäiseen vapaaseen paikkaan (F3); `engine/song.ts`
+  päivittää paikat `refreshSlots`illa valintarenkaan avautuessa, joten laulu on
+  käytettävissä myös taistelukohtauksissa. **Laulun vaikutus puuttuu**: taistelussa
+  laulettu Pohjolan uni vain näyttää viestin ja lähettää `song.performed`
+  (`context: "cast"`); V5 käyttää sitä Louhen karkotukseen. Kielet FI/EN.
+  **Testattu:** Vitest (säkeet, paikat, opettelupolut, väärä konteksti/kohtaus,
+  anteeksianto) ja selaimessa onnistunut ja epäonnistunut harjoitus, flagin tallentuminen,
+  laulu kehässä rannalla ja nuotioaukiolla, ei konsolivirheitä. **Ei testattu:** oikea
+  näppäimistö/hiirirytmi ihmiskäsin, ääni, kuvakaappaus (aikakatkaisut).
+- **Satunnaiset pihapiirit (V3, mergattu).** Pihat ovat kampanjan `world.siteInstances`
+  (`yard`/`yard-b`, `x`, `y`, `archer`) ja `world.worldSeed`; skeema/avain 5/v5 (luku
+  sallivaa). Vanha piha = `yard` (esine-ID:t `yard.table-*`), toinen `yard-b.table-*`.
+  Koodi: `map/placement.ts`, `map/siteInstances.ts`, `sites.ts` `siteIdAt`; kartta välittää
+  `?site=<id>`, `scene3d.ts` `setSiteInstance`, `world.ts` jousineito vain `archer`-pihaan.
+- **CampaignStore (V1).** `map/campaignStore.ts`: 3D:n yksi tilan omistaja, `update(fn)`
+  tallentaa ennen käyttöönottoa; 3D:ssä `engine/store.ts` (`campaignStore()`,
+  `worldRuntime()`). Kartta (`map/app.ts`) lataa kampanjan omaan muuttujaansa.
 - **Maailmamoottori v0 (V2), `src/world/`**, Three.js- ja DOM-vapaa:
   `registry.ts` (tunnetut liput, laskurit, esineiden nimet; **uusi lippu lisätään
   tänne**), `state.ts` (`campaign.engine`, versioitu lohko, luetaan sallivasti),
@@ -306,13 +306,12 @@ Päivitetty: 2026-11-17 (Claude, Windows; pohja `origin/main` `9339675`)
 - **UI ja kielituki.** Kartan pellavapohja, kirjontakehykset, paperinukke,
   kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
   tyypitetyissä FI/EN-sanakirjoissa.
-- **Tarkistukset 2026-11-17 (v04.02.00):** `bun run test` (23 tiedostoa, 272
-  testiä; `vitest run` ottaa mukaan myös `.worktrees/`-kopiot), `bun run lint`,
-  `bun run build` ja `git diff --check` läpäisty. Build varoittaa vain
-  ennestään suuresta 3D-chunkista. Rantamaskit ja kahlaamo (Codex) on tarkastettu
+- **Tarkistukset 2026-11-17 (v04.03.00):** `bunx vitest run --exclude ".worktrees/**"` (23
+  tiedostoa, 278 testiä; pelkkä `bun run test` ottaa mukaan `.worktrees/`-kopiot), `bun run
+  lint`, `bun run build`, `git diff --check` läpäisty. Build varoittaa vain ennestään
+  suuresta 3D-chunkista (832 kt, gzip 224 kt). Rantamaskit ja kahlaamo (Codex) on tarkastettu
   vain staattisesta renderikoosteesta.
-- **Riippuvuustarkistus:** 2026-11-17, ei mitään odottamassa; audit puhdas (viimeksi ajettu
-  tässä sessiossa: vite 8.3.8 jo päivitetty).
+- **Riippuvuustarkistus:** 2026-11-17, ei mitään odottamassa; `bun audit` puhdas ja `bun outdated` tyhjä.
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
   3D:ssä `window.__game`. Selainpaneelin fokus voi pysäyttää 3D-pelin.
 
@@ -367,15 +366,17 @@ Päivitetty: 2026-11-17 (Claude, Windows; pohja `origin/main` `9339675`)
 
 ## Seuraava tehtävä
 
-Omistaja pelaa V3:n (kaksi pihaa löytyy ja on saavutettavissa; jousineito vain toisessa)
-ja kertoo, ovatko etäisyydet sopivat. Sen jälkeen ROADMAPin **V4: laulun opettelu**:
-**esitä ensin omistajalle ehdokkaat kolmannen laulun sanoiksi Kalevalasta (1849) ja odota
-valintaa**; älä toteuta opettelua ennen sitä. Älä aloita V4:ää ennen V3:n palautetta,
-jos omistaja muuttaa pihojen sijoittelua.
+Omistaja pelaa V4:n (tietäjä opettaa Pohjolan unen; laulu F3-paikkaan). Sen jälkeen
+ROADMAPin **V5: Louhen karkotus laululla** (`song.performed` `cast` kalmistolla Louhen
+läheisyydessä; moottoriin tarvitaan efekti "paljasta paikka" ja Louhen poistuminen
+kohtauksesta). **Omistajan jonossa oleva pihojen väen viilaus** (tee V5:n kanssa tai heti
+sen jälkeen, omistaja päättää): tietäjät pois pihoista (MVP:ssä yksi tietäjä, rannalla),
+nuori urho tietäjän paikalle `archer`-vapaassa pihassa (urho on vain taistelija
+`characters.glb`:ssä, rauhan asento/kyläläistuki puuttuu), emäntien ja jousineidon dialogit.
 
 ## Ei vielä aloiteta
 
-- Louhen taistelu ja suoloitsu (varaukset yllä); esine- ja puhemekaniikka kalmistolla
+- Louhen taistelu (varaukset yllä; karkotus laululla kuuluu V5:een); esine- ja puhemekaniikka kalmistolla
   on Codexin suunnittelema.
 - Täysi karttaeditori, satunnaiset matkakohtaamiset ja sivujuonigeneraattori.
 - Paperinuken vaate-esineiden datamalli ja 3D-ulkoasun vaihto.

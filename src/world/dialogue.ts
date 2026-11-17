@@ -4,7 +4,7 @@ import type { CampaignState } from "../map/campaign";
 import { evaluate } from "./conditions";
 import { applyEffects, type EffectFailure } from "./effects";
 import type { TextKey } from "../i18n";
-import type { Dialogue, DialogueChoice, OutMessage, WorldData } from "./types";
+import type { Dialogue, DialogueChoice, OutAction, OutMessage, WorldData } from "./types";
 
 export interface DialogueView {
   dialogueId: string;
@@ -36,7 +36,7 @@ export function startDialogue(dialogue: Dialogue, state: CampaignState, data: Wo
 }
 
 export type ChooseResult =
-  | { ok: true; state: CampaignState; messages: OutMessage[]; next: DialogueView | null }
+  | { ok: true; state: CampaignState; messages: OutMessage[]; actions: OutAction[]; next: DialogueView | null }
   | { ok: false; reason: EffectFailure | "no-such-choice"; detail: string; state: CampaignState };
 
 /** Suorittaa valinnan efektit atomisesti ja palauttaa seuraavan näkymän (null = dialogi päättyy). */
@@ -55,5 +55,5 @@ export function chooseDialogue(
   const applied = applyEffects(state, choice.effects ?? [], data);
   if (!applied.ok) return { ok: false, reason: applied.reason, detail: applied.detail, state };
   const next = choice.next ? viewOf(dialogue, choice.next, applied.state, data) : null;
-  return { ok: true, state: applied.state, messages: applied.messages, next };
+  return { ok: true, state: applied.state, messages: applied.messages, actions: applied.actions, next };
 }

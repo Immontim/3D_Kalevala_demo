@@ -10,6 +10,8 @@ import { $ } from "./dom";
 import { showMsg } from "./hud";
 import { clearInputs, lockPointer } from "./input";
 import { paused } from "./loop";
+import { startLesson } from "./song";
+import { SONGS, type SongId } from "../songLogic";
 import { g } from "./state";
 import { worldRuntime } from "./store";
 
@@ -80,7 +82,13 @@ function choose(index: number) {
     return;
   }
   show(outcome.messages);
+  const lesson = outcome.actions.find((a) => a.kind === "songLesson");
+  const npcId = active.view.npcId;
   if (outcome.next) { active = outcome.next; render(); } else closeDialogue();
+  // Opetus alkaa vasta, kun dialogi on suljettu ja valinnan tila tallennettu.
+  if (lesson && Object.prototype.hasOwnProperty.call(SONGS, lesson.songId)) {
+    startLesson(lesson.songId as SongId, { npcId, name: speaker });
+  }
 }
 
 export function closeDialogue(silent = false) {

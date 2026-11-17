@@ -5,7 +5,7 @@
 import type { CampaignState } from "../map/campaign";
 import { evaluate } from "./conditions";
 import { applyEffects, type EffectFailure } from "./effects";
-import type { EventPattern, GameEvent, OutMessage, Rule, WorldData } from "./types";
+import type { EventPattern, GameEvent, OutAction, OutMessage, Rule, WorldData } from "./types";
 
 export function matchesPattern(pattern: EventPattern, event: GameEvent): boolean {
   if (pattern.type !== event.type) return false;
@@ -29,6 +29,8 @@ export interface PostResult {
   /** Säännöt, joiden tapahtumakuvio täsmäsi mutta jotka eivät vaikuttaneet, syineen. */
   skipped: SkippedRule[];
   messages: OutMessage[];
+  /** Sääntöjen pyytämät UI-toimet (esim. laulun opettelu), joita moottori ei itse tee. */
+  actions: OutAction[];
 }
 
 /** Ajaa tapahtuman sääntöjen läpi. Palauttaa uuden tilan; alkuperäinen ei muutu. */
@@ -37,6 +39,7 @@ export function postEvent(state: CampaignState, event: GameEvent, data: WorldDat
   const fired: FiredRule[] = [];
   const skipped: SkippedRule[] = [];
   const messages: OutMessage[] = [];
+  const actions: OutAction[] = [];
   for (const rule of data.rules) {
     if (!matchesPattern(rule.on, event)) continue;
     if (rule.when) {
@@ -51,8 +54,9 @@ export function postEvent(state: CampaignState, event: GameEvent, data: WorldDat
     current = applied.state;
     fired.push({ ruleId: rule.id, messages: applied.messages });
     messages.push(...applied.messages);
+    actions.push(...applied.actions);
   }
-  return { state: current, fired, skipped, messages };
+  return { state: current, fired, skipped, messages, actions };
 }
 
 export interface RuleExplanation {

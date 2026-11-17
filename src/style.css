@@ -74,7 +74,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; col
   background: rgba(150, 150, 150, 0.16); border: 1px solid rgba(220, 220, 220, 0.3); color: #fff; text-shadow: 0 0 10px rgba(0, 0, 0, 0.8); transition: filter 0.1s, box-shadow 0.1s; }
 .slot.bog { background: rgba(60, 165, 90, 0.34); border-color: rgba(150, 235, 170, 0.75); cursor: pointer; }
 .slot.heal { background: rgba(205, 55, 55, 0.34); border-color: rgba(255, 160, 150, 0.75); cursor: pointer; }
-.slot.bog:hover, .slot.heal:hover { filter: brightness(1.35); box-shadow: 0 0 18px rgba(255, 240, 200, 0.6); }
+.slot.sleep { background: rgba(90, 100, 200, 0.34); border-color: rgba(170, 180, 255, 0.75); cursor: pointer; }
+.slot.bog:hover, .slot.heal:hover, .slot.sleep:hover { filter: brightness(1.35); box-shadow: 0 0 18px rgba(255, 240, 200, 0.6); }
 .slot.off { filter: grayscale(0.8) brightness(0.7); cursor: default; }
 .slot small { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 5px; white-space: nowrap; font-size: 13px; color: #e8dcc0; text-shadow: 0 1px 3px #000, 0 0 6px #000; text-align: center; line-height: 1.25; }
 .slot.empty small { color: var(--muted); }

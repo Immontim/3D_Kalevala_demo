@@ -5,7 +5,7 @@ import type { CampaignStore } from "../map/campaignStore";
 import { chooseDialogue, findDialogue, startDialogue, type ChooseResult, type DialogueView } from "./dialogue";
 import { explainRule, postEvent, type PostResult } from "./engine";
 import { summarizeRule, summarizeWorld, type TextLookup } from "./summary";
-import type { Dialogue, GameEvent, OutMessage, WorldData } from "./types";
+import type { Dialogue, GameEvent, OutAction, OutMessage, WorldData } from "./types";
 
 export interface PostOutcome {
   /** false = tallennus epäonnistui eikä tapahtuma vaikuttanut. */
@@ -19,7 +19,7 @@ export interface ActiveDialogue {
 }
 
 export type ChooseOutcome =
-  | { saved: true; messages: OutMessage[]; next: ActiveDialogue | null }
+  | { saved: true; messages: OutMessage[]; actions: OutAction[]; next: ActiveDialogue | null }
   | { saved: false; reason: "save-failed" | Extract<ChooseResult, { ok: false }>["reason"] };
 
 export interface WorldRuntime {
@@ -67,6 +67,7 @@ export function createWorldRuntime(store: CampaignStore, data: WorldData): World
       return {
         saved: true,
         messages: outcome.messages,
+        actions: outcome.actions,
         next: outcome.next ? { dialogue: active.dialogue, view: outcome.next } : null,
       };
     },

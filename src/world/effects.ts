@@ -3,17 +3,18 @@
 // (`worldMinutes`): 3D-kohtaus ei kuluta aikaa.
 import { setSceneItemTakeMode, tryAddItem, tryRemoveItem, type CampaignState } from "../map/campaign";
 import { withCounterAdded, withFlag } from "./state";
-import type { Effect, OutMessage, WorldData } from "./types";
+import type { Effect, OutAction, OutMessage, WorldData } from "./types";
 
 export type EffectFailure = "inventory-full" | "missing-item" | "unknown-flag" | "unknown-counter";
 
 export type ApplyResult =
-  | { ok: true; state: CampaignState; messages: OutMessage[] }
-  | { ok: false; reason: EffectFailure; detail: string; state: CampaignState; messages: [] };
+  | { ok: true; state: CampaignState; messages: OutMessage[]; actions: OutAction[] }
+  | { ok: false; reason: EffectFailure; detail: string; state: CampaignState; messages: []; actions: [] };
 
 export function applyEffects(state: CampaignState, effects: readonly Effect[], data: WorldData): ApplyResult {
   let current = state;
   const messages: OutMessage[] = [];
+  const actions: OutAction[] = [];
   for (const effect of effects) {
     switch (effect.kind) {
       case "setFlag": {
@@ -46,13 +47,16 @@ export function applyEffects(state: CampaignState, effects: readonly Effect[], d
       case "message":
         messages.push(effect.sub ? { text: effect.text, sub: effect.sub } : { text: effect.text });
         break;
+      case "startSongLesson":
+        actions.push({ kind: "songLesson", songId: effect.songId });
+        break;
     }
   }
-  return { ok: true, state: current, messages };
+  return { ok: true, state: current, messages, actions };
 }
 
 function fail(state: CampaignState, reason: EffectFailure, detail: string): ApplyResult {
-  return { ok: false, reason, detail, state, messages: [] };
+  return { ok: false, reason, detail, state, messages: [], actions: [] };
 }
 
 /** Kaikki efektien viittaamat liput, laskurit ja instanssit tarkistuksia varten. */

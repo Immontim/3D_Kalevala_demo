@@ -1,22 +1,32 @@
 import * as THREE from "three";
 import { SONG_SLOT_ACTIONS, codeLabel } from "../bindings";
 import { renderVerbatim, t } from "../i18n";
-import { SONG, SONGS, SONG_SLOTS, SongId, beatGap, healOnHit, inZone, slotPositions, songLead, songOutcome, zoneHalf } from "../songLogic";
+import { SONG, SONGS, SONG_SLOTS, SongId, beatGap, healOnHit, inZone, slotPositions, songLead, songOutcome, songSlots, zoneHalf } from "../songLogic";
+import { ARENA } from "../world";
 import { setState } from "./actor";
+import { talkTo } from "./dialogue";
 import { $, isTouch } from "./dom";
 import { focusEnemy } from "./enemies";
 import { flash, showMsg } from "./hud";
 import { bindings, clearInputs, lockPointer } from "./input";
 import { paused } from "./loop";
 import { fx, g, inputs, sfx } from "./state";
+import { campaignStore, worldRuntime } from "./store";
 import { camera, canvas } from "./view";
 
 // ---------- Laulu ----------
 // Kulku: 1) maailma hidastuu, 2) pelaaja ottaa lauluasennon normaalinopeudella,
 // 3) rytmipeli: välilyönti, kun merkki on riimun osuma-alueella, 4) loitsu laukeaa tai ei.
 // Jos hidastettu vastustaja ehtii osua, laulu katkeaa heti.
+/** Tietäjän opetus: sama rytmipeli, mutta maailma ei hidastu ja säe näytetään etukäteen. */
+export interface SongLesson { npcId: string; name: string }
+
 export interface SongState {
   id: SongId;
+  /** Opetuskerta (null = laulu taistelussa). */
+  lesson: SongLesson | null;
+  /** Opetuksessa viimeksi näytetyn säkeen indeksi. */
+  verseShown: number;
   /** Parannuslaulun tähän mennessä palauttama elämä. */
   healed: number;
   start: number; // reaaliaika
@@ -39,6 +49,17 @@ export const RUNES = ["ᚠ", "ᚹ", "ᛃ", "ᛟ", "ᚱ", "ᛉ", "ᛏ", "ᛗ"];
 // kun paikka valitaan pikanäppäimellä tai napsauttamalla; laulunappi uudestaan peruu valinnan.
 export let choosing = false;
 
+/** Voimassa olevat laulupaikat: opeteltu laulu ilmestyy paikkaan kampanjan lipun mukaan. */
+let slots: readonly (SongId | null)[] = SONG_SLOTS;
+function refreshSlots() {
+  slots = songSlots(campaignStore().get().engine.flags);
+  slotEls.forEach((el, i) => {
+    const id = slots[i] ?? null;
+    el.className = "slot " + (id ?? "empty");
+    (el.firstChild as HTMLElement).textContent = id ? SONGS[id].rune : "";
+  });
+}
+
 export const slotEls: HTMLDivElement[] = SONG_SLOTS.map((id, i) => {
   const d = document.createElement("div");
   d.className = "slot " + (id ?? "empty");
@@ -57,7 +78,8 @@ export function openChoice() {
   choosing = true;
   clearInputs();
   setState(g.player, "idle");
-  SONG_SLOTS.forEach((id, i) => {
+  refreshSlots();
+  slots.forEach((id, i) => {
     const key = codeLabel(bindings[SONG_SLOT_ACTIONS[i]].find((c) => c) ?? "");
     slotEls[i].classList.toggle("off", id !== null && !songAvailable(id));
     (slotEls[i].lastChild as HTMLElement).innerHTML = "";
@@ -100,13 +122,18 @@ export function updateChoice() {
   });
   if (inputs.songQueued) { closeChoice(); return; }
   if (inputs.pickQueued !== null) {
-    const id = SONG_SLOTS[inputs.pickQueued] ?? null;
+    const id = slots[inputs.pickQueued] ?? null;
     inputs.pickQueued = null;
     if (songAvailable(id)) { closeChoice(); startSong(id); }
   }
 }
 
-export function startSong(id: SongId) {
+/** Aloittaa tietäjän opettaman laulun harjoituksen. Harjoituksen päätyttyä dialogi avautuu uudelleen. */
+export function startLesson(id: SongId, lesson: SongLesson) {
+  startSong(id, lesson);
+}
+
+export function startSong(id: SongId, lesson: SongLesson | null = null) {
   const verses = SONGS[id].verses;
   g.songPower = 0; // voima kuluu kokonaan, kävi laululle miten tahansa
   sfx.startDrone();
@@ -127,11 +154,12 @@ export function startSong(id: SongId) {
     track.appendChild(d);
     return d;
   });
-  songState = { id, healed: 0, start: g.realTime, playAt, shown: false, beats, results: beats.map(() => null), runes, zones, endAt: -1 };
+  songState = { id, lesson, verseShown: -1, healed: 0, start: g.realTime, playAt, shown: false, beats, results: beats.map(() => null), runes, zones, endAt: -1 };
   $("verse").textContent = "";
   canvas.classList.add("singing");
   $("vignette").classList.add("on");
   $("song").classList.toggle("heal", id === "heal");
+  $("songHint").textContent = t(lesson ? "song.lesson.hint" : "song.rhythmHint");
   setState(g.player, "idle");
   showMsg(SONGS[id].name, "", 1);
 }
@@ -153,6 +181,11 @@ export function updateSong() {
     s.zones[i].style.width = `${w}px`;
     if (s.results[i] === null && g.realTime > bt + zoneHalf(i)) judge(i, false);
   });
+  // Opetuksessa tietäjä laulaa säkeen etukäteen: seuraava arvioimaton säe näkyy ruudulla.
+  if (s.lesson) {
+    const n = s.results.findIndex((r) => r === null);
+    if (n >= 0 && n !== s.verseShown) { s.verseShown = n; renderVerbatim($("verse"), SONGS[s.id].verses[n]); }
+  }
   // Tikitys ennen jokaista riimua.
   const next = s.beats.findIndex((b, i) => s.results[i] === null && b > g.realTime);
   if (next >= 0) {
@@ -167,7 +200,8 @@ export function updateSong() {
   if (s.endAt < 0 && s.results.every((r) => r !== null)) s.endAt = g.realTime + SONG.outro;
   if (s.endAt >= 0 && g.realTime >= s.endAt) {
     const out = songOutcome(s.results as boolean[]);
-    endSong(s.id, out.success, out.rootTime, out.hits, s.healed);
+    if (s.lesson) endLesson(s.id, s.lesson, out.success, out.hits);
+    else endSong(s.id, out.success, out.rootTime, out.hits, s.healed);
   }
 }
 
@@ -198,13 +232,34 @@ export function closeSong(instant = false) {
   if (instant) g.timeScale = 1;
 }
 
+/**
+ * Opetus päättyy: tulos lähetetään moottorille (`song.performed`, lesson), jonka sääntö antaa
+ * laulun lipulla. Sen jälkeen tietäjän dialogi avataan uudelleen (onnistuessa "opetettu"-solmu).
+ */
+export function endLesson(id: SongId, lesson: SongLesson, success: boolean, hits: number) {
+  closeSong();
+  const posted = worldRuntime().post({ type: "song.performed", songId: id, context: "lesson", success, hits, sceneId: ARENA });
+  const message = posted.result.messages[0];
+  // Dialogi ensin: sen avaus tyhjentää ruudun viestin, joten tulos näytetään vasta sen jälkeen.
+  talkTo(lesson.npcId, lesson.name);
+  if (!posted.saved) showMsg(t("dialogue.saveFailed"), "", 2);
+  else if (message) showMsg(t(message.text), message.sub ? t(message.sub) : "", 2.6);
+  else showMsg(t("song.lesson.failed"), t("song.lesson.failedSub"), 2.2);
+}
+
 export function endSong(id: SongId, success: boolean, rootTime: number, hits: number, healed: number) {
   closeSong();
   const total = SONGS[id].verses.length;
+  // Laulu taistelussa kerrotaan moottorille (V5: Louhen karkotus laulamalla kalmistolla).
+  worldRuntime().post({ type: "song.performed", songId: id, context: "cast", success, hits, sceneId: ARENA });
   // Suo lauletaan lukitun tai lähimmän vastustajan alle.
   const target = id === "heal" ? null : focusEnemy();
   if (id === "heal") {
     if (hits > 0) showMsg(t("song.healSuccess"), t("song.healed", { hits, total, healed: Math.round(healed) }), 2.4);
+    else showMsg(t("song.failed"), t("song.rhythmFailed"), 1.6);
+  } else if (id === "sleep") {
+    // Vaikutus (Louhen karkotus) tulee V5:ssä; toistaiseksi laulu vain kaikuu.
+    if (success) showMsg(t("song.sleepSuccess"), t("song.sleepNoListener"), 2.4);
     else showMsg(t("song.failed"), t("song.rhythmFailed"), 1.6);
   } else if (success && target) {
     target.state = "rooted";
