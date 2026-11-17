@@ -5,7 +5,6 @@ export const PROTOTYPE_MAP_ID = "kalevala-prototype";
 export const PROTOTYPE_START = { x: 10, y: 14 } as const;
 /** Vanhan tallennuksen kiinteä piha. Kartassa ei ole enää pihaa: pihat ovat kampanjan instansseja. */
 export const YARD_POSITION = LEGACY_YARD_POSITION;
-export const CAMPFIRE_POSITION = MAP_SITE_DEFINITIONS.campfire.position;
 /** Niityn ja järven rajalla: tietäjän mökki rannalla (rauhallinen 3D-kohtaus). */
 export const LAKESIDE_POSITION = MAP_SITE_DEFINITIONS.lakeside.position;
 /** Kaakon vaaran kalliokumpu veden rannalla: kalmisto (rauhallinen 3D-kohtaus). */
@@ -64,7 +63,6 @@ if (ROWS.length !== MAP_HEIGHT || ROWS.some((row) => row.length !== MAP_WIDTH)) 
 const cells: MapCell[] = ROWS.flatMap((row, y) => [...row].map((symbol, x) => ({
   terrainId: RIVER_CELLS.has(`${x},${y}`) ? "river" : LEGEND[symbol],
   ...(x === FORD_POSITION.x && y === FORD_POSITION.y ? { crossingId: "ford" as const } : {}),
-  ...(x === CAMPFIRE_POSITION.x && y === CAMPFIRE_POSITION.y ? { siteId: "campfire" } : {}),
   ...(x === LAKESIDE_POSITION.x && y === LAKESIDE_POSITION.y ? { siteId: "lakeside" } : {}),
   ...(x === CAIRNFIELD_POSITION.x && y === CAIRNFIELD_POSITION.y ? { siteId: "cairnfield" } : {}),
 })));

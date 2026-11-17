@@ -263,6 +263,8 @@ export interface FighterLook {
   loadout: Loadout;
   /** Naissankari: vartalo on jousineito (assets/villagers_f.glb) ilman jousta; aseet ja kypärä tulevat characters.glb:stä. */
   female?: boolean;
+  /** Miekka on taivaanrautamiekka: sama malli, tumma sinertävä teräs (V6; oma Blender-malli odottaa). */
+  skyIron?: boolean;
 }
 
 // ---------- Blender-hahmot (assets/characters.glb) ----------
@@ -534,6 +536,7 @@ export class Fighter {
         if (mat.metalness > 0.5) {
           // Oma kopio, jotta vihollisen terän hehku ei sytytä muiden teriä.
           const own = mat.clone();
+          if (this.look.skyIron) { own.color.set(0x38425c); own.roughness = Math.min(own.roughness, 0.3); own.metalness = 1; }
           if (envMap) own.envMap = envMap;
           envTargets.add(own);
           m.material = own;

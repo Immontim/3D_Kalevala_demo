@@ -10,6 +10,7 @@ import cairnfieldUrl from "../assets/cairnfield.glb?url";
 import louhiUrl from "../assets/louhi.glb?url";
 import villagersUrl from "../assets/villagers.glb?url";
 import villagersFUrl from "../assets/villagers_f.glb?url";
+import charactersUrl from "../assets/characters.glb?url";
 import dogUrl from "../assets/animals/koira.glb?url";
 import henUrl from "../assets/animals/kana.glb?url";
 import pigUrl from "../assets/animals/possu.glb?url";
@@ -81,6 +82,42 @@ export const siteInstance = { id: "yard", archer: true };
 export function setSiteInstance(next: { id: string; archer: boolean }) {
   siteInstance.id = next.id;
   siteInstance.archer = next.archer;
+}
+
+/** Pihan pysyvä tila: jousineito on parannettu (`archer.healed`), joten hän seisoo eikä makaa. `scene3d.ts` asettaa. */
+export const yardState = { archerHealed: false };
+
+/** Jousineidon paikka pihassa (maassa makaava ja seisova ovat samassa kohdassa). */
+const ARCHER_AT = { x: 2.3, z: 8.9 };
+/** Loukkaantuneen jousineidon vartalon lisäesteet (ympyrät juuresta pitkin vartaloa), poistetaan paranemisessa. */
+const ARCHER_BODY_IDS = ["folk:jousineito-ruumis1", "folk:jousineito-ruumis2"] as const;
+
+/**
+ * Jousineito pihassa: loukkaantuneena selällään maassa (V6, ilman jousta) tai parannettuna seisomassa
+ * jousi kädessä. Sama tunniste "jousineito" molemmille, jotta `vanishVillager` löytää hänet.
+ */
+function spawnArcher(scene: THREE.Scene, standing: boolean): Promise<void> {
+  const { x: jx, z: jz } = ARCHER_AT;
+  const yaw = Math.atan2(-1 - jx, 0 - jz);
+  if (!standing) {
+    return spawnVillager(scene, { id: "jousineito", url: villagersFUrl, character: "jousineito", x: jx, y: groundHeight(jx, jz), z: jz, yaw, scale: 0.95, lying: true });
+  }
+  return spawnVillager(scene, {
+    id: "jousineito", url: villagersFUrl, character: "jousineito", x: jx, y: groundHeight(jx, jz), z: jz, yaw, scale: 0.95,
+    armL: { upper: [0.16, -1, 0.06], fore: [0.12, -0.25, 1] },
+    prop: { name: "jousi", hand: "L", kind: "bow", grip: GRIP_FEMALE_L },
+  });
+}
+
+/**
+ * Hahmon tilan vaihto kesken kohtauksen (moottorin `setNpcState`-toimi). Nyt vain jousineito: parannettu
+ * hahmo nousee seisomaan (maassa makaava malli vaihdetaan heti seisovaan) ja vartaloesteet poistuvat.
+ */
+export function setNpcStateInScene(scene: THREE.Scene, collision: CollisionWorld, npcId: string, state: string): boolean {
+  if (npcId !== "jousineito" || state !== "healed" || !vanishVillager("jousineito", true)) return false;
+  void spawnArcher(scene, true);
+  for (const id of ARCHER_BODY_IDS) collision.disable(id);
+  return true;
 }
 
 /** Kalmiston pysyvä tila: Louhi on karkotettu (`louhi.banished`), eikä häntä luoda. `scene3d.ts` asettaa ennen rakennusta. */
@@ -481,6 +518,8 @@ export interface World {
   removeSceneItem(id: string): boolean;
   /** Poistaa hahmon (esim. "louhi") kesken kohtauksen; false, jos häntä ei ole. */
   removeNpc(npcId: string): boolean;
+  /** Vaihtaa hahmon tilan kesken kohtauksen (jousineito: "healed" = nousee seisomaan). */
+  setNpcState(npcId: string, state: string): boolean;
   /** Siirtää kameran paikan pois rakennusten sisältä (pihapiirissä kehän sisäpuolelle). */
   clearCamera(pos: THREE.Vector3): void;
   /** focus = kulkija (sankari), jota pihan väki katsoo. */
@@ -1245,23 +1284,31 @@ function populateYardLife(scene: THREE.Scene, collision: CollisionWorld) {
   }));
   solid("emanta", ex, ez, 0.35);
 
-  const tx = FIRE.x + 2.5, tz = FIRE.z - 1.5;
-  jobs.push(spawnVillager(scene, {
-    url: villagersUrl, character: "tietaja", x: tx, y: groundHeight(tx, tz), z: tz, yaw: facing(tx, tz, FIRE.x - 2, FIRE.z + 4),
-    armR: { upper: [0.2, -1, 0.3], fore: [0.05, -0.1, 1] },
-    prop: { name: "sauva", hand: "R", kind: "staff", grip: GRIP_MALE_R },
-  }));
-  solid("tietaja", tx, tz, 0.4);
-
-  // Jousineito on vain siinä pihassa, jonka instanssi niin määrää (satunnaisesti valittu talo).
-  if (siteInstance.archer) {
-    const jx = 2.3, jz = 8.9;
+  // Tietäjä asuu vain rannalla (MVP:ssä yksi tietäjä). Pihassa, jossa ei ole jousineitoa, tulen
+  // vieressä seisoo nuori urho (aseeton, rauhassa).
+  if (!siteInstance.archer) {
+    const ux = FIRE.x + 2.5, uz = FIRE.z - 1.5;
     jobs.push(spawnVillager(scene, {
-      url: villagersFUrl, character: "jousineito", x: jx, y: groundHeight(jx, jz), z: jz, yaw: facing(jx, jz, -1, 0), scale: 0.95,
-      armL: { upper: [0.16, -1, 0.06], fore: [0.12, -0.25, 1] },
-      prop: { name: "jousi", hand: "L", kind: "bow", grip: GRIP_FEMALE_L },
+      id: "urho", url: charactersUrl, character: "urho", x: ux, y: groundHeight(ux, uz), z: uz, yaw: facing(ux, uz, FIRE.x - 2, FIRE.z + 4),
+      armL: { upper: [0.14, -1, 0.04], fore: [0.1, -0.8, 0.45] }, armR: { upper: [0.14, -1, 0.04], fore: [0.1, -0.8, 0.45] },
     }));
-    solid("jousineito", jx, jz, 0.38);
+    solid("urho", ux, uz, 0.4);
+  }
+
+  // Jousineito on vain siinä pihassa, jonka instanssi niin määrää (satunnaisesti valittu talo):
+  // loukkaantuneena maassa, kunnes pelaaja on parantanut hänet laululla (V6).
+  if (siteInstance.archer) {
+    const healed = yardState.archerHealed;
+    jobs.push(spawnArcher(scene, healed));
+    solid("jousineito", ARCHER_AT.x, ARCHER_AT.z, 0.38);
+    if (!healed) {
+      const yaw = Math.atan2(-1 - ARCHER_AT.x, 0 - ARCHER_AT.z);
+      const body = { x: -Math.sin(yaw), z: -Math.cos(yaw) };
+      ARCHER_BODY_IDS.forEach((id, i) => {
+        const k = 0.65 * (i + 1);
+        collision.add({ id, kind: "circle", x: ARCHER_AT.x + body.x * k, z: ARCHER_AT.z + body.z * k, radius: 0.34, blocksMovement: true, blocksMelee: false });
+      });
+    }
   }
 
   const dx = -1.7, dz = -3.9;
@@ -1562,6 +1609,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     setTakenSceneItemIds,
     removeSceneItem,
     removeNpc: (npcId) => removeNpcFromScene(npcId, collision),
+    setNpcState: (npcId, state) => setNpcStateInScene(scene, collision, npcId, state),
     clearCamera(pos) {
       const r = Math.hypot(pos.x, pos.z);
       if (r > SITE.camMaxR) { pos.x *= SITE.camMaxR / r; pos.z *= SITE.camMaxR / r; }

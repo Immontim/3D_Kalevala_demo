@@ -20,6 +20,8 @@ export const FLAGS: Record<string, FlagDef> = {
   "sage.robbed": { label: "tietäjä tietää, että tuohikontti vietiin luvatta" },
   "sage.forgiven": { label: "tietäjä on antanut varkauden anteeksi" },
   "song.sleep.learned": { label: "pelaaja on oppinut laulun Pohjolan uni" },
+  "archer.healed": { label: "jousineito on parannettu laululla ja nousee seisomaan" },
+  "archer.gaveSword": { label: "jousineito on antanut taivaanrautamiekan" },
   "louhi.banished": { label: "Louhi on karkotettu kalmistolta ja vainolaisten leiri on paljastunut" },
   // Varattu tarinakäänteelle "emäntä kertoo huhun" (ROADMAP V2). Sillä ei ole vielä
   // pelisääntöä: moottorin testit käyttävät sitä esimerkkikäänteessä.

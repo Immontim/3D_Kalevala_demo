@@ -3,7 +3,7 @@ import type { SiteInstance } from "./campaign";
 import { MAP_RULES, mapCell, type MapPosition, type WorldMapDefinition } from "./domain";
 import type { MapCellVisibility } from "./uiState";
 
-export const FIXED_SITE_IDS = ["lakeside", "campfire", "cairnfield"] as const;
+export const FIXED_SITE_IDS = ["lakeside", "cairnfield"] as const;
 export type FixedSiteId = (typeof FIXED_SITE_IDS)[number];
 export type MapSiteMovement = "fixed" | "mobile";
 export type MapSiteLifetime = "persistent" | "temporary";
@@ -41,16 +41,6 @@ export const MAP_SITE_DEFINITIONS: Record<FixedSiteId, MapSiteDefinition> = {
     movement: "fixed",
     lifetime: "persistent",
   },
-  /** Vainolaisten leiri (punainen käsi): paljastuu vasta, kun Louhi on karkotettu (V5). */
-  campfire: {
-    id: "campfire",
-    mapId: "kalevala-prototype",
-    position: { x: 13, y: 14 },
-    sceneId: "clearing",
-    movement: "fixed",
-    lifetime: "persistent",
-    requiresFlag: "louhi.banished",
-  },
   /** Kaakon vaaran kalliokumpu veden rannalla: rauhallinen kalmisto kuppikivineen. */
   cairnfield: {
     id: "cairnfield",
@@ -62,15 +52,22 @@ export const MAP_SITE_DEFINITIONS: Record<FixedSiteId, MapSiteDefinition> = {
   },
 };
 
-/** Pihainstanssin 2D-metadata: sama `yard`-kohtaus ajetaan jokaiselle instanssille omilla parametreillaan. */
+/** Vainolaisten leirin lukitus: piilossa, kunnes Louhi on karkotettu (V5). */
+export const CAMP_REQUIRES_FLAG = "louhi.banished";
+
+/**
+ * Instanssin 2D-metadata: sama kohtaus ajetaan jokaiselle instanssille omilla parametreillaan.
+ * Piha avaa `yard`-kohtauksen; vainolaisten leiri (punainen käsi) avaa `clearing`-taistelun ja on lukossa.
+ */
 export function instanceSiteDefinition(instance: SiteInstance): MapSiteDefinition {
   return {
     id: instance.id,
     mapId: "kalevala-prototype",
     position: { x: instance.x, y: instance.y },
-    sceneId: "yard",
+    sceneId: instance.kind === "camp" ? "clearing" : "yard",
     movement: "fixed",
     lifetime: "persistent",
+    ...(instance.kind === "camp" ? { requiresFlag: CAMP_REQUIRES_FLAG } : {}),
   };
 }
 
@@ -151,7 +148,6 @@ export function siteDisplayForDefinition(
 const LEGACY_SITE_SNAPSHOT = [
   { id: "yard", x: 10, y: 11 },
   { id: "lakeside", x: 9, y: 6 },
-  { id: "campfire", x: 13, y: 14 },
 ] as const;
 
 export function legacyKnownSiteIds(

@@ -60,6 +60,9 @@ export function applyEffects(state: CampaignState, effects: readonly Effect[], d
       case "removeNpc":
         actions.push({ kind: "removeNpc", npcId: effect.npcId });
         break;
+      case "setNpcState":
+        actions.push({ kind: "npcState", npcId: effect.npcId, state: effect.state });
+        break;
     }
   }
   return { ok: true, state: current, messages, actions };

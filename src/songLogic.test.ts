@@ -66,6 +66,7 @@ describe("laulut ja laulupaikat", () => {
     expect(SONGS.sleep.peaceful).toBe(true);                       // vain tämän voi laulaa rauhassa
     expect(SONGS.bog.peaceful).toBeUndefined();
     expect(SONGS.heal.peaceful).toBeUndefined();
+    expect(SONGS.heal.peaceTargets).toEqual(["jousineito"]);       // parannus rauhassa vain loukkaantuneen jousineidon luona
   });
   it("opeteltu laulu ilmestyy laulupaikkaan vasta lipun jälkeen ja vie ensimmäisen vapaan paikan", () => {
     expect(songSlots({})).toEqual(["bog", "heal", null, null, null]);

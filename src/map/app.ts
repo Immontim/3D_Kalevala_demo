@@ -15,6 +15,8 @@ import {
   combatLoadout,
   consumeFood,
   ITEMS,
+  isSkyIron,
+  ownsMainHand,
   setEquipped,
   setPlayerGender,
   type CampaignState,
@@ -115,7 +117,8 @@ function buildUi(root: HTMLElement) {
     button.addEventListener("click", () => openScene(button.dataset.scene as SceneId));
   });
   root.querySelector<HTMLSelectElement>("#mainHand")!.addEventListener("change", (event) => {
-    const value = (event.target as HTMLSelectElement).value as "sword" | "spear";
+    const value = (event.target as HTMLSelectElement).value as "sword" | "sky_iron_sword" | "spear";
+    if (!ownsMainHand(campaign, value)) { renderUi(); return; }
     campaign = setEquipped(campaign, "mainHand", value);
     if (value === "spear") campaign = setEquipped(campaign, "offHand", null);
     persistAndRender();
@@ -330,12 +333,22 @@ function renderUi() {
   drawMoon();
 
   const loadout = combatLoadout(campaign.player.equipment);
-  const loadoutName = loadout === "sword_shield" ? t("loadout.swordShield.name")
+  const loadoutName = isSkyIron(campaign.player.equipment) ? t("map.item.skyIronSword")
+    : loadout === "sword_shield" ? t("loadout.swordShield.name")
     : loadout === "sword" ? t("loadout.sword.name")
       : loadout === "spear" ? t("loadout.spear.name") : t("map.noWeapon");
   document.getElementById("equipmentSummary")!.textContent = loadoutName;
   const main = document.getElementById("mainHand") as HTMLSelectElement;
   const off = document.getElementById("offHand") as HTMLSelectElement;
+  // Taivaanrautamiekka ilmestyy valintaan vasta, kun se on saatu (inventaariossa).
+  const hasSky = ownsMainHand(campaign, "sky_iron_sword");
+  const skyOption = main.querySelector<HTMLOptionElement>('option[value="sky_iron_sword"]');
+  if (hasSky && !skyOption) {
+    const option = document.createElement("option");
+    option.value = "sky_iron_sword";
+    option.textContent = t("map.item.skyIronSword");
+    main.insertBefore(option, main.querySelector('option[value="spear"]'));
+  } else if (!hasSky && skyOption) skyOption.remove();
   main.value = campaign.player.equipment.mainHand ?? "";
   off.value = campaign.player.equipment.offHand ?? "";
 

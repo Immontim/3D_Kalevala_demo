@@ -6,42 +6,56 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-17 (Claude, Windows; pohja `origin/main` `6504b2c`)
+Päivitetty: 2026-11-17 (Claude, Windows; pohja `origin/main` `0123847`)
 
-- **Branchin `claude/louhi-banish` koodiversio on v04.04.00** (V5: Louhen karkotus,
-  alla). Koodi valmis, ei deployattu, käsin testattu selaimessa; omistaja ei testaa V5:ttä
-  erikseen vaan pelaa MVP:tä kokonaisuutena. Tarkista merge-tila ennen jatkamista:
-  `git merge-base --is-ancestor claude/louhi-banish origin/main`. V1-V4 ja Codexin kahlaamo
-  on mergattu; omistaja hyväksyi dialogin sävyn ja testasi V3:n (toimii).
-- **Louhen karkotus (V5).** Laulun Pohjolan uni onnistunut laulaminen kalmistolla (`cairnfield`)
-  enintään 6 m (`SONG_AUDIENCE_RANGE`) Louhesta: `engine/song.ts` `endSong` lähettää
-  `song.performed` (cast) kentällä `nearNpcId` (lähin puhuteltava, `interact.ts`
-  `nearestTalkable`), ja sääntö `louhi.banished` (`world/content.ts`) asettaa lipun
-  `louhi.banished`, efektin `revealSite campfire` (`map/reveal.ts`: tunnetuksi + ruudun
-  3x3 näkyviin) ja `removeNpc louhi` (`OutAction`, 3D tekee: `world.removeNpc` ->
-  `folk.ts` `vanishVillager` pienentää ja painaa hahmon maahan 2,2 s, `CollisionWorld.disable`,
-  `removeTalkable`) sekä viestin. Pysyvyys: `cairnState.louhiBanished` luetaan
-  lipusta `scene3d.ts`:ssä ennen rakennusta, eikä Louhea luoda. Epäonnistunut tai liian
-  kaukainen laulu ei muuta tilaa eikä rankaise. **Rauhassa laulaminen:** laulurengas avautuu
-  rauhallisessa kohtauksessa (ilman taistelun voimaa) vain, jos pelaajalla on rauhassa
-  laulettava laulu (`SongDef.peaceful`, nyt vain `sleep`; `canSingAtPeace`); suo ja
-  parannus ovat rauhassa harmaina. **Leiri (`campfire`, punainen käsi) on lukossa:**
-  `MapSiteDefinition.requiresFlag = "louhi.banished"`; `siteUnlocked` piilottaa sen,
-  estää löytämisen, Enterin ja viestin kartalla (`discoverVisibleSites`/`mapSiteDisplay`/
-  `sceneForMapSite` ottavat `flags`). Esc-valikon oikotie `clearing`iin on silti auki
-  (kehittäjän oikotie). **Testattu:** Vitest (sääntö, epäonnistumiset, yksi kerta,
-  tallennus, paljastus, lukitus, estojen poisto) ja selaimessa koko polku (leiri piilossa,
-  liian kaukaa kaikuu, läheltä Louhi katoaa, uudelleenlatauksessa poissa, leiri avautuu).
-  **Ei testattu:** ihmiskäsin rytmi, ääni (`sfx.swamp`), katoamisen ulkoasu liikkeessä.
-- **Laulun opettelu (V4, mergattu).** Laulu **Pohjolan uni** (`SONGS.sleep`, rune ᛋ,
-  Kalevala runo 42, omistajan valinta C). Tietäjän dialogi "Opeta minulle laulu" ->
-  `songIntro` -> "Olen valmis" -> efekti `startSongLesson` (`OutAction`; moottori ei tee
-  UI-toimia) -> `engine/song.ts` `startLesson`: sama rytmipeli, `SongState.lesson` (maailma
-  ei hidastu, seuraava säe näkyy etukäteen). `endLesson` lähettää `song.performed`
-  (lesson); sääntö `sage.song-learned` (vain `lakeside`) asettaa `song.sleep.learned` ja
-  dialogi avautuu (`taught`). Epäonnistuminen ei rankaise; raja `SONG.minHits` (4/8).
-  Loukattu tietäjä ei opeta ennen anteeksiantoa. `songLogic.songSlots(flags)` sijoittaa
-  opitun laulun paikkaan F3; `refreshSlots` päivittää renkaan avautuessa.
+- **Branchin `claude/archer-sword` koodiversio on v04.05.00** (V6 + leirin arvonta + pihojen
+  väki, alla). Koodi valmis, ei deployattu, käsin testattu selaimessa; omistaja pelaa MVP:tä
+  kokonaisuutena eikä testaa vaiheita erikseen. Tarkista merge-tila:
+  `git merge-base --is-ancestor claude/archer-sword origin/main`. V1-V5 ja Codexin
+  kahlaamo on mergattu.
+- **Vainolaisten leiri on arvottu instanssi (`camp`).** Kartasta poistettiin kiinteä
+  `campfire`; `SiteInstance.kind` on `"yard" | "camp"`. `map/placement.ts`: `CAMP_PLACEMENT`
+  (kartan reuna: etäisyys reunaan <= 4, maasto niitty/metsä/umpimetsä/kallio, Chebyshev >= 8
+  aloituksesta, reitti <= 600 min, >= 4 pihoista ja kiinteistä), `placeCampInstance` (oma virta
+  `camp`), `validateCampPlacement`; `siteInstances.ts` `newSiteInstances`/`completeSiteInstances`
+  (vanha tallennus saa puuttuvan `camp`in). `sites.ts` `instanceSiteDefinition`: leiri avaa
+  `clearing`in ja on lukossa lipulla `louhi.banished` (`CAMP_REQUIRES_FLAG`). Sääntö
+  `louhi.banished` paljastaa `camp`in. 1000 siementä läpäisee validaattorin.
+- **Jousineidon haara (V6).** Jousineito makaa `archer`-pihassa loukkaantuneena (`lying`-malli,
+  vartaloesteet `folk:jousineito-ruumis1/2`, ei jousta). Rauhassa **parannuslaulu** on käytettävissä,
+  kun hän on kuuluvilla (`SongDef.peaceTargets`, `songAvailable`; ring avautuu vain, jos jokin laulu
+  on käytettävissä: `canSingAtPeace`). Sääntö `archer.healed` (`song.performed` heal/cast/success,
+  `yard`, `nearNpcId` jousineito) asettaa lipun ja efektin `setNpcState` (`OutAction npcState`):
+  `world.setNpcState` vaihtaa makaavan seisovaan (`vanishVillager(id, true)` + `spawnArcher`) ja
+  poistaa vartaloesteet. Dialogi `archer.yard`: loukkaantuneena `wounded`/`story`, parannettuna
+  `reward` -> `take` antaa `sky_iron_sword`in (`giveItem`; täysi inventaario -> valinta
+  epäonnistuu, toistettavissa) ja lipun `archer.gaveSword`, sen jälkeen `after`.
+- **Taivaanrautamiekka.** `ItemId`/`EquipmentItemId` `sky_iron_sword`, `WEAPONS.sky_iron_sword`
+  (vahinko 1,3 vs 1,0, muuten sama miekka), `weaponOf(loadout, skyIron)`, `FighterLook.skyIron`,
+  `combatLoadout` kartoittaa sen miekaksi (+ kilpi), `isSkyIron`/`ownsMainHand`. Kartan
+  paperinuken pääkäsi-valinta näyttää sen vasta, kun se on inventaariossa; esine pysyy
+  inventaariossa valinnan jälkeen. Hierarkia: `tuning.ts` `weapons.sky_iron_sword.damage`.
+  **Malli on väliaikainen:** sama miekkamalli, terä sävytetty tummansiniseksi
+  (`fighter.ts`); oma Blender-malli odottaa (ks. BLENDER_HANDOFF).
+- **Pihojen väki.** Tietäjä poistettiin pihoilta (yksi tietäjä, rannalla). `archer`-vapaassa pihassa
+  tulen vieressä seisoo **nuori urho** (`characters.glb` `char_urho` `spawnVillager`illa, aseeton;
+  dialogi `urho.yard`: vihje kalmiston lähettilääseen). Emäntällä (molemmat pihat) on dialogi
+  `emanta.yard`: "Onko kuulunut mitään outoa?" asettaa `rumor.heard` ja `revealSite lakeside`
+  (huhu). Tietäjän opetus (`sage.song-learned`) paljastaa myös `cairnfield`in kartalle.
+  **Testattu:** Vitest (kaikki säännöt ja epäonnistumiset, leirin 1000 siementä) ja selaimessa koko
+  polku (parannus rauhassa, seisomaan nousu, miekan otto, valinta kartalla, vahinko 1,3, urho, emäntä).
+  **Ei testattu:** miekan ja loukkaantuneen mallin ulkonäkö lähikuvassa, rytmi ihmiskäsin.
+- **Louhen karkotus (V5, mergattu).** Pohjolan uni <= 6 m (`SONG_AUDIENCE_RANGE`) Louhesta
+  kalmistolla: `endSong` lähettää `song.performed` (cast, `nearNpcId`); sääntö `louhi.banished`
+  asettaa lipun, `revealSite` ja `removeNpc` (`world.removeNpc`: `vanishVillager`,
+  `CollisionWorld.disable`, `removeTalkable`). Pysyvyys: `cairnState.louhiBanished` lipusta.
+  Lukitut paikat: `MapSiteDefinition.requiresFlag`, `siteUnlocked`. Esc-oikotie `clearing`iin
+  on kehittäjälle auki.
+- **Laulun opettelu (V4, mergattu).** Laulu **Pohjolan uni** (`SONGS.sleep`, Kalevala runo 42).
+  Tietäjän dialogi -> efekti `startSongLesson` (`OutAction`) -> `engine/song.ts` `startLesson`
+  (`SongState.lesson`: ei hidastusta, säe näkyy etukäteen) -> `endLesson` lähettää `song.performed`
+  (lesson); sääntö `sage.song-learned` antaa lipun `song.sleep.learned`. Epäonnistuminen ei rankaise
+  (raja `SONG.minHits` 4/8). `songLogic.songSlots(flags)` sijoittaa laulun paikkaan F3.
 - **Satunnaiset pihapiirit (V3, mergattu).** Kampanjan `world.siteInstances` (`yard`/`yard-b`,
   `archer`) ja `worldSeed`; skeema 5/v5. Vanha piha = `yard` (`yard.table-*`), toinen
   `yard-b.table-*`. `map/placement.ts`, `map/siteInstances.ts`, `sites.ts` `siteIdAt`;
@@ -49,30 +63,17 @@ Päivitetty: 2026-11-17 (Claude, Windows; pohja `origin/main` `6504b2c`)
 - **CampaignStore (V1).** `map/campaignStore.ts`: 3D:n yksi tilan omistaja, `update(fn)`
   tallentaa ennen käyttöönottoa; 3D:ssä `engine/store.ts` (`campaignStore()`,
   `worldRuntime()`). Kartta (`map/app.ts`) lataa kampanjan omaan muuttujaansa.
-- **Maailmamoottori v0 (V2), `src/world/`**, Three.js- ja DOM-vapaa:
-  `registry.ts` (tunnetut liput, laskurit, esineiden nimet; **uusi lippu lisätään
-  tänne**), `state.ts` (`campaign.engine`, versioitu lohko, luetaan sallivasti),
-  `conditions.ts` (all/any/not, flag, counter, moonPhase, itemTaken; syy suomeksi),
-  `effects.ts` (setFlag, addCounter, giveItem, takeItem, setSceneItemTakeMode,
-  message; efektilista **atominen**, ei koske `worldMinutes`iä), `engine.ts`
-  (`postEvent`: säännöt määrittelyjärjestyksessä; ei ajastimia, `unless`ia eikä
-  ketjureaktioita), `take.ts` (esineen otto + `item.taken` yhtenä päivityksenä),
-  `dialogue.ts`, `summary.ts`, `runtime.ts`, `content.ts` (**pelin oikea data**:
-  `RULES`, `SAGE_DIALOGUE`, `GAME_WORLD`). Tapahtumat `item.taken`, `npc.talked`,
-  `scene.entered`. Jokaisella säännöllä ja dialogilla pakollinen `intent`-lause
-  (testi vaatii). "Emäntä kertoo huhun" on testattu testimaailmalla, ei pelisääntönä.
-- **Konsoli `__world`** (3D): `flags`, `counters`, `post(event)`, `explain(ruleId?)`,
-  `describe()` (kaikki säännöt ja dialogit proosana omistajan hyväksyttäväksi),
-  `last`, `items` (poimittavat esineet ja katseen kohde), `scene`. Sama olio sisältää
-  `world.ts`:n tilastot (puut, kolmiot, törmäykset), jotka `world.ts` liittää siihen.
-- **Dialogi 3D:ssä** (`engine/dialogue.ts`, `#dialogue`): puhe-ele (`melee.ts`
-  `gestureEffect`) lähettää `npc.talked`in ja avaa dialogin, jos `findDialogue(ARENA,
-  npcId)` löytyy, muuten näyttää vain nimen. Pelilogiikka ja aika seisovat, valinta
-  numerolla 1-9 tai klikkauksella, Esc sulkee. **Ensimmäinen polku** (`lakeside`,
-  `tietaja`, `lakeside.sage-pack`): pyyntö antaa luvan (`sage.permission`,
-  `setSceneItemTakeMode`); luvaton otto kirjaa varkauden ja sääntö `sage.theft-noticed`
-  asettaa `sage.robbed`, laskurin `thefts.noticed` ja viestin; dialogi vaihtuu
-  (anteeksipyyntö → `forgiven`, loki säilyy). `lakeruin`issa ja pihalla ei seurausta.
+- **Maailmamoottori v0 (V2), `src/world/`**, Three.js- ja DOM-vapaa: `registry.ts` (liput, laskurit;
+  **uusi lippu lisätään tänne**), `state.ts` (`campaign.engine`, sallivasti luettu), `conditions.ts`,
+  `effects.ts` (atominen, ei koske `worldMinutes`iä; UI-toimet `OutAction`eina), `engine.ts`
+  (`postEvent`; ei ajastimia, `unless`ia eikä ketjureaktioita), `take.ts`, `dialogue.ts`,
+  `summary.ts`, `runtime.ts`, `content.ts` (**pelin oikea data**: `RULES`, dialogit, `GAME_WORLD`).
+  Tapahtumat `item.taken`, `npc.talked`, `scene.entered`, `song.performed`. Jokaisella säännöllä ja
+  dialogilla pakollinen `intent`-lause. Konsoli `__world`: `flags`, `counters`, `post`, `explain`,
+  `describe()` (kaikki proosana omistajalle), `items`, `scene`. Dialogi 3D:ssä: `engine/dialogue.ts`
+  (puhe-ele -> `npc.talked` -> dialogi, jos `findDialogue(ARENA, npcId)`; pelilogiikka seisoo; numero/
+  klikkaus, Esc sulkee). Tietäjä (`lakeside`): `sage.permission` + `setSceneItemTakeMode`; luvaton
+  otto -> `sage.theft-noticed` (lippu, laskuri, viesti), anteeksipyyntö, loki säilyy.
 - **Rauhallisten 3D-kohtausten esineet.** `sceneInteraction.ts` valitsee
   sankarin katseakselilta enintään 2,8 m:n päässä olevan esineen. HUDin pieni
   piste projisoidaan maailmaan; osuva piste näyttää esineen nimen, varkauden ja
@@ -311,9 +312,9 @@ Päivitetty: 2026-11-17 (Claude, Windows; pohja `origin/main` `6504b2c`)
 - **UI ja kielituki.** Kartan pellavapohja, kirjontakehykset, paperinukke,
   kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
   tyypitetyissä FI/EN-sanakirjoissa.
-- **Tarkistukset 2026-11-17 (v04.04.00):** `bunx vitest run --exclude ".worktrees/**"` (24
-  tiedostoa, 288 testiä), `bun run lint`, `bun run build`, `git diff --check` läpäisty;
-  build varoittaa vain suuresta 3D-chunkista (835 kt, gzip 225 kt).
+- **Tarkistukset 2026-11-17 (v04.05.00):** `bunx vitest run --exclude ".worktrees/**"` (24
+  tiedostoa, 300 testiä), `bun run lint`, `bun run build`, `git diff --check` läpäisty; build
+  varoittaa vain suuresta 3D-chunkista (839 kt, gzip 227 kt).
 - **Riippuvuustarkistus:** 2026-11-17: `bun outdated` tyhjä, mutta **`bun audit` löysi 1 korkean
   löydöksen: picomatch 4.0.7 (ReDoS, GHSA-fc5q-39xc-vjpf) vite/vitest-kehitystyökalujen
   kautta**. Vain kehitysaikainen, ei kulje pelaajalle. **Päivitysajoa ehdotettu omana
@@ -373,13 +374,11 @@ Päivitetty: 2026-11-17 (Claude, Windows; pohja `origin/main` `6504b2c`)
 
 ## Seuraava tehtävä
 
-ROADMAPin **V6: jousineidon haara** (loukkaantunut jousineito `archer`-pihassa; parannuslaulu
-rauhalliseen NPC:hen antaa taivaanrautamiekan; tarvitsee laulun kohteeksi NPC:n, uuden
-esinemäärittelyn, `combatLoadout`-kartoituksen ja Blender-mallin). **Omistajan jonossa oleva
-pihojen väen viilaus** (voidaan tehdä V6:n yhteydessä, koska se koskee samaa pihaa):
-tietäjät pois pihoista (MVP:ssä yksi tietäjä, rannalla), nuori urho tietäjän paikalle
-`archer`-vapaassa pihassa (urho on vain taistelija `characters.glb`:ssä, rauhan
-asento/kyläläistuki puuttuu), emäntien ja jousineidon dialogit. Pidä tähtäin MVP:ssä.
+ROADMAPin **V7: leiri ja loppu**: `clearing`-aaltotaistelun voitto päättää kampanjan (loppuruutu,
+"jatka / aloita alusta"); leiri on jo kartalla vasta V5:n jälkeen ja arvottu reunalle. Tarvitaan
+tapahtuma taistelun voitosta (`wave.cleared`/`campaign.won`) moottoriin ja lippu `campaign.won`;
+valitse aaltoraja (nyt `skirmish.ts` ei lopu) ja kirjaa se ROADMAPiin. Sen jälkeen V8
+(pelitestaus, tallennuksen vienti/tuonti, läpipeluutesti, deployaus).
 
 ## Ei vielä aloiteta
 

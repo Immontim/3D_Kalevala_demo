@@ -47,6 +47,7 @@ export function describeEffect(effect: Effect, data: WorldData, text: TextLookup
     case "setSceneItemTakeMode": return `${itemLabel(effect.instanceId)} muuttuu ${TAKE_MODE_TEXT[effect.takeMode]} otettavaksi`;
     case "message": return `näytetään viesti "${text(effect.text)}"${effect.sub ? ` / "${text(effect.sub)}"` : ""}`;
     case "revealSite": return `karttapaikka "${effect.siteId}" paljastuu kartalle`;
+    case "setNpcState": return `hahmon "${effect.npcId}" tila vaihtuu: ${effect.state}`;
     case "removeNpc": return `hahmo "${effect.npcId}" poistuu kohtauksesta`;
     case "startSongLesson": return `aloitetaan laulun "${effect.songId}" opettelu (rytmiharjoitus)`;
   }

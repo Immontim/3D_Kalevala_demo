@@ -29,7 +29,7 @@ describe("2D-kohtaamisrekisteri", () => {
   ];
 
   it("luokittelee kiinteät paikat ja pihainstanssit kiinteiksi ja pysyviksi", () => {
-    expect(Object.keys(MAP_SITE_DEFINITIONS).sort()).toEqual(["cairnfield", "campfire", "lakeside"]);
+    expect(Object.keys(MAP_SITE_DEFINITIONS).sort()).toEqual(["cairnfield", "lakeside"]);
     for (const site of Object.values(MAP_SITE_DEFINITIONS)) {
       expect(site).toMatchObject({ movement: "fixed", lifetime: "persistent" });
     }
@@ -38,8 +38,9 @@ describe("2D-kohtaamisrekisteri", () => {
     expect(sceneForMapSite("yard-b", instances)).toBe("yard");
     expect(sceneForMapSite("yard-c", instances)).toBeNull();
     expect(sceneForMapSite("lakeside")).toBe("lakeside");
-    expect(sceneForMapSite("campfire")).toBeNull();                       // leiri on lukossa, kunnes Louhi on karkotettu
-    expect(sceneForMapSite("campfire", [], { "louhi.banished": true })).toBe("clearing");
+    const camp: SiteInstance = { id: "camp", kind: "camp", x: 3, y: 4, archer: false };
+    expect(sceneForMapSite("camp", [camp])).toBeNull();                   // leiri on lukossa, kunnes Louhi on karkotettu
+    expect(sceneForMapSite("camp", [camp], { "louhi.banished": true })).toBe("clearing");
     expect(sceneForMapSite("cairnfield")).toBe("cairnfield");
     expect(sceneForMapSite("unknown")).toBeNull();
   });
@@ -48,23 +49,25 @@ describe("2D-kohtaamisrekisteri", () => {
     const map = siteMap([
       { x: 9, y: 9, siteId: "lakeside" },
       { x: 11, y: 11, siteId: "cairnfield" },
-      { x: 12, y: 10, siteId: "campfire" },
+      { x: 12, y: 10, siteId: "lakeside" },
     ]);
     expect(discoverVisibleSites(map, ["lakeside"], { x: 10, y: 10 }).sort()).toEqual(["cairnfield", "lakeside"]);
   });
 
   it("vainolaisten leiri on piilossa ja sisäänpääsemätön ennen Louhen karkotusta, sen jälkeen tavallinen paikka", () => {
-    const map = siteMap([{ x: 10, y: 10, siteId: "campfire" }]);
+    const map = siteMap([]);
+    const camp: SiteInstance[] = [{ id: "camp", kind: "camp", x: 10, y: 10, archer: false }];
     const visible = { active: true, known: true, cellVisibility: "visible" } as const;
-    expect(discoverVisibleSites(map, [], { x: 10, y: 10 })).toEqual([]);
-    expect(mapSiteDisplay("campfire", visible)).toBe("hidden");
-    expect(sceneForMapSite("campfire")).toBeNull();
+    expect(discoverVisibleSites(map, [], { x: 10, y: 10 }, camp)).toEqual([]);
+    expect(mapSiteDisplay("camp", visible, camp)).toBe("hidden");
+    expect(sceneForMapSite("camp", camp)).toBeNull();
     const flags = { "louhi.banished": true };
-    expect(discoverVisibleSites(map, [], { x: 10, y: 10 }, [], 1, flags)).toEqual(["campfire"]);
-    expect(mapSiteDisplay("campfire", visible, [], flags)).toBe("normal");
-    expect(mapSiteDisplay("campfire", { ...visible, cellVisibility: "remembered" }, [], flags)).toBe("dimmed");
-    expect(sceneForMapSite("campfire", [], flags)).toBe("clearing");
+    expect(discoverVisibleSites(map, [], { x: 10, y: 10 }, camp, 1, flags)).toEqual(["camp"]);
+    expect(mapSiteDisplay("camp", visible, camp, flags)).toBe("normal");
+    expect(mapSiteDisplay("camp", { ...visible, cellVisibility: "remembered" }, camp, flags)).toBe("dimmed");
+    expect(sceneForMapSite("camp", camp, flags)).toBe("clearing");
     expect(siteUnlocked(MAP_SITE_DEFINITIONS.lakeside, {})).toBe(true);        // muut paikat eivät ole lukossa
+    expect(siteIdAt(map, camp, 10, 10)).toBe("camp");
   });
 
   it("löytää myös pihainstanssit lähinäössä ja siirtää saman ruudun paikan instanssista", () => {

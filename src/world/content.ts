@@ -19,12 +19,24 @@ export const RULES: Rule[] = [
   },
   {
     id: "sage.song-learned",
-    intent: "Kun pelaaja laulaa tietäjän opettaman laulun onnistuneesti harjoituksessa, hän oppii sen: laulu ilmestyy laulupaikkaan.",
+    intent: "Kun pelaaja laulaa tietäjän opettaman laulun onnistuneesti harjoituksessa, hän oppii sen: laulu ilmestyy laulupaikkaan ja kalmisto, jossa Louhi seisoo, merkitään kartalle.",
     on: { type: "song.performed", songId: "sleep", context: "lesson", success: true, sceneId: "lakeside" },
     when: { kind: "flag", flag: "song.sleep.learned", value: false },
     then: [
       { kind: "setFlag", flag: "song.sleep.learned" },
+      { kind: "revealSite", siteId: "cairnfield" },
       { kind: "message", text: "song.lesson.learned", sub: "song.lesson.learnedSub" },
+    ],
+  },
+  {
+    id: "archer.healed",
+    intent: "Kun pelaaja laulaa onnistuneesti parannuslaulun loukkaantuneen jousineidon kuuluvilla pihassa, jousineito paranee ja nousee seisomaan; epäonnistunut yritys ei rankaise.",
+    on: { type: "song.performed", songId: "heal", context: "cast", success: true, sceneId: "yard", nearNpcId: "jousineito" },
+    when: { kind: "flag", flag: "archer.healed", value: false },
+    then: [
+      { kind: "setFlag", flag: "archer.healed" },
+      { kind: "setNpcState", npcId: "jousineito", state: "healed" },
+      { kind: "message", text: "world.archer.healed", sub: "world.archer.healedSub" },
     ],
   },
   {
@@ -34,7 +46,7 @@ export const RULES: Rule[] = [
     when: { kind: "flag", flag: "louhi.banished", value: false },
     then: [
       { kind: "setFlag", flag: "louhi.banished" },
-      { kind: "revealSite", siteId: "campfire" },
+      { kind: "revealSite", siteId: "camp" },
       { kind: "removeNpc", npcId: "louhi" },
       { kind: "message", text: "world.louhi.banished", sub: "world.louhi.banishedSub" },
     ],
@@ -117,9 +129,87 @@ export const SAGE_DIALOGUE: Dialogue = {
   },
 };
 
+/** Jousineito (V6): makaa loukkaantuneena, kunnes pelaaja parantaa hänet laululla; sitten hän antaa taivaanrautamiekan. */
+export const ARCHER_DIALOGUE: Dialogue = {
+  id: "archer.yard",
+  sceneId: "yard",
+  npcId: "jousineito",
+  intent: "Loukkaantunut jousineito pyytää parannuslaulua; parannettuna hän antaa taivaanrautamiekan, jonka voi saada vain näin.",
+  entries: [
+    { when: { kind: "flag", flag: "archer.gaveSword" }, node: "after" },
+    { when: { kind: "flag", flag: "archer.healed" }, node: "reward" },
+    { node: "wounded" },
+  ],
+  nodes: {
+    wounded: {
+      text: "dialogue.archer.wounded",
+      choices: [
+        { id: "ask-story", text: "dialogue.archer.askStory", next: "story" },
+        { id: "leave", text: "dialogue.sage.leave" },
+      ],
+    },
+    story: { text: "dialogue.archer.story", choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
+    reward: {
+      text: "dialogue.archer.reward",
+      choices: [
+        {
+          id: "take",
+          text: "dialogue.archer.take",
+          effects: [
+            { kind: "giveItem", itemId: "sky_iron_sword", quantity: 1 },
+            { kind: "setFlag", flag: "archer.gaveSword" },
+            { kind: "message", text: "world.archer.sword", sub: "world.archer.swordSub" },
+          ],
+        },
+        { id: "leave", text: "dialogue.sage.leave" },
+      ],
+    },
+    after: { text: "dialogue.archer.after", choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
+  },
+};
+
+/** Emäntä kertoo huhun vainolaisista ja merkitsee tietäjän rannan kartalle (ROADMAP: huhu). Molemmissa pihoissa. */
+export const HOUSEWIFE_DIALOGUE: Dialogue = {
+  id: "emanta.yard",
+  sceneId: "yard",
+  npcId: "emanta",
+  intent: "Emäntä kertoo huhun Pohjan akan vainolaisista ja neuvoo tietäjän luo: tietäjän ranta merkitään kartalle.",
+  entries: [{ when: { kind: "flag", flag: "rumor.heard" }, node: "again" }, { node: "greet" }],
+  nodes: {
+    greet: {
+      text: "dialogue.emanta.greet",
+      choices: [
+        {
+          id: "ask-news",
+          text: "dialogue.emanta.askNews",
+          effects: [
+            { kind: "setFlag", flag: "rumor.heard" },
+            { kind: "revealSite", siteId: "lakeside" },
+            { kind: "message", text: "world.emanta.rumor", sub: "world.emanta.rumorSub" },
+          ],
+          next: "rumor",
+        },
+        { id: "leave", text: "dialogue.sage.leave" },
+      ],
+    },
+    rumor: { text: "dialogue.emanta.rumor", choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
+    again: { text: "dialogue.emanta.again", choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
+  },
+};
+
+/** Nuori urho (pihassa ilman jousineitoa): vihjaa kalmiston lähettilääseen. */
+export const YOUNG_WARRIOR_DIALOGUE: Dialogue = {
+  id: "urho.yard",
+  sceneId: "yard",
+  npcId: "urho",
+  intent: "Nuori urho kertoo, että kalmistolla seisoo Pohjan akan lähettiläs ja joku saa ajettua hänet pois: vihje pelaajalle.",
+  entries: [{ node: "greet" }],
+  nodes: { greet: { text: "dialogue.urho.greet", choices: [{ id: "leave", text: "dialogue.sage.leave" }] } },
+};
+
 export const GAME_WORLD: WorldData = {
   flags: FLAGS,
   counters: COUNTERS,
   rules: RULES,
-  dialogues: [SAGE_DIALOGUE],
+  dialogues: [SAGE_DIALOGUE, ARCHER_DIALOGUE, HOUSEWIFE_DIALOGUE, YOUNG_WARRIOR_DIALOGUE],
 };

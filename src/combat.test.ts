@@ -338,3 +338,27 @@ describe("usea vastustaja", () => {
     expect(mayStartAttack(true, 10, 0, true)).toBe(false);
   });
 });
+
+describe("taivaanrautamiekka (V6)", () => {
+  it("on sama miekka mutta mitattavasti tehokkaampi: 30 % enemmän vahinkoa jokaisella iskulla", () => {
+    expect(weaponOf("sword")).toBe(WEAPONS.sword);
+    expect(weaponOf("sword_shield", false)).toBe(WEAPONS.sword);
+    expect(weaponOf("sword", true)).toBe(WEAPONS.sky_iron_sword);
+    expect(weaponOf("sword_shield", true)).toBe(WEAPONS.sky_iron_sword);
+    expect(weaponOf("spear", true)).toBe(WEAPONS.spear);                // keihäs ei muutu
+    const base = WEAPONS.sword, sky = WEAPONS.sky_iron_sword;
+    expect(sky.damage / base.damage).toBeCloseTo(1.3, 5);
+    for (const style of STYLES) {
+      for (const weight of ["light", "heavy"] as const) {
+        const a = makeAttack(base, style, weight), b = makeAttack(sky, style, weight);
+        expect(b.damage / a.damage).toBeCloseTo(1.3, 5);
+        // Ajoitus, kantama ja kulma ovat samat: ero on vain vahingossa.
+        expect(b.timing).toEqual(a.timing);
+        expect(b.range).toBe(a.range);
+        expect(b.arc).toBe(a.arc);
+      }
+    }
+    expect(sky.blockArc).toBe(base.blockArc);
+    expect(sky.styles).toEqual(base.styles);
+  });
+});

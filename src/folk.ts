@@ -75,9 +75,10 @@ const villagers = new Map<string, Villager>();
 const VANISH_SECONDS = 2.2;
 
 /** Hahmo vaipuu näkyvistä hitaasti ja poistuu sitten kokonaan. Palauttaa false, jos tunnistetta ei ole. */
-export function vanishVillager(id: string): boolean {
+export function vanishVillager(id: string, instant = false): boolean {
   const v = villagers.get(id);
   if (!v || v.vanishing) return false;
+  if (instant) { v.onGone?.(); return true; }      // heti pois (esim. maassa makaava hahmo vaihtuu seisovaan)
   v.startVanish();
   return true;
 }
