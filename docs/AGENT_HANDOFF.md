@@ -304,11 +304,9 @@ Päivitetty: 2026-11-20 (Claude, Windows; pohja `origin/main` `a9b4818`)
 - **Tarkistukset 2026-11-20 (v04.06.00):** `bunx vitest run --exclude ".worktrees/**"` (26
   tiedostoa, 312 testiä), `bun run lint`, `bun run build`, `git diff --check` läpäisty; build
   varoittaa vain suuresta 3D-chunkista (839 kt, gzip 226 kt).
-- **Riippuvuustarkistus:** 2026-11-20 (ennallaan edellisestä): `bun outdated` tyhjä, mutta **`bun audit` löysi 1 korkean
-  löydöksen: picomatch 4.0.7 (ReDoS, GHSA-fc5q-39xc-vjpf) vite/vitest-kehitystyökalujen
-  kautta**. Vain kehitysaikainen, ei kulje pelaajalle. **Päivitysajoa ehdotettu omana
-  branchinaan, odottaa omistajan lupaa** (`bun audit fix` tai lockfilen uusinta; ei apupaketin
-  `bun update`).
+- **Riippuvuustarkistus:** 2026-11-20: `bun audit` puhdas (aiempi picomatch-löydös ei enää raportoidu).
+  `bun outdated`: vitest 5.1.0 -> 5.1.1 (rajojen sisäinen patch; **päivitysajoa ehdotettu omana
+  branchinaan, odottaa omistajan lupaa**).
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
   3D:ssä `window.__game`. Selainpaneelin fokus voi pysäyttää 3D-pelin.
 
@@ -366,8 +364,7 @@ Päivitetty: 2026-11-20 (Claude, Windows; pohja `origin/main` `a9b4818`)
 ROADMAPin **V8: pelitestaus ja julkaisu**. Omistaja pelaa MVP:n alusta loppuun ja kirjaa korjattavaa (hän
 on jo löytänyt joitakin, ne kerätään V8:n listaksi). Koodipuolella: tallennuksen vienti/tuonti tiedostona,
 abstrakti läpipeluutesti (liput ja tapahtumat, ei 3D: pääpolku läpäistävissä, sivupolut eivät lukitse),
-tasapainosäädöt (stamina, kylläisyys, aallot) ja deployaus GitHub Pagesiin. **Odottaa omistajan lupaa:**
-picomatch-riippuvuuspäivitys (ks. riippuvuustarkistus).
+tasapainosäädöt (stamina, kylläisyys, aallot) ja deployaus GitHub Pagesiin. **Odottaa omistajan lupaa:** vitest-patchpäivitys (ks. riippuvuustarkistus).
 
 ## Ei vielä aloiteta
 
