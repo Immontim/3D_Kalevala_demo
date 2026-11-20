@@ -6,12 +6,14 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-20 (Claude, Windows; pohja `origin/main` `a9b4818`)
+Päivitetty: 2026-11-20 (Codex, Windows; pohja `origin/main` `2db0950`)
 
-- **Branchin `claude/victory-screen` koodiversio on v04.06.00** (V7: aallot ja loppuruutu, alla).
-  Koodi valmis, ei deployattu, käsin testattu selaimessa; omistaja pelaa MVP:tä kokonaisuutena.
-  Tarkista merge-tila: `git merge-base --is-ancestor claude/victory-screen origin/main`.
-  V1-V6 ja Codexin kahlaamo on mergattu. **MVP:n koko pelikaari on nyt koodissa.**
+- **Branchin `codex/deps-vitest-5-1-1` koodiversio on v04.06.01.** Vitest on päivitetty
+  versiosta 5.1.0 versioon 5.1.1. Koodi valmis, ei deployattu; testit ja build on ajettu.
+  In-app-selain ei saanut yhteyttä elävään paikalliseen preview-palvelimeen (localhost-aikakatkaisu),
+  joten tämän branchin selaintarkistus jäi ympäristösyystä tekemättä. Tarkista merge-tila:
+  `git merge-base --is-ancestor codex/deps-vitest-5-1-1 origin/main`.
+- V1-V7 ja Codexin kahlaamo on mergattu. **MVP:n koko pelikaari on nyt koodissa.**
 - **Leirin aallot ja voitto (V7).** `src/waves.ts` (puhdas): `CAMPAIGN_WAVES` 5 kiinteää aaltoa
   omistajan listan mukaan (urho/miekka; pohja/miekka+kilpi; urho/keihäs + pohja/miekka; pohja/keihäs +
   pohja/miekka+kilpi; urho/keihäs + pohja/miekka+kilpi + pohja/miekka), `FINAL_WAVE`, `TOTAL_ENEMIES` (9).
@@ -301,12 +303,12 @@ Päivitetty: 2026-11-20 (Claude, Windows; pohja `origin/main` `a9b4818`)
 - **UI ja kielituki.** Kartan pellavapohja, kirjontakehykset, paperinukke,
   kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
   tyypitetyissä FI/EN-sanakirjoissa.
-- **Tarkistukset 2026-11-20 (v04.06.00):** `bunx vitest run --exclude ".worktrees/**"` (26
-  tiedostoa, 312 testiä), `bun run lint`, `bun run build`, `git diff --check` läpäisty; build
+- **Tarkistukset 2026-11-20 (v04.06.01):** `bun ci`, `bun audit`, `bun outdated --no-cache`,
+  `bun run test` (26 tiedostoa, 312 testiä), `bunx tsc --noEmit`, `bun run lint` ja `bun run build`
+  läpäisty; build
   varoittaa vain suuresta 3D-chunkista (839 kt, gzip 226 kt).
-- **Riippuvuustarkistus:** 2026-11-20: `bun audit` puhdas (aiempi picomatch-löydös ei enää raportoidu).
-  `bun outdated`: vitest 5.1.0 -> 5.1.1 (rajojen sisäinen patch; **päivitysajoa ehdotettu omana
-  branchinaan, odottaa omistajan lupaa**).
+- **Riippuvuustarkistus:** 2026-11-20: ei mitään odottamassa. `bun audit` on puhdas ja
+  `bun outdated --no-cache` ei listaa paketteja.
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
   3D:ssä `window.__game`. Selainpaneelin fokus voi pysäyttää 3D-pelin.
 
@@ -361,17 +363,15 @@ Päivitetty: 2026-11-20 (Claude, Windows; pohja `origin/main` `a9b4818`)
 
 ## Seuraava tehtävä
 
-ROADMAPin **V8: pelitestaus ja julkaisu**. Omistaja pelaa MVP:n alusta loppuun ja kirjaa korjattavaa (hän
-on jo löytänyt joitakin, ne kerätään V8:n listaksi). Koodipuolella: tallennuksen vienti/tuonti tiedostona,
-abstrakti läpipeluutesti (liput ja tapahtumat, ei 3D: pääpolku läpäistävissä, sivupolut eivät lukitse),
-tasapainosäädöt (stamina, kylläisyys, aallot) ja deployaus GitHub Pagesiin. **Odottaa omistajan lupaa:** vitest-patchpäivitys (ks. riippuvuustarkistus).
+Laajenna paperinukke ja inventaario yhteiseksi 2D/3D-näkymäksi: versionoidut vaatepaikat,
+turvallinen varusteiden vaihto, omat ruoka- ja taivaanrautamiekan ikonit sekä tauotettu käyttö
+rauhallisissa 3D-kohtauksissa. Taistelussa sama näkymä on vain luettavissa.
 
 ## Ei vielä aloiteta
 
 - Louhen taistelu (varaukset yllä; karkotus laululla kuuluu V5:een); esine- ja puhemekaniikka kalmistolla
   on Codexin suunnittelema.
 - Täysi karttaeditori, satunnaiset matkakohtaamiset ja sivujuonigeneraattori.
-- Paperinuken vaate-esineiden datamalli ja 3D-ulkoasun vaihto.
 - 3D-palkintojen tai ruokien lisääminen paluukuormasta inventaarioon.
 - Yleinen quest-editori, laaja dialogipuu, ajastimet, `unless` ja kyläläisten vapaa liikkuminen.
 - Inventaarion pudotus-UI ja pudotettujen esineiden 3D-instanssit.
