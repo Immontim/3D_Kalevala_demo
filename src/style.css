@@ -243,6 +243,24 @@ body.mode-scene > #mapRoot { display: none !important; }
   box-shadow: 0 12px 38px #000; }
 .map-modal-card > h2 { margin: 0 42px 20px; color: #8f2f18; text-align: center; font-weight: normal; }
 .map-modal-card .map-close { position: absolute; right: 10px; top: 8px; font-size: 25px; padding: 0 8px; }
+/* Loppuruutu: sama pellavapohja, kaksoiskehys ja punasinen kirjontanauha kuin kartan paneeleissa. */
+.ending-card { width: min(780px, 94vw); max-height: 94vh; overflow-y: auto; padding: 18px 28px 14px; text-align: center; }
+.ending-band { height: 14px; margin: 0 -10px; background: repeating-linear-gradient(90deg, #9c351c 0 10px, transparent 10px 14px, #1f4d5a 14px 24px, transparent 24px 28px);
+  border-top: 2px solid #5b2c1d; border-bottom: 2px solid #5b2c1d; }
+.ending-ornament { margin: 10px 0 2px; color: #a33c20; letter-spacing: 0.4em; font-size: 20px; }
+.ending-ornament.small { margin: 4px 0 8px; font-size: 16px; }
+.ending-card h2 { margin: 4px 0 8px; color: #8f2f18; font-weight: normal; font-size: clamp(24px, 4vw, 36px); letter-spacing: 0.06em; }
+.ending-subtitle { margin: 0 auto 4px; max-width: 560px; color: #4b3022; font-size: 16px; line-height: 1.45; font-style: italic; }
+.ending-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 8px 0 14px; text-align: left; }
+.ending-columns section { padding: 10px 14px; border: 2px solid #a16a45; background: rgba(239, 224, 189, 0.55); box-shadow: inset 0 0 0 3px rgba(112, 71, 39, 0.12); }
+.ending-columns h3 { margin: 0 0 8px; color: #8f2f18; font-weight: normal; text-align: center; letter-spacing: 0.05em; }
+.ending-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 15px; color: #2a2119; }
+.ending-list li b { display: inline-block; width: 1.4em; color: #8f2f18; }
+.ending-list li.undone { color: #7d6a55; }
+.ending-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin: 6px 0 4px; }
+.ending-actions button { min-width: 190px; font-size: 16px; }
+.ending-version { margin: 6px 0 0; color: #7d6a55; font-size: 12px; letter-spacing: 0.08em; }
+@media (max-width: 640px) { .ending-columns { grid-template-columns: 1fr; } }
 .map-paper { min-width: 0; }
 .paper-figure { display: grid; grid-template-columns: 82px 128px minmax(0, 1fr); align-items: center; gap: 7px; margin-bottom: 8px; }
 .paper-armour { display: grid; gap: 5px; }

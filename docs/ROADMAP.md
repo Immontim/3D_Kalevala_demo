@@ -1,6 +1,6 @@
 # Roadmap — 3D Kalevala
 
-Päivitetty: 2026-11-17 (Claude; pohja `origin/main` `0123847`, koodiversio v04.05.00 branchilla `claude/archer-sword`).
+Päivitetty: 2026-11-20 (Claude; pohja `origin/main` `a9b4818`, koodiversio v04.06.00 branchilla `claude/victory-screen`).
 
 Tämä on **suunta ja päätökset**, ei tehtävälista. Nykytila ja yksi seuraava
 tehtävä ovat `docs/AGENT_HANDOFF.md`:ssä, mallien ja assettien tila
@@ -54,7 +54,7 @@ ne ovat MVP:n jälkeen.
 | Kylläisyys, kuukalenteri, 2D→3D→2D-silta | Valmis |
 | `CampaignStore`, maailmamoottori v0, dialogi v0 | Valmis (V1–V2, v04.00.00): liput, laskurit, ehdot, efektit, tapahtumat, `__world` |
 
-Puuttuu: aaltotaistelun voitto ja loppuruutu,
+Puuttuu: pelitestaus ja säädöt (V8),
 taivaanrautamiekan oma malli.
 
 ## Vaiheet
@@ -93,10 +93,10 @@ uuteen matkaan kartan reunalle kauas aloituksesta (instanssi `camp`), tietäjät
 nuori urho `archer`-vapaaseen pihaan ja emännän huhu-dialogi. Taivaanrautamiekan oma Blender-malli
 puuttuu (väliaikainen sävytys).
 
-**V7. Leiri ja loppu.** Leiri on arvottu reunalle ja kartalla vasta V5:n jälkeen. Aaltotaistelun
-voitto päättää kampanjan: loppuruutu ja "jatka / aloita alusta". Valmis, kun
-koko peli pelataan alusta loppuun yhdellä tallennuksella ja uuden matkan voi
-aloittaa.
+**V7 (valmis, v04.06.00).** Leirillä viisi kiinteää aaltoa (1 / 1 / 2 / 2 / 3 vihollista, kaikki perusarvoissa,
+vain tekoälyn taito nousee), viimeisen kaatuminen voittaa kampanjan, ja kartalla näytetään loppuruutu
+(pelipäivät, tutkittu kartta, laulut, kukistetut, kaatumiset, luvattomat otot, sivupolut) sekä "jatka / aloita
+uusi matka". **MVP:n koko kaari on pelattavissa alusta loppuun.**
 
 **V8. Pelitestaus ja julkaisu.** Omistaja pelaa, me säädämme (stamina,
 vaikeus, ruoan määrä, kuinka löydettävissä pihat ovat). Mukaan tallennuksen

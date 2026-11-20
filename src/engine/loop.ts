@@ -4,7 +4,7 @@ import { stepFreeCam } from "../freecam";
 import { t } from "../i18n";
 import { mapUrl, parseAppRoute } from "../app/route";
 import { openTune, renderBinds } from "../ui/pauseMenu";
-import { birdSongLevel, groundHeight } from "../world";
+import { ARENA, birdSongLevel, groundHeight } from "../world";
 import { removeActor } from "./actor";
 import { updateAi } from "./ai";
 import { syncVisual } from "./animate";
@@ -23,11 +23,14 @@ import { choosing, closeChoice, closeSong, songState, updateChoice, updateSong }
 import { aim, bindUi, fx, g, inputs, keys, sfx } from "./state";
 import { camera, canvas, composer, world } from "./view";
 import { createEmptySceneReturn, saveSceneReturn } from "../map/transition";
+import { worldRuntime } from "./store";
 import { updateSceneItemFocus } from "./sceneItems";
 import { closeDialogue, dialogueOpen } from "./dialogue";
 
 export function onPlayerDeath() {
   g.gameOver = true;
+  // Kaatuminen kirjataan loppuruudun tilastoon (moottorin sääntö `player.death-counted`).
+  worldRuntime().post({ type: "player.died", sceneId: ARENA });
   showMsg(t("death.title"), isTouch ? t("death.touch") : t("death.keyboard"), 9999);
 }
 /** Tyhjentää kentän ja luo sankarin uudelleen aloituspaikalleen. */

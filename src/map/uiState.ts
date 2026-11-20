@@ -29,6 +29,12 @@ export function mapCellVisibility(
     : "remembered";
 }
 
+/** Kuinka mones pelipäivä on menossa tausta-ajan kohdalla (ensimmäinen päivä = 1); koko matkan päivät yhteensä. */
+export function totalDays(worldMinutes: number): number {
+  const time = Math.max(0, Number.isFinite(worldMinutes) ? worldMinutes : 0);
+  return Math.floor(time * DAYS_PER_MOON / WORLD_MINUTES_PER_MOON) + 1;
+}
+
 /** Muuntaa tallennuksen tausta-ajan pelilliseksi kuuksi ja päiväksi. */
 export function mapCalendarTime(worldMinutes: number): MapCalendarTime {
   const time = Math.max(0, Number.isFinite(worldMinutes) ? worldMinutes : 0);

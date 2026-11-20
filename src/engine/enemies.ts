@@ -15,12 +15,15 @@ export interface EnemyDef {
   level: number;
   /** Elämän kerroin (ryhmässä alle 1). */
   hpScale?: number;
+  /** Tekoälyn taito, jos se eroaa tasosta (leirin aalloissa elämä ja voima pysyvät perusarvoissa, taito kasvaa). */
+  aiLevel?: number;
 }
 
 /** Tuo vastustajan kentälle annettuun paikkaan. */
 export function addEnemy(def: EnemyDef, pos: THREE.Vector3): Actor {
   const a = makeActor(def.look, pos, def.level, 0xff6a3a);
   a.name = def.name;
+  if (def.aiLevel !== undefined) a.level = def.aiLevel;
   if (def.hpScale !== undefined && def.hpScale !== 1) {
     a.base = { ...a.base, maxHp: Math.round(a.base.maxHp * def.hpScale) };
     a.stats = effectiveStats(a.base, a.mods, g.gameTime);

@@ -37,7 +37,9 @@ export type Effect =
   /** Pyytää 3D:tä poistamaan hahmon kohtauksesta heti (pysyvyys tulee lipusta, jonka sääntö asettaa). */
   | { kind: "removeNpc"; npcId: string }
   /** Pyytää 3D:tä vaihtamaan hahmon tilan heti (esim. jousineito "healed": nousee seisomaan). Pysyvyys tulee lipusta. */
-  | { kind: "setNpcState"; npcId: string; state: string };
+  | { kind: "setNpcState"; npcId: string; state: string }
+  /** Kirjaa kampanjan voitetuksi ja tallentaa loppuruudun tilastot (päivät, tutkittu kartta) lipuiksi ja laskureiksi. */
+  | { kind: "recordVictory" };
 
 export interface OutMessage { text: TextKey; sub?: TextKey }
 
@@ -53,6 +55,10 @@ export type GameEvent =
   | { type: "item.taken"; instanceId: string; itemId: ItemId; siteId: string; sceneId: string; takeMode: TakeMode; ownerId?: string }
   | { type: "npc.talked"; npcId: string; sceneId: string }
   | { type: "scene.entered"; sceneId: string }
+  /** Leirin viimeinen aalto kaatui. */
+  | { type: "battle.won"; sceneId: string; wave: number }
+  /** Sankari kaatui taistelussa (ennen uutta yritystä). */
+  | { type: "player.died"; sceneId: string }
   /** Laulu laulettu: `lesson` = tietäjän opetus, `cast` = laulu taistelussa. */
   | {
     type: "song.performed"; songId: string; context: "lesson" | "cast"; success: boolean; hits: number; sceneId: string;

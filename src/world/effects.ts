@@ -3,7 +3,8 @@
 // (`worldMinutes`): 3D-kohtaus ei kuluta aikaa.
 import { setSceneItemTakeMode, tryAddItem, tryRemoveItem, type CampaignState } from "../map/campaign";
 import { revealSiteOnMap } from "../map/reveal";
-import { withCounterAdded, withFlag } from "./state";
+import { totalDays } from "../map/uiState";
+import { withCounterAdded, withCounterSet, withFlag } from "./state";
 import type { Effect, OutAction, OutMessage, WorldData } from "./types";
 
 export type EffectFailure = "inventory-full" | "missing-item" | "unknown-flag" | "unknown-counter" | "unknown-site";
@@ -60,6 +61,15 @@ export function applyEffects(state: CampaignState, effects: readonly Effect[], d
       case "removeNpc":
         actions.push({ kind: "removeNpc", npcId: effect.npcId });
         break;
+      case "recordVictory": {
+        const cells = current.world.discovered;
+        const explored = cells.length ? (100 * cells.filter(Boolean).length) / cells.length : 0;
+        let engine = withFlag(current.engine, "campaign.won", true);
+        engine = withCounterSet(engine, "win.days", totalDays(current.world.worldMinutes), data.counters["win.days"]?.max ?? 9999);
+        engine = withCounterSet(engine, "win.explored", explored, data.counters["win.explored"]?.max ?? 100);
+        current = { ...current, engine };
+        break;
+      }
       case "setNpcState":
         actions.push({ kind: "npcState", npcId: effect.npcId, state: effect.state });
         break;

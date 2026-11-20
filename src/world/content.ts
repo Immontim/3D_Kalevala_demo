@@ -29,6 +29,19 @@ export const RULES: Rule[] = [
     ],
   },
   {
+    id: "campaign.victory",
+    intent: "Kun leirin viimeinen aalto kaatuu, kampanja on voitettu: päivät ja tutkittu kartta kirjataan loppuruutua varten.",
+    on: { type: "battle.won", sceneId: "clearing" },
+    when: { kind: "flag", flag: "campaign.won", value: false },
+    then: [{ kind: "recordVictory" }],
+  },
+  {
+    id: "player.death-counted",
+    intent: "Jokainen sankarin kaatuminen taistelussa lasketaan loppuruudun tilastoon (ei rankaise muuten).",
+    on: { type: "player.died" },
+    then: [{ kind: "addCounter", counter: "player.deaths", amount: 1 }],
+  },
+  {
     id: "archer.healed",
     intent: "Kun pelaaja laulaa onnistuneesti parannuslaulun loukkaantuneen jousineidon kuuluvilla pihassa, jousineito paranee ja nousee seisomaan; epäonnistunut yritys ei rankaise.",
     on: { type: "song.performed", songId: "heal", context: "cast", success: true, sceneId: "yard", nearNpcId: "jousineito" },
