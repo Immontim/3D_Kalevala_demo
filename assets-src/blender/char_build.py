@@ -627,46 +627,73 @@ def cap_parts(C, col=(0.75, 0.68, 0.6)):
     return [shell(C, is_cap, lambda c: 0.022, "hessian", tile=0.12, smooth=3, col=col)]
 
 
-def legs_parts(C, trousers_mat, trousers_col, wrap_col, greaves=False, baggy=0.04):
-    L = C.L
-    is_leg = lambda i, c: (C.leg_frac[i] > 0.5 or (c.z < 1.03 and C.arm_frac[i] < 0.2))
+def _is_leg(C):
+    return lambda i, c: (C.leg_frac[i] > 0.5 or (c.z < 1.03 and C.arm_frac[i] < 0.2))
+
+
+def legs_trousers_wraps(C, trousers_mat, trousers_col, wrap_col, baggy=0.04):
+    """Housut ja säärikääreet (kenkiä ja säärisuojia ei)."""
+    is_leg = _is_leg(C)
     parts = [shell(C, lambda i, c: is_leg(i, c) and 0.40 < c.z < 1.03,
                    lambda c: 0.012 + baggy * smoothstep(0.41, 0.47, c.z) * (1 - smoothstep(0.60, 0.70, c.z)), trousers_mat, smooth=4, col=trousers_col)]
     # säärikääreet: vaakaraidat jäljittelevät kierrettyä nauhaa
     wrap = lambda c: tuple(x * (0.7 + 0.3 * (0.5 + 0.5 * math.sin(c.z * 130 + math.atan2(c.y - 0.03, abs(c.x) - 0.15) * 3))) for x in wrap_col)
     parts.append(shell(C, lambda i, c: is_leg(i, c) and 0.085 < c.z < 0.46, lambda c: 0.017, "jersey", tile=0.1, smooth=3, colfn=wrap))
+    return parts
+
+
+def legs_shoes(C):
+    """Nahkakengät: kuori jalkaterän päällä, pohja painettu hieman maan alle."""
+    is_leg = _is_leg(C)
     shoe = shell(C, lambda i, c: is_leg(i, c) and c.z < 0.125, lambda c: 0.014, "leather", tile=0.2, smooth=4, col=(1.0, 0.92, 0.85))
     zmin = min(c.z for c in shoe.co)
     for c in shoe.co:
         if c.z < 0.07:
             c.z -= (zmin + 0.004) * (1 - c.z / 0.07)
-    parts.append(shoe)
+    return [shoe]
+
+
+def legs_greaves(C):
+    """Säärisuojat: kaareva rautalevy säären edessä, kaksi nahkahihnaa."""
+    L = C.L
+    parts = []
+    for s in (1, -1):
+        kn = V((L["knee"].x * s, L["knee"].y, L["knee"].z))
+        an = V((L["ankle"].x * s, L["ankle"].y, L["ankle"].z))
+        w = {"shin_" + ("L" if s > 0 else "R"): 1.0}
+        g = Part()
+        rows, n = 5, 8
+        grid = []
+        for j in range(rows + 1):
+            t = 0.14 + 0.66 * j / rows
+            ctr = kn.lerp(an, t)
+            r = 0.074 - 0.014 * (j / rows) + (0.006 if j in (0, rows) else 0)
+            ring = []
+            for k in range(n + 1):
+                a = math.pi - 1.25 + 2.5 * k / n
+                ring.append(g.v(ctr + V((math.sin(a) * r, math.cos(a) * r * 1.05 - 0.004, 0)), w))
+            grid.append(ring)
+        for j in range(rows):
+            for k in range(n):
+                g.f([grid[j][k], grid[j][k + 1], grid[j + 1][k + 1], grid[j + 1][k]], "metal", None, (0.19, 0.195, 0.205))
+        parts.append(g)
+        for t in (0.3, 0.62):
+            ctr = kn.lerp(an, t)
+            parts.append(band(C, ctr, (an - kn).normalized(), V((0, -1, 0)), 0.022, 0.03, "leather", n=12,
+                              keep=lambda i, c, s=s: c.x * s > 0.02 and C.leg_frac[i] > 0.5, col=(0.9, 0.8, 0.7)))
+    return parts
+
+
+def foot_skin_parts(C, skin=(0.72, 0.47, 0.33)):
+    """Paljas jalkaterä (ilman kenkiä): ihokuori vartalon pinnalla, jotta kengätön hahmo ei ole tyhjä nilkoista alas."""
+    is_leg = _is_leg(C)
+    return [shell(C, lambda i, c: is_leg(i, c) and c.z < 0.13, lambda c: 0.0, "skin", smooth=3, col=skin)]
+
+
+def legs_parts(C, trousers_mat, trousers_col, wrap_col, greaves=False, baggy=0.04):
+    parts = legs_trousers_wraps(C, trousers_mat, trousers_col, wrap_col, baggy) + legs_shoes(C)
     if greaves:
-        # säärisuojat: kaareva rautalevy säären edessä, kaksi nahkahihnaa
-        for s in (1, -1):
-            kn = V((L["knee"].x * s, L["knee"].y, L["knee"].z))
-            an = V((L["ankle"].x * s, L["ankle"].y, L["ankle"].z))
-            w = {"shin_" + ("L" if s > 0 else "R"): 1.0}
-            g = Part()
-            rows, n = 5, 8
-            grid = []
-            for j in range(rows + 1):
-                t = 0.14 + 0.66 * j / rows
-                ctr = kn.lerp(an, t)
-                r = 0.074 - 0.014 * (j / rows) + (0.006 if j in (0, rows) else 0)
-                ring = []
-                for k in range(n + 1):
-                    a = math.pi - 1.25 + 2.5 * k / n
-                    ring.append(g.v(ctr + V((math.sin(a) * r, math.cos(a) * r * 1.05 - 0.004, 0)), w))
-                grid.append(ring)
-            for j in range(rows):
-                for k in range(n):
-                    g.f([grid[j][k], grid[j][k + 1], grid[j + 1][k + 1], grid[j + 1][k]], "metal", None, (0.19, 0.195, 0.205))
-            parts.append(g)
-            for t in (0.3, 0.62):
-                ctr = kn.lerp(an, t)
-                parts.append(band(C, ctr, (an - kn).normalized(), V((0, -1, 0)), 0.022, 0.03, "leather", n=12,
-                                  keep=lambda i, c, s=s: c.x * s > 0.02 and C.leg_frac[i] > 0.5, col=(0.9, 0.8, 0.7)))
+        parts += legs_greaves(C)
     return parts
 
 
@@ -678,9 +705,29 @@ SHEATH_D = V((0.10, 0.35, -0.93)).normalized()
 SHEATH_LEN = 0.80          # miekan terä on 0,74 m
 
 
-def belt_parts(C, z=1.005, off=0.034, scabbard=False, knife=False):
+def belt_flange(C, z, off, inner, width=0.05, n=24):
+    """Vyön ylä- ja alareunan rengaslevyt vartalon pinnasta (inner) vyön ulkopintaan (off): vyö istuu paksuna
+    nahkahihnana tunikan päällä, vaikka rengaspaita (joka nostaa pintaa) puuttuisi. Levyt ovat kaksipuolisia."""
+    keep = lambda i, c: abs(c.x) < 0.2 and C.arm_frac[i] < 0.3
+    rad, e1, e2 = ring_profile(C, V((0, 0.02, z)), V((0, 0, 1)), V((0, -1, 0)), n, keep=keep)
+    p = Part()
+    for zz, sgn in ((z + width / 2, 1), (z - width / 2, -1)):
+        for k in range(n):
+            k2 = (k + 1) % n
+            pts = []
+            for kk, r in ((k, rad[k] + inner), (k2, rad[k2] + inner), (k2, rad[k2] + off), (k, rad[k] + off)):
+                a = (kk + 0.5) / n * 2 * math.pi
+                pt = V((0, 0.02, zz)) + (e1 * math.cos(a) + e2 * math.sin(a)) * r
+                pts.append(p.v(pt, C.near_w(pt)))
+            p.f(pts if sgn > 0 else list(reversed(pts)), "leather", [(0, 0), (1, 0), (1, 1), (0, 1)], (1.0, 0.92, 0.85), False)
+    return p
+
+
+def belt_parts(C, z=1.005, off=0.034, scabbard=False, knife=False, flange=None):
     keep = lambda i, c: abs(c.x) < 0.2 and C.arm_frac[i] < 0.3
     parts = [band(C, V((0, 0.02, z)), V((0, 0, 1)), V((0, -1, 0)), 0.05, off, "leather", keep=keep, col=(1.0, 0.92, 0.85))]
+    if flange is not None:
+        parts.append(belt_flange(C, z, off, flange))
     hw = {"hips": 0.7, "spine": 0.3}
     parts.append(box_part(V((0.0, -0.155, z)), (0.045, 0.012, 0.05), "metal", hw, (0.62, 0.42, 0.14)))        # pronssisolki
     if scabbard:
@@ -785,6 +832,32 @@ def cloak_parts(C, col=(0.42, 0.06, 0.05)):
     return parts
 
 
+def build_hero_modular(C, blond):
+    """Sankarin modulaariset osat nykyisen täyden char_herokin rinnalle (sama luuranko, painot ja lepoasento):
+    char_hero_base (iho, hiukset, sininen pellavatunika ja helma, housut, säärikäärit, vyö ja huotra),
+    char_hero_mail (rengaspaita hihoineen ja rengashelma), char_hero_greaves (säärisuojat) ja
+    char_hero_shoes (nahkakengät). Peli poistaa nämä, kunnes runtime-integraatio ottaa ne käyttöön."""
+    blue = (0.26, 0.31, 0.52)
+    stats = {}
+    B = skin_parts(C, 0.62, blond)
+    B += hair_parts(C, blond, length=1.39, cap=True)
+    # pellavatunika kokonaan (varsinaisessa char_herossa rengaspaita peittää rungon ja hihan yläosan)
+    B += torso_parts(C, "linen", blue, 0.78, inflate=0.013, collar=(0.36, 0.42, 0.62))
+    B += cuff_parts(C, 0.775, "trim_diamond", 0.02)
+    B += [skirt(C, 0.98, 0.50, 0.012, (0.268, 0.212), "linen", col=blue, rows=4, trim="trim_diamond")]
+    B += legs_trousers_wraps(C, "linen", (0.22, 0.27, 0.46), (0.9, 0.86, 0.75))
+    B += foot_skin_parts(C)
+    B += belt_parts(C, off=0.04, scabbard=True, flange=0.014)
+    _, stats["char_hero_base"] = assemble("char_hero_base", B)
+    M = torso_parts(C, "mail", (1, 1, 1), 0.47, inflate=0.03, tile=0.11, smooth=9, collar=(0.9, 0.35, 0.3))
+    M += [skirt(C, 1.0, 0.57, 0.034, (0.27, 0.215), "mail", tile=0.11)]
+    M += cuff_parts(C, 0.47, "trim_diamond", 0.034)
+    _, stats["char_hero_mail"] = assemble("char_hero_mail", M)
+    _, stats["char_hero_greaves"] = assemble("char_hero_greaves", legs_greaves(C))
+    _, stats["char_hero_shoes"] = assemble("char_hero_shoes", legs_shoes(C))
+    return stats
+
+
 def build_characters():
     global CM
     CM = make_char_materials()
@@ -803,6 +876,7 @@ def build_characters():
     P += legs_parts(C, "linen", (0.22, 0.27, 0.46), (0.9, 0.86, 0.75), greaves=True)
     P += belt_parts(C, off=0.04, scabbard=True)
     _, stats["char_hero"] = assemble("char_hero", P)
+    stats.update(build_hero_modular(C, blond))
     # Kantohihna on oma kappaleensa samassa luurangossa. Nimi alkaa char_, joten peli piilottaa
     # sen, kunnes rauhan varustus otetaan käyttöön (kilpi selässä).
     _, stats["char_hero_hihna"] = assemble("char_hero_hihna", strap_parts(C))
@@ -864,6 +938,57 @@ def build_equipment():
         pommel.co[i] = V((c.x, 0.066 + c.z, c.y))
     p.extend(pommel)
     stats["sword"] = assemble("sword", [p], rig=False)[1]
+
+    # Taivaanrautamiekka: täsmälleen swordin origo, suunta, terän pituus (0,74 m) ja otegeometria
+    # (kahva y -0,05..0,055, säde 1,4 -> 1,3 cm), jotta peli voi vaihtaa mallin ilman uusia kiinnityksiä.
+    # Erona lehtimäinen terä (leveimmillään 6 cm), kuusikulmainen poikkileikkaus ja meteoriittiraudan
+    # kerrostumat verteksiväreinä, kaareva lähes-ristikahva, kuusikulmainen nuppi ja kierretty nahkakahva.
+    sky = Part()
+    steel_n = 28
+    prof = [(0.0, 1.0, 1.0), (0.08, 1.0, 1.0), (0.30, 1.1, 0.95), (0.55, 1.06, 0.85), (0.80, 0.8, 0.7), (0.93, 0.42, 0.45), (1.0, 0.03, 0.1)]
+
+    def interp(t):
+        for (t0, w0, k0), (t1, w1, k1) in zip(prof, prof[1:]):
+            if t <= t1:
+                f = (t - t0) / max(1e-6, t1 - t0)
+                return w0 + (w1 - w0) * f, k0 + (k1 - k0) * f
+        return prof[-1][1], prof[-1][2]
+    rings = []
+    for i in range(steel_n + 1):
+        t = i / steel_n
+        wk, tk = interp(t)
+        y = -(0.065 + 0.74 * t)
+        hw, ht = 0.0285 * wk, 0.0042 * tk
+        pts = [(hw, 0), (hw * 0.34, ht), (-hw * 0.34, ht), (-hw, 0), (-hw * 0.34, -ht), (hw * 0.34, -ht)]
+        rings.append([sky.v(V((x, y, z)), W) for x, z in pts])
+    rng_s = random.Random(77)
+
+    def sky_col(pos, k, i):
+        n1 = 0.5 + 0.5 * math.sin(i * 0.9 + k * 1.7 + 2.0 * math.sin(i * 0.31))           # taottu kerroslinja
+        base = 0.19 + 0.035 * n1 + 0.015 * rng_s.random()
+        if k in (0, 3):
+            base += 0.11                                                                   # kiillotetut terät
+        elif 0.35 < (-pos[1] - 0.065) / 0.74 < 0.6 and rng_s.random() < 0.15:
+            base *= 0.55                                                                   # kuoppa
+        return (base * 0.9, base * 1.0, base * 1.28)
+    for i, (a, b) in enumerate(zip(rings, rings[1:])):
+        for k in range(6):
+            mid = (sky.co[a[k]] + sky.co[b[(k + 1) % 6]]) * 0.5
+            sky.f([a[k], a[(k + 1) % 6], b[(k + 1) % 6], b[k]], "metal", None, sky_col(mid, k, i), False)
+    dark_bronze = (0.34, 0.25, 0.12)
+    sky.extend(tube_part([V((x, -0.058 - 0.022 * (1 - (x / 0.062) ** 2) * 0 - 0.016 * (abs(x) / 0.062) ** 2, 0)) for x in (-0.062, -0.047, -0.031, -0.016, 0, 0.016, 0.031, 0.047, 0.062)],
+                         [0.008, 0.0105, 0.0115, 0.012, 0.0125, 0.012, 0.0115, 0.0105, 0.008], 6, "metal", W, dark_bronze))        # kaareva ristikahva
+    # kahva: sama geometria kuin swordilla, mutta kierretty nahkanauha (vuorotellen tumma ja vaalea)
+    g0, g1, n_wr = -0.05, 0.055, 7
+    for i in range(n_wr):
+        ya, yb = g0 + (g1 - g0) * i / n_wr, g0 + (g1 - g0) * (i + 1) / n_wr
+        ra, rb = 0.014 - 0.001 * (ya - g0) / (g1 - g0), 0.014 - 0.001 * (yb - g0) / (g1 - g0)
+        sky.extend(tube_part([V((0, ya, 0)), V((0, yb, 0))], [ra, rb], 8, "leather", W, (0.2, 0.12, 0.09) if i % 2 == 0 else (0.34, 0.22, 0.14), tile=0.05, cap=False))
+    pom = lathe(V((0, 0, 0)), [(0.004, -0.012), (0.03, -0.006), (0.034, 0.0), (0.03, 0.008), (0.004, 0.016)], 6, "metal", W, dark_bronze)
+    for i, c in enumerate(pom.co):
+        pom.co[i] = V((c.x, 0.066 + c.z, c.y))
+    sky.extend(pom)
+    stats["sword_sky_iron"] = assemble("sword_sky_iron", [sky], rig=False)[1]
 
     # keihäs: takakäden ote origossa, kärki -Y. Kokonaispituus 2,14 m: tyvi 0,62 m otteen
     # takana, varsi 2,7 cm, putkiholkki ja 30 cm lehtimäinen kärki keskiharjalla.

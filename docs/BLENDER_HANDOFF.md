@@ -6,7 +6,7 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-16 (Claude, Windows; pohja main eed0b8c)
+Päivitetty: 2026-11-20 (Claude, Windows; pohja main 2db0950)
 
 - **Mainissa** (pohja `3191123`) ovat `assets/forest.glb`,
   `characters.glb`, `bog.glb`, `homestead.glb`, `household.glb`,
@@ -54,61 +54,58 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja main eed0b8c)
   (0,385; -0,058; 0,769), suunta (-0,283; -0,795; -0,537); oikea käsi on
   peilikuva x:n suhteen. Jousen kahva uppoaa suljettuun nyrkkiin, mikä
   näyttää otteelta, mutta kuvista tätä ei ole tarkistettu.
-- **Hihat ja ranteet.** Pitkän hihan (`torso_parts`, hihan loppu 0,97) leikkasi
-  aiemmin vartalon korkeusraja z < 0,95, ja riippuvan käden ranne on tämän
-  alapuolella: hiha päättyi rosoisesti kyynärvarren puolivälissä ja ranneke ja
-  käsi leijuivat irrallaan ("katkennut ranne"). Käsivarren verteksejä rajaa nyt
-  vain `arm_t`; z-alaraja koskee vain vartaloa. Korjaus näkyy tietäjällä,
-  jousineidolla (myös naissankari), emännällä, nuorella urholla ja Pohjan
-  sotureilla. Sankarin hiha (loppu 0,78) ei muuttunut.
-- **Sormiluut** (`char_rig.py`: `finger_setup`, `add_fingers`, `FINGER_*`):
-  `finger1..3_L/R` (rystys, keskinivel, kärkinivel; peukalolla ei luuta)
-  kummallakin luurangolla (`RIG`, `RIG_F`), vanhempana `hand_*`. Lepoasento on
-  edelleen nyrkki (verkko ei muuttunut), luut ovat koukistetun sormen
-  nivelissä ja luun paikallinen Z on koukistusakseli: sormet aukeavat
-  kiertämällä luita Z:n ympäri +1,25/+1,5/+0,9 rad (täysin suorat sormet).
-  Painot: sormiverteksit jaetaan `hand_*`n painosta samoilla nivelkohdilla
-  kuin koukistus (`finger_ks`); peukalo jää `hand_*`lle. `ARM`-ryhmä ja
-  `grip_carve` laskevat sormiluut käden osaksi. `build_base`/`build_base_f`
-  kutsuvat `add_fingers`ia (uusi vartalo), nykyisen `characters.blend`in
-  BODY ja BODY_F päivitettiin paikallaan. Sormen ulkonäkö on `h_open`-kuvissa
-  hyvä; sormet ovat yhtenä levynä (neljä sormea liikkuu yhdessä) ja peukalo
-  pysyy kämmenellä kiinni.
-- **Naissankarin varusteet** (`char_folk.py`: `build_hero_f_gear`, osa
-  `run_folk(only='f')`ia, jousineidon vartalolla): `char_jousineito_huotra`
-  (416 kolmiota; soikea nahkarunko, messinkisuu ja -kärki, vyösilmukka;
-  painotettu lantioon, `SHEATH_TOP_F` (0,19; −0,03; 1,03), sama suunta ja pituus
-  kuin miehellä), `char_jousineito_hihna` (72 kolmiota, kantohihna viitan
-  päältä, `strap_parts(off=0,07)`) sekä tyhjät `mount_huotra_f` (lantioluu) ja
-  `mount_kilpi_selka_f` (rintaluu). Kaikki ovat `villagers_f.glb`:ssä; NPC-koodi
-  poistaa ne, `Fighter.build` käyttää naissankarilla. Huotra menee kävellessä
-  reiden läpi kuten miehen. Kilpi selässä menee jousineidon viinen päälle.
-- **Hävitetty ranta** (`assets/lakeruin.glb`, noin 1,9 Mt; `assets-src/blender/lakeruin.py`,
-  ajetaan taustalla ja lukee ensin `lakeside.py`:n): `mokki_palanut` (5 500 kolmiota; sama
-  pohja kuin `mokki`, hiiltyneet hirsiseinät eri korkeuksille, ovi- ja ikkunaaukko tallessa,
-  sortuneet parrut, turvelaatat ja tuohi sisällä, ympärillä noen tummentama maa),
-  `keittopaikka_sammunut` (3 100; kivikehä, kylmä tuhka, sortunut kolmijalka, ketju maassa,
-  kaatunut pata suu +X-suuntaan ja valunut keitto), `haasia_kaatunut` (900; heinät roikkuvat
-  maailman alas-suuntaan), `verilammikko` (1 300; noin 1,7 x 1,3 m läikkä ja roiskeet, makaava
-  hahmo asetetaan keskelle) ja `verilammikko_pieni`. Veren väri tulee verteksiväreistä
-  (materiaali `M_Blood` valkoinen, kiiltävä); peli nostaa sen syvyydessä. Mallien mitat ja
-  tarkistus Blenderin kuvista (a-e); pelissä katsottu vain ylhäältä ja läheltä.
-- **Kalmisto** (`assets/cairnfield.glb`, noin 5,0 Mt; `assets-src/blender/cairnfield.py`,
-  ajetaan taustalla ja lukee ensin `homestead.py`:n ja `household.py`:n, `trees.py`
-  luetaan omaan nimiavaruuteensa karsikkoa varten; esikatselukuvat `KALEVALA_PREVIEW`):
-  `kuppikivi` (26 000 kolmiota; litteä lakipinta 2,2 x 1,75 m, korkeus 0,8 m, 11 kuppia
-  ja juoksutusura laskettu korkeuskenttään 2,2 cm:n ruudukolla, helma 0,3 m maan alle,
-  graniitin väri verteksiväreistä + `mossy_rock`-rakenne), `roykkio_a` (pyöreä),
-  `roykkio_b` (soikea), `roykkio_c` (kehäröykkiö, keskellä kuoppa) ja `roykkio_d`
-  (pieni): sammalpeitteinen kumpu (`M_CairnMoss`) ja 40–60 satunnaiskiertoista kiveä
-  (8 600–14 600 kolmiota/malli), sekä `karsikko` (2 600 kolmiota; 14 m mänty, jonka
-  oksat on karsittu tyngiksi 11 m:iin asti, latvassa pieni oksatupsu `trees.py`:n
-  korteilla). Mitat ja törmäysehdotukset ovat skriptin alun kommentissa. Katsottu
-  Blenderin kuvista ja pelissä (kuppikivi lähellä ja ylhäältä, röykkiöt, Louhi ja
-  karsikon alaosa; karsikon latvaa ei pelissä). Kupit ovat mallissa melko pieniä:
-  jos haluat näkyvämmät, nosta `cup_depth`in syvyyttä ja `CUPS`in säteitä.
-  Röykkiöiden kivet ovat matalapolygonisia ja hieman kulmikkaita; samaa mallia
-  käytetään kahdesti eri kierrolla ja mittakaavalla.
+- **Hihat ja ranteet.** Pitkän hihan (`torso_parts`, loppu 0,97) leikkasi aiemmin vartalon z-alaraja 0,95 ("katkennut
+  ranne"); käsivarren verteksejä rajaa nyt vain `arm_t`. Sankarin hiha (0,78) ei muuttunut.
+- **Sormiluut** (`char_rig.py`: `finger_setup`, `add_fingers`, `FINGER_*`): `finger1..3_L/R` kummallakin luurangolla
+  (`RIG`, `RIG_F`), vanhempana `hand_*`. Lepoasento on edelleen nyrkki (verkko ei muuttunut); luun paikallinen Z on
+  koukistusakseli ja sormet aukeavat kiertämällä luita +1,25/+1,5/+0,9 rad. Sormiverteksit jaetaan `hand_*`n painosta
+  koukistuksen nivelkohdilla (`finger_ks`), peukalo jää `hand_*`lle. Neljä sormea liikkuu yhtenä levynä.
+- **Naissankarin varusteet** (`char_folk.py`: `build_hero_f_gear`): `char_jousineito_huotra` (416 kolmiota, painotettu
+  lantioon, `SHEATH_TOP_F` (0,19; −0,03; 1,03), sama suunta ja pituus kuin miehellä), `char_jousineito_hihna` (72,
+  `strap_parts(off=0,07)`) ja tyhjät `mount_huotra_f` (lantioluu) ja `mount_kilpi_selka_f` (rintaluu) `villagers_f.glb`:ssä;
+  NPC-koodi poistaa ne. Huotra menee kävellessä reiden läpi kuten miehen; kilpi selässä menee viinen päälle.
+- **Hävitetty ranta** (`assets/lakeruin.glb`, 1,9 Mt; `lakeruin.py`, taustalla, lukee ensin `lakeside.py`:n):
+  `mokki_palanut` (5 500 kolmiota; sama pohja kuin `mokki`, hiiltyneet seinät eri korkeuksille, sortuneet parrut),
+  `keittopaikka_sammunut` (3 100; sortunut kolmijalka, kaatunut pata suu +X), `haasia_kaatunut` (900),
+  `verilammikko` (1 300) ja `verilammikko_pieni`. Veren väri tulee verteksiväreistä (`M_Blood` valkoinen, kiiltävä);
+  peli nostaa sen syvyydessä.
+- **Kalmisto** (`assets/cairnfield.glb`, 5,0 Mt; `cairnfield.py`, taustalla, lukee ensin `homestead.py`:n ja
+  `household.py`:n; `trees.py` omaan nimiavaruuteensa; esikatselu `KALEVALA_PREVIEW`): `kuppikivi` (26 000 kolmiota;
+  lakipinta 2,2 x 1,75 m, 11 kuppia ja ura korkeuskentässä, helma 0,3 m maan alla), `roykkio_a`–`d` (sammalkumpu
+  `M_CairnMoss` ja 40–60 kiveä, 8 600–14 600 kolmiota/malli) ja `karsikko` (2 600; 14 m mänty, oksat tyngiksi 11 m:iin).
+  Mitat ja törmäysehdotukset skriptin alun kommentissa. Kupit ovat pieniä (`cup_depth`, `CUPS`); röykkiöiden kivet
+  matalapolygonisia, samaa mallia käytetään kahdesti eri kierrolla.
+- **Modulaariset sankariosat** (`char_build.py`: `build_hero_modular`, `legs_trousers_wraps`, `legs_shoes`,
+  `legs_greaves`, `foot_skin_parts`, `belt_flange`; naiselle `char_folk.py`: `build_jousineito_modular`,
+  `_jousineito_core`): nykyisten täysien `char_hero`n ja `char_jousineito`n **rinnalle** (ne ovat verteksi
+  verteksiltä ennallaan, tarkistettu tiivisteellä) samalla luurangolla (23 luuta, yksi skin), painoilla ja
+  lepoasennolla. Solmut: `char_hero_base` / `_mail` / `_greaves` / `_shoes` (`characters.glb`) ja
+  `char_jousineito_base` / `_mail` / `_greaves` / `_shoes` (`villagers_f.glb`); peli poistaa ne, koska nimi alkaa
+  `char_` (`Fighter.build`), kunnes Codexin runtime-integraatio ottaa ne käyttöön. Kolmiot: hero base 27 600,
+  mail 2 800, greaves 260, shoes 4 700; jousineito base 28 500, mail 3 200, greaves 260, shoes 4 700. Tiedostot
+  kasvoivat: `characters.glb` 5,3 -> 7,1 Mt ja `villagers_f.glb` 3,2 -> 5,0 Mt (base kopioi kokonaisen hahmon);
+  koko asussa miehellä ~35 400 kolmiota (legacy 28 200). Sisältö:
+  - mies base: iho, hiukset, **kokonainen** sininen pellavatunika hihoineen ja helma (0,98 -> 0,50), housut, säärikäärit,
+    **paljas jalkaterä** (`foot_skin_parts`), vyö (`flange=0,014`: rengaslevyt tunikan pinnasta vyön ulkopintaan, jotta
+    vyö ei leiju ilman rengaspaitaa) ja huotra; mail = rengaspaita 0,47:ään, rengashelma (`skirt` 1,0 -> 0,57) ja
+    hihansuun nauha, samat mitat kuin legacyssa; kokonaisuus näyttää legacyn kaltaiselta;
+  - nainen base: legacy-asu ilman kenkiä (paljas jalkaterä), viitta ja viini mukana; mail = rengaspaita (infl. 0,021)
+    ja rengashelma, joka käyttää tunikan helman rivejä (`fitted_skirt` 1,05 -> 0,62) mutta jokainen säteen termi
+    >= 1,2 cm suurempi (ei läpileikkausta missään kulmassa) sekä oma vyönauha rengaspaidan päällä; ei hihansuun nauhaa
+    (polven ja kyynärpään akseli ei istu naisen käsivarteen); greaves/shoes samoilla funktioilla kuin miehellä;
+  - `legs_parts` on jaettu apufunktioiksi (tuloksen järjestys sama), joten muiden hahmojen jalat eivät muuttuneet.
+  Tarkistus: `char_modular_check.py` (`check_set("hero"|"fem")`) taivuttaa luurangon lepo-, kävely-, torjunta-,
+  ylälyönti- ja sivuasentoon ja mittaa kerrosten välin; vyö-, huotra-, viini- ja kengän yläreunan päällekkäisyydet ovat
+  tarkoituksellisia. Ääriasennoissa (jalka eteen yli 0,35 rad) sininen tunika pistää rengashelman läpi etureidestä
+  **kuten legacyssakin**; naisen säärisuojat jäävät baggy-housujen alle polven kohdalla. Katsottu: edestä, sivulta,
+  takaa ja yläviistosta lepoasennossa sekä kolmessa ääriasennossa molemmilla; peliin ladattuna kumpikin sukupuoli
+  näkyy ennallaan eikä uusia solmuja näy.
+- **Taivaanrautamiekka** (`sword_sky_iron`, `characters.glb`, 600 kolmiota): sama origo, suunta, terän pituus (0,74 m)
+  ja kahvan geometria (y -0,05..0,055, säde 1,4 -> 1,3 cm) kuin `sword`illa, joten käsikiinnitystä ei tarvitse
+  muuttaa. Lehtimäinen terä (leveimmillään 6 cm), kuusikulmainen poikkileikkaus, tumma siniharmaa meteoriittirauta
+  verteksiväreinä (kerroslinjat, kiillotetut terät, satunnaisia kuoppia), kaareva pronssiristikahva, kuusikulmainen
+  nuppi ja kierretty nahkakahva. Ei hohtoa. Peli poistaa sen (`sword*`-nimi menee `equip`iin muttei käytetä); käyttöön
+  vain Codexin integraatiolla.
 - **Pihapiiri** tehdään skriptillä `assets-src/blender/homestead.py` →
   `build_homestead()`: `talo`, `kuoppatalo`, `aitta`, `katos`, `aita`,
   `portinpieli`, `pino`, `polkky`, `haasia` ja `ruukku`. Kuoppatalon
@@ -135,20 +132,11 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja main eed0b8c)
   origossa, linnunpää -Y, nokka +Z). Viitta ja kanteleen kotelo on
   painotettu vartaloon. Vasen käsi pidetään viitan alla sivulla ja oikea
   on vapaa sauvalle.
-- **Louhi** (`assets/louhi.glb`, noin 1,7 Mt; `char_louhi.py` →
-  `run_louhi()`, lukee ensin `char_folk.py`:n; ajetaan avoimessa
-  `characters.blend`issa kuten kyläläiset, kokoelma LOUHI): `char_louhi`
-  (noin 27 500 kolmiota, sama `RIG`, naisvartalo ja lepoasento kuin
-  emännällä, 17 luuta). Musta pitkä mekko, sininen esiliina
-  kirjontanauhalla, kultaiset olkasoljet ja ketjut, helmikaulakoru,
-  rengasvyö ja puukko, mustat silmämaalit sekä peuran kallo, sarvet ja
-  mustat sulat päässä. Päähine on samaa verkkoa kuin hahmo ja painotettu
-  pään luuhun (ei irrotettava). Viittaa ei ole tarkoituksella. Jalat
-  ovat mekon alla paljain jaloin. Kuvalähde oli omistajan antama
-  Sketchfab-referenssi (ei käytetty mallina eikä kopioitu); kaikki
-  geometria on tehty itse. Katsottu vain Blenderin kuvista lepoasennossa
-  ja kädet alhaalla. Pelissä (kalmisto) hän seisoo paikallaan emännän käsiasennolla;
-  ulkonäkö on katsottu läheltä, kävelyä ei kokeiltu.
+- **Louhi** (`assets/louhi.glb`, 1,7 Mt; `char_louhi.py` → `run_louhi()`, lukee ensin `char_folk.py`:n; ajetaan
+  avoimessa `characters.blend`issa, kokoelma LOUHI): `char_louhi` (27 500 kolmiota, sama `RIG`, naisvartalo ja
+  lepoasento kuin emännällä): musta mekko, sininen esiliina, kultaiset solet ja ketjut, helmikaulakoru, puukko,
+  peuran kallo sarvineen päässä (osa hahmoa, ei irrotettava), ei viittaa, paljaat jalat. Kuvalähde omistajan
+  Sketchfab-referenssi (ei kopioitu). Pelissä seisoo emännän käsiasennolla; kävelyä ei kokeiltu.
 - **Naishahmot** (`assets/villagers_f.glb`, noin 3,2 Mt):
   `char_jousineito` (noin 27 900 kolmiota), `jousi` (ote origossa, lavat
   Z-suunnassa, jänne +Y) ja `char_emanta` (noin 26 600 kolmiota).
@@ -159,29 +147,15 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja main eed0b8c)
   Emännän pitkä helma seuraa reisiä ja sääriä, mutta kävelyä ei ole
   kokeiltu. Jousineidon olkaviitta ei kestä käsien nostoa jousen
   jännitysasentoon ilman läpimenoa.
-- **Eläimet** (`assets/animals/`, yhteensä 3,1 Mt; skripti `animals.py`,
-  ajetaan taustalla; lähteet Sketchfabista CC-BY 4.0, omistaja lataa
-  glTF-muodossa kansioon `assets-src/_downloads/animals/<nimi>/`):
-  `koira.glb` (8 000 kolmiota, 191 luuta, korkeus 0,56 m; leikkeet
-  `seisoo`, `istuu`, `tassu`), `kana.glb` (5 000, 56 luuta, 0,37 m; `olo`
-  = nokkii maata), `possu.glb` (7 000, 54 luuta, 0,50 m; `kavely`
-  paikallaan, ei lepoleikettä) ja `kukko_kana.glb` (liikkumattomat `kukko`
-  2 400 ja `kana_b` 2 000 kolmiota). Juurisolmu on eläimen nimi, origo
-  jalkojen välissä maassa, nokka -Y, koko valmiiksi metreinä (juuressa on
-  skaala). Eläimet ovat omissa tiedostoissaan, koska lähdemallien luiden
-  nimet menevät päällekkäin. Materiaali `M_AN_*`, vain värikartta.
-  Skripti kirjoittaa leikkeisiin luiden avaimettomat kanavat
-  (`key_static_channels`): ilman sitä koiran viikset ja varpaat siirtyvät
-  viennissä. Uusi eläin on rivi `ANIMALS`-taulukkoon.
-- **Tarkistuksen taso:** mallit on katsottu vain Blenderin kuvista
-  (hahmot lepoasennossa ja kädet alhaalla). Kyläläiset, eläimet,
-  talousesineet, sikolätti ja kanakoppi on lisäksi nähty pelissä
-  rauhallisella pihalla kuvakaappauksista, mutta ei liikkeessä. Rauhan
-  varustus on katsottu Blenderin kuvasta neljästä suunnasta (miekka ja
-  kilpi kiinnityspisteissä, lepoasento), ja uusi `characters.glb` on
-  ajettu pelissä: taistelijat näkyvät ennallaan, hihna on piilossa eikä
-  konsolissa ole virheitä. Eläinten viedyt tiedostot on tuotu takaisin Blenderiin ja
-  jokainen leike kuvattu yhdestä ruudusta.
+- **Eläimet** (`assets/animals/`, 3,1 Mt; `animals.py`, taustalla; lähteet Sketchfab CC-BY 4.0 kansiossa
+  `assets-src/_downloads/animals/<nimi>/`): `koira.glb` (8 000 kolmiota, 191 luuta, 0,56 m; `seisoo`, `istuu`, `tassu`),
+  `kana.glb` (5 000, 0,37 m; `olo`), `possu.glb` (7 000, 0,50 m; `kavely` paikallaan) ja `kukko_kana.glb` (liikkumattomat
+  `kukko` ja `kana_b`). Juurisolmu on eläimen nimi, origo jalkojen välissä, nokka -Y, koko metreinä. Omissa tiedostoissa
+  (luiden nimet menevät päällekkäin), materiaali `M_AN_*`. `key_static_channels` kirjoittaa leikkeisiin luiden
+  avaimettomat kanavat (muuten viikset ja varpaat siirtyvät viennissä). Uusi eläin = rivi `ANIMALS`-taulukkoon.
+- **Tarkistuksen taso:** mallit on katsottu Blenderin kuvista (lepoasento), kyläläiset, eläimet, esineet ja
+  rakennelmat lisäksi pelissä kuvakaappauksista, ei liikkeessä. Eläinten GLB:t on tuotu takaisin Blenderiin ja
+  jokainen leike kuvattu.
 - **Blender-putket** (`assets-src/blender/`): metsä `build_all.py`,
   taistelijat `char_all.py` → `run_chars()`, kyläläiset `char_folk.py` →
   `run_folk()`, suo `bog.py` → `build_bog()`, pihapiiri `homestead.py` ja
@@ -237,20 +211,16 @@ Päivitetty: 2026-11-16 (Claude, Windows; pohja main eed0b8c)
 
 ## Koodin väliaikaiset korvikkeet (odottavat malleja)
 
-- **Taivaanrautamiekka** (V6): perusmiekan malli, terä sävytetty (`fighter.ts`, `look.skyIron`). Tarvitaan
-  oma malli samoilla kiinnityspisteillä kuin `sword`illa.
+- **Taivaanrautamiekka** (V6): peli käyttää vielä perusmiekan mallia sävytettynä (`fighter.ts`, `look.skyIron`).
+  Oma malli `sword_sky_iron` on `characters.glb`:ssä (ks. yllä), odottaa integraatiota.
 - **Loukkaantunut jousineito**: `lying`-asento (kuin kuollut tietäjä), ei jousta. Tarvitaan istuva/kyljellään-asento.
 - **Nuori urho kyläläisenä**: `char_urho` ilman aseita (`spawnVillager`); anna tarvittaessa oma rauhan asento.
 
 ## Seuraava Blender-tehtävä
 
-Ei avointa Blender-tehtävää. Ehdotus omistajalle: sormien viimeistely
-(neljä sormea erilleen ja peukalolle oma luu, jos vilkutus näyttää
-jäykältä), koiran kävelyleike (`animals.py`, 191 luuta) ranta- ja
-pihakoiran käyskentelyyn sekä istuva tietäjä (uusi istumaleike). Jos omistaja
-pitää jousineidon otetta huonona, koverretaan hänen nyrkkinsä
-(`skin_parts(carve=…)` omalla kanavalla). Muuten odotetaan palautetta pelissä
-näkyvistä virheistä.
+Ei avointa Blender-tehtävää. Odottaa Codexin runtime-integraatiota (modulaariset osat ja `sword_sky_iron`);
+sen jälkeen legacy-hahmot voi poistaa tiedostoista (säästää noin 1,7 Mt kummassakin). Muuta: sormien viimeistely,
+koiran kävelyleike, istuva tietäjä ja loukkaantuneen jousineidon asento.
 
 ## Ei vielä aloiteta
 

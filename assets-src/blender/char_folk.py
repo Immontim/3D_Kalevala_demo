@@ -420,13 +420,15 @@ def quiver_parts(C):
     return parts
 
 
-def build_jousineito():
-    C = Ctx(FEM["body"], FEM["src"], FEM["rig"], FEM_P, fem_xf())
+def _jousineito_core(C, shoes=True):
+    """Jousineidon osat samassa järjestyksessä kuin aiemmin. shoes=False: ilman nahkakenkiä, paljas jalkaterä
+    (naissankarin modulaarinen perusasu)."""
     hair = (0.6, 0.42, 0.22)
     grey = (1.0, 0.97, 0.93)
     dark = (0.3, 0.3, 0.34)
     red = (0.15, 0.012, 0.008)
-    P = skin_parts(C, 0.9, hair, skin=(0.74, 0.5, 0.38), lips=(0.55, 0.26, 0.24), face=(-0.008, 0.002), carve=False)
+    skin = (0.74, 0.5, 0.38)
+    P = skin_parts(C, 0.9, hair, skin=skin, lips=(0.55, 0.26, 0.24), face=(-0.008, 0.002), carve=False)
     P += hair_parts(C, hair, length=1.47, beard=0, cap=True)
     P += braid_parts(C, hair)
     P += cap_parts(C, col=(0.3, 0.3, 0.33))
@@ -435,11 +437,39 @@ def build_jousineito():
     P += [fitted_skirt(C, 1.05, 0.62, 0.018, (0.25, 0.212), "wool", tile=0.14, col=grey, trim="trim_zigzag")]
     P += [skirt(C, 0.72, 0.52, 0.0, (0.247, 0.209), "wool", col=dark, rows=2)]          # laskostettu alushelma
     P += cuff_parts(C, 0.96, "trim_zigzag", 0.022)
-    P += legs_parts(C, "wool", (0.55, 0.47, 0.38), (0.9, 0.86, 0.75), baggy=0.055)
+    P += legs_trousers_wraps(C, "wool", (0.55, 0.47, 0.38), (0.9, 0.86, 0.75), baggy=0.055)
+    P += legs_shoes(C) if shoes else foot_skin_parts(C, skin)
     P += belt_parts(C, z=1.05, off=0.024, knife=True)
     P += quiver_parts(C)
     P += mantle_parts(C, col=dark, edge=(0.04, 0.04, 0.05), z_hem=1.27, a_open=12, gap=1, pleat=0.06, pleat_n=26, hem_trim=None, cowl=False, clear=0.03, brooch_row=2)
-    return assemble("char_jousineito", P, col_name="FOLK_F", rig_name=FEM["rig"])[1]
+    return P
+
+
+def build_jousineito():
+    C = Ctx(FEM["body"], FEM["src"], FEM["rig"], FEM_P, fem_xf())
+    return assemble("char_jousineito", _jousineito_core(C), col_name="FOLK_F", rig_name=FEM["rig"])[1]
+
+
+def build_jousineito_modular():
+    """Naissankarin modulaariset osat täyden char_jousineidon rinnalle (sama RIG_F, painot ja lepoasento):
+    _base (täysi asu ilman kenkiä: paljas jalkaterä), _mail (rengaspaita hihoineen ja rengashelma, sovitettu
+    naisvartaloon tunikan alle ja viitan alle), _greaves (säärisuojat) ja _shoes (nahkakengät)."""
+    C = Ctx(FEM["body"], FEM["src"], FEM["rig"], FEM_P, fem_xf())
+    out = {}
+    def put(name, parts):
+        out[name] = assemble(name, parts, col_name="FOLK_F", rig_name=FEM["rig"])[1]
+    put("char_jousineito_base", _jousineito_core(C, shoes=False))
+    M = torso_parts(C, "mail", (1, 1, 1), 0.47, inflate=0.021, tile=0.11, smooth=5, collar=(0.9, 0.35, 0.3))
+    # rengashelma: sama rivijako ja ylä- ja alareuna kuin tunikan helmalla (fitted_skirt 1,05 -> 0,62), mutta kaikki
+    # säteen termit vähintään 1,2 cm suuremmat (off +1,6 cm, fit +1,6 cm, helma +1,2/+1,0 cm), joten tunikan helma
+    # ei pääse sen läpi missään kulmassa eikä asennossa; vyö (1,05) tulee rengaspaidan päälle omana nauhanaan.
+    M += [fitted_skirt(C, 1.05, 0.62, 0.034, (0.262, 0.222), "mail", tile=0.11, fit=0.038)]
+    keep = lambda i, c: abs(c.x) < 0.2 and C.arm_frac[i] < 0.3
+    M += [band(C, V((0, 0.02, 1.05)), V((0, 0, 1)), V((0, -1, 0)), 0.05, 0.047, "leather", keep=keep, col=(1.0, 0.92, 0.85))]
+    put("char_jousineito_mail", M)
+    put("char_jousineito_greaves", legs_greaves(C))
+    put("char_jousineito_shoes", legs_shoes(C))
+    return out
 
 
 # ---------- naissankarin varusteet (jousineidon vartalolla) ----------
@@ -871,6 +901,7 @@ def run_folk(preview_dir=None, out_dir=None, save=True, base_f=False, only=None)
                 out["tris"].update({"char_jousineito": build_jousineito()["tris"], "jousi": build_bow()["tris"]})
                 out["tris"]["char_emanta"] = build_emanta()["tris"]
                 out["gear_f"] = build_hero_f_gear()
+                out["modular_f"] = build_jousineito_modular()
             bpy.context.view_layer.update()
             if preview_dir:
                 for name, rig, on in (("tietaja", "RIG", only != 'f'), ("jousineito", FEM["rig"], only != 'm'), ("emanta", FEM["rig"], only != 'm')):
