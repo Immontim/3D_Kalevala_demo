@@ -20,6 +20,8 @@ export const FLAGS: Record<string, FlagDef> = {
   "sage.robbed": { label: "tietäjä tietää, että tuohikontti vietiin luvatta" },
   "sage.forgiven": { label: "tietäjä on antanut varkauden anteeksi" },
   "song.sleep.learned": { label: "pelaaja on oppinut laulun Pohjolan uni" },
+  "campaign.won": { label: "kampanja on voitettu (leirin viimeinen aalto kaatui)" },
+  "campaign.endSeen": { label: "pelaaja on nähnyt loppuruudun" },
   "archer.healed": { label: "jousineito on parannettu laululla ja nousee seisomaan" },
   "archer.gaveSword": { label: "jousineito on antanut taivaanrautamiekan" },
   "louhi.banished": { label: "Louhi on karkotettu kalmistolta ja vainolaisten leiri on paljastunut" },
@@ -30,6 +32,10 @@ export const FLAGS: Record<string, FlagDef> = {
 
 export const COUNTERS: Record<string, CounterDef> = {
   "thefts.noticed": { label: "huomatut varkaudet", max: 999 },
+  "player.deaths": { label: "sankarin kaatumiset taistelussa", max: 999 },
+  /** Loppuruudun tilastot kirjataan voiton hetkellä (`recordVictory`), jotta myöhempi vaeltaminen ei muuta niitä. */
+  "win.days": { label: "matkaan kulunut pelipäivien määrä voitettaessa", max: 9999 },
+  "win.explored": { label: "tutkittu osuus kartasta voitettaessa (prosenttia)", max: 100 },
 };
 
 /** Maailmanesineiden instanssitunnisteet ihmisen luettavina nimina (yhteenvetoa varten). */

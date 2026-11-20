@@ -47,6 +47,7 @@ export function describeEffect(effect: Effect, data: WorldData, text: TextLookup
     case "setSceneItemTakeMode": return `${itemLabel(effect.instanceId)} muuttuu ${TAKE_MODE_TEXT[effect.takeMode]} otettavaksi`;
     case "message": return `näytetään viesti "${text(effect.text)}"${effect.sub ? ` / "${text(effect.sub)}"` : ""}`;
     case "revealSite": return `karttapaikka "${effect.siteId}" paljastuu kartalle`;
+    case "recordVictory": return "kampanja merkitään voitetuksi ja loppuruudun tilastot (päivät, tutkittu kartta) kirjataan";
     case "setNpcState": return `hahmon "${effect.npcId}" tila vaihtuu: ${effect.state}`;
     case "removeNpc": return `hahmo "${effect.npcId}" poistuu kohtauksesta`;
     case "startSongLesson": return `aloitetaan laulun "${effect.songId}" opettelu (rytmiharjoitus)`;
@@ -72,6 +73,14 @@ export function describePattern(on: EventPattern): string {
     case "scene.entered": {
       detail("sceneId", "kohtaus");
       return `Kun kohtaukseen siirrytään${extra.length ? ` (${extra.join(", ")})` : ""}`;
+    }
+    case "battle.won": {
+      detail("sceneId", "kohtaus");
+      return `Kun leirin viimeinen aalto kaatuu${extra.length ? ` (${extra.join(", ")})` : ""}`;
+    }
+    case "player.died": {
+      detail("sceneId", "kohtaus");
+      return `Kun sankari kaatuu taistelussa${extra.length ? ` (${extra.join(", ")})` : ""}`;
     }
     case "song.performed": {
       detail("songId", "laulu");

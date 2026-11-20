@@ -6,45 +6,34 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-17 (Claude, Windows; pohja `origin/main` `0123847`)
+Päivitetty: 2026-11-20 (Claude, Windows; pohja `origin/main` `a9b4818`)
 
-- **Branchin `claude/archer-sword` koodiversio on v04.05.00** (V6 + leirin arvonta + pihojen
-  väki, alla). Koodi valmis, ei deployattu, käsin testattu selaimessa; omistaja pelaa MVP:tä
-  kokonaisuutena eikä testaa vaiheita erikseen. Tarkista merge-tila:
-  `git merge-base --is-ancestor claude/archer-sword origin/main`. V1-V5 ja Codexin
-  kahlaamo on mergattu.
-- **Vainolaisten leiri on arvottu instanssi (`camp`).** Kartasta poistettiin kiinteä
-  `campfire`; `SiteInstance.kind` on `"yard" | "camp"`. `map/placement.ts`: `CAMP_PLACEMENT`
-  (kartan reuna: etäisyys reunaan <= 4, maasto niitty/metsä/umpimetsä/kallio, Chebyshev >= 8
-  aloituksesta, reitti <= 600 min, >= 4 pihoista ja kiinteistä), `placeCampInstance` (oma virta
-  `camp`), `validateCampPlacement`; `siteInstances.ts` `newSiteInstances`/`completeSiteInstances`
-  (vanha tallennus saa puuttuvan `camp`in). `sites.ts` `instanceSiteDefinition`: leiri avaa
-  `clearing`in ja on lukossa lipulla `louhi.banished` (`CAMP_REQUIRES_FLAG`). Sääntö
-  `louhi.banished` paljastaa `camp`in. 1000 siementä läpäisee validaattorin.
-- **Jousineidon haara (V6).** Jousineito makaa `archer`-pihassa loukkaantuneena (`lying`-malli,
-  vartaloesteet `folk:jousineito-ruumis1/2`, ei jousta). Rauhassa **parannuslaulu** on käytettävissä,
-  kun hän on kuuluvilla (`SongDef.peaceTargets`, `songAvailable`; ring avautuu vain, jos jokin laulu
-  on käytettävissä: `canSingAtPeace`). Sääntö `archer.healed` (`song.performed` heal/cast/success,
-  `yard`, `nearNpcId` jousineito) asettaa lipun ja efektin `setNpcState` (`OutAction npcState`):
-  `world.setNpcState` vaihtaa makaavan seisovaan (`vanishVillager(id, true)` + `spawnArcher`) ja
-  poistaa vartaloesteet. Dialogi `archer.yard`: loukkaantuneena `wounded`/`story`, parannettuna
-  `reward` -> `take` antaa `sky_iron_sword`in (`giveItem`; täysi inventaario -> valinta
-  epäonnistuu, toistettavissa) ja lipun `archer.gaveSword`, sen jälkeen `after`.
-- **Taivaanrautamiekka.** `ItemId`/`EquipmentItemId` `sky_iron_sword`, `WEAPONS.sky_iron_sword`
-  (vahinko 1,3 vs 1,0, muuten sama miekka), `weaponOf(loadout, skyIron)`, `FighterLook.skyIron`,
-  `combatLoadout` kartoittaa sen miekaksi (+ kilpi), `isSkyIron`/`ownsMainHand`. Kartan
-  paperinuken pääkäsi-valinta näyttää sen vasta, kun se on inventaariossa; esine pysyy
-  inventaariossa valinnan jälkeen. Hierarkia: `tuning.ts` `weapons.sky_iron_sword.damage`.
-  **Malli on väliaikainen:** sama miekkamalli, terä sävytetty tummansiniseksi
-  (`fighter.ts`); oma Blender-malli odottaa (ks. BLENDER_HANDOFF).
-- **Pihojen väki.** Tietäjä poistettiin pihoilta (yksi tietäjä, rannalla). `archer`-vapaassa pihassa
-  tulen vieressä seisoo **nuori urho** (`characters.glb` `char_urho` `spawnVillager`illa, aseeton;
-  dialogi `urho.yard`: vihje kalmiston lähettilääseen). Emäntällä (molemmat pihat) on dialogi
-  `emanta.yard`: "Onko kuulunut mitään outoa?" asettaa `rumor.heard` ja `revealSite lakeside`
-  (huhu). Tietäjän opetus (`sage.song-learned`) paljastaa myös `cairnfield`in kartalle.
-  **Testattu:** Vitest (kaikki säännöt ja epäonnistumiset, leirin 1000 siementä) ja selaimessa koko
-  polku (parannus rauhassa, seisomaan nousu, miekan otto, valinta kartalla, vahinko 1,3, urho, emäntä).
-  **Ei testattu:** miekan ja loukkaantuneen mallin ulkonäkö lähikuvassa, rytmi ihmiskäsin.
+- **Branchin `claude/victory-screen` koodiversio on v04.06.00** (V7: aallot ja loppuruutu, alla).
+  Koodi valmis, ei deployattu, käsin testattu selaimessa; omistaja pelaa MVP:tä kokonaisuutena.
+  Tarkista merge-tila: `git merge-base --is-ancestor claude/victory-screen origin/main`.
+  V1-V6 ja Codexin kahlaamo on mergattu. **MVP:n koko pelikaari on nyt koodissa.**
+- **Leirin aallot ja voitto (V7).** `src/waves.ts` (puhdas): `CAMPAIGN_WAVES` 5 kiinteää aaltoa
+  omistajan listan mukaan (urho/miekka; pohja/miekka+kilpi; urho/keihäs + pohja/miekka; pohja/keihäs +
+  pohja/miekka+kilpi; urho/keihäs + pohja/miekka+kilpi + pohja/miekka), `FINAL_WAVE`, `TOTAL_ENEMIES` (9).
+  **Vastustajat ovat perusarvoissa** (taso 0, ei `groupHpScale`a; urho 70 HP, pohja 80 HP); vain
+  tekoälyn taito nousee (`aiLevelForWave` = aalto-1, `EnemyDef.aiLevel`). `engine/skirmish.ts`:
+  viimeisen aallon kaatuminen -> viesti -> `engine/victory.ts` `finishVictory`: `battle.won`
+  -> sääntö `campaign.victory` (efekti `recordVictory`: lippu `campaign.won`, laskurit `win.days` =
+  `totalDays(worldMinutes)` ja `win.explored` %) -> `mapUrl`. Kaatuminen: `onPlayerDeath` ->
+  `player.died` -> `player.deaths`-laskuri. Debug: `__game.killEnemies()`, `skipTo(1..5)`.
+  Alkuperäiset `groupSize`/`WAVES.hpPerWave` jäivät `combat.ts`:ään käyttämättöminä (testit).
+- **Loppuruutu** (`map/ending.ts` puhdas `endingSummary`/`shouldShowEnding`; `map/app.ts` `#mapEnding`,
+  CSS `.ending-card`: pellavapohja, kaksoiskehys ja punasininen kirjontanauha): näkyy kartalla
+  voiton jälkeen kerran. Tilasto: pelipäivät (+ kuunkierrot), tutkittu kartta %, opitut laulut x/3,
+  kukistetut 9, kaatumiset (tai "et kaatunut kertaakaan"), luvattomat otot (tai "et ottanut mitään
+  luvatta") ja sivupolut (huhu, Louhi, jousineito, taivaanrautamiekka ✓/–). "Jatka vaellusta"
+  asettaa `campaign.endSeen` (Esc sama), "Aloita uusi matka" nollaa kampanjan; asetuksissa
+  "Katso loppuruutu". Päivät ja kartta jäädytetään voiton hetkeen.
+- **V6 ja leirin arvonta (mergattu).** Leiri on instanssi `camp` (`placement.ts` `CAMP_PLACEMENT`: reunakaista,
+  >= 8 ruutua aloituksesta, <= 600 min, lukossa lipulla `louhi.banished`). Jousineito makaa `archer`-pihassa;
+  parannuslaulu rauhassa (`SongDef.peaceTargets`) -> `archer.healed` + `setNpcState` -> seisoo; dialogista
+  `sky_iron_sword` (vahinko 1,3; malli väliaikainen, ks. BLENDER_HANDOFF). Tietäjä vain rannalla, nuori urho
+  `archer`-vapaassa pihassa, emäntä kertoo huhun (`rumor.heard` + tietäjän ranta kartalle).
 - **Louhen karkotus (V5, mergattu).** Pohjolan uni <= 6 m (`SONG_AUDIENCE_RANGE`) Louhesta
   kalmistolla: `endSong` lähettää `song.performed` (cast, `nearNpcId`); sääntö `louhi.banished`
   asettaa lipun, `revealSite` ja `removeNpc` (`world.removeNpc`: `vanishVillager`,
@@ -312,14 +301,12 @@ Päivitetty: 2026-11-17 (Claude, Windows; pohja `origin/main` `0123847`)
 - **UI ja kielituki.** Kartan pellavapohja, kirjontakehykset, paperinukke,
   kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
   tyypitetyissä FI/EN-sanakirjoissa.
-- **Tarkistukset 2026-11-17 (v04.05.00):** `bunx vitest run --exclude ".worktrees/**"` (24
-  tiedostoa, 300 testiä), `bun run lint`, `bun run build`, `git diff --check` läpäisty; build
-  varoittaa vain suuresta 3D-chunkista (839 kt, gzip 227 kt).
-- **Riippuvuustarkistus:** 2026-11-17: `bun outdated` tyhjä, mutta **`bun audit` löysi 1 korkean
-  löydöksen: picomatch 4.0.7 (ReDoS, GHSA-fc5q-39xc-vjpf) vite/vitest-kehitystyökalujen
-  kautta**. Vain kehitysaikainen, ei kulje pelaajalle. **Päivitysajoa ehdotettu omana
-  branchinaan, odottaa omistajan lupaa** (`bun audit fix` tai lockfilen uusinta; ei apupaketin
-  `bun update`).
+- **Tarkistukset 2026-11-20 (v04.06.00):** `bunx vitest run --exclude ".worktrees/**"` (26
+  tiedostoa, 312 testiä), `bun run lint`, `bun run build`, `git diff --check` läpäisty; build
+  varoittaa vain suuresta 3D-chunkista (839 kt, gzip 226 kt).
+- **Riippuvuustarkistus:** 2026-11-20: `bun audit` puhdas (aiempi picomatch-löydös ei enää raportoidu).
+  `bun outdated`: vitest 5.1.0 -> 5.1.1 (rajojen sisäinen patch; **päivitysajoa ehdotettu omana
+  branchinaan, odottaa omistajan lupaa**).
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
   3D:ssä `window.__game`. Selainpaneelin fokus voi pysäyttää 3D-pelin.
 
@@ -374,11 +361,10 @@ Päivitetty: 2026-11-17 (Claude, Windows; pohja `origin/main` `0123847`)
 
 ## Seuraava tehtävä
 
-ROADMAPin **V7: leiri ja loppu**: `clearing`-aaltotaistelun voitto päättää kampanjan (loppuruutu,
-"jatka / aloita alusta"); leiri on jo kartalla vasta V5:n jälkeen ja arvottu reunalle. Tarvitaan
-tapahtuma taistelun voitosta (`wave.cleared`/`campaign.won`) moottoriin ja lippu `campaign.won`;
-valitse aaltoraja (nyt `skirmish.ts` ei lopu) ja kirjaa se ROADMAPiin. Sen jälkeen V8
-(pelitestaus, tallennuksen vienti/tuonti, läpipeluutesti, deployaus).
+ROADMAPin **V8: pelitestaus ja julkaisu**. Omistaja pelaa MVP:n alusta loppuun ja kirjaa korjattavaa (hän
+on jo löytänyt joitakin, ne kerätään V8:n listaksi). Koodipuolella: tallennuksen vienti/tuonti tiedostona,
+abstrakti läpipeluutesti (liput ja tapahtumat, ei 3D: pääpolku läpäistävissä, sivupolut eivät lukitse),
+tasapainosäädöt (stamina, kylläisyys, aallot) ja deployaus GitHub Pagesiin. **Odottaa omistajan lupaa:** vitest-patchpäivitys (ks. riippuvuustarkistus).
 
 ## Ei vielä aloiteta
 

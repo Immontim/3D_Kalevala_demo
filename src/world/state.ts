@@ -61,6 +61,12 @@ export function withFlag(state: EngineState, flag: string, value: boolean): Engi
   return { ...state, flags };
 }
 
+/** Asettaa laskurin tarkkaan arvoon (rajattuna 0..max). */
+export function withCounterSet(state: EngineState, counter: string, value: number, max: number): EngineState {
+  const target = Math.max(0, Math.min(max, Math.round(value)));
+  return withCounterAdded(state, counter, target - counterValue(state, counter), max);
+}
+
 export function withCounterAdded(state: EngineState, counter: string, amount: number, max: number): EngineState {
   const next = Math.max(0, Math.min(max, counterValue(state, counter) + amount));
   if (next === counterValue(state, counter)) return state;

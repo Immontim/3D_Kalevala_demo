@@ -29,6 +29,8 @@ import { discoverVisibleSites, mapSiteDefinition, mapSiteDisplay, sceneForMapSit
 import { clearCampaign, loadCampaign, newCampaign, saveCampaign } from "./storage";
 import { riverTile, shoreEdgeTurns, terrainFrame, waterShoreMask, type AtlasFrame } from "./tiles";
 import { consumeSceneReturn } from "./transition";
+import { endingSummary, isWon, shouldShowEnding } from "./ending";
+import { withFlag } from "../world/state";
 import { mapCalendarTime, mapCellVisibility, satietyBand } from "./uiState";
 
 const TILE = 48;
@@ -96,11 +98,20 @@ function buildUi(root: HTMLElement) {
   }).join("");
   const languageButtons = (["fi", "en"] as const).map((language) => `<button type="button" class="map-choice${language === getLanguage() ? " on" : ""}" data-language="${language}" aria-pressed="${language === getLanguage()}"><span class="language-flag flag-${language}" aria-hidden="true"></span><span>${t(`language.${language}`)}</span></button>`).join("");
   const genderButtons = (["male", "female"] as const).map((gender) => `<button type="button" class="map-choice gender-choice${gender === campaign.player.gender ? " on" : ""}" data-gender="${gender}" aria-pressed="${gender === campaign.player.gender}"><span class="gender-face gender-face-${gender}" aria-hidden="true"></span><span>${t(`map.gender.${gender}`)}</span></button>`).join("");
-  settings.innerHTML = `<div class="map-modal-card map-settings-card"><button id="closeSettings" class="map-close" type="button" aria-label="${t("map.close")}">×</button><h2 id="mapSettingsTitle">${t("map.settings")}</h2><p>${t("map.settingsHelp")}</p><div class="map-setting-grid"><section class="map-setting-group" aria-labelledby="mapLanguageTitle"><h3 id="mapLanguageTitle">${t("language.label")}</h3><div class="map-choice-row">${languageButtons}</div></section><section class="map-setting-group" aria-labelledby="mapGenderTitle"><h3 id="mapGenderTitle">${t("map.gender")}</h3><div class="map-choice-row">${genderButtons}</div></section></div><p id="mapSettingsError" class="map-settings-error" role="status" aria-live="polite"></p><button id="newJourney" class="map-danger" type="button">${t("map.newJourney")}</button><section class="scene-shortcuts"><h3>${t("map.sceneShortcuts")}</h3>${sceneButtons}</section></div>`;
+  settings.innerHTML = `<div class="map-modal-card map-settings-card"><button id="closeSettings" class="map-close" type="button" aria-label="${t("map.close")}">×</button><h2 id="mapSettingsTitle">${t("map.settings")}</h2><p>${t("map.settingsHelp")}</p><div class="map-setting-grid"><section class="map-setting-group" aria-labelledby="mapLanguageTitle"><h3 id="mapLanguageTitle">${t("language.label")}</h3><div class="map-choice-row">${languageButtons}</div></section><section class="map-setting-group" aria-labelledby="mapGenderTitle"><h3 id="mapGenderTitle">${t("map.gender")}</h3><div class="map-choice-row">${genderButtons}</div></section></div><p id="mapSettingsError" class="map-settings-error" role="status" aria-live="polite"></p><button id="newJourney" class="map-danger" type="button">${t("map.newJourney")}</button><button id="showEnding" class="map-danger hidden" type="button">${t("ending.show")}</button><section class="scene-shortcuts"><h3>${t("map.sceneShortcuts")}</h3>${sceneButtons}</section></div>`;
 
-  root.append(header, layout, footer, settings);
+  const ending = h("div", "map-modal hidden");
+  ending.id = "mapEnding";
+  ending.setAttribute("role", "dialog");
+  ending.setAttribute("aria-modal", "true");
+  ending.setAttribute("aria-labelledby", "endingTitle");
+  ending.innerHTML = `<div class="map-modal-card ending-card"><div class="ending-band" aria-hidden="true"></div><div class="ending-ornament" aria-hidden="true">◆ ❖ ◆</div><h2 id="endingTitle">${t("ending.title")}</h2><p class="ending-subtitle">${t("ending.subtitle")}</p><div class="ending-ornament small" aria-hidden="true">❖</div><div class="ending-columns"><section><h3>${t("ending.statsTitle")}</h3><ul id="endingStats" class="ending-list"></ul></section><section><h3>${t("ending.sideTitle")}</h3><ul id="endingSide" class="ending-list"></ul></section></div><div class="ending-actions"><button id="endingContinue" type="button">${t("ending.continue")}</button><button id="endingNew" type="button">${t("ending.newJourney")}</button></div><div class="ending-ornament" aria-hidden="true">◆ ❖ ◆</div><div class="ending-band" aria-hidden="true"></div><p class="ending-version">${t("map.title")} · ${VERSION}</p></div>`;
+  root.append(header, layout, footer, settings, ending);
+  root.querySelector("#endingContinue")!.addEventListener("click", () => closeEnding());
+  root.querySelector("#endingNew")!.addEventListener("click", () => { closeEnding(false); restartJourney(false); });
+  root.querySelector("#showEnding")?.addEventListener("click", () => { toggleSettings(false); openEnding(); });
   root.querySelector("#closeSettings")!.addEventListener("click", () => toggleSettings(false));
-  root.querySelector("#newJourney")!.addEventListener("click", restartJourney);
+  root.querySelector("#newJourney")!.addEventListener("click", () => restartJourney());
   root.querySelectorAll<HTMLButtonElement>("[data-language]").forEach((button) => {
     button.addEventListener("click", () => {
       const language = button.dataset.language as "fi" | "en";
@@ -226,10 +237,56 @@ function openScene(scene: SceneId, site?: string) {
   location.href = sceneUrl(location.href, scene, true, site).href;
 }
 
+let endingOpen = false;
+
+/** Loppuruutu: voitetun kampanjan tilasto kartan ilmeellä. Sulkeminen merkitsee sen nähdyksi. */
+function openEnding() {
+  const summary = endingSummary(campaign);
+  if (!summary) return;
+  const stats: string[] = [
+    t(summary.days === 1 ? "ending.daysOne" : "ending.daysMany", { days: summary.days }),
+  ];
+  if (summary.moons > 0) stats.push(t("ending.moons", { moons: summary.moons }));
+  stats.push(
+    t("ending.explored", { percent: summary.explored }),
+    t("ending.songs", { count: summary.songsKnown, total: summary.songsTotal }),
+    t("ending.enemies", { count: summary.enemiesDefeated }),
+    summary.deaths === 0 ? t("ending.noDeaths") : t("ending.deaths", { count: summary.deaths }),
+    summary.thefts === 0 ? t("ending.noThefts") : t("ending.thefts", { count: summary.thefts }),
+  );
+  const fill = (id: string, rows: { text: string; done?: boolean }[]) => {
+    const list = document.getElementById(id)!;
+    list.replaceChildren(...rows.map((row) => {
+      const li = h("li", row.done === undefined ? "" : row.done ? "done" : "undone", row.text);
+      if (row.done !== undefined) li.prepend(h("b", "", row.done ? "✓" : "–"));
+      return li;
+    }));
+  };
+  fill("endingStats", stats.map((text) => ({ text })));
+  fill("endingSide", summary.sideStories.map((story) => ({ text: t(`ending.side.${story.id}`), done: story.done })));
+  const root = document.getElementById("mapRoot")!;
+  root.querySelectorAll<HTMLElement>(".map-header, .map-layout, .map-footer").forEach((element) => { element.inert = true; });
+  document.getElementById("mapEnding")!.classList.remove("hidden");
+  endingOpen = true;
+  document.getElementById("endingContinue")!.focus();
+}
+
+function closeEnding(markSeen = true) {
+  const root = document.getElementById("mapRoot")!;
+  document.getElementById("mapEnding")!.classList.add("hidden");
+  root.querySelectorAll<HTMLElement>(".map-header, .map-layout, .map-footer").forEach((element) => { element.inert = false; });
+  endingOpen = false;
+  if (markSeen && campaign.engine.flags["campaign.endSeen"] !== true) {
+    campaign = { ...campaign, engine: withFlag(campaign.engine, "campaign.endSeen", true) as typeof campaign.engine };
+    saveCampaign(campaign);
+  }
+}
+
 function toggleSettings(open = !settingsOpen) {
   const root = document.getElementById("mapRoot")!;
   const background = root.querySelectorAll<HTMLElement>(".map-header, .map-layout, .map-footer");
   settingsOpen = open;
+  document.getElementById("showEnding")?.classList.toggle("hidden", !isWon(campaign));
   document.getElementById("mapSettings")!.classList.toggle("hidden", !open);
   background.forEach((element) => { element.inert = open; });
   if (open) {
@@ -243,8 +300,8 @@ function toggleSettings(open = !settingsOpen) {
   renderUi();
 }
 
-function restartJourney() {
-  if (!confirm(t("map.newJourneyConfirm"))) return;
+function restartJourney(confirmFirst = true) {
+  if (confirmFirst && !confirm(t("map.newJourneyConfirm"))) return;
   clearCampaign();
   campaign = newCampaign();
   ensureRevealed();
@@ -544,6 +601,11 @@ function renderMap() {
 
 function onKeyDown(event: KeyboardEvent) {
   if (event.repeat) return;
+  if (endingOpen) {
+    // Loppuruudun aikana kartta ei liiku; Esc vastaa "Jatka vaellusta".
+    if (event.code === "Escape") { event.preventDefault(); closeEnding(); }
+    return;
+  }
   if (settingsOpen) {
     if (event.code === "Escape") { event.preventDefault(); toggleSettings(false); }
     return;
@@ -585,6 +647,7 @@ export function initMap() {
   renderMap();
   renderUi();
   window.addEventListener("keydown", onKeyDown);
+  if (shouldShowEnding(campaign)) openEnding();
   (window as unknown as { __map: unknown }).__map = {
     get state() { return structuredClone(campaign); },
     move,

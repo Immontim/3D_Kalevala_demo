@@ -6,6 +6,7 @@ import { tmpB } from "./engine/animate";
 import { peace } from "./engine/encounter";
 import { addEnemy, focusEnemy, lockTarget, startEncounter } from "./engine/enemies";
 import { bindings } from "./engine/input";
+import { killActor } from "./engine/melee";
 import { pause, paused, resume, simulate } from "./engine/loop";
 import { setShowcase, showcase } from "./engine/showcase";
 import { ENEMIES, currentWave, skipToWave, skirmish } from "./engine/skirmish";
@@ -55,6 +56,8 @@ export function initDebug() {
     /** Säädetyt arvot polku → arvo. */
     get tuning() { return Object.fromEntries(changedValues()); },
     /** Asettaa kestävyydet (savutestit); null jättää ennalleen. */
+    /** Savutesti: kaataa kaikki elävät vastustajat kuin kuolettavalla iskulla (aalto etenee, viimeinen aalto voittaa). */
+    killEnemies() { for (const e of [...g.enemies]) { e.hp = 0; killActor(e, false); } return g.enemies.length; },
     setHp(p: number) { g.player.hp = Math.min(g.player.stats.maxHp, p); },
     setStamina(p: number | null, e: number | null = null) { if (p !== null) g.player.stamina = p; if (e !== null && d.enemy) d.enemy.stamina = e; },
     /** Laulaa vastustajan suoraan suohon t sekunniksi (savutestit). */
