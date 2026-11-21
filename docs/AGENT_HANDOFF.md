@@ -6,16 +6,23 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `6218fc1`)
+Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `7b46582`)
 
-- **Koodiversio v06.04.00** branchissa `claude/hunting-bow` (tarkista merge-tila `git merge-base`illa).
-  Koodi valmis, ei deployattu, omistaja ei ole käsin testannut. Claude testasi in-app-selaimessa
-  (`?scene=wilds`, paneeli piilossa, joten peli ajettiin `__game.step`illä ja syöte `__game.huntInput`illa
-  sekä oikeilla X-, hiiri- ja B-tapahtumilla): jousi esiin, tähtäys, jännitys, kaksi osumaa jänikseen,
-  ohilaukaus säikäytti jäniksen, lihan ja nuolten poiminta, inventaarion kuvake, näppäinlista. Konsoli
-  puhdas. `bun run test` (380/380), `bunx tsc --noEmit`, `bun run lint`, `bun run build` läpi.
-  Piirto `__game.renderBench()`: 2,5–6 ms/ruutu 1024×768 kotikoneella (~150 piirtokutsua, 1,35–1,7 milj.
-  kolmiota varjoineen); tähtäys lisää 6 kutsua. Peliläppärillä ei mitattu.
+- **Koodiversio v06.05.00** branchissa `claude/enemy-reaction-variety` (tarkista merge-tila `git merge-base`illa).
+  Koodi valmis, ei deployattu, omistaja ei ole käsin testannut. Claude ajoi aukiolla `__game.step`illä
+  (moduulit konsoliin `import('/src/engine/state.ts')`): 150 lyöntiä; edessä olevien torjunta nousi
+  0,05–0,18 s noston alusta, kahden torjujan ero keskim. 0,05 s, sivulla oleva ei torjunut. Etenevä nosto
+  osui 1,4 m/s peruuttavaan, ei 3,4 m/s. Konsoli puhdas. `bunx vitest run --dir src` (391/391; juuresta
+  `bun run test` poimii myös työpuiden testit), `bunx tsc --noEmit`, `bun run lint`, `bun run build` läpi.
+- **Vihollisen torjuntareaktio ja etenevä nosto (v06.05, `engine/ai.ts`, säännöt `combat.ts`).** Pelaajan
+  noston aikana kukin vastustaja, joka on `threatenedBy` (iskun kaari + `ENEMY_AI.threatMargin` 25°) ja alle
+  3,2 m:n päässä, arpoo torjunnan kerran iskua kohti; nousu ajastetaan `ai.blockAt`iin viiveellä
+  `blockReactionDelay` (0,03–0,16 s, katkaistu niin, että `BLOCK_RAISE` ehtii ennen `timeToImpact`ia; muuten
+  ei torjuta). Odottava ei aloita omaa iskua, ja odotus raukeaa tilan vaihtuessa. `BLOCK_RAISE` (s, 85 %
+  valmis) määrää myös torjunta-asennon animaationopeuden `blockPoseRate` kaikille saman varustuksen
+  kantajille, myös sankarille. Iskun alussa `rollsAdvance` (45 %, ei kilpityöntö) asettaa `ai.advance`:
+  noston aikana astutaan katseen suuntaan `advanceScale` 0,6 × kävely, kun `advancesInWindup` (pelaaja yli
+  `range − advanceKeep` 0,6 m ja alle 50° sivulla). Paneelissa vain `advanceChance` ja `advanceScale`.
 - **Metsästys (v06.04, `src/hunt/` puhdas + `engine/hunt.ts`).** Vain `HUNTING` = erämaa. Toiminto `bow`
   (oletus X, sidottavissa) ottaa jousen esiin rauhassa; vihollinen pakottaa sen pois. Jousi esillä:
   `strikeHeld.slash` (vasen) jännittää, `blockHeld` (oikea) tähtää, ja jännitys tähtää aina; oikea painike
@@ -59,11 +66,9 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `6218fc1`)
 - **Metsä (`src/forest.ts`).** Kaikki puut piirtää `Forest`: alle `nearR`:n täysi malli varjoineen,
   kauempana `forest_lod.glb`:n kaukopuu; vaihto 5–6 m:n kaistalla vastakkaisilla Bayer-pikselikuvioilla
   (`aFade`-attribuutti, kloonatut materiaalit). Lista kootaan, kun pelaaja liikkuu 0,8 m. Aukioilla
-  `nearR` 48 (reunametsä pysyy täytenä), erämaassa 38 ja `farR` 135 (sumu). Kaukopuiden sävy korjataan
-  `LOD_TINT`illä ja `M_BarkLOD` × 0,62 (BLENDER_HANDOFF). Horisonttisuikaleet (`metsaseina`): aukioilla
-  kehä 84 m (rannoilla vain maan puolella), erämaassa neliö ±178 m. Varjokamera ja taivaspallo seuraavat
-  pelaajaa/kameraa (varjo napsautetaan tekseleihin). Konsoli: `__world.forest`, `__world.forestNear(r)`,
-  `__game.drawLoad()`, `__game.ground(x, z)`.
+  `nearR` 48, erämaassa 38 ja `farR` 135 (sumu). Kaukopuiden sävy `LOD_TINT` (BLENDER_HANDOFF).
+  Horisonttisuikaleet (`metsaseina`): aukioilla kehä 84 m, erämaassa neliö ±178 m. Varjokamera ja taivas
+  seuraavat pelaajaa. Konsoli: `__world.forest`, `__world.forestNear(r)`, `__game.drawLoad()`.
 - **Kamera metsässä.** `CollisionWorld.firstCameraHit` + `blocksCamera` (puut, kota, karsikko, juurakko,
   rakennukset): kamera vetäytyy rungon eteen heti ja palaa hitaasti. `engine/foliageFade.ts`: lehvästö
   häipyy kuvioiden alle 2,2 m:n päässä kamerasta ja harvenee 80 % kameran ja sankarin rinnan välisellä
@@ -148,17 +153,11 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `6218fc1`)
   tuohikontti on tavallinen yhden kappaleen esine.
 - **Kalmisto `cairnfield`** (friendly; Esc-oikotie, aloitusvalikko, `?scene=cairnfield`, karttapaikka ruutu
   16,16). `world.ts`: `CAIRN`-lippu; `LAKE` = `LAKESIDE || CAIRN` (vesi, kaukoranta, rantakaista). Maasto on
-  kallionokka (`terrainHeight`, `shoreZ` z ≈ 21). Sijoittelu vakioina `world.ts`:n alussa: `CUPSTONE`,
-  `CAIRNS_AT`, `KARSIKKO`, `LOUHI_AT`, `DARK_SOIL` (canvas-läikät). Mallit `cairnfield.glb`:stä, törmäykset
-  `PROP_COLLIDERS`ista. Louhi `populateCairnLife`issa (`folk.louhi`), vesilintu `buildLoon`. Ääni:
-  `Sfx.birds` tasolla `birdSongLevel` (vain kalmistolla). Tarkistettu 60 FPS:ssä in-app; törmäyksiä vasten
-  kävelyä ja ääntä ei ole tarkistettu.
-- **Taisteluvaraukset (Louhi suohon):** kuppikiven ympärillä on röykkeistä vapaa
-  noin 5 m:n alue, ja suoloitsun efekti (`bog`, `effects.ts`) on jo olemassa. Puuttuu
-  vielä vihollistyyppi `louhi` (nyt vain NPC), hänen taistelumalli ja animaatiot
-  (kävely, kädet ylös) sekä `Encounter`, joka vaihtaa `cairnfieldVisit`in taisteluun.
-  `ARENA_RADIUS` 11 m kattaa kuppikiven ja neljä röykkiötä; karsikko ja Louhi ovat
-  sen ulkopuolella.
+  kallionokka (`terrainHeight`, `shoreZ` z ≈ 21). Sijoittelu vakioina `world.ts`:n alussa (`CUPSTONE`,
+  `CAIRNS_AT`, `KARSIKKO`, `LOUHI_AT`, `DARK_SOIL`). Louhi `populateCairnLife`issa, ääni `Sfx.birds`.
+  Törmäyksiä vasten kävelyä ja ääntä ei ole tarkistettu.
+- **Taisteluvaraukset (Louhi suohon):** kuppikiven ympärillä on noin 5 m:n vapaa alue ja suoloitsun efekti
+  (`bog`). Puuttuu vihollistyyppi `louhi`, taistelumalli ja animaatiot sekä `Encounter` kalmiston taisteluun.
 - **Rauhan kävely ja eleet** (`fighter.ts`, `interact.ts`, `engine/{hero,melee,animate}.ts`): rauhassa
   (`heroAtPeace`) iskunappi = `talk`, torjuntanappi = `use`; eleet ovat `gesturePose()`-avainkehyksiä ja
   vaikutus ratkeaa `gestureEffect`issä (`TALK_ZONE` 2,3 m / ±60°). Puhuteltava väki `world.ts`:n `solid()`ista.
@@ -185,12 +184,8 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `6218fc1`)
   moottorin. Kartta ei pyydä GLB-tiedostoja eikä aja 3D-silmukkaa.
 - **2D-maailmankartta** (`src/map/app.ts`) on Canvas 2D -näkymä: 20 × 20
   ruudun maailma, 48 × 48 px:n tiilet ja 17 × 13 ruudun kamera
-  (816 × 624 px). 1135 px leveässä testinäkymässä canvas oli noin 798 px.
-  Sankarin ruutu ja kaikki kahdeksan naapuria paljastuvat pysyvästi. Vain tämä
-  nykyinen 3 × 3 -alue on kirkas; aiemmin löydetty terrain näkyy sumutettuna,
-  ja löydetyt kiinteät paikat näkyvät siinä himmeinä. Tuntematon paikka tai
-  liikkuva kohtaaminen ei näy sumun läpi. WASD/nuolet liikuttavat vain neljään
-  pääilmansuuntaan.
+  (816 × 624 px). Näkyvyys: ks. Pysyvät päätökset. WASD/nuolet liikuttavat vain
+  neljään pääilmansuuntaan.
 - **Karttadata ja säännöt** ovat puhtaassa `src/map/domain.ts`:ssä. Kuusi
   aiempaa maastoa (niitty, metsä, umpimetsä, suo, kallio ja vesi) sekä uusi
   joki. Kohderuudun `minuteCost` lisää maailmanaikaa; estynyt liike ei kuluta
@@ -202,10 +197,7 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `6218fc1`)
   Kohderuudun kulku: niitty 1/6 päivää, metsä 1/4, umpimetsä 1/3, kallio 1/2, suo 0,7 ja silta
   0,4 päivää. Kylläisyys vähenee 3,6 pistettä päivässä (niittyliike 0,6); 100 → 0 kestää noin 28
   päivää ilman ruokaa. Arvo ei tapa tai estä liikkumista. Kuun kuva näyttää kahdeksan vaihetta;
-  tavallinen liike ei näytä kustannusta.
-  Viisi numerotonta kasvokuvaa:
-  80–100 oikein kylläinen, 60–alle 80 kylläinen, 40–alle 60 puolivatsainen,
-  yli 20–alle 40 nälkäinen, 0–20 nääntynyt.
+  tavallinen liike ei näytä kustannusta. Viisi numerotonta kasvokuvaa 20 pisteen portain.
 - **Kampanjatallennus** (`campaign.ts`, `storage.ts`) käyttää skeemaa 6 ja
   avainta `laulun-miekka.campaign.v6`. Terrain-muisti ja `knownSiteIds` säilyvät erikseen.
   Vanhat hunger-, sukupuoli-, maailmanesine- ja virtuaalivarustetiedot migroidaan häviöttömästi;
@@ -213,9 +205,8 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `6218fc1`)
   `validWorldTime`illa**, ei kokonaislukuna (kartan aika on murtolukuja).
 - **Matkan asetukset.** Esc-dialogissa ovat FI/GB-kieli, sukupuoli, vahvistettava uudelleenaloitus
   ja 3D-oikotiet kohtaustyyppeineen. Mies on uuden ja migroidun kampanjan oletus.
-- **Paikat.** `sites.ts` omistaa liikkumisen (`fixed|mobile`), elinkaaren
-  (`persistent|temporary`), sijainnin ja `sceneId`-kytkennän. Nykyiset paikat ovat
-  `fixed+persistent`; kaksi pihainstanssia käyttää samaa 3D-sceneä.
+- **Paikat.** `sites.ts` omistaa liikkumisen, elinkaaren, sijainnin ja `sceneId`-kytkennän; nykyiset
+  ovat `fixed+persistent`, ja kaksi pihainstanssia käyttää samaa 3D-sceneä.
 - **2D↔3D-sillat.** `transition.ts` vähentää nälkäisessä taistelussa HP- ja staminakattoa 20,
   nääntyneenä 40; vaikutus on idempotentti eikä koske ystävällisiä kohtauksia. Paluukuorma
   `laulun-miekka.scene-return.v1` kulutetaan kerran; `rewards` on vielä tyhjä varaus.
@@ -224,8 +215,7 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `6218fc1`)
   Naisella ovat `paper-doll-hero.png`, `satiety-faces.png` ja nelisuuntainen
   `map-hero-female.png`; sininen viitta erottaa hänet kartalla. Miehellä ovat
   `paper-doll-hero-male.png`, `satiety-faces-male.png` ja atlaksen nykyiset
-  neljä sankariruutua. Paperinuket ovat 256 × 384, kasvot 480 × 96 ja
-  karttaspritet 48 px. Valinta vaihtaa kaikki kolme 2D-esitystä heti.
+  neljä sankariruutua. Valinta vaihtaa kaikki kolme 2D-esitystä heti.
 - **3D-moottori.** Rauhassa miekka on huotrassa, kilpi selässä ja kypärä poissa;
   taistelu palauttaa varustuksen. Keihäs pysyy kädessä. Assettiriskit: `BLENDER_HANDOFF.md`.
 - **Taistelun stamina-arvot:** kevyt isku 6, raskas isku 12, toteutunut
@@ -270,7 +260,10 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `6218fc1`)
 - Kartta–3D-siirtymä lataa sivun uudelleen. Samassa ajossa mount/dispose
   vaatisi scene/world-singletonien laajemman elinkaarirefaktoroinnin.
 - 3D-taistelun tasapainoa ei ole kattavasti pelitestattu. Suuntatorjunta,
-  keihään kantama, usean vastustajan rytmi ja nuotion vahinko ovat arvioita.
+  keihään kantama, usean vastustajan rytmi, etenevä nosto ja nuotion vahinko ovat arvioita.
+- Torjunta ratkeaa yhä tilan (`block`) eikä asennon mukaan: hetken vielä nouseva asento torjuu. Keihäsmiehen
+  hitaampi torjunta-animaatio (tulossa) tehdään suurentamalla `BLOCK_RAISE.spear`ia, joka hidastaa myös
+  keihästä kantavaa sankaria; jos vain vihollisen pitää hidastua, erota arvot silloin.
 - Rauhallisen pihan väki ei reagoi taisteluun. Eläinten ja kyläläisten
   mallikohtaiset avoimet asiat ovat `docs/BLENDER_HANDOFF.md`:ssä.
 - Järven rannan vesi on yksinkertainen: ei rantavaahtoa, syvyysväriä eikä
@@ -299,9 +292,10 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `6218fc1`)
 
 ## Seuraava tehtävä
 
-Omistaja testaa metsästyksen (v06.04) erämaassa hiirellä: tähtäyksen tuntuma (kamera, tähtäin, putoama),
-jäniksen pakoetäisyys 12 m ja poiminta. Palautteen perusteella viritetään `ARCHERY`- ja `SPECIES.hare`-arvot.
-Sen jälkeen jäniksen, jousen ja nuolen Blender-mallit (BLENDER_HANDOFF). Samalla pihan ruoan luvaton otto ei saa enää nollata matkaa (v06.03.01).
+Omistaja pelitestaa v06.05:n aalloissa 3–5 (useampi vihollinen): näyttääkö torjunta luontevalta, ja onko
+etenevä nosto sopivan vaarallinen. Viritys paneelista (`advanceChance`, `advanceScale`) tai `ENEMY_AI`-arvoista.
+Metsästyksen (v06.04) käsitesti on yhä tekemättä (`ARCHERY`, `SPECIES.hare`), samoin jäniksen, jousen ja
+nuolen Blender-mallit (BLENDER_HANDOFF).
 
 ## Ei vielä aloiteta
 

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { ENEMY_AI, STYLES, StrikeStyle, StrikeWeight, angleBetween, canStrikeHeavy, exhausted, makeAttack, mayStartAttack, shouldShieldBash, styleFor, turnToward } from "../combat";
+import { BLOCK_RAISE, ENEMY_AI, STYLES, StrikeStyle, StrikeWeight, advancesInWindup, angleBetween, blockReactionDelay, canStrikeHeavy, exhausted, makeAttack, mayStartAttack, rollsAdvance, shouldShieldBash, styleFor, threatenedBy, timeToImpact, turnToward } from "../combat";
 import { Actor, setState } from "./actor";
 import { bearing } from "./camera";
 import { moveActor, startAttack } from "./melee";
@@ -14,9 +14,13 @@ export interface Ai {
   seen: THREE.Vector3;
   /** Metsästä saapuva saa olla kuljettavan alueen ulkopuolella tähän pelin aikaan asti (−1 = ei saavu). */
   arriveUntil: number;
+  /** Päätetty torjunta nousee tällä pelin hetkellä (oma reaktioviive; −1 = ei odottavaa torjuntaa). */
+  blockAt: number;
+  /** Tämän iskun noston aikana astutaan perääntyvän pelaajan perään (arvottu iskun alussa). */
+  advance: boolean;
 }
 
-export function newAi(): Ai { return { decide: 1.2, strafeDir: Math.random() < 0.5 ? 1 : -1, reactedTo: -1, counter: false, reorient: false, resting: false, seen: g.player.pos.clone(), arriveUntil: -1 }; }
+export function newAi(): Ai { return { decide: 1.2, strafeDir: Math.random() < 0.5 ? 1 : -1, reactedTo: -1, counter: false, reorient: false, resting: false, seen: g.player.pos.clone(), arriveUntil: -1, blockAt: -1, advance: false }; }
 // Tekoälyn luvut ovat taulukossa ENEMY_AI (combat.ts).
 
 
@@ -61,6 +65,8 @@ function hasTurn(e: Actor) {
 
 function beginAttack(e: Actor, kind: StrikeStyle | "bash", weight: StrikeWeight) {
   startAttack(e, kind, weight);
+  // Jokainen arpoo itse, astuuko tämän iskun noston aikana perääntyvän pelaajan perään.
+  if (e.ai) e.ai.advance = rollsAdvance(kind, Math.random());
   lastAttacker = e;
   attackFreeAt = g.gameTime + e.timing.windup + e.timing.release + ENEMY_AI.attackGap;
 }
@@ -88,13 +94,27 @@ export function updateAi(e: Actor, dt: number) {
     e.yaw = turnToward(e.yaw, facing, e.stats.turnSpeed * DEG * (busy ? ENEMY_AI.attackTurnScale : 1) * dt);
   }
 
+  // Odottava torjunta raukeaa, jos vastustaja ehti sillä välin lyödä, horjahtaa tai juuttua suohon.
+  if (e.state !== "idle") ai.blockAt = -1;
+
   if (e.state === "idle" && ai.reorient) {
     e.moveSpeed = 0;
   } else if (e.state === "idle") {
-    // Reagoi pelaajan nostoon: torju joskus.
-    if (g.player.state === "windup" && ai.reactedTo !== g.playerAttackId && dist < 3.2) {
+    // Reagoi pelaajan nostoon: torju joskus. Vain iskun edessä oleva harkitsee torjuntaa, ja jokainen
+    // arpoo oman reaktioviiveensä, jotta ryhmän kilvet eivät nouse samassa ruudussa. Sivussa oleva
+    // jatkaa liikettä ja voi aloittaa oman iskunsa; jos pelaaja kääntyy häntä kohti, hän reagoi silloin.
+    const threatened = threatenedBy(angleBetween(g.player.yaw, bearing(g.player.pos, e.pos)), g.player.attack.arc);
+    if (g.player.state === "windup" && ai.reactedTo !== g.playerAttackId && dist < 3.2 && threatened) {
       ai.reactedTo = g.playerAttackId;
-      if (!exhausted(e.stamina) && Math.random() < blockChance(e)) {
+      const delay = !exhausted(e.stamina) && Math.random() < blockChance(e)
+        ? blockReactionDelay(timeToImpact(g.player.stateTime, g.player.timing), BLOCK_RAISE[e.loadout], Math.random())
+        : null;
+      if (delay !== null) ai.blockAt = g.gameTime + delay;
+    }
+    if (ai.blockAt >= 0 && g.gameTime >= ai.blockAt) {
+      ai.blockAt = -1;
+      const playerBusy = g.player.state === "windup" || g.player.state === "release";
+      if (playerBusy && !exhausted(e.stamina)) {
         setState(e, "block");
         // Aseella torjuva arvaa iskun suunnan: myöhemmillä aalloilla useammin oikein.
         const real = g.player.attack.kind === "bash" ? "slash" : g.player.attack.kind;
@@ -139,7 +159,8 @@ export function updateAi(e: Actor, dt: number) {
 
     ai.decide -= dt;
     // Lepäävä vastustaja ei hyökkää, ellei pelaaja tule iholle.
-    const mayAttack = turn && (!ai.resting || dist < ENEMY_AI.restCornered);
+    // Torjuntaa odottava ei aloita samalla omaa iskuaan.
+    const mayAttack = turn && ai.blockAt < 0 && (!ai.resting || dist < ENEMY_AI.restCornered);
     const counter = ai.counter && mayAttack ? pickEnemyAttack(e, dist, true) : null;
     if (counter) {
       ai.counter = false;
@@ -150,6 +171,10 @@ export function updateAi(e: Actor, dt: number) {
       const pick = mayAttack ? pickEnemyAttack(e, dist) : null;
       if (pick && g.player.state !== "dead" && Math.random() < ENEMY_AI.attackChance) beginAttack(e, pick.kind, pick.weight);
     }
+  } else if (e.state === "windup" && advancesInWindup(ai.advance, dist, e.attack.range, angleBetween(e.yaw, bearing(e.pos, g.player.pos)))) {
+    // Etenevä nosto: perääntyvän pelaajan perään astutaan katseen suuntaan hitaammin kuin pelaaja kävelee.
+    // Sivulle kiertäminen pysäyttää etenemisen (advanceArc), ja kantaman sisällä seistään paikallaan.
+    moveActor(e, new THREE.Vector3(Math.sin(e.yaw), 0, Math.cos(e.yaw)), e.stats.moveSpeed * ENEMY_AI.advanceScale, dt);
   } else {
     e.moveSpeed = 0;
   }

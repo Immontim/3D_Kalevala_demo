@@ -213,6 +213,22 @@ export const ENEMY_AI = {
   bashChance: 0.12,
   /** Vastaisku torjunnan jälkeen. */
   counterChance: 0.55,
+  /**
+   * Torjunnan reaktioviive (s): jokainen vastustaja arpoo oman viiveensä jokaiseen pelaajan iskuun,
+   * jotta kilvet eivät nouse yhtä aikaa. Yläraja lyhenee, jos asento ei muuten ehtisi nousta (BLOCK_RAISE).
+   */
+  blockDelayMin: 0.03,
+  blockDelayMax: 0.16,
+  /** Vastustaja torjuu vain, jos se on pelaajan iskun kaaressa tai enintään näin monta astetta sen ulkopuolella. */
+  threatMargin: 25,
+  /** Etenevä nosto: osuus iskuista, joiden noston aikana vastustaja astuu perääntyvän pelaajan perään. */
+  advanceChance: 0.45,
+  /** Etenevän noston nopeus vastustajan omasta kävelynopeudesta. */
+  advanceScale: 0.6,
+  /** Eteneminen loppuu, kun pelaaja on näin paljon (m) iskun kantaman sisäpuolella. */
+  advanceKeep: 0.6,
+  /** Eteneminen vain, jos pelaaja on enintään näin monta astetta katseen sivulla: kiertäminen auttaa yhä. */
+  advanceArc: 50,
   /** Uupunut vetäytyy tälle etäisyydelle, kunnes kestävyyttä on taas restUntil; lyö silti, jos pelaaja tulee restCornered lähemmäs. */
   restUntil: 12,
   restDistance: 3.8,
@@ -586,4 +602,49 @@ export function angleBetween(a: number, b: number): number {
  */
 export function mayStartAttack(othersStriking: boolean, now: number, freeAt: number, lastWasOwn: boolean): boolean {
   return !othersStriking && (lastWasOwn || now >= freeAt);
+}
+
+/**
+ * Torjunta-asennon nousuaika (s) varustuksen mukaan: aika, jossa asento on BLOCK_RAISE_DONE-osuudelta valmis.
+ * Asennon animaationopeus johdetaan tästä (blockPoseRate), joten luku ja kuva pysyvät samassa tahdissa.
+ * Keihäsmiehen tuleva oma torjunta-animaatio saa olla hitaampi: suurenna keihään arvoa, niin
+ * hän ehtii nopeita iskuja vastaan harvemmin (blockReactionDelay palauttaa null).
+ * Koskee kaikkia saman varustuksen kantajia, myös keihästä kantavaa sankaria.
+ */
+export const BLOCK_RAISE: Record<Loadout, number> = { sword: 0.086, sword_shield: 0.086, spear: 0.086 };
+export const BLOCK_RAISE_DONE = 0.85;
+
+/** Torjunta-asennon animaationopeus (eksponentiaalinen lähestyminen), joka valmistuu BLOCK_RAISE-ajassa. */
+export function blockPoseRate(loadout: Loadout): number {
+  return -Math.log(1 - BLOCK_RAISE_DONE) / BLOCK_RAISE[loadout];
+}
+
+/** Pelaajan iskun aikaisin mahdollinen osumahetki (s nyt): kevyt isku laukeaa aikaisintaan oman nostonsa jälkeen. */
+export function timeToImpact(stateTime: number, t: AttackTiming): number {
+  return Math.max(0, t.windup - stateTime) + t.release * COMBAT.strikePoint;
+}
+
+/**
+ * Vastustajan torjuntareaktion viive (s), tai null, jos asento ei ehtisi nousta ennen osumaa.
+ * `roll` on vastustajan oma arpa (0–1), jotta ryhmän kilvet eivät nouse samaan aikaan.
+ */
+export function blockReactionDelay(impactIn: number, raise: number, roll: number): number | null {
+  const latest = Math.min(ENEMY_AI.blockDelayMax, impactIn - raise);
+  if (latest < ENEMY_AI.blockDelayMin) return null;
+  return ENEMY_AI.blockDelayMin + roll * (latest - ENEMY_AI.blockDelayMin);
+}
+
+/** Onko vastustaja pelaajan iskun edessä: iskun kaaressa tai enintään threatMargin-asteen päässä siitä. */
+export function threatenedBy(angleFromAttacker: number, arc: number): boolean {
+  return Math.abs(angleFromAttacker) <= arc + ENEMY_AI.threatMargin * Math.PI / 180;
+}
+
+/** Arvotaanko iskusta etenevä nosto. Kilpityöntö on lähiliike eikä etene. */
+export function rollsAdvance(kind: StrikeStyle | "bash", roll: number): boolean {
+  return kind !== "bash" && roll < ENEMY_AI.advanceChance;
+}
+
+/** Astuuko etenevää nostoa tekevä vastustaja tällä ruudulla: pelaaja on kantaman reunalla ja edessä. */
+export function advancesInWindup(advancing: boolean, distance: number, range: number, angleToPlayer: number): boolean {
+  return advancing && distance > range - ENEMY_AI.advanceKeep && Math.abs(angleToPlayer) < ENEMY_AI.advanceArc * Math.PI / 180;
 }
