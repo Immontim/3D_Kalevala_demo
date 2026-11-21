@@ -6,8 +6,23 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-21 (Codex, Windows; pohja main b2c04bc)
+Päivitetty: 2026-11-21 (Claude, Windows; pohja main 8fc9397)
 
+- **Metsän LOD- ja reuna-assetit** (`assets/forest_lod.glb`, 1,6 Mt; `assets-src/blender/forest_lod.py`,
+  branch `claude/terrain-assets`, tarkista merge-tila). Peli ei vielä lataa tiedostoa. Skripti lukee
+  valmiin `forest.glb`:n, joten `forest_clearing.blend`iä ei tarvita; ajo taustalla noin 2 min
+  (`blender --background --factory-startup --python ...`, `KALEVALA_PREVIEW=1` kirjoittaa vertailukuvat
+  `assets-src/cards/lod_preview/`, joka ei ole Gitissä). Solmut, mitat ja suunnat ovat skriptin alussa:
+  - `<puu>_lod1` kahdeksalle puulle, 59–92 kolmiota (täydet 1 000–2 800): kevennetty päärunko
+    (`M_BarkLOD`, kaarnan keskiväri verteksiväreinä) + kolme ristikkäistä kuvakorttia 60°:n välein.
+    Kortit ovat valaisemattomia ortokuvia puusta ilman päärunkoa (kalteva runko ei tuplaannu).
+    Atlas 2048², 256 × 512 px korttia kohti (`M_FoliageLOD`, glTF MASK, sama mittakaava ja origo kuin
+    täydellä puulla).
+  - `metsaseina`: 80 × 20 m:n horisonttisuikale samassa atlaksessa (rivi 4), laatoittuu vaakasuunnassa.
+  - `juurakko`: kaatuneen puun juurilevy (2 230 kolmiota, `M_Soil` = maaston dirt-tekstuuri,
+    juuret `M_Log`) ja +Y:hen laskeva runkotynkä kelon (`log`) tyveksi.
+  - Katsottu Blenderin Cycles-kuvista 70 m:n päästä kahdesta kulmasta täyden puun rinnalla ja
+    reunanäkymänä. Pelissä katsomatta: valaistus ja sävy suhteessa täysiin puihin, LOD-vaihdon näkyvyys.
 - **Mainissa** ovat `assets/forest.glb`,
   `characters.glb`, `bog.glb`, `homestead.glb`, `household.glb`,
   `yard.glb`, `villagers.glb`, `villagers_f.glb` ja `assets/animals/`.
@@ -207,7 +222,13 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja main b2c04bc)
   kävellessä reiden ja helman läpi. Selässä kilven kädensija painuu hieman
   panssariin ja sankarin pitkät hiukset menevät kilven läpi. Kantohihna
   kulkee selässä kilven alla, ei kiinnity kilpeen.
-- Blender-skriptien polut on kovakoodattu (`C:\Data\3D Kalevala`).
+- Blender-skriptien polut on kovakoodattu (`C:\Data\3D Kalevala`), paitsi `forest_lod.py`.
+- Kaukopuiden kortit ovat valaisemattomia albedokuvia ilman itsevarjostusta: Cycles-kuvissa ne ovat
+  hieman vaaleampia ja litteämpiä kuin täydet puut. Jos ero näkyy pelissä LOD-rajalla, tummenna kuvia
+  skriptissä (`bake_material`) tai lisää kortteihin sävyliukuma. Kuvat on otettu kolmesta suunnasta,
+  joten suoraan kortin suuntaisesti katsottuna kaksi muuta korttia näyttävät puun hieman leveämpänä.
+- `forest_lod.glb` sisältää omat kopiot `M_Log`- ja dirt-tekstuureista (noin 0,8 Mt), koska tiedostot
+  eivät jaa materiaaleja.
 
 ## Koodin väliaikaiset korvikkeet (odottavat malleja)
 
@@ -216,11 +237,14 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja main b2c04bc)
 
 ## Seuraava Blender-tehtävä
 
-Ei avointa Blender-tehtävää. Modulaariset osat ja `sword_sky_iron` on integroitu; legacy-hahmot voi poistaa
-vasta omistajan käsisavutestin jälkeen (säästää noin 1,7 Mt kummassakin). Muuta: sormien viimeistely,
-koiran kävelyleike, istuva tietäjä ja loukkaantuneen jousineidon asento.
+Ei avointa Blender-tehtävää ennen kuin metsän koodivaihe (tilkut ja LOD-renkaat, ks. AGENT_HANDOFF)
+on katsonut `forest_lod.glb`:n pelissä; sen jälkeen mahdollinen kaukopuiden sävyn viritys. Muuta:
+legacy-hahmojen poisto omistajan käsisavutestin jälkeen (säästää noin 1,7 Mt kummassakin), sormien
+viimeistely, koiran kävelyleike, istuva tietäjä ja loukkaantuneen jousineidon asento.
 
 ## Ei vielä aloiteta
 
 - Isännän malli.
+- Kuvakortti-impostorit (useita kulmia) tai uudet LOD-tasot ennen kuin `forest_lod.glb` on mitattu pelissä.
+- Metsästyksen assetit (jänis, jousi aseena, nuolet, nuoliviini) ennen perusta- ja metsävaihetta.
 - Dialogianimaatiot ennen omistajan palautetta rauhallisesta pihasta.
