@@ -102,8 +102,10 @@ describe("paikkainstanssit kampanjassa", () => {
   it("uusi matka tallentaa siemenen ja konkretisoidut pihat, jotka säilyvät tallennuksen läpi", () => {
     const state = newCampaign(777);
     expect(state.world.worldSeed).toBe(777);
-    expect(state.world.siteInstances).toEqual(newSiteInstances(777));
-    expect(state.world.siteInstances.map((i) => i.kind)).toEqual(["yard", "yard", "camp"]);
+    // Metsästysapajat (kind "hunt") testataan huntGrounds.test.ts:ssä.
+    const fixed = state.world.siteInstances.filter((i) => i.kind !== "hunt");
+    expect(fixed).toEqual(newSiteInstances(777));
+    expect(fixed.map((i) => i.kind)).toEqual(["yard", "yard", "camp"]);
     expect(parseCampaign(serializeCampaign(state))?.world.siteInstances).toEqual(state.world.siteInstances);
     expect(parseCampaign(serializeCampaign(state))?.world.worldSeed).toBe(777);
   });
@@ -131,7 +133,7 @@ describe("paikkainstanssit kampanjassa", () => {
     const old = createCampaign();                              // ei instansseja, siemen 0
     const done = completeSiteInstances(old, 4242);
     const [a, b] = done.world.siteInstances;
-    expect(done.world.siteInstances.map((i) => i.id)).toEqual(["yard", "yard-b", "camp"]);
+    expect(done.world.siteInstances.filter((i) => i.kind !== "hunt").map((i) => i.id)).toEqual(["yard", "yard-b", "camp"]);
     expect(a).toEqual({ id: "yard", kind: "yard", x: LEGACY_YARD_POSITION.x, y: LEGACY_YARD_POSITION.y, archer: true });
     expect(b).toMatchObject({ id: "yard-b", archer: false });
     expect(done.world.worldSeed).toBe(4242);
@@ -145,7 +147,7 @@ describe("paikkainstanssit kampanjassa", () => {
     const partial = createCampaign({ worldSeed: 31, siteInstances: [{ id: "yard-b", kind: "yard", x: 8, y: 9, archer: true }] });
     const done = completeSiteInstances(partial, 1);
     expect(done.world.worldSeed).toBe(31);
-    expect(done.world.siteInstances.map((i) => i.id).sort()).toEqual(["camp", "yard", "yard-b"]);
+    expect(done.world.siteInstances.filter((i) => i.kind !== "hunt").map((i) => i.id).sort()).toEqual(["camp", "yard", "yard-b"]);
     expect(done.world.siteInstances.find((i) => i.id === "yard-b")).toEqual({ id: "yard-b", kind: "yard", x: 8, y: 9, archer: true });
     expect(done.world.siteInstances.filter((i) => i.archer)).toHaveLength(1);
     expect(PROTOTYPE_START).toBeDefined();

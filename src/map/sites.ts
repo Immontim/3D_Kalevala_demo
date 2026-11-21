@@ -58,15 +58,16 @@ export const CAMP_REQUIRES_FLAG = "louhi.banished";
 /**
  * Instanssin 2D-metadata: sama kohtaus ajetaan jokaiselle instanssille omilla parametreillaan.
  * Piha avaa `yard`-kohtauksen; vainolaisten leiri (punainen käsi) avaa `clearing`-taistelun ja on lukossa.
+ * Metsästysapaja avaa erämaan ja on kertakäyttöinen (huntGrounds.ts).
  */
 export function instanceSiteDefinition(instance: SiteInstance): MapSiteDefinition {
   return {
     id: instance.id,
     mapId: "kalevala-prototype",
     position: { x: instance.x, y: instance.y },
-    sceneId: instance.kind === "camp" ? "clearing" : "yard",
+    sceneId: instance.kind === "camp" ? "clearing" : instance.kind === "hunt" ? "wilds" : "yard",
     movement: "fixed",
-    lifetime: "persistent",
+    lifetime: instance.kind === "hunt" ? "temporary" : "persistent",
     ...(instance.kind === "camp" ? { requiresFlag: CAMP_REQUIRES_FLAG } : {}),
   };
 }

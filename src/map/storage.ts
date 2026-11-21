@@ -1,5 +1,6 @@
 import { createCampaign, parseCampaign, serializeCampaign, type CampaignState } from "./campaign";
 import { PROTOTYPE_MAP_ID, PROTOTYPE_START } from "./prototype";
+import { ensureHuntGrounds } from "./huntGrounds";
 import { completeSiteInstances, newSiteInstances } from "./siteInstances";
 import { legacyKnownSiteIds } from "./sites";
 import { VERSION } from "../version";
@@ -48,12 +49,13 @@ export function randomSeed(): number {
 
 /** Uusi matka: pihapiirit arvotaan siemenestä ja tallennetaan konkretisoituina. */
 export function newCampaign(seed: number = randomSeed()): CampaignState {
-  return createCampaign({
+  // Metsästysapajat arvotaan pihojen ja leirin jälkeen, jotta ne väistävät niitä.
+  return ensureHuntGrounds(createCampaign({
     mapId: PROTOTYPE_MAP_ID,
     ...PROTOTYPE_START,
     worldSeed: seed,
     siteInstances: newSiteInstances(seed),
-  });
+  }));
 }
 
 function compatible(state: CampaignState): boolean {

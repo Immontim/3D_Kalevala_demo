@@ -132,6 +132,12 @@ Kalmiston karttaikoni (48 × 48). Johdettu omistajan ImageGen-kuvasta
 (kuppikivi ja Louhi), pienennetty ja värikvantisoitu kartan ikonipalettiin.
 Ei ulkopuolisia lähteitä.
 
+## `map/hunt-site.png`
+
+Metsästysapajan karttaikoni (48 × 48): kalliomaalaustyylinen jousimies ja jänis.
+Claude piirsi sen koodilla (Pillow) kalmistoikonin neljän värin paletilla.
+Ei ulkopuolisia lähteitä.
+
 ## `household.glb`
 
 | Pelin malli | Lähde (Poly Haven -tunniste, CC0) | Käyttö |

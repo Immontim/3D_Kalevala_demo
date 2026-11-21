@@ -100,13 +100,16 @@ describe("kampanjan selainvarasto", () => {
 
     const migrated = loadCampaign(storage);
     // Vanha tallennus ei tunne pihainstansseja: kiinteä piha "yard" säilyy, "yard-b" arvotaan kerran.
-    expect(migrated.world.siteInstances.map((i) => i.id)).toEqual(["yard", "yard-b", "camp"]);
+    // Samalla arvotaan metsästysapajat kerran (huntCycle asettuu nykyiseen jaksoon).
+    expect(migrated.world.siteInstances.filter((i) => i.kind !== "hunt").map((i) => i.id)).toEqual(["yard", "yard-b", "camp"]);
+    expect(migrated.world.siteInstances.filter((i) => i.kind === "hunt").length).toBeGreaterThanOrEqual(3);
     expect(migrated.world.siteInstances[0]).toMatchObject({ x: LEGACY_YARD_POSITION.x, y: LEGACY_YARD_POSITION.y, archer: true });
     expect(migrated.world.worldSeed).toBeGreaterThan(0);
     expect(migrated.world).toEqual({
       ...current.world,
       worldSeed: migrated.world.worldSeed,
       siteInstances: migrated.world.siteInstances,
+      huntCycle: migrated.world.huntCycle,
     });
     // Arvonta tallentui: seuraava lataus ei muuta pihoja.
     expect(loadCampaign(storage).world.siteInstances).toEqual(migrated.world.siteInstances);

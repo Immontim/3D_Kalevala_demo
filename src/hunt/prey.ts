@@ -50,7 +50,8 @@ export const SPECIES: Record<SpeciesId, SpeciesDef> = {
     // Omistajan päätös 2026-11-21: alkuun pako 12 m:stä. Näkö ja kuulo ovat silti erillisiä.
     senses: { sight: { range: 12, fovDeg: 360 }, hearing: { acuity: 1 } },
     alertTime: 0.18,
-    fleeSpeed: 8.5,
+    // Omistajan pelitesti 2026-11-21: pako 20 % hitaammaksi (8,5 → 6,8 m/s), jotta pakenevaan ehtii tähdätä.
+    fleeSpeed: 6.8,
     fleeTime: [2.2, 3.6],
     safeDistance: 24,
     zigAngle: 0.6,

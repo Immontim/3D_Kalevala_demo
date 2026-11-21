@@ -2,6 +2,7 @@ import atlasUrl from "../../assets/map/kalevala-map-atlas-v2.png?url";
 import lakeShoreEdgeUrl from "../../assets/map/lake-shore-edge.png?url";
 import femaleMapHeroUrl from "../../assets/map/map-hero-female.png?url";
 import cairnSiteUrl from "../../assets/map/cairn-site.png?url";
+import huntSiteUrl from "../../assets/map/hunt-site.png?url";
 import redHandUrl from "../../assets/map/red-hand-site.png?url";
 import femaleSatietyFacesUrl from "../../assets/map/satiety-faces.png?url";
 import maleSatietyFacesUrl from "../../assets/map/satiety-faces-male.png?url";
@@ -9,6 +10,7 @@ import { VERSION } from "../version";
 import { getLanguage, setLanguage, t } from "../i18n";
 import { mapUrl, sceneKind, sceneUrl, type SceneId } from "../app/route";
 import { setPlayerGender, type CampaignState, type PlayerGender } from "./campaign";
+import { advanceHuntGrounds, isHuntInstance, removeHuntGround } from "./huntGrounds";
 import { createWorldMapState, mapCell, moveOnMap, type MapDirection } from "./domain";
 import { PROTOTYPE_MAP } from "./prototype";
 import { yardMeadowMap } from "./yardMeadows";
@@ -185,6 +187,8 @@ function move(direction: MapDirection) {
     },
     player: { ...campaign.player, satiety: result.state.satiety },
   };
+  // Aika kului: 20 päivän välein uusi (piilossa oleva) metsästysapaja.
+  campaign = advanceHuntGrounds(campaign, journeyMap);
   setMessage(siteMessage(siteIdAt(journeyMap, campaign.world.siteInstances, result.state.x, result.state.y), ""));
   persistAndRender();
 }
@@ -196,6 +200,7 @@ function siteMessage(siteId: string | undefined, fallback: string) {
   if (scene === "lakeside") return t("map.lakesideFound");
   if (scene === "clearing") return t("map.campfireFound");
   if (scene === "cairnfield") return t("map.cairnfieldFound");
+  if (scene === "wilds") return t("map.huntFound");
   return fallback;
 }
 
@@ -204,17 +209,27 @@ function enterSite() {
   const scene = sceneForMapSite(siteId, campaign.world.siteInstances, campaign.engine.flags);
   // Instanssin tunniste välitetään 3D:lle, jotta sama pihakohtaus saa instanssin omat parametrit.
   const instance = campaign.world.siteInstances.find((entry) => entry.id === siteId);
-  if (scene) openScene(scene, instance?.id);
+  if (!scene) return;
+  // Metsästysapaja on kertakäyttöinen: se kuluu jo lähtiessä, joten paluu kartalle (tai
+  // kohtauksen uudelleenlataus) ei tuo sitä takaisin eikä täytä viiniä uudelleen samassa paikassa.
+  if (instance && isHuntInstance(instance)) {
+    const previous = campaign;
+    campaign = removeHuntGround(campaign, instance.id);
+    if (!openScene(scene, instance.id)) { campaign = previous; renderMap(); }
+    return;
+  }
+  openScene(scene, instance?.id);
 }
 
-function openScene(scene: SceneId, site?: string) {
+function openScene(scene: SceneId, site?: string): boolean {
   if (!saveCampaign(campaign)) {
     const error = t("map.saveFailed");
     setMessage(error);
     document.getElementById("mapSettingsError")!.textContent = settingsOpen ? error : "";
-    return;
+    return false;
   }
   location.href = sceneUrl(location.href, scene, true, site).href;
+  return true;
 }
 
 let endingOpen = false;
@@ -377,6 +392,9 @@ redHand.addEventListener("load", renderMap);
 const cairnSite = new Image();
 cairnSite.src = cairnSiteUrl;
 cairnSite.addEventListener("load", renderMap);
+const huntSite = new Image();
+huntSite.src = huntSiteUrl;
+huntSite.addEventListener("load", renderMap);
 const femaleMapHero = new Image();
 femaleMapHero.src = femaleMapHeroUrl;
 femaleMapHero.addEventListener("load", renderMap);
@@ -468,6 +486,23 @@ function drawCairnSite(ctx: CanvasRenderingContext2D, x: number, y: number) {
   ctx.restore();
 }
 
+function drawHuntSite(ctx: CanvasRenderingContext2D, x: number, y: number) {
+  if (huntSite.complete && huntSite.naturalWidth > 0) {
+    ctx.drawImage(huntSite, x, y, TILE, TILE);
+    return;
+  }
+  // Varakuva: punainen jousi kalpealla pohjalla.
+  ctx.save();
+  ctx.fillStyle = "#e8d6b0";
+  ctx.fillRect(x, y, TILE, TILE);
+  ctx.strokeStyle = "#a7331d";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(x + 30, y + 24, 14, Math.PI * 0.6, Math.PI * 1.4);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function renderMap() {
   const canvas = document.getElementById("mapCanvas") as HTMLCanvasElement | null;
   if (!canvas) return;
@@ -521,6 +556,7 @@ function renderMap() {
         if (sceneId === "lakeside") sprite(ctx, [3, 1], vx * TILE, vy * TILE);
         if (sceneId === "clearing") drawRedHand(ctx, vx * TILE, vy * TILE);
         if (sceneId === "cairnfield") drawCairnSite(ctx, vx * TILE, vy * TILE);
+        if (sceneId === "wilds") drawHuntSite(ctx, vx * TILE, vy * TILE);
       }
       if (visibility === "remembered") {
         ctx.fillStyle = "rgba(20, 17, 13, 0.44)";
@@ -576,6 +612,7 @@ export function initMap() {
   const loaded = loadCampaignReport();
   campaign = loaded.campaign;
   journeyMap = yardMeadowMap(PROTOTYPE_MAP, campaign.world.worldSeed, campaign.world.siteInstances);
+  campaign = advanceHuntGrounds(campaign, journeyMap);
   ensureRevealed();
   saveCampaign(campaign);
   buildUi(root);
