@@ -2,6 +2,7 @@ import { createCampaign, parseCampaign, serializeCampaign, type CampaignState } 
 import { PROTOTYPE_MAP_ID, PROTOTYPE_START } from "./prototype";
 import { completeSiteInstances, newSiteInstances } from "./siteInstances";
 import { legacyKnownSiteIds } from "./sites";
+import { VERSION } from "../version";
 
 export const CAMPAIGN_STORE = "laulun-miekka.campaign.v6";
 export const PREVIOUS_CAMPAIGN_STORE = "laulun-miekka.campaign.v5";
@@ -9,6 +10,26 @@ export const VERSION4_CAMPAIGN_STORE = "laulun-miekka.campaign.v4";
 export const VERSION3_CAMPAIGN_STORE = "laulun-miekka.campaign.v3";
 export const LEGACY_CAMPAIGN_STORE = "laulun-miekka.campaign.v2";
 export const EARLIEST_CAMPAIGN_STORE = "laulun-miekka.campaign.v1";
+/**
+ * Hylätyn tallennuksen kopio. Kun tallennus on olemassa mutta ei kelpaa, sitä ei korvata hiljaa: raaka
+ * teksti siirretään tänne ennen uutta matkaa, jotta vika voidaan selvittää ja matka mahdollisesti
+ * palauttaa käsin. Vain viimeisin hylätty tallennus säilyy. Uudelleenaloitus ei poista tätä.
+ */
+export const REJECTED_CAMPAIGN_STORE = "laulun-miekka.campaign.rejected";
+
+export interface RejectedCampaignBackup {
+  rejectedAt: string;
+  /** Pelin versio, joka hylkäsi tallennuksen. */
+  version: string;
+  store: string;
+  raw: string;
+}
+
+export interface CampaignLoad {
+  campaign: CampaignState;
+  /** Tallennus oli olemassa mutta ei kelvannut; se kopioitiin avaimelle REJECTED_CAMPAIGN_STORE. */
+  rejected: boolean;
+}
 
 export interface CampaignStorage {
   getItem(key: string): string | null;
@@ -43,12 +64,35 @@ function compatible(state: CampaignState): boolean {
 }
 
 export function loadCampaign(storage?: CampaignStorage): CampaignState {
+  return loadCampaignReport(storage).campaign;
+}
+
+function backupRejected(target: CampaignStorage, store: string, raw: string): boolean {
+  const backup: RejectedCampaignBackup = { rejectedAt: new Date().toISOString(), version: VERSION, store, raw };
+  // Näkyy kehittäjälle konsolissa; pelaajalle kartta kertoo viestillä (map.saveRejected).
+  console.error(`Tallennus ${store} ei kelvannut (${VERSION}). Raaka tallennus kopioitiin avaimelle ${REJECTED_CAMPAIGN_STORE}.`);
+  try {
+    target.setItem(REJECTED_CAMPAIGN_STORE, JSON.stringify(backup));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Lataa kampanjan ja kertoo, hylättiinkö olemassa oleva tallennus (se kopioidaan ensin talteen). */
+export function loadCampaignReport(storage?: CampaignStorage): CampaignLoad {
   try {
     const target = storage ?? localStorage;
     const stores = [CAMPAIGN_STORE, PREVIOUS_CAMPAIGN_STORE, VERSION4_CAMPAIGN_STORE, VERSION3_CAMPAIGN_STORE, LEGACY_CAMPAIGN_STORE, EARLIEST_CAMPAIGN_STORE];
+    let rejected = false;
     for (const store of stores) {
-      const parsed = parseCampaign(target.getItem(store));
-      if (!parsed || !compatible(parsed)) continue;
+      const raw = target.getItem(store);
+      const parsed = parseCampaign(raw);
+      if (!parsed || !compatible(parsed)) {
+        // Vain ensimmäinen (uusin) hylätty tallennus kopioidaan: se on arvokkain.
+        if (raw !== null && !rejected) { backupRejected(target, store, raw); rejected = true; }
+        continue;
+      }
       const inferLegacyKnowledge = store === VERSION3_CAMPAIGN_STORE
         || store === LEGACY_CAMPAIGN_STORE
         || store === EARLIEST_CAMPAIGN_STORE;
@@ -77,11 +121,11 @@ export function loadCampaign(storage?: CampaignStorage): CampaignState {
           for (const oldStore of stores.slice(1)) target.removeItem(oldStore);
         } catch { /* migraatio yritetään uudelleen seuraavalla latauksella */ }
       }
-      return campaign;
+      return { campaign, rejected };
     }
-    return newCampaign();
+    return { campaign: newCampaign(), rejected };
   } catch {
-    return newCampaign();
+    return { campaign: newCampaign(), rejected: false };
   }
 }
 
