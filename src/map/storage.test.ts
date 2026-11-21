@@ -6,8 +6,10 @@ import {
   PREVIOUS_CAMPAIGN_STORE,
   VERSION4_CAMPAIGN_STORE,
   VERSION3_CAMPAIGN_STORE,
+  REJECTED_CAMPAIGN_STORE,
   clearCampaign,
   loadCampaign,
+  loadCampaignReport,
   saveCampaign,
   type CampaignStorage,
 } from "./storage";
@@ -53,6 +55,35 @@ describe("kampanjan selainvarasto", () => {
     const state = loadCampaign(memoryStorage("{not-json"));
     expect(state.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
     expect(state.world).toMatchObject({ mapId: "kalevala-prototype", width: 20, height: 20 });
+  });
+
+  it("kopioi hylätyn tallennuksen talteen ennen uutta matkaa ja kertoo siitä", () => {
+    const storage = memoryStorage("{not-json");
+    const errors: unknown[] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => { errors.push(args); };
+    try {
+      const report = loadCampaignReport(storage);
+      expect(report.rejected).toBe(true);
+      expect(report.campaign.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
+    } finally {
+      console.error = original;
+    }
+    expect(errors).toHaveLength(1);
+    const backup = JSON.parse(storage.data.get(REJECTED_CAMPAIGN_STORE)!);
+    expect(backup).toMatchObject({ store: CAMPAIGN_STORE, raw: "{not-json" });
+    expect(typeof backup.version).toBe("string");
+    // Uudelleenaloitus ei pyyhi talteen otettua.
+    clearCampaign(storage);
+    expect(storage.data.has(REJECTED_CAMPAIGN_STORE)).toBe(true);
+  });
+
+  it("kelvollinen tai puuttuva tallennus ei tee kopiota", () => {
+    const empty = memoryStorage();
+    expect(loadCampaignReport(empty).rejected).toBe(false);
+    saveCampaign(loadCampaign(empty), empty);
+    expect(loadCampaignReport(empty).rejected).toBe(false);
+    expect(empty.data.has(REJECTED_CAMPAIGN_STORE)).toBe(false);
   });
 
   it("migroi v1-avaimen nykyiseen avaimeen menettämättä etenemistä", () => {

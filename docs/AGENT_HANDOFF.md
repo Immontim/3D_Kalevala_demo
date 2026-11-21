@@ -6,14 +6,20 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `1ffb1e4`)
+Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `2e60ff7`)
 
-- **Koodiversio v06.03.00** branchissa `codex/map-bridge-and-clearings` (tarkista merge-tila `git merge-base`illa).
-  Koodi valmis, ei deployattu. Codex testasi käsin in-app-selaimessa näppäimillä sillan ylityksen,
-  pohjoisen aukeat ja pihaniityn ennen sivun uudelleenlatausta ja sen jälkeen. Konsoli oli puhdas.
-  Kartta piirtyy tapahtumista, joten sillä ei ole jatkuvaa FPS-silmukkaa. Omistaja ei ole vielä käsin
-  testannut. `bun install --frozen-lockfile`, `bun run test` (1181/1181), `bunx tsc --noEmit`,
-  `bun run lint`, `bun run build` ja `git diff --check` läpi. Build varoitti 861 kt:n 3D-chunkista.
+- **Koodiversio v06.03.01** branchissa `claude/save-rejection-fix` (tarkista merge-tila `git merge-base`illa).
+  Koodi valmis, ei deployattu eikä omistaja ole käsin testannut. Ajettu: `bun run test` 100 tiedostoa /
+  1185 testiä, `bunx tsc --noEmit`, `bun run lint`, `bun run build`, `git diff --check` läpi. In-app-
+  selaimessa: varkaus murtolukuaikana säilyy uudelleenlatauksessa; rikottu tallennus kopioituu talteen ja
+  kartta näyttää viestin.
+- **Tallennuksen hylkäys (v06.03.01).** Omistajan matka nollautui: v06.01:n murtolukuaika teki varkauden
+  `atWorldMinutes`ista murtoluvun, jonka tarkistus vaati kokonaisluvuksi, ja lataus korvasi koko matkan
+  hiljaa uudella. Nyt kaikki aikakentät tarkistetaan samalla `validWorldTime`illa (äärellinen, ≥ 0).
+  `loadCampaignReport` kopioi olemassa olevan mutta kelvottoman tallennuksen raakana avaimelle
+  `laulun-miekka.campaign.rejected` (`{rejectedAt, version, store, raw}`, vain viimeisin; uudelleenaloitus ei
+  poista), kirjoittaa `console.error`in ja kartta näyttää alapalkissa `map.saveRejected`. Lataus on
+  tarkoituksella yhä tiukka (ei sallivaa pudottamista), jotta vika näkyy eikä peity.
 - **Saapuminen polunsuulta (v06.02).** `sceneLayout.entrySpawn(layout, inset)` = ensimmäisen polunsuun portista
   `ENTRY_INSET` 3,5 m sisään, katse sisään. `world.ts` `SPAWN`: kalmisto ja erämaa käsin (jo polulla), pihat
   inset 6,4 (kameran `camMaxR` 12,2 aidan sisällä, muuten kamera painuu maahan), ranta katsoo `LAKE_FIRE`a.
@@ -214,7 +220,8 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `1ffb1e4`)
 - **Kampanjatallennus** (`campaign.ts`, `storage.ts`) käyttää skeemaa 6 ja
   avainta `laulun-miekka.campaign.v6`. Terrain-muisti ja `knownSiteIds` säilyvät erikseen.
   Vanhat hunger-, sukupuoli-, maailmanesine- ja virtuaalivarustetiedot migroidaan häviöttömästi;
-  kelvollinen vanha tila palautetaan myös, jos migraation kirjoitus estyy.
+  kelvollinen vanha tila palautetaan myös, jos migraation kirjoitus estyy. **Uusi aikakenttä tarkistetaan
+  `validWorldTime`illa**, ei kokonaislukuna (kartan aika on murtolukuja).
 - **Matkan asetukset.** Esc-dialogissa ovat FI/GB-kieli, sukupuoli, vahvistettava uudelleenaloitus
   ja 3D-oikotiet kohtaustyyppeineen. Mies on uuden ja migroidun kampanjan oletus.
 - **Paikat.** `sites.ts` omistaa liikkumisen (`fixed|mobile`), elinkaaren
@@ -291,14 +298,16 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `1ffb1e4`)
   leiri jää kartalle ja aallot alkavat alusta.
 - Moottori on v0: ei ajastimia, `unless`-peruutusta eikä efektien ketjureaktioita.
   Tuntematon engine-versionumero luetaan sallivasti; semantiikkamuutos tarvitsee versionhaaran.
-- Rikkinäistä tallennetta ei kopioida talteen ennen korvaamista (ROADMAPin riski);
-  moottorilohkossa salliva luku vain pudottaa tuntemattoman.
+- Hylätty tallennus näkyy pelaajalle vain alapalkin viestinä, joka häviää ensimmäisestä liikkeestä. Talteen
+  jää vain viimeisin hylätty. Palautustyökalua ei ole: matka palautetaan käsin `raw`-kentästä, kun vika
+  on korjattu. Moottorilohkossa salliva luku vain pudottaa tuntemattoman.
 
 ## Seuraava tehtävä
 
 Omistaja testaa v06:n peliläppärillä (selain GTX:llä, laturissa): erämaa, aukio ja ranta (uusi saapuminen
 polulta ja aaltojen tulo metsästä), FPS oikeasta alakulmasta, polunsuusta poistuminen kartan kautta,
-kamera ja lehvästö metsässä sekä kartalla sillan näkyvyys ja niittyjen vaikutus matkarytmiin.
+kamera ja lehvästö metsässä sekä kartalla sillan näkyvyys ja niittyjen vaikutus matkarytmiin. Pihan ruoan
+luvaton otto ja polulta poistuminen eivät saa enää nollata matkaa (v06.03.01).
 
 ## Ei vielä aloiteta
 

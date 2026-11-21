@@ -18,6 +18,7 @@ import {
   tryUnequipItem,
   type SceneItemDefinition,
 } from "./campaign";
+import { WORLD_MINUTES_PER_DAY } from "./uiState";
 
 function legacyPlayer(state: ReturnType<typeof createCampaign>) {
   return {
@@ -177,6 +178,29 @@ describe("maailmanesineet", () => {
       quantity: 1, ownerId: "tietaja", atWorldMinutes: 42,
     });
     expect(result.state.world.sceneItems.thefts).toEqual([result.theft]);
+  });
+
+  it("varkaus päivän murto-osan kohdalla säilyy tallennuksessa (kartan liike ei ole kokonaislukuaikaa)", () => {
+    const state = createCampaign();
+    // Yksi niittyaskel: 1/6 päivää. Ennen v06.03.01:tä tämä aikaleima hylkäsi koko tallennuksen.
+    state.world.worldMinutes = WORLD_MINUTES_PER_DAY / 6;
+    const result = tryTakeSceneItem(state, pack);
+    expect(result.status).toBe("taken");
+    if (result.status !== "taken") return;
+    expect(Number.isInteger(result.theft?.atWorldMinutes)).toBe(false);
+    const loaded = parseCampaign(serializeCampaign(result.state));
+    expect(loaded?.world.sceneItems.thefts).toEqual([result.theft]);
+    expect(loaded?.world.worldMinutes).toBe(state.world.worldMinutes);
+  });
+
+  it("hylkää yhä negatiivisen tai äärettömän varkauden ajan", () => {
+    const result = tryTakeSceneItem(createCampaign(), pack);
+    if (result.status !== "taken") throw new Error("otto epäonnistui");
+    for (const bad of [-1, Infinity, "5"]) {
+      const raw = JSON.parse(serializeCampaign(result.state));
+      raw.world.sceneItems.thefts[0].atWorldMinutes = bad;
+      expect(parseCampaign(JSON.stringify(raw))).toBeNull();
+    }
   });
 
   it("lupamuutos ohittaa staattisen oletuksen ja saman instanssin voi ottaa vain kerran", () => {
