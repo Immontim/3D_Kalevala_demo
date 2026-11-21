@@ -3,7 +3,7 @@ import { SONG } from "../songLogic";
 import { stepFreeCam } from "../freecam";
 import { t } from "../i18n";
 import { mapUrl, parseAppRoute } from "../app/route";
-import { openTune, renderBinds, showTab, type PauseTab } from "../ui/pauseMenu";
+import { openTune, renderBinds, setMetersUnlocked, showTab, type PauseTab } from "../ui/pauseMenu";
 import { ARENA, birdSongLevel, groundHeight } from "../world";
 import { removeActor } from "./actor";
 import { updateAi } from "./ai";
@@ -69,7 +69,7 @@ export function toStartMenu() {
   g.running = false;
   paused = false;
   $("pause").classList.add("hidden");
-  $("hud").classList.remove("arrange");
+  setMetersUnlocked(false);
   showMsg("", "", 0.01);
   $("start").classList.remove("hidden");
   if (document.pointerLockElement) document.exitPointerLock();
@@ -179,8 +179,8 @@ export function pause(tab: PauseTab = "binds") {
   renderBinds();
   openTune();
   showTab(tab);
+  setMetersUnlocked(false);
   $("pause").classList.remove("hidden");
-  $("hud").classList.add("arrange");
 }
 
 export function resume() {
@@ -189,7 +189,7 @@ export function resume() {
   bindUi.capture = null;
   paused = false;
   $("pause").classList.add("hidden");
-  $("hud").classList.remove("arrange");
+  setMetersUnlocked(false);
   last = performance.now();
   if (!choosing && !dialogueOpen) lockPointer();
 }
@@ -197,6 +197,7 @@ export function resume() {
 /** Tauon tarkastelu: valikko piiloon ja kamera vapaaksi. Peli pysyy pysäytettynä. */
 export function enterFreeCam() {
   if (!paused || freeCam.active || bindUi.capture) return;
+  setMetersUnlocked(false);
   startFreeCam();
   $("pause").classList.add("hidden");
   $("freecamHint").classList.remove("hidden");

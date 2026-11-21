@@ -149,6 +149,17 @@ export function showTab(tab: PauseTab) {
 // oletuspaikasta pikseleinä ja tallentuu selaimen muistiin.
 export const METER_STORE = "laulun-miekka.meters.v1";
 export const meterOff: Record<string, { x: number; y: number }> = { meterPlayer: { x: 0, y: 0 }, meterEnemy: { x: 0, y: 0 } };
+let metersUnlocked = false;
+
+/** Mittarit ovat tauolla oletuksena lukossa ja dialogin alla. */
+export function setMetersUnlocked(unlocked: boolean) {
+  metersUnlocked = unlocked;
+  $("hud").classList.toggle("arrange", unlocked);
+  const toggle = $("toggleMeters");
+  toggle.textContent = t(unlocked ? "pause.lockMeters" : "pause.unlockMeters");
+  toggle.setAttribute("aria-pressed", String(unlocked));
+}
+
 export function placeMeters(save = false) {
   for (const id of Object.keys(meterOff)) {
     const el = $(id), o = meterOff[id];
@@ -267,7 +278,8 @@ export function initPauseMenu() {
       const maxY = (window.innerHeight + panel.offsetHeight) / 2 - 60;
       off.x = Math.max(-maxX, Math.min(maxX, drag.ox + e.clientX - drag.x));
       off.y = Math.max(-maxY, Math.min(maxY, drag.oy + e.clientY - drag.y));
-      panel.style.transform = `translate(${off.x}px, ${off.y}px)`;
+      panel.style.left = `${off.x}px`;
+      panel.style.top = `${off.y}px`;
       overlay.classList.toggle("moved", off.x !== 0 || off.y !== 0);
     });
     const drop = () => { drag = null; };
@@ -286,13 +298,13 @@ export function initPauseMenu() {
     const el = $(id);
     let drag: { x: number; y: number; ox: number; oy: number } | null = null;
     el.addEventListener("pointerdown", (e) => {
-      if (!paused) return;
+      if (!paused || !metersUnlocked) return;
       drag = { x: e.clientX, y: e.clientY, ox: meterOff[id].x, oy: meterOff[id].y };
       el.setPointerCapture(e.pointerId);
       e.preventDefault();
     });
     el.addEventListener("pointermove", (e) => {
-      if (!drag) return;
+      if (!drag || !paused || !metersUnlocked) return;
       meterOff[id] = { x: drag.ox + e.clientX - drag.x, y: drag.oy + e.clientY - drag.y };
       placeMeters();
     });
@@ -304,6 +316,8 @@ export function initPauseMenu() {
     for (const id of Object.keys(meterOff)) meterOff[id] = { x: 0, y: 0 };
     placeMeters(true);
   });
+  $("toggleMeters").addEventListener("click", () => setMetersUnlocked(!metersUnlocked));
   window.addEventListener("resize", () => placeMeters());
+  setMetersUnlocked(false);
   placeMeters();
 }
