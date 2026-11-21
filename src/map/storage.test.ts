@@ -4,6 +4,7 @@ import {
   EARLIEST_CAMPAIGN_STORE,
   LEGACY_CAMPAIGN_STORE,
   PREVIOUS_CAMPAIGN_STORE,
+  VERSION4_CAMPAIGN_STORE,
   VERSION3_CAMPAIGN_STORE,
   clearCampaign,
   loadCampaign,
@@ -24,6 +25,18 @@ function memoryStorage(initial?: string): CampaignStorage & { data: Map<string, 
   };
 }
 
+function legacyPlayer(state: ReturnType<typeof loadCampaign>) {
+  return {
+    gender: state.player.gender,
+    satiety: state.player.satiety,
+    inventory: {
+      capacity: 8,
+      stacks: state.player.inventory.stacks.filter((stack) => stack.itemId !== "spear").map((stack) => ({ ...stack })),
+    },
+    equipment: { mainHand: state.player.equipment.mainHand, offHand: state.player.equipment.offHand },
+  };
+}
+
 describe("kampanjan selainvarasto", () => {
   it("tallentaa ja palauttaa karttaruudun, ajan, kylläisyyden ja varusteet", () => {
     const storage = memoryStorage();
@@ -31,7 +44,7 @@ describe("kampanjan selainvarasto", () => {
     state.world.x = 3;
     state.world.worldMinutes = 95;
     state.player.satiety = 86;
-    state.player.equipment = { mainHand: "spear", offHand: null };
+    state.player.equipment = { ...state.player.equipment, mainHand: "spear", offHand: null };
     expect(saveCampaign(state, storage)).toBe(true);
     expect(loadCampaign(storage)).toEqual(state);
   });
@@ -50,8 +63,8 @@ describe("kampanjan selainvarasto", () => {
     const legacy = JSON.parse(JSON.stringify(current));
     legacy.schemaVersion = 1;
     delete legacy.world.knownSiteIds;
+    legacy.player = { ...legacyPlayer(current), hunger: 65 };
     delete legacy.player.satiety;
-    legacy.player.hunger = 65;
     storage.data.set(EARLIEST_CAMPAIGN_STORE, JSON.stringify(legacy));
 
     const migrated = loadCampaign(storage);
@@ -76,6 +89,7 @@ describe("kampanjan selainvarasto", () => {
     const storage = memoryStorage();
     const legacy = JSON.parse(JSON.stringify(loadCampaign(storage)));
     legacy.schemaVersion = 2;
+    legacy.player = legacyPlayer(loadCampaign(storage));
     delete legacy.player.gender;
     delete legacy.world.knownSiteIds;
     legacy.world.worldMinutes = 360;
@@ -94,6 +108,7 @@ describe("kampanjan selainvarasto", () => {
     const storage = memoryStorage();
     const legacy = JSON.parse(JSON.stringify(loadCampaign(storage)));
     legacy.schemaVersion = 3;
+    legacy.player = legacyPlayer(loadCampaign(storage));
     delete legacy.world.knownSiteIds;
     const yard = LEGACY_YARD_POSITION;
     legacy.world.discovered[yard.y * legacy.world.width + yard.x] = true;
@@ -106,20 +121,40 @@ describe("kampanjan selainvarasto", () => {
     expect(storage.data.has(VERSION3_CAMPAIGN_STORE)).toBe(false);
   });
 
-  it("migroi v4-avaimen v5-avaimeen tyhjällä maailmanesinetilalla", () => {
+  it("migroi v4-avaimen v6-avaimeen tyhjällä maailmanesinetilalla", () => {
     const storage = memoryStorage();
-    const legacy = JSON.parse(JSON.stringify(loadCampaign(storage)));
+    const current = loadCampaign(storage);
+    const legacy = JSON.parse(JSON.stringify(current));
     legacy.schemaVersion = 4;
     delete legacy.world.sceneItems;
+    legacy.player = legacyPlayer(current);
     legacy.world.x = 5;
     storage.data.delete(CAMPAIGN_STORE);
-    storage.data.set(PREVIOUS_CAMPAIGN_STORE, JSON.stringify(legacy));
+    storage.data.set(VERSION4_CAMPAIGN_STORE, JSON.stringify(legacy));
 
     const migrated = loadCampaign(storage);
     expect(migrated.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
     expect(migrated.world.x).toBe(5);
     expect(migrated.world.sceneItems.takenInstanceIds).toEqual([]);
     expect(storage.data.has(CAMPAIGN_STORE)).toBe(true);
+    expect(storage.data.has(VERSION4_CAMPAIGN_STORE)).toBe(false);
+  });
+
+  it("migroi v5-avaimen v6-avaimeen ilman että paikkatietoa päätellään uudelleen", () => {
+    const storage = memoryStorage();
+    const current = loadCampaign(storage);
+    const legacy = JSON.parse(JSON.stringify(current));
+    legacy.schemaVersion = 5;
+    legacy.player = legacyPlayer(current);
+    legacy.world.knownSiteIds = [];
+    storage.data.delete(CAMPAIGN_STORE);
+    storage.data.set(PREVIOUS_CAMPAIGN_STORE, JSON.stringify(legacy));
+
+    const migrated = loadCampaign(storage);
+    expect(migrated.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
+    expect(migrated.world.knownSiteIds).toEqual([]);
+    expect(migrated.player.inventory.capacity).toBe(12);
+    expect(migrated.player.inventory.stacks).toContainEqual({ itemId: "spear", quantity: 1 });
     expect(storage.data.has(PREVIOUS_CAMPAIGN_STORE)).toBe(false);
   });
 
@@ -131,8 +166,8 @@ describe("kampanjan selainvarasto", () => {
     const legacy = JSON.parse(JSON.stringify(source));
     legacy.schemaVersion = 1;
     delete legacy.world.knownSiteIds;
+    legacy.player = { ...legacyPlayer(source), hunger: 25 };
     delete legacy.player.satiety;
-    legacy.player.hunger = 25;
     const serialized = JSON.stringify(legacy);
     const blocked: CampaignStorage = {
       getItem: (key) => key === EARLIEST_CAMPAIGN_STORE ? serialized : null,
@@ -162,12 +197,14 @@ describe("kampanjan selainvarasto", () => {
     const storage = memoryStorage("saved");
     storage.data.set(LEGACY_CAMPAIGN_STORE, "old");
     storage.data.set(PREVIOUS_CAMPAIGN_STORE, "previous");
+    storage.data.set(VERSION4_CAMPAIGN_STORE, "version4");
     storage.data.set(VERSION3_CAMPAIGN_STORE, "version3");
     storage.data.set(EARLIEST_CAMPAIGN_STORE, "oldest");
     storage.data.set("other", "keep");
     expect(clearCampaign(storage)).toBe(true);
     expect(storage.data.get(CAMPAIGN_STORE)).toBeUndefined();
     expect(storage.data.get(PREVIOUS_CAMPAIGN_STORE)).toBeUndefined();
+    expect(storage.data.get(VERSION4_CAMPAIGN_STORE)).toBeUndefined();
     expect(storage.data.get(VERSION3_CAMPAIGN_STORE)).toBeUndefined();
     expect(storage.data.get(LEGACY_CAMPAIGN_STORE)).toBeUndefined();
     expect(storage.data.get(EARLIEST_CAMPAIGN_STORE)).toBeUndefined();

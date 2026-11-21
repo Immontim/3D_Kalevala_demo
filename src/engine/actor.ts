@@ -25,6 +25,7 @@ export interface Actor {
   /** Ehjä kilpi, tai null jos kilpeä ei ole tai se on hajonnut. */
   shield: ShieldDef | null;
   shieldHp: number;
+  armour: { ringMail: boolean; greaves: boolean };
   /** Aseella torjuttaessa: mitä iskusuuntaa vastaan torjunta on. */
   stance: StrikeStyle;
   /** Pelaaja pitää iskunappia pohjassa: isku virittyy eikä vielä laukea. */
@@ -73,7 +74,8 @@ export function makeActor(look: FighterLook, pos: THREE.Vector3, level: number, 
   const stats = effectiveStats(base, [], 0);
   return {
     base, mods: [], stats, stamina: stats.maxStamina,
-    weapon, shield, shieldHp: shield ? shield.durability : 0, stance: "slash", charging: false,
+    weapon, shield, shieldHp: shield ? shield.durability : 0,
+    armour: { ringMail: !!look.ringMail, greaves: !!look.greaves }, stance: "slash", charging: false,
     fighter, trail, pos: pos.clone(), radius: COLLISION.actorRadius, yaw: 0, state: "idle", stateTime: 0, timing: { windup: 0.3, release: 0.1, recovery: 0.3 },
     attack: makeAttack(weapon, styleFor(weapon, "slash"), "light"), character: look.character, loadout: look.loadout, struck: false, hp: stats.maxHp,
     blockStart: -99, rootTime: 0, dodgeDir: new THREE.Vector3(), dodgeCd: 0,

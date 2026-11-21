@@ -91,6 +91,10 @@ export function initInput() {
       else if (performance.now() - pausedAt > 400) resume();
       return;
     }
+    if (e.code === "KeyB") {
+      if (!paused) pause("inventory");
+      return;
+    }
     keys.add(e.code);
     if (freeCam.active) { if (e.code === "Space" || e.code === "Tab") e.preventDefault(); return; } // tarkastelutila: ei pelitoimintoja
     if (pressCode(e.code)) e.preventDefault();

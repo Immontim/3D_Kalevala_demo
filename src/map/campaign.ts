@@ -4,13 +4,24 @@ import type { Loadout } from "../combat";
 import type { TextKey } from "../i18n";
 import { createEngineState, parseEngineState, type EngineState } from "../world/state";
 
-export const CAMPAIGN_SCHEMA_VERSION = 5 as const;
-export const INVENTORY_CAPACITY = 8;
+export const CAMPAIGN_SCHEMA_VERSION = 6 as const;
+export const INVENTORY_CAPACITY = 12;
+const LEGACY_INVENTORY_CAPACITY = 8;
 export const SATIETY_MAX = 100;
 
 export type PlayerGender = "male" | "female";
 export type FoodId = "barley_flatbread" | "dried_fish";
-export type EquipmentItemId = "sword" | "sky_iron_sword" | "spear" | "round_shield";
+export type EquipmentSlot = "head" | "torso" | "hands" | "legs" | "feet" | "mainHand" | "offHand";
+export type EquipmentItemId =
+  | "iron_helmet"
+  | "ring_mail"
+  | "leather_gloves"
+  | "iron_greaves"
+  | "leather_shoes"
+  | "sword"
+  | "sky_iron_sword"
+  | "spear"
+  | "round_shield";
 export type ItemId = FoodId | EquipmentItemId | "birch_bark_pack";
 
 export interface ItemDefinition {
@@ -18,7 +29,7 @@ export interface ItemDefinition {
   nameKey: TextKey;
   stackMax: number;
   satietyGain?: number;
-  equipmentSlot?: "mainHand" | "offHand";
+  equipmentSlot?: EquipmentSlot;
 }
 
 export const ITEMS: Record<ItemId, ItemDefinition> = {
@@ -39,6 +50,11 @@ export const ITEMS: Record<ItemId, ItemDefinition> = {
     nameKey: "map.item.birchBarkPack",
     stackMax: 1,
   },
+  iron_helmet: { id: "iron_helmet", nameKey: "map.item.ironHelmet", stackMax: 1, equipmentSlot: "head" },
+  ring_mail: { id: "ring_mail", nameKey: "map.item.ringMail", stackMax: 1, equipmentSlot: "torso" },
+  leather_gloves: { id: "leather_gloves", nameKey: "map.item.leatherGloves", stackMax: 1, equipmentSlot: "hands" },
+  iron_greaves: { id: "iron_greaves", nameKey: "map.item.ironGreaves", stackMax: 1, equipmentSlot: "legs" },
+  leather_shoes: { id: "leather_shoes", nameKey: "map.item.leatherShoes", stackMax: 1, equipmentSlot: "feet" },
   sword: { id: "sword", nameKey: "map.item.sword", stackMax: 1, equipmentSlot: "mainHand" },
   sky_iron_sword: { id: "sky_iron_sword", nameKey: "map.item.skyIronSword", stackMax: 1, equipmentSlot: "mainHand" },
   spear: { id: "spear", nameKey: "map.item.spear", stackMax: 1, equipmentSlot: "mainHand" },
@@ -56,6 +72,11 @@ export interface Inventory {
 }
 
 export interface Equipment {
+  head: Extract<EquipmentItemId, "iron_helmet"> | null;
+  torso: Extract<EquipmentItemId, "ring_mail"> | null;
+  hands: Extract<EquipmentItemId, "leather_gloves"> | null;
+  legs: Extract<EquipmentItemId, "iron_greaves"> | null;
+  feet: Extract<EquipmentItemId, "leather_shoes"> | null;
   mainHand: Extract<EquipmentItemId, "sword" | "sky_iron_sword" | "spear"> | null;
   offHand: Extract<EquipmentItemId, "round_shield"> | null;
 }
@@ -216,9 +237,18 @@ export function createCampaign(start: CampaignStart = {}): CampaignState {
         capacity: INVENTORY_CAPACITY,
         stacks: [
           { itemId: "barley_flatbread", quantity: 3 },
+          { itemId: "spear", quantity: 1 },
         ],
       },
-      equipment: { mainHand: "sword", offHand: "round_shield" },
+      equipment: {
+        head: "iron_helmet",
+        torso: "ring_mail",
+        hands: "leather_gloves",
+        legs: "iron_greaves",
+        feet: "leather_shoes",
+        mainHand: "sword",
+        offHand: "round_shield",
+      },
     },
     engine: createEngineState(),
   };
@@ -370,22 +400,81 @@ export function setEquipped(state: CampaignState, slot: keyof Equipment, itemId:
   } as CampaignState;
 }
 
+export type EquipmentChangeStatus = "equipped" | "unequipped" | "missing-item" | "inventory-full" | "incompatible";
+export interface EquipmentChangeResult {
+  state: CampaignState;
+  status: EquipmentChangeStatus;
+}
+
+/**
+ * Siirtää inventaariossa olevan varusteen paperinukelle atomisesti. Nykyinen varuste
+ * palautuu tavaroihin; keihäs siirtää samalla kilven pois kädestä. Epäonnistuminen ei
+ * muuta kampanjaa osittain.
+ */
+export function tryEquipItem(state: CampaignState, itemId: EquipmentItemId): EquipmentChangeResult {
+  const slot = ITEMS[itemId].equipmentSlot;
+  if (!slot) return { state, status: "incompatible" };
+  let inventory = tryRemoveItem(state.player.inventory, itemId, 1);
+  if (!inventory) return { state, status: "missing-item" };
+  const equipment = { ...state.player.equipment };
+  const displaced: EquipmentItemId[] = [];
+  const previous = equipment[slot];
+  if (previous) displaced.push(previous);
+  if (itemId === "spear" && equipment.offHand) {
+    displaced.push(equipment.offHand);
+    equipment.offHand = null;
+  }
+  equipment[slot] = itemId as never;
+  if (slot === "offHand" && equipment.mainHand === "spear") return { state, status: "incompatible" };
+  if (!combatLoadout(equipment)) return { state, status: "incompatible" };
+  for (const replaced of displaced) {
+    const next = tryAddItem(inventory, replaced, 1);
+    if (!next) return { state, status: "inventory-full" };
+    inventory = next;
+  }
+  return {
+    status: "equipped",
+    state: { ...state, player: { ...state.player, inventory, equipment } },
+  };
+}
+
+/** Siirtää varusteen tavaroihin. Pääasetta ei voi vielä riisua, koska 3D tarvitsee tuetun aseen. */
+export function tryUnequipItem(state: CampaignState, slot: EquipmentSlot): EquipmentChangeResult {
+  const itemId = state.player.equipment[slot];
+  if (!itemId) return { state, status: "unequipped" };
+  if (slot === "mainHand") return { state, status: "incompatible" };
+  const inventory = tryAddItem(state.player.inventory, itemId, 1);
+  if (!inventory) return { state, status: "inventory-full" };
+  return {
+    status: "unequipped",
+    state: {
+      ...state,
+      player: {
+        ...state.player,
+        inventory,
+        equipment: { ...state.player.equipment, [slot]: null },
+      },
+    },
+  };
+}
+
 function isSwordMain(item: Equipment["mainHand"]): boolean {
   return item === "sword" || item === "sky_iron_sword";
 }
 
 /** Onko pääkädessä taivaanrautamiekka? */
-export function isSkyIron(equipment: Equipment): boolean {
+export function isSkyIron(equipment: Pick<Equipment, "mainHand">): boolean {
   return equipment.mainHand === "sky_iron_sword";
 }
 
-/** Voiko pelaaja valita pääkätensä esineeksi (onko hänellä se)? Perusmiekka ja keihäs ovat aina käytössä. */
+/** Voiko pelaaja valita pääkätensä esineeksi (onko se kädessä tai tavaroissa)? */
 export function ownsMainHand(state: CampaignState, item: NonNullable<Equipment["mainHand"]>): boolean {
-  return item !== "sky_iron_sword" || state.player.inventory.stacks.some((stack) => stack.itemId === "sky_iron_sword");
+  return state.player.equipment.mainHand === item
+    || state.player.inventory.stacks.some((stack) => stack.itemId === item);
 }
 
 /** Muuntaa vain nykyisen 3D-moottorin tukemat käsi-varusteyhdistelmät Loadoutiksi. */
-export function combatLoadout(equipment: Equipment): Loadout | null {
+export function combatLoadout(equipment: Pick<Equipment, "mainHand" | "offHand">): Loadout | null {
   // Taivaanrautamiekka käyttää samaa miekan mallia ja otetta; ero on aseen arvoissa (`isSkyIron`).
   if (isSwordMain(equipment.mainHand) && equipment.offHand === "round_shield") return "sword_shield";
   if (isSwordMain(equipment.mainHand) && equipment.offHand === null) return "sword";
@@ -410,39 +499,47 @@ export function parseCampaign(value: unknown): CampaignState | null {
     && validPlayer(data.player)) {
     return cloneCampaign(data as unknown as ParsedCampaign);
   }
-  if (data.schemaVersion === 4
+  if (data.schemaVersion === 5
     && validKnownSiteIds(data.world.knownSiteIds)
-    && validPlayer(data.player)) {
+    && validSceneItemState(data.world.sceneItems)
+    && validLegacyPlayer(data.player)) {
     return cloneCampaign({
       schemaVersion: CAMPAIGN_SCHEMA_VERSION,
-      world: withEmptySceneItems(data.world as unknown as Version4CampaignWorld),
-      player: data.player,
+      world: data.world as unknown as CampaignWorld,
+      player: migrateLegacyPlayer(data.player),
       engine: data.engine,
     });
   }
-  if (data.schemaVersion === 3 && validPlayer(data.player)) {
+  if (data.schemaVersion === 4
+    && validKnownSiteIds(data.world.knownSiteIds)
+    && validLegacyPlayer(data.player)) {
+    return cloneCampaign({
+      schemaVersion: CAMPAIGN_SCHEMA_VERSION,
+      world: withEmptySceneItems(data.world as unknown as Version4CampaignWorld),
+      player: migrateLegacyPlayer(data.player),
+      engine: data.engine,
+    });
+  }
+  if (data.schemaVersion === 3 && validLegacyPlayer(data.player)) {
     return cloneCampaign({
       schemaVersion: CAMPAIGN_SCHEMA_VERSION,
       world: withEmptySiteKnowledge(data.world as unknown as LegacyCampaignWorld),
-      player: data.player,
+      player: migrateLegacyPlayer(data.player),
     });
   }
   if (data.schemaVersion === 2 && validVersion2Player(data.player)) {
     return cloneCampaign({
       schemaVersion: CAMPAIGN_SCHEMA_VERSION,
       world: withEmptySiteKnowledge(data.world as unknown as LegacyCampaignWorld),
-      player: { ...data.player, gender: "male" },
+      player: migrateLegacyPlayer({ ...data.player, gender: "male" }),
     });
   }
-  if (data.schemaVersion === 1 && validLegacyPlayer(data.player)) {
+  if (data.schemaVersion === 1 && validVersion1Player(data.player)) {
     return cloneCampaign({
       schemaVersion: CAMPAIGN_SCHEMA_VERSION,
       world: withEmptySiteKnowledge(data.world as unknown as LegacyCampaignWorld),
       player: {
-        gender: "male",
-        satiety: SATIETY_MAX - data.player.hunger,
-        inventory: data.player.inventory,
-        equipment: data.player.equipment,
+        ...migrateLegacyPlayer({ ...data.player, gender: "male", satiety: SATIETY_MAX - data.player.hunger }),
       },
     });
   }
@@ -542,28 +639,52 @@ function validPlayer(value: unknown): value is CampaignPlayer {
   return true;
 }
 
+interface LegacyInventory {
+  capacity: typeof LEGACY_INVENTORY_CAPACITY;
+  stacks: ItemStack[];
+}
+
+interface LegacyEquipment {
+  mainHand: Extract<EquipmentItemId, "sword" | "sky_iron_sword" | "spear"> | null;
+  offHand: Extract<EquipmentItemId, "round_shield"> | null;
+}
+
+interface LegacyCampaignPlayer {
+  gender: PlayerGender;
+  satiety: number;
+  inventory: LegacyInventory;
+  equipment: LegacyEquipment;
+}
+
 interface Version2CampaignPlayer {
   satiety: number;
-  inventory: Inventory;
-  equipment: Equipment;
+  inventory: LegacyInventory;
+  equipment: LegacyEquipment;
 }
 
 function validVersion2Player(value: unknown): value is Version2CampaignPlayer {
   if (!isRecord(value) || typeof value.satiety !== "number" || !Number.isFinite(value.satiety)
     || value.satiety < 0 || value.satiety > SATIETY_MAX) return false;
-  return validInventory(value.inventory) && validEquipment(value.equipment);
-}
-
-interface LegacyCampaignPlayer {
-  hunger: number;
-  inventory: Inventory;
-  equipment: Equipment;
+  return validLegacyInventory(value.inventory) && validLegacyEquipment(value.equipment);
 }
 
 function validLegacyPlayer(value: unknown): value is LegacyCampaignPlayer {
+  if (!isRecord(value) || !isPlayerGender(value.gender)
+    || typeof value.satiety !== "number" || !Number.isFinite(value.satiety)
+    || value.satiety < 0 || value.satiety > SATIETY_MAX) return false;
+  return validLegacyInventory(value.inventory) && validLegacyEquipment(value.equipment);
+}
+
+interface Version1CampaignPlayer {
+  hunger: number;
+  inventory: LegacyInventory;
+  equipment: LegacyEquipment;
+}
+
+function validVersion1Player(value: unknown): value is Version1CampaignPlayer {
   if (!isRecord(value) || typeof value.hunger !== "number" || !Number.isFinite(value.hunger)
     || value.hunger < 0 || value.hunger > SATIETY_MAX) return false;
-  return validInventory(value.inventory) && validEquipment(value.equipment);
+  return validLegacyInventory(value.inventory) && validLegacyEquipment(value.equipment);
 }
 
 function validInventory(value: unknown): value is Inventory {
@@ -577,13 +698,75 @@ function validInventory(value: unknown): value is Inventory {
   return true;
 }
 
+function validLegacyInventory(value: unknown): value is LegacyInventory {
+  if (!isRecord(value) || value.capacity !== LEGACY_INVENTORY_CAPACITY || !Array.isArray(value.stacks)
+    || value.stacks.length > LEGACY_INVENTORY_CAPACITY) return false;
+  for (const stack of value.stacks) {
+    if (!isRecord(stack) || !isItemId(stack.itemId) || !Number.isInteger(stack.quantity)) return false;
+    const quantity = stack.quantity as number;
+    if (quantity < 1 || quantity > ITEMS[stack.itemId].stackMax) return false;
+  }
+  return true;
+}
+
 function validEquipment(value: unknown): value is Equipment {
+  if (!isRecord(value)) return false;
+  const main = value.mainHand;
+  const off = value.offHand;
+  if (!(value.head === null || value.head === "iron_helmet")
+    || !(value.torso === null || value.torso === "ring_mail")
+    || !(value.hands === null || value.hands === "leather_gloves")
+    || !(value.legs === null || value.legs === "iron_greaves")
+    || !(value.feet === null || value.feet === "leather_shoes")) return false;
+  if (!(main === null || main === "sword" || main === "sky_iron_sword" || main === "spear")
+    || !(off === null || off === "round_shield")) return false;
+  return combatLoadout({ mainHand: main, offHand: off }) !== null;
+}
+
+function validLegacyEquipment(value: unknown): value is LegacyEquipment {
   if (!isRecord(value)) return false;
   const main = value.mainHand;
   const off = value.offHand;
   if (!(main === null || main === "sword" || main === "sky_iron_sword" || main === "spear")
     || !(off === null || off === "round_shield")) return false;
   return combatLoadout({ mainHand: main, offHand: off }) !== null;
+}
+
+/**
+ * V1–V5:ssä perusmiekka, keihäs ja kilpi olivat valittavissa ilman inventaarioesineitä.
+ * V6 tekee omistajuudesta yksiselitteisen: kädessä oleva esine on varusteissa ja muut
+ * aiemmat vaihtoehdot lisätään tavaroihin. Taivaanrautamiekka oli poikkeuksena sekä
+ * inventaariossa että kädessä, joten kädessä ollessa siitä poistetaan täsmälleen yksi pino.
+ */
+function migrateLegacyPlayer(player: LegacyCampaignPlayer): CampaignPlayer {
+  let inventory: Inventory = {
+    capacity: INVENTORY_CAPACITY,
+    stacks: player.inventory.stacks.map((stack) => ({ ...stack })),
+  };
+  if (player.equipment.mainHand === "sky_iron_sword") {
+    inventory = tryRemoveItem(inventory, "sky_iron_sword", 1) ?? inventory;
+  }
+  const virtualItems: EquipmentItemId[] = ["sword", "spear", "round_shield"];
+  for (const itemId of virtualItems) {
+    if (player.equipment.mainHand === itemId || player.equipment.offHand === itemId) continue;
+    const next = tryAddItem(inventory, itemId, 1);
+    if (!next) throw new Error("V5-varusteiden migraatio ei mahtunut 12 tavarapaikkaan");
+    inventory = next;
+  }
+  return {
+    gender: player.gender,
+    satiety: player.satiety,
+    inventory,
+    equipment: {
+      head: "iron_helmet",
+      torso: "ring_mail",
+      hands: "leather_gloves",
+      legs: "iron_greaves",
+      feet: "leather_shoes",
+      mainHand: player.equipment.mainHand,
+      offHand: player.equipment.offHand,
+    },
+  };
 }
 
 /**

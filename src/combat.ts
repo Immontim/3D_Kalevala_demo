@@ -81,6 +81,33 @@ export const COMBAT = {
   graceArc: 75,
 };
 
+/** Puettujen suojavarusteiden kertoimet ja kypärän irtoamisen todennäköisyydet. */
+export const ARMOUR = {
+  ringMailDamage: 0.85,
+  greavesDamage: 0.95,
+  helmetLightKnock: 0.25,
+  helmetHeavyKnock: 0.6,
+  helmetFatalKnock: 1,
+};
+
+export function damageAfterArmour(damage: number, ringMail: boolean, greaves: boolean): number {
+  return damage * (ringMail ? ARMOUR.ringMailDamage : 1) * (greaves ? ARMOUR.greavesDamage : 1);
+}
+
+/** Kypärä voi irrota vain osuvasta ylälyönnistä; irrotessaan se ottaa koko iskun vastaan. */
+export function helmetAbsorbsOverhead(
+  kind: StrikeStyle,
+  weight: StrikeWeight,
+  hasHelmet: boolean,
+  wouldBeFatal: boolean,
+  roll: number,
+): boolean {
+  if (!hasHelmet || kind !== "overhead") return false;
+  const chance = wouldBeFatal ? ARMOUR.helmetFatalKnock
+    : weight === "heavy" ? ARMOUR.helmetHeavyKnock : ARMOUR.helmetLightKnock;
+  return roll < chance;
+}
+
 /** Hahmon perusarvot. Ajonaikaiset muutokset (ruoka, nälkä, loitsut) tehdään stats.ts:n muuntimilla. */
 export interface CharacterDef {
   hp: number;

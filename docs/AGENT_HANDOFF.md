@@ -6,6 +6,22 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
+Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `c792089`)
+
+- **Branchin `codex/inventory-paper-doll` koodiversio on v05.00.00.** Koodi valmis,
+  ei deployattu eikä käsin testattu: in-app-selain ei saanut yhteyttä käynnissä olleeseen
+  localhost-palvelimeen. Automaattitarkistukset ja GLB-solmujen tarkistus on ajettu.
+  Branch sisältää myös erillisen Vitest 5.1.1 -commitin `32db996`; tarkista merge-tila:
+  `git merge-base --is-ancestor codex/inventory-paper-doll origin/main`.
+- **Paperinukke ja inventaario.** Skeema 6, avain `laulun-miekka.campaign.v6`, 12 tavarapaikkaa ja
+  seitsemän varustepaikkaa. Kartta ja 3D:n pause käyttävät samaa `ui/inventoryView.ts`-näkymää.
+  Rauhassa varusteita voi vaihtaa ja ruokaa syödä; taistelussa näkymä on vain luettavissa.
+  `B` avaa 3D-inventaarion ja pysäyttää kohtauksen. Ase- ja kilpivaihdot ovat atomisia;
+  keihäs palauttaa kilven inventaarioon, eikä pääkättä voi jättää tyhjäksi.
+- **3D-varusteet ja suoja.** Mies- ja naissankari käyttävät Clauden modulaarisia base/mail/greaves/
+  shoes-solmuja ja Taivaanrautamiekka omaa `sword_sky_iron`-malliaan. Rengaspaita kertoo vahingon
+  0,85:llä, säärisuojat 0,95:llä. Vain ylälyönti voi irrottaa kypärän; silloin koko isku torjutaan.
+  Sama sääntö on pelaajalla ja vihollisilla. Tarkat arvot ovat `combat.ts`in `ARMOUR`-vakiossa.
 Päivitetty: 2026-11-20 (Codex, Windows; pohja `origin/main` `2db0950`)
 
 - **Branchin `codex/deps-vitest-5-1-1` koodiversio on v04.06.01.** Vitest on päivitetty
@@ -34,7 +50,7 @@ Päivitetty: 2026-11-20 (Codex, Windows; pohja `origin/main` `2db0950`)
 - **V6 ja leirin arvonta (mergattu).** Leiri on instanssi `camp` (`placement.ts` `CAMP_PLACEMENT`: reunakaista,
   >= 8 ruutua aloituksesta, <= 600 min, lukossa lipulla `louhi.banished`). Jousineito makaa `archer`-pihassa;
   parannuslaulu rauhassa (`SongDef.peaceTargets`) -> `archer.healed` + `setNpcState` -> seisoo; dialogista
-  `sky_iron_sword` (vahinko 1,3; malli väliaikainen, ks. BLENDER_HANDOFF). Tietäjä vain rannalla, nuori urho
+  `sky_iron_sword` (vahinko 1,3; oma GLB-malli). Tietäjä vain rannalla, nuori urho
   `archer`-vapaassa pihassa, emäntä kertoo huhun (`rumor.heard` + tietäjän ranta kartalle).
 - **Louhen karkotus (V5, mergattu).** Pohjolan uni <= 6 m (`SONG_AUDIENCE_RANGE`) Louhesta
   kalmistolla: `endSong` lähettää `song.performed` (cast, `nearNpcId`); sääntö `louhi.banished`
@@ -75,8 +91,8 @@ Päivitetty: 2026-11-20 (Codex, Windows; pohja `origin/main` `2db0950`)
   Instanssit: `lakeside.sage-pack` (sama myös `lakeruin`issa) sekä pihassa
   `<pihan tunniste>.table-flatbread` (3 rieskaa) ja `.table-dried-fish` (3 kalaa).
   Pöydän muut astiat jäävät paikoilleen ruoan ottamisen jälkeen.
-- **Esinedomain ja pysyvyys.** Kampanjaskeema 5 ja avain
-  `laulun-miekka.campaign.v5`; v4 migroidaan menettämättä etenemistä.
+- **Esinedomain ja pysyvyys.** Kampanjaskeema 6 ja avain
+  `laulun-miekka.campaign.v6`; v5 migroidaan menettämättä etenemistä tai varusteita.
   `CampaignWorld.sceneItems` tallentaa otetut instanssit, `allowed|theft`-
   lupapoikkeamat, varkaustietueet sekä varauksen myöhemmille pudotetuille
   esineille (paikka, kierto, määrä ja seuraava tunniste). `setSceneItemTakeMode`
@@ -237,65 +253,28 @@ Päivitetty: 2026-11-20 (Codex, Windows; pohja `origin/main` `2db0950`)
   Viisi numerotonta kasvokuvaa:
   80–100 oikein kylläinen, 60–alle 80 kylläinen, 40–alle 60 puolivatsainen,
   yli 20–alle 40 nälkäinen, 0–20 nääntynyt.
-- **Paperinukke ja inventaario.** Oikean reunan yhtenäinen näkymä korvaa
-  tuohikonttipaneelin. Siinä ovat ImageGenillä tehty sankari, viisi tulevaa
-  vaatepaikkaa, toimivat pää- ja sivukäden valinnat sekä kahdeksan
-  tavarapaikkaa. Uusi matka alkaa kolmella ohrarieskalla; 3D-maailmasta voi
-  saada lisää rieskaa, kuivattua kalaa ja tuohikontin. Ruoat kasvattavat
-  kylläisyyttä eivätkä kulu arvossa 100. Keihäs tyhjentää sivukäden.
-  Vain 3D-moottorin tukemat `sword_shield`-, `sword`- ja `spear`-yhdistelmät
-  hyväksytään.
-- **Kampanjatallennus** (`campaign.ts`, `storage.ts`) käyttää skeemaa 5 ja
-  avainta `laulun-miekka.campaign.v5`. Se säilyttää terrain-paljastusten lisäksi
-  erilliset `knownSiteIds`-paikkatiedot. V1–v3-migraatio päättelee tunnetuiksi
-  vain ne kolmesta vanhasta paikasta, joiden ruutu oli löydetty; tulevia paikkoja
-  ei skannata rekisteristä. Skeeman 1 `hunger` muunnetaan kylläisyydeksi ja
-  v1/v2-tallennukset saavat miesoletuksen; v4 saa tyhjän maailmanesinetilan.
-  Kelvollinen vanha tallennus ja sen
-  päätelty paikkatieto palautetaan myös silloin, kun migraation kirjoitus estyy.
-- **Matkan asetukset.** Esc avaa saavutettavan dialogin. Siellä valitaan
-  kieli fontista riippumattomilla FI/GB-lipuilla ja karttasankarin sukupuoli
-  kylläisimmistä kasvokuvista. Mies on uuden ja migroidun kampanjan oletus.
-  Lisäksi dialogissa ovat vahvistettava "Aloita matka uudelleen" sekä
-  oikotiet kaikkiin 3D-paikkoihin; rauhallinen piha ja järven ranta ovat
-  ystävällisiä, nuotioaukio ja pihapiiri taisteluita. Paperinuken selectit ja
-  tavaranapit eivät vuoda kartan näppäinohjaukseen.
-- **Paikat.** `src/map/sites.ts` omistaa 2D-instanssin liikkumisen
-  (`fixed|mobile`), elinkaaren (`persistent|temporary`), sijainnin ja erillisen
-  `sceneId`-kytkennän. Pihat (instanssit), järven ranta, nuotioaukio ja kalmisto ovat
-  `fixed+persistent`: ne löytyvät lähinäössä ja jäävät sen jälkeen sumuun himmeinä.
-  Sama 3D-scene on kytketty kahteen 2D-instanssiin (`yard`, `yard-b`). Enter tai välilyönti
-  aktivoi sankarin ruudun paikan kuten ennen.
-- **Yleinen 2D→3D-silta** on `src/map/transition.ts`. Kohtaukset luokitellaan
-  `src/app/route.ts`:ssä. `SCENE_TRANSITION_BALANCE` säätää vaikutuksen:
-  taistelussa kylläisyys 50–100 ei rankaise, 1–alle 50 vähentää 20 ja 0
-  vähentää 40 sekä HP:n että staminan enimmäis- ja nykyarvosta. Vaikutus on
-  idempotentti ja säilyy taistelun restartissa. Ystävällinen kohtaus ei
-  rankaise kylläisyydestä riippumatta.
-- **3D→2D-paluusilta** käyttää versionoitua avainta
-  `laulun-miekka.scene-return.v1`. 3D tallentaa ennen kartalle palaamista
-  tyypitetyn `SceneToMapTransition`-kuorman; kartta kuluttaa sen kerran.
-  `rewards` on nyt aina tyhjä, mutta rakenne varaa paikan tuleville ruoka- ja
-  esinepalkinnoille.
-- **Karttagrafiikka ja sankari.** `kalevala-map-atlas-v2.png` on 8 × 4 atlas;
-  sen vasen puolisko säilyttää vanhat ikonit ja hahmot ennallaan. Kuudella
-  aiemmalla terrainilla on kaksi deterministisesti valittavaa variaatiota.
-  Joella on kolme suora-, mutka- ja päätevariaatiota, joita kierretään
-  naapuriyhteyksien mukaan. `lake-shore-edge.png` muodostaa vesiruudun viereisen
-  maan mukaan kierretyt, pyöristetyt rannat; joki lasketaan vedeksi joensuissa.
-  `river-ford-overlay.png` piirtää kahlaamon joen päälle. Molemmat ovat 48 px:n
-  läpinäkyviä ImageGen-päällysteitä Kalevala-tyylioppaan ja atlaksen pohjalta.
+- **Kampanjatallennus** (`campaign.ts`, `storage.ts`) käyttää skeemaa 6 ja
+  avainta `laulun-miekka.campaign.v6`. Terrain-muisti ja `knownSiteIds` säilyvät erikseen.
+  Vanhat hunger-, sukupuoli-, maailmanesine- ja virtuaalivarustetiedot migroidaan häviöttömästi;
+  kelvollinen vanha tila palautetaan myös, jos migraation kirjoitus estyy.
+- **Matkan asetukset.** Esc-dialogissa ovat FI/GB-kieli, sukupuoli, vahvistettava uudelleenaloitus
+  ja 3D-oikotiet kohtaustyyppeineen. Mies on uuden ja migroidun kampanjan oletus.
+- **Paikat.** `sites.ts` omistaa liikkumisen (`fixed|mobile`), elinkaaren
+  (`persistent|temporary`), sijainnin ja `sceneId`-kytkennän. Nykyiset paikat ovat
+  `fixed+persistent`; kaksi pihainstanssia käyttää samaa 3D-sceneä.
+- **2D↔3D-sillat.** `transition.ts` vähentää nälkäisessä taistelussa HP- ja staminakattoa 20,
+  nääntyneenä 40; vaikutus on idempotentti eikä koske ystävällisiä kohtauksia. Paluukuorma
+  `laulun-miekka.scene-return.v1` kulutetaan kerran; `rewards` on vielä tyhjä varaus.
+- **Karttagrafiikka ja sankari.** `kalevala-map-atlas-v2.png` sisältää kaksi terrainvariaatiota
+  ja naapureista kierrettävät jokipalat. 48 px:n `lake-shore-edge.png` pyöristää rannat ja
+  `river-ford-overlay.png` piirtää kahlaamon.
   Naisella ovat `paper-doll-hero.png`, `satiety-faces.png` ja nelisuuntainen
   `map-hero-female.png`; sininen viitta erottaa hänet kartalla. Miehellä ovat
   `paper-doll-hero-male.png`, `satiety-faces-male.png` ja atlaksen nykyiset
   neljä sankariruutua. Paperinuket ovat 256 × 384, kasvot 480 × 96 ja
   karttaspritet 48 px. Valinta vaihtaa kaikki kolme 2D-esitystä heti.
-- **3D-moottori.** `src/engine/` hoitaa taistelun ja kohtausten elinkaaren.
-  Rauhallisella pihalla sankarin miekka on huotrassa, kilpi selässä ja
-  kypärä poissa; vihollisen lisääminen palauttaa taisteluvarustuksen.
-  Keihäs pysyy kädessä. Pihalla ovat emäntä, tietäjä, jousineito ja eläimet.
-  Mallien, otteiden ja animaatioiden avoimet asiat ovat
-  `docs/BLENDER_HANDOFF.md`:ssä.
+- **3D-moottori.** Rauhassa miekka on huotrassa, kilpi selässä ja kypärä poissa;
+  taistelu palauttaa varustuksen. Keihäs pysyy kädessä. Assettiriskit: `BLENDER_HANDOFF.md`.
 - **Taistelun stamina-arvot:** kevyt isku 6, raskas isku 12, toteutunut
   torjunta 4 ja torjunta-asento 1,5/s. Tavallisella 1/s palautumisella
   torjunta kuluttaa nettomääräisesti 0,5/s. Keihään vahinkokerroin on 1,1.
@@ -303,6 +282,11 @@ Päivitetty: 2026-11-20 (Codex, Windows; pohja `origin/main` `2db0950`)
 - **UI ja kielituki.** Kartan pellavapohja, kirjontakehykset, paperinukke,
   kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
   tyypitetyissä FI/EN-sanakirjoissa.
+- **Tarkistukset 2026-11-21 (v05.00.00):** `bun run test` (27 tiedostoa, 320 testiä),
+  `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja `git diff --check` läpäisty. Build
+  varoittaa vain suuresta 3D-chunkista (840 kt, gzip 227 kt). GLB-tarkistus löysi kaikki mies- ja
+  naissankarin modulaariset solmut sekä `sword_sky_iron`in; Node-ympäristön tekstuurivaroitukset
+  eivät koske selaimen Vite-latausta.
 - **Tarkistukset 2026-11-20 (v04.06.01):** `bun ci`, `bun audit`, `bun outdated --no-cache`,
   `bun run test` (26 tiedostoa, 312 testiä), `bunx tsc --noEmit`, `bun run lint` ja `bun run build`
   läpäisty; build
@@ -329,8 +313,9 @@ Päivitetty: 2026-11-20 (Codex, Windows; pohja `origin/main` `2db0950`)
 - Vanha v3-tallennus voi ensimmäisellä latauksella asettaa sankarin ruutuun,
   joka on tässä karttaversiossa muuttunut joeksi. Sankari pääsee poistumaan
   viereiseen maahan, mutta lataus ei vielä siirrä häntä automaattisesti.
-- Paperinuken viisi vaatepaikkaa ovat vasta visuaalisia varauksia. Vain
-  pää- ja sivukäsi ovat toimivia; alkuvarusteet eivät vie tavarapaikkoja.
+- Keskushahmon paperinukkekuva ei kerrostu vaatekappale kerrallaan; toimiva varustetila näkyy
+  sitä ympäröivissä ikonislotteissa. Hansikkailla ei vielä ole erillistä 3D-mesh-versiota eikä
+  kengillä tai hansikkailla pelivaikutusta. Rauhassa kypärä on edelleen tarkoituksella pois päästä.
 - Sukupuolivalinta vaihtaa 2D-kartan spriten, paperinuken ja kylläisyyskasvot
   sekä 3D-sankarin (jousineidon vartalo). Jousineito-NPC pihalla (vain `archer`-talossa) on
   jousen kanssa, joten naissankarin rinnalla on kaksi samannäköistä hahmoa.
@@ -353,16 +338,15 @@ Päivitetty: 2026-11-20 (Codex, Windows; pohja `origin/main` `2db0950`)
   nähtynä; rantakohtauksen koira ei käyskentele (ei kävelyleikettä).
 - 3D-chunk on noin 829 kt ja metsä noin 2 milj. kolmiota. LOD-malleja tai
   laatuasetusta ei ole; 60 FPS on mitattu tehokoneella.
-- Moottori on v0: ei ajastimia, `unless`-peruutusta, ketjureaktioita (efekti ei
-  lähetä tapahtumaa), laulu- tai paikkatapahtumia (`song.performed`) eikä efektejä
-  "avaa laulu"/"paljasta paikka". Engine-lohkon tuntematon `version` luetaan
-  silti (flags/counters poimitaan); jos semantiikka muuttuu, lisää versiohaara
-  `parseEngineState`en. `npc.talked` lähtee jokaiselle puhutulle hahmolle.
+- Moottori on v0: ei ajastimia, `unless`-peruutusta eikä efektien ketjureaktioita.
+  Tuntematon engine-versionumero luetaan sallivasti; semantiikkamuutos tarvitsee versionhaaran.
 - Rikkinäistä tallennetta ei kopioida talteen ennen korvaamista (ROADMAPin riski);
   moottorilohkossa salliva luku vain pudottaa tuntemattoman.
 
 ## Seuraava tehtävä
 
+Pelaa inventaarion käsisavutesti: vaihda mies- ja naissankarilla kengät, rengaspaita, säärisuojat,
+ase ja kilpi rauhallisessa 3D-kohtauksessa, varmista taistelun lukittu näkymä sekä kypärän ylälyöntisuoja.
 Laajenna paperinukke ja inventaario yhteiseksi 2D/3D-näkymäksi: versionoidut vaatepaikat,
 turvallinen varusteiden vaihto, omat ruoka- ja taivaanrautamiekan ikonit sekä tauotettu käyttö
 rauhallisissa 3D-kohtauksissa. Taistelussa sama näkymä on vain luettavissa.

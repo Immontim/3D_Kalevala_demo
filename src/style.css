@@ -106,6 +106,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; col
 .panel button.tab { margin: 0; padding: 6px 18px; font-size: 15px; background: transparent; color: var(--bronze); border: 1px solid rgba(217, 164, 65, 0.45); }
 .panel button.tab.on { background: var(--bronze); color: #1a1209; }
 .pane.hidden { display: none; }
+#pause.showing-inventory .panel { max-width: 700px; }
+#paneInventory { max-height: min(72vh, 700px); overflow-y: auto; padding: 12px; border: 5px double #9c351c;
+  background: #dfd0ae; box-shadow: inset 0 0 20px rgba(91, 56, 39, 0.18); }
+#paneInventory > .small { margin: 0 0 8px; color: #6d4b35; text-align: center; }
+#paneInventory .inventory-title, #paneInventory .inventory-view > h3 { color: #8f2f18; }
+#paneInventory .inventory-content { grid-template-columns: minmax(92px, 1fr) 150px minmax(92px, 1fr); }
+#paneInventory .inventory-portrait { width: 150px; height: 250px; }
 .panel button.secondary.first { margin-left: 0; }
 #arenaPick, #gearPick { display: flex; gap: 8px; flex-wrap: wrap; }
 .panel button.arena { flex: 1 1 160px; margin: 0; padding: 8px 12px; text-align: left; font-size: 16px; background: transparent; color: var(--bronze); border: 1px solid rgba(217, 164, 65, 0.45); }
@@ -262,22 +269,40 @@ body.mode-scene > #mapRoot { display: none !important; }
 .ending-version { margin: 6px 0 0; color: #7d6a55; font-size: 12px; letter-spacing: 0.08em; }
 @media (max-width: 640px) { .ending-columns { grid-template-columns: 1fr; } }
 .map-paper { min-width: 0; }
-.paper-figure { display: grid; grid-template-columns: 82px 128px minmax(0, 1fr); align-items: center; gap: 7px; margin-bottom: 8px; }
-.paper-armour { display: grid; gap: 5px; }
-.paper-armour-slot { min-width: 0; display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 3px; color: #6d3c27; font-size: 10px; }
-.paper-armour-slot i { width: 26px; height: 26px; display: grid; place-items: center; border: 2px solid #8b5a38; background: rgba(205, 187, 148, 0.55); color: #a16a45; font-style: normal; }
-.paper-hands { display: grid; align-content: center; gap: 17px; }
-.paper-hand { display: flex; min-width: 0; flex-direction: column; gap: 5px; color: #6d3c27; text-align: center; font-size: 12px; }
-.paper-hand select { min-width: 0; width: 100%; padding: 5px 3px; background: #eee0bd; color: #2a2119; border-color: #8b5a38; font-size: 12px; }
-.hero-portrait { width: 128px; height: 220px; margin: 0 auto; background-image: var(--paper-doll); background-repeat: no-repeat;
-  background-position: center; background-size: contain; image-rendering: auto; }
-.equipment-summary { min-height: 1.4em; margin: 6px 0 12px; color: #6d3c27; text-align: center; font-size: 13px; }
-.inventory-slots { display: grid; grid-template-columns: repeat(4, 58px); justify-content: center; gap: 8px; }
-.inventory-slot { position: relative; width: 58px; height: 58px; padding: 3px !important; background: #cdbb94 !important; border-color: #7e5237 !important; }
-.inventory-slot .atlas-icon { transform: scale(0.94); }
-.inventory-slot b { position: absolute; right: 3px; bottom: 1px; min-width: 18px; color: #fff1cd; background: #8f2f18; border-radius: 9px; font-size: 12px; }
-.inventory-slot:disabled { cursor: default; opacity: 0.42; }
-.paper-hint { margin: 9px 0 0; color: #6d4b35; text-align: center; font-size: 12px; }
+.inventory-view { --inventory-ink: #2a2119; --inventory-red: #8f2f18; --inventory-border: #7e5237; color: var(--inventory-ink); }
+.inventory-title, .inventory-view > h3 { margin: 0 0 9px; color: var(--inventory-red); text-align: center; font-weight: normal; }
+.inventory-content { display: grid; grid-template-columns: minmax(72px, 1fr) 128px minmax(72px, 1fr); align-items: center; gap: 6px; }
+.inventory-equipment, .inventory-hands { display: grid; align-content: center; gap: 5px; }
+.inventory-hands { gap: 18px; }
+.inventory-equipment-slot { min-width: 0; height: 48px; display: grid; grid-template-columns: minmax(0, 1fr) 38px; align-items: center; gap: 3px;
+  margin: 0 !important; padding: 3px !important; color: #5e3928 !important; background: rgba(205, 187, 148, 0.62) !important;
+  border: 2px solid var(--inventory-border) !important; border-radius: 1px !important; font: inherit !important; cursor: pointer; }
+.inventory-equipment-slot:disabled { cursor: default; opacity: 0.72; }
+.inventory-slot-label { min-width: 0; overflow: hidden; font-size: 10px; text-overflow: ellipsis; }
+.inventory-empty-mark { display: grid; place-items: center; width: 36px; height: 36px; color: #a16a45; font-size: 20px; }
+.inventory-portrait { width: 128px; height: 220px; margin: 0 auto; background: var(--paper-doll) center / contain no-repeat; }
+.inventory-item-icon { position: relative; display: inline-block; width: 48px; height: 48px; flex: 0 0 48px; overflow: hidden;
+  background-image: var(--inventory-atlas); background-size: 192px 144px; background-repeat: no-repeat; image-rendering: pixelated; }
+.inventory-equipment-slot .inventory-item-icon { width: 48px; height: 48px; transform: scale(0.75); transform-origin: center; margin: -6px; }
+.inventory-item-icon.item-barley_flatbread { background-position: 0 0; }
+.inventory-item-icon.item-dried_fish { background-position: -48px 0; }
+.inventory-item-icon.item-birch_bark_pack { background-position: -96px 0; }
+.inventory-item-icon.item-sword { background-position: -144px 0; }
+.inventory-item-icon.item-sky_iron_sword { background-position: 0 -48px; }
+.inventory-item-icon.item-spear { background-position: -48px -48px; }
+.inventory-item-icon.item-round_shield { background-position: -96px -48px; }
+.inventory-item-icon.item-iron_helmet { background-position: -144px -48px; }
+.inventory-item-icon.item-ring_mail { background-position: 0 -96px; }
+.inventory-item-icon.item-leather_gloves { background-position: -48px -96px; }
+.inventory-item-icon.item-iron_greaves { background-position: -96px -96px; }
+.inventory-item-icon.item-leather_shoes { background-position: -144px -96px; }
+.inventory-view > h3 { margin-top: 10px; }
+.inventory-grid { display: grid; grid-template-columns: repeat(4, 58px); justify-content: center; gap: 7px; }
+.inventory-grid-slot { position: relative; width: 58px; height: 58px; margin: 0 !important; padding: 3px !important; background: #cdbb94 !important;
+  border: 2px solid var(--inventory-border) !important; border-radius: 1px !important; }
+.inventory-grid-slot b { position: absolute; right: 3px; bottom: 1px; min-width: 18px; color: #fff1cd; background: #8f2f18; border-radius: 9px; font-size: 12px; }
+.inventory-grid-slot:disabled { cursor: default; opacity: 0.45; }
+.inventory-note { min-height: 2.5em; margin: 8px 0 0; color: #6d4b35; text-align: center; font-size: 11px; line-height: 1.25; }
 .map-danger { width: 100%; margin: 5px 0 20px; }
 .map-settings-error { min-height: 1.3em; margin: 6px 0; color: #8f2f18; font-weight: bold; text-align: center; }
 .map-setting-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 15px 0; }
@@ -322,12 +347,12 @@ body.from-map #start .panel { max-width: 500px; }
   .map-status { grid-column: 2; grid-row: 1; }
   .map-paper { grid-column: 2; grid-row: 2; }
   .map-panel { padding: 9px; }
-  .paper-figure { grid-template-columns: 60px 96px minmax(0, 1fr); gap: 3px; }
-  .paper-armour-slot { grid-template-columns: 22px minmax(0, 1fr); font-size: 9px; }
-  .paper-armour-slot i { width: 20px; height: 20px; }
-  .hero-portrait { width: 96px; height: 180px; }
-  .inventory-slots { grid-template-columns: repeat(4, 52px); gap: 5px; }
-  .inventory-slot { width: 52px; height: 52px; }
+  .inventory-content { grid-template-columns: 72px 96px 72px; gap: 3px; }
+  .inventory-portrait { width: 96px; height: 180px; }
+  .inventory-equipment-slot { height: 39px; grid-template-columns: minmax(0, 1fr) 30px; }
+  .inventory-equipment-slot .inventory-item-icon { transform: scale(0.62); margin: -9px; }
+  .inventory-grid { grid-template-columns: repeat(4, 52px); gap: 5px; }
+  .inventory-grid-slot { width: 52px; height: 52px; }
 }
 @media (max-width: 1100px) {
   .map-layout { grid-template-columns: 1fr; }
@@ -338,8 +363,8 @@ body.from-map #start .panel { max-width: 500px; }
   .map-ornament { display: none; }
 }
 @media (max-width: 560px) {
-  .inventory-slots { grid-template-columns: repeat(4, 52px); }
-  .inventory-slot { width: 52px; height: 52px; }
+  .inventory-grid { grid-template-columns: repeat(4, 52px); }
+  .inventory-grid-slot { width: 52px; height: 52px; }
   .map-setting-grid { grid-template-columns: 1fr; }
 }
 

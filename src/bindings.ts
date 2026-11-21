@@ -47,7 +47,7 @@ export const DEFAULT_BINDINGS: Bindings = {
 };
 
 /** Näppäimet, joilla on kiinteä tehtävä: liike, laulun tahti, uusi peli ja tauko. */
-export const RESERVED: readonly string[] = ["KeyW", "KeyA", "KeyS", "KeyD", "Space", "KeyR", "Escape"];
+export const RESERVED: readonly string[] = ["KeyW", "KeyA", "KeyS", "KeyD", "KeyB", "Space", "KeyR", "Escape"];
 
 export function mouseCode(button: number): string {
   return `Mouse${button}`;

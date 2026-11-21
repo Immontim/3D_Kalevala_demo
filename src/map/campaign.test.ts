@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CAMPAIGN_SCHEMA_VERSION,
+  INVENTORY_CAPACITY,
   SATIETY_MAX,
   ITEMS,
   combatLoadout,
@@ -9,16 +10,34 @@ import {
   parseCampaign,
   sceneItemTakeMode,
   serializeCampaign,
-  setEquipped,
   setPlayerGender,
   setSceneItemTakeMode,
   tryAddItem,
+  tryEquipItem,
   tryTakeSceneItem,
+  tryUnequipItem,
   type SceneItemDefinition,
 } from "./campaign";
 
+function legacyPlayer(state: ReturnType<typeof createCampaign>) {
+  return {
+    gender: state.player.gender,
+    satiety: state.player.satiety,
+    inventory: {
+      capacity: 8,
+      stacks: state.player.inventory.stacks
+        .filter((stack) => stack.itemId !== "spear")
+        .map((stack) => ({ ...stack })),
+    },
+    equipment: {
+      mainHand: state.player.equipment.mainHand,
+      offHand: state.player.equipment.offHand,
+    },
+  };
+}
+
 describe("kampanjatila", () => {
-  it("luo 20 × 20 maailman, kahdeksan tavarapaikkaa ja kolme aloitusrieskaa", () => {
+  it("luo 20 × 20 maailman, 12 tavarapaikkaa ja puetut aloitusvarusteet", () => {
     const state = createCampaign();
     expect(state.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
     expect(state.world).toMatchObject({ width: 20, height: 20, worldMinutes: 0 });
@@ -27,10 +46,15 @@ describe("kampanjatila", () => {
     expect(state.world.sceneItems).toEqual({
       takenInstanceIds: [], takeModeOverrides: [], thefts: [], droppedItems: [], nextDroppedItemId: 1,
     });
-    expect(state.player.inventory.capacity).toBe(8);
+    expect(state.player.inventory.capacity).toBe(12);
     expect(state.player.inventory.stacks).toEqual([
       { itemId: "barley_flatbread", quantity: 3 },
+      { itemId: "spear", quantity: 1 },
     ]);
+    expect(state.player.equipment).toEqual({
+      head: "iron_helmet", torso: "ring_mail", hands: "leather_gloves",
+      legs: "iron_greaves", feet: "leather_shoes", mainHand: "sword", offHand: "round_shield",
+    });
     expect(state.player.satiety).toBe(SATIETY_MAX);
     expect(state.player.gender).toBe("male");
     expect(ITEMS.barley_flatbread.satietyGain).toBeGreaterThan(0);
@@ -66,16 +90,19 @@ describe("kampanjatila", () => {
     const added = tryAddItem(inventory, "barley_flatbread", 8);
     expect(added?.stacks).toEqual([
       { itemId: "barley_flatbread", quantity: 6 },
+      { itemId: "spear", quantity: 1 },
       { itemId: "barley_flatbread", quantity: 5 },
     ]);
-    expect(inventory.stacks).toEqual([{ itemId: "barley_flatbread", quantity: 3 }]);
+    expect(inventory.stacks).toEqual([
+      { itemId: "barley_flatbread", quantity: 3 }, { itemId: "spear", quantity: 1 },
+    ]);
   });
 
   it("lisää vain koko määrän eikä muuta täyttä inventaariota", () => {
     const inventory = createCampaign().player.inventory;
-    inventory.stacks = Array.from({ length: 8 }, () => ({ itemId: "birch_bark_pack" as const, quantity: 1 }));
+    inventory.stacks = Array.from({ length: INVENTORY_CAPACITY }, () => ({ itemId: "birch_bark_pack" as const, quantity: 1 }));
     expect(tryAddItem(inventory, "dried_fish", 1)).toBeNull();
-    expect(inventory.stacks).toHaveLength(8);
+    expect(inventory.stacks).toHaveLength(INVENTORY_CAPACITY);
   });
 
   it("johtaa vain tuetut pää- ja sivukäden yhdistelmät 3D-varustukseksi", () => {
@@ -86,11 +113,24 @@ describe("kampanjatila", () => {
     expect(combatLoadout({ mainHand: null, offHand: null })).toBeNull();
   });
 
-  it("vaihtaa vain esineen tukemaan paperinuken paikkaan", () => {
+  it("vaihtaa inventaarioesineen atomisesti ja siirtää keihään tieltä miekan sekä kilven tavaroihin", () => {
     const state = createCampaign();
-    const spear = setEquipped(setEquipped(state, "offHand", null), "mainHand", "spear");
-    expect(spear.player.equipment).toEqual({ mainHand: "spear", offHand: null });
-    expect(setEquipped(spear, "offHand", "sword")).toBe(spear);
+    const result = tryEquipItem(state, "spear");
+    expect(result.status).toBe("equipped");
+    expect(result.state.player.equipment).toMatchObject({ mainHand: "spear", offHand: null });
+    expect(result.state.player.inventory.stacks).toContainEqual({ itemId: "sword", quantity: 1 });
+    expect(result.state.player.inventory.stacks).toContainEqual({ itemId: "round_shield", quantity: 1 });
+    expect(result.state.player.inventory.stacks).not.toContainEqual({ itemId: "spear", quantity: 1 });
+    expect(state.player.equipment.mainHand).toBe("sword");
+  });
+
+  it("riisuu vaatevarusteen tavaroihin mutta ei jätä 3D-sankaria ilman pääasetta", () => {
+    const state = createCampaign();
+    const helmet = tryUnequipItem(state, "head");
+    expect(helmet.status).toBe("unequipped");
+    expect(helmet.state.player.equipment.head).toBeNull();
+    expect(helmet.state.player.inventory.stacks).toContainEqual({ itemId: "iron_helmet", quantity: 1 });
+    expect(tryUnequipItem(state, "mainHand")).toEqual({ state, status: "incompatible" });
   });
 
   it("vaihtaa sankarin sukupuolen muuttamatta muuta kampanjatilaa", () => {
@@ -150,7 +190,7 @@ describe("maailmanesineet", () => {
 
   it("jättää esineen ja kampanjan koskematta, jos koko määrä ei mahdu", () => {
     const state = createCampaign();
-    state.player.inventory.stacks = Array.from({ length: 8 }, () => ({ itemId: "birch_bark_pack" as const, quantity: 1 }));
+    state.player.inventory.stacks = Array.from({ length: INVENTORY_CAPACITY }, () => ({ itemId: "birch_bark_pack" as const, quantity: 1 }));
     const food: SceneItemDefinition = {
       instanceId: "yard.table-fish", siteId: "yard", itemId: "dried_fish", quantity: 3,
       takeMode: "theft", ownerId: "yard-household",
@@ -189,9 +229,11 @@ describe("kampanjatallennus", () => {
   });
 
   it("migroi version 3 tallennuksen tyhjään paikkatietoon", () => {
-    const legacy = JSON.parse(serializeCampaign(createCampaign({ x: 8, y: 9 })));
+    const current = createCampaign({ x: 8, y: 9 });
+    const legacy = JSON.parse(serializeCampaign(current));
     legacy.schemaVersion = 3;
     delete legacy.world.knownSiteIds;
+    legacy.player = legacyPlayer(current);
     const migrated = parseCampaign(legacy);
     expect(migrated).not.toBeNull();
     expect(migrated!.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
@@ -200,14 +242,34 @@ describe("kampanjatallennus", () => {
   });
 
   it("migroi version 4 tallennuksen tyhjään maailmanesinetilaan", () => {
-    const legacy = JSON.parse(serializeCampaign(createCampaign({ x: 8, y: 9 })));
+    const current = createCampaign({ x: 8, y: 9 });
+    const legacy = JSON.parse(serializeCampaign(current));
     legacy.schemaVersion = 4;
     delete legacy.world.sceneItems;
+    legacy.player = legacyPlayer(current);
     const migrated = parseCampaign(legacy);
     expect(migrated?.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
     expect(migrated?.world.sceneItems).toEqual({
       takenInstanceIds: [], takeModeOverrides: [], thefts: [], droppedItems: [], nextDroppedItemId: 1,
     });
+  });
+
+  it("migroi v5-varusteet häviöttömästi ja poistaa kädessä olevan taivaanrautamiekan kaksoiskappaleen", () => {
+    const current = createCampaign();
+    const legacy = JSON.parse(serializeCampaign(current));
+    legacy.schemaVersion = 5;
+    legacy.player = legacyPlayer(current);
+    legacy.player.equipment = { mainHand: "sky_iron_sword", offHand: "round_shield" };
+    legacy.player.inventory.stacks.push({ itemId: "sky_iron_sword", quantity: 1 });
+    const migrated = parseCampaign(legacy)!;
+    expect(migrated.player.equipment).toMatchObject({
+      head: "iron_helmet", torso: "ring_mail", legs: "iron_greaves",
+      mainHand: "sky_iron_sword", offHand: "round_shield",
+    });
+    expect(migrated.player.inventory.capacity).toBe(12);
+    expect(migrated.player.inventory.stacks.filter((stack) => stack.itemId === "sky_iron_sword")).toEqual([]);
+    expect(migrated.player.inventory.stacks).toContainEqual({ itemId: "sword", quantity: 1 });
+    expect(migrated.player.inventory.stacks).toContainEqual({ itemId: "spear", quantity: 1 });
   });
 
   it("migroi version 1 nälän version 2 kylläisyydeksi ja säilyttää etenemisen", () => {
@@ -218,14 +280,14 @@ describe("kampanjatallennus", () => {
       ...current,
       schemaVersion: 1,
       world: { ...current.world, knownSiteIds: undefined },
-      player: { ...current.player, hunger: 73, satiety: undefined },
+      player: { ...legacyPlayer(current), hunger: 73, satiety: undefined },
     };
     const migrated = parseCampaign(JSON.parse(JSON.stringify(legacy)));
     expect(migrated).not.toBeNull();
     expect(migrated!.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
     expect(migrated!.player.satiety).toBe(27);
     expect(migrated!.world).toEqual(current.world);
-    expect(migrated!.player.inventory).toEqual(current.player.inventory);
+    expect(migrated!.player.inventory.stacks).toContainEqual({ itemId: "spear", quantity: 1 });
     expect(migrated!.player.equipment).toEqual(current.player.equipment);
     expect(migrated!.player.gender).toBe("male");
   });
@@ -236,7 +298,8 @@ describe("kampanjatallennus", () => {
     const legacy = JSON.parse(serializeCampaign(current));
     legacy.schemaVersion = 2;
     delete legacy.world.knownSiteIds;
-    legacy.player.gender = "female";
+    legacy.player = legacyPlayer(current);
+    delete legacy.player.gender;
     const migrated = parseCampaign(legacy);
     expect(migrated).not.toBeNull();
     expect(migrated!.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
@@ -252,6 +315,7 @@ describe("kampanjatallennus", () => {
 
     const legacy = JSON.parse(serializeCampaign(createCampaign()));
     legacy.schemaVersion = 1;
+    legacy.player = legacyPlayer(createCampaign());
     delete legacy.player.satiety;
     legacy.player.hunger = -1;
     expect(parseCampaign(legacy)).toBeNull();
@@ -297,7 +361,7 @@ describe("kampanjatallennus", () => {
 
   it("hylkää varusteyhdistelmän, jota nykyinen 3D-hahmo ei tue", () => {
     const state = createCampaign();
-    state.player.equipment = { mainHand: "spear", offHand: "round_shield" };
+    state.player.equipment = { ...state.player.equipment, mainHand: "spear", offHand: "round_shield" };
     expect(parseCampaign(state)).toBeNull();
   });
 });
@@ -324,7 +388,9 @@ describe("moottoriosio (engine)", () => {
     const parsed = parseCampaign(raw);
     expect(parsed).not.toBeNull();
     expect(parsed?.engine).toEqual({ version: 1, flags: { "sage.robbed": true }, counters: { "thefts.noticed": 999 } });
-    expect(parsed?.player.inventory.stacks).toEqual([{ itemId: "barley_flatbread", quantity: 3 }]);
+    expect(parsed?.player.inventory.stacks).toEqual([
+      { itemId: "barley_flatbread", quantity: 3 }, { itemId: "spear", quantity: 1 },
+    ]);
   });
 
   it("puuttuva tai rikkinäinen lohko ei hylkää tallennusta (vanha v5 ennen moottoria)", () => {
@@ -339,7 +405,7 @@ describe("moottoriosio (engine)", () => {
 describe("tryRemoveItem", () => {
   it("ottaa määrän useasta pinosta ja poistaa tyhjät pinot", async () => {
     const { tryRemoveItem } = await import("./campaign");
-    const inv = { capacity: 8 as const, stacks: [{ itemId: "dried_fish" as const, quantity: 4 }, { itemId: "barley_flatbread" as const, quantity: 3 }, { itemId: "dried_fish" as const, quantity: 2 }] };
+    const inv = { capacity: INVENTORY_CAPACITY as typeof INVENTORY_CAPACITY, stacks: [{ itemId: "dried_fish" as const, quantity: 4 }, { itemId: "barley_flatbread" as const, quantity: 3 }, { itemId: "dried_fish" as const, quantity: 2 }] };
     expect(tryRemoveItem(inv, "dried_fish", 3)?.stacks).toEqual([
       { itemId: "dried_fish", quantity: 3 }, { itemId: "barley_flatbread", quantity: 3 },
     ]);
@@ -354,8 +420,8 @@ describe("taivaanrautamiekka varusteena (V6)", () => {
     const { isSkyIron, ownsMainHand } = await import("./campaign");
     expect(combatLoadout({ mainHand: "sky_iron_sword", offHand: "round_shield" })).toBe("sword_shield");
     expect(combatLoadout({ mainHand: "sky_iron_sword", offHand: null })).toBe("sword");
-    expect(isSkyIron({ mainHand: "sky_iron_sword", offHand: null })).toBe(true);
-    expect(isSkyIron({ mainHand: "sword", offHand: null })).toBe(false);
+    expect(isSkyIron({ mainHand: "sky_iron_sword" })).toBe(true);
+    expect(isSkyIron({ mainHand: "sword" })).toBe(false);
     const state = createCampaign();
     expect(ownsMainHand(state, "sky_iron_sword")).toBe(false);          // ei vielä saatu
     expect(ownsMainHand(state, "sword")).toBe(true);
@@ -365,7 +431,9 @@ describe("taivaanrautamiekka varusteena (V6)", () => {
   });
 
   it("varustus säilyy tallennuksen läpi ja valinta onnistuu paperinuken tapaan", () => {
-    const state = setEquipped(createCampaign(), "mainHand", "sky_iron_sword");
+    const start = createCampaign();
+    start.player.inventory = tryAddItem(start.player.inventory, "sky_iron_sword", 1)!;
+    const state = tryEquipItem(start, "sky_iron_sword").state;
     expect(state.player.equipment.mainHand).toBe("sky_iron_sword");
     expect(parseCampaign(serializeCampaign(state))?.player.equipment.mainHand).toBe("sky_iron_sword");
   });

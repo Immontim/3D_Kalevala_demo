@@ -302,7 +302,7 @@ describe("jousineito, emäntä ja nuori urho (V6)", () => {
     const { store, runtime } = setup();
     store.update((s) => ({
       ...s,
-      player: { ...s.player, inventory: { ...s.player.inventory, stacks: Array.from({ length: 8 }, () => ({ itemId: "birch_bark_pack" as const, quantity: 1 })) } },
+      player: { ...s.player, inventory: { ...s.player.inventory, stacks: Array.from({ length: s.player.inventory.capacity }, () => ({ itemId: "birch_bark_pack" as const, quantity: 1 })) } },
     }));
     runtime.post(heal());
     const reward = runtime.startDialogue("yard", "jousineito")!;

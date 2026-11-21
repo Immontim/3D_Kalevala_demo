@@ -141,7 +141,7 @@ describe("efektit", () => {
     const base = createCampaign();
     const full: CampaignState = {
       ...base,
-      player: { ...base.player, inventory: { ...base.player.inventory, stacks: Array.from({ length: 8 }, () => ({ itemId: "birch_bark_pack" as const, quantity: 1 })) } },
+      player: { ...base.player, inventory: { ...base.player.inventory, stacks: Array.from({ length: base.player.inventory.capacity }, () => ({ itemId: "birch_bark_pack" as const, quantity: 1 })) } },
     };
     const r = applyEffects(full, [{ kind: "giveItem", itemId: "dried_fish", quantity: 1 }], TEST_WORLD);
     expect(r.ok).toBe(false);
