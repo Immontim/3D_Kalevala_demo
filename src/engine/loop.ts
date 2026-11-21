@@ -21,7 +21,7 @@ import { updateHazards } from "./hazards";
 import { updateShowcase } from "./showcase";
 import { choosing, closeChoice, closeSong, songState, updateChoice, updateSong } from "./song";
 import { aim, bindUi, fx, g, inputs, keys, sfx } from "./state";
-import { camera, canvas, composer, world } from "./view";
+import { camera, canvas, composer, updateSongLook, world } from "./view";
 import { createEmptySceneReturn, saveSceneReturn } from "../map/transition";
 import { worldRuntime } from "./store";
 import { updateSceneItemFocus } from "./sceneItems";
@@ -82,6 +82,7 @@ export function frame(now: number) {
   const realDt = Math.min(0.05, (now - last) / 1000);
   last = now;
   simulate(realDt);
+  updateSongLook(realDt);
   composer.render();
   requestAnimationFrame(frame);
 }

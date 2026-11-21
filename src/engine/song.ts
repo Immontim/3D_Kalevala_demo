@@ -14,7 +14,7 @@ import { fx, g, inputs, sfx } from "./state";
 import { campaignStore, worldRuntime } from "./store";
 import { heroAtPeace } from "./hero";
 import { nearestTalkable } from "../interact";
-import { camera, canvas, world } from "./view";
+import { camera, setSongLook, world } from "./view";
 
 // ---------- Laulu ----------
 // Kulku: 1) maailma hidastuu, 2) pelaaja ottaa lauluasennon normaalinopeudella,
@@ -105,16 +105,14 @@ export function openChoice() {
   });
   $("choiceHint").textContent = isTouch ? t("song.chooseTouch") : t("song.choose", { key: codeLabel(bindings.song.find((c) => c) ?? "") });
   $("choice").classList.remove("hidden");
-  canvas.classList.add("singing");
-  $("vignette").classList.add("on");
+  setSongLook(true);
   if (document.pointerLockElement) { g.choiceUnlock = true; document.exitPointerLock(); }
 }
 export function closeChoice() {
   choosing = false;
   inputs.pickQueued = null;
   $("choice").classList.add("hidden");
-  canvas.classList.remove("singing");
-  $("vignette").classList.remove("on");
+  setSongLook(false);
   clearInputs();
   if (!paused) lockPointer();
 }
@@ -174,8 +172,7 @@ export function startSong(id: SongId, lesson: SongLesson | null = null) {
   });
   songState = { id, lesson, verseShown: -1, healed: 0, start: g.realTime, playAt, shown: false, beats, results: beats.map(() => null), runes, zones, endAt: -1 };
   $("verse").textContent = "";
-  canvas.classList.add("singing");
-  $("vignette").classList.add("on");
+  setSongLook(true);
   $("song").classList.toggle("heal", id === "heal");
   $("songHint").textContent = t(lesson ? "song.lesson.hint" : "song.rhythmHint");
   setState(g.player, "idle");
@@ -245,8 +242,7 @@ export function closeSong(instant = false) {
   songState = null;
   sfx.stopDrone();
   $("song").classList.add("hidden");
-  canvas.classList.remove("singing");
-  $("vignette").classList.remove("on");
+  setSongLook(false);
   if (instant) g.timeScale = 1;
 }
 

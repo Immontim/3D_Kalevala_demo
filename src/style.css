@@ -8,11 +8,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; color: var(--ink);
   font-family: Georgia, "Palatino Linotype", serif; user-select: none; -webkit-user-select: none; touch-action: none; }
-#c { display: block; cursor: crosshair; width: 100vw; height: 100vh; transition: filter 0.4s; }
-#c.singing { filter: saturate(0.3) sepia(0.25) contrast(1.1) brightness(0.92); }
-#vignette { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.4s;
-  background: radial-gradient(ellipse at center, transparent 45%, rgba(30, 20, 5, 0.75) 100%); }
-#vignette.on { opacity: 1; }
+#c { display: block; cursor: crosshair; width: 100vw; height: 100vh; }
 #flash { position: fixed; inset: 0; pointer-events: none; background: var(--blood); opacity: 0; }
 #hud { position: fixed; inset: 0; pointer-events: none; }
 #gazeFocus { position: absolute; left: 50%; top: 50%; z-index: 8; transform: translate(-50%, -50%); color: #f3ddb0; text-align: center; text-shadow: 0 1px 3px #17100b, 0 0 5px #17100b; }
@@ -193,7 +189,6 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; col
 
 /* ---------- 2D-maailmankartta ---------- */
 body.mode-map > #c,
-body.mode-map > #vignette,
 body.mode-map > #flash,
 body.mode-map > #hud,
 body.mode-map > #choice,
@@ -370,7 +365,7 @@ body.from-map #start .panel { max-width: 500px; }
 
 /* Vapaa kamera (tauon tarkastelu): pelin käyttöliittymä piiloon, ohje alareunaan. */
 body.freecam #hud, body.freecam #foeBars, body.freecam #lockMark, body.freecam #rearWarn,
-body.freecam #song, body.freecam #choice, body.freecam #vignette, body.freecam #flash { display: none; }
+body.freecam #song, body.freecam #choice, body.freecam #flash { display: none; }
 #freecamHint { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); max-width: calc(100vw - 24px);
   padding: 8px 14px; border: 1px solid #d9a44173; border-radius: 4px; background: var(--panel); color: var(--muted);
   font-size: 14px; text-align: center; pointer-events: none; }
