@@ -6,9 +6,9 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-21 (Codex, Windows; pohja main c792089)
+Päivitetty: 2026-11-21 (Codex, Windows; pohja main b2c04bc)
 
-- **Mainissa** (pohja `3191123`) ovat `assets/forest.glb`,
+- **Mainissa** ovat `assets/forest.glb`,
   `characters.glb`, `bog.glb`, `homestead.glb`, `household.glb`,
   `yard.glb`, `villagers.glb`, `villagers_f.glb` ja `assets/animals/`.
   `characters.glb` sisältää sankarin rauhan varustuksen (ks. alla). Se,
