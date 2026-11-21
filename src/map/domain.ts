@@ -1,5 +1,7 @@
 // Maailmankartan puhdas sääntöydin. Ei selain-, DOM- tai Three.js-riippuvuuksia.
 
+import { WORLD_MINUTES_PER_DAY } from "./uiState";
+
 export const MAP_WIDTH = 20;
 export const MAP_HEIGHT = 20;
 
@@ -12,29 +14,31 @@ export interface TerrainDefinition {
   id: TerrainId;
   /** Voiko ruutuun kulkea ilman myöhemmin lisättävää erityiskykyä (esim. venettä). */
   passable: boolean;
-  /** Kohderuutuun siirtymiseen kuluva maailmanaika minuutteina. */
+  /** Kohderuutuun siirtymiseen kuluva piilotettu maailmanaika. Saa olla päivän murto-osa. */
   minuteCost: number;
 }
 
-/** Ensimmäisen karttaprototyypin luvut. Tasapaino tarkistetaan pelitestissä. */
+const dayFraction = (movesPerDay: number): number => WORLD_MINUTES_PER_DAY / movesPerDay;
+
+/** Matkavauhti kohderuudun mukaan: helpolla maalla ehtii useampaan ruutuun saman päivän aikana. */
 export const TERRAINS: Record<TerrainId, TerrainDefinition> = {
-  meadow: { id: "meadow", passable: true, minuteCost: 10 },
-  forest: { id: "forest", passable: true, minuteCost: 15 },
-  deepForest: { id: "deepForest", passable: true, minuteCost: 25 },
-  bog: { id: "bog", passable: true, minuteCost: 35 },
-  rock: { id: "rock", passable: true, minuteCost: 25 },
+  meadow: { id: "meadow", passable: true, minuteCost: dayFraction(6) },
+  forest: { id: "forest", passable: true, minuteCost: dayFraction(4) },
+  deepForest: { id: "deepForest", passable: true, minuteCost: dayFraction(3) },
+  bog: { id: "bog", passable: true, minuteCost: WORLD_MINUTES_PER_DAY * 0.7 },
+  rock: { id: "rock", passable: true, minuteCost: dayFraction(2) },
   water: { id: "water", passable: false, minuteCost: 0 },
   river: { id: "river", passable: false, minuteCost: 0 },
 };
 
 /** Joen tai muun esteen paikallinen ylitystapa ilman uutta maastolajia. */
 export const CROSSINGS: Record<CrossingId, Pick<TerrainDefinition, "passable" | "minuteCost">> = {
-  ford: { passable: true, minuteCost: 20 },
+  ford: { passable: true, minuteCost: WORLD_MINUTES_PER_DAY * 0.4 },
 };
 
 export const MAP_RULES = {
-  /** Menetettyä kylläisyyttä per maailmassa kulunut minuutti. */
-  satietyLossPerMinute: 0.05,
+  /** 3,6 pistettä päivässä: niittyliike vie 0,6 pistettä (ennen 0,5). */
+  satietyLossPerMinute: 3.6 / WORLD_MINUTES_PER_DAY,
   revealRadius: 1,
 } as const;
 

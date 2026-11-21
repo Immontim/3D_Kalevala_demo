@@ -292,6 +292,13 @@ describe("kampanjatallennus", () => {
     expect(migrated!.player.gender).toBe("male");
   });
 
+  it("säilyttää päivän murto-osista kertyvän maailmanajan tallennuksessa", () => {
+    const current = createCampaign();
+    current.world.worldMinutes = 45 / 7;
+    const parsed = parseCampaign(JSON.parse(serializeCampaign(current)));
+    expect(parsed?.world.worldMinutes).toBeCloseTo(45 / 7);
+  });
+
   it("migroi version 2 tallennuksen miesoletukseen", () => {
     const current = createCampaign({ x: 6, y: 8 });
     current.player.satiety = 42;
