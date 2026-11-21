@@ -24,7 +24,13 @@ export interface SceneLayout {
   /** Taistelun keskus ja säde (vihollisten tulopaikat). */
   arena: { x: number; z: number; radius: number };
   exits: SceneExit[];
+  /** Etäisyys arenan keskeltä, jolta vastustajat tulevat metsästä kuljettavan alueen ulkopuolelta.
+   *  Puuttuu, jos taakse ei pääse (esim. aidattu piha): silloin vastustajat ilmestyvät alueen reunalle. */
+  approach?: number;
 }
+
+/** Sankarin aloitus polunsuulla: ensimmäisen polunsuun portista näin monta metriä sisään. */
+export const ENTRY_INSET = 3.5;
 
 /** Käytävä ulottuu portista näin monta metriä sisään- ja ulospäin. */
 export const EXIT_CORRIDOR_IN = 5;
@@ -151,11 +157,43 @@ export function nearestExit(layout: SceneLayout, x: number, z: number): { exit: 
   return best;
 }
 
+/** Aloituspaikka ensimmäisen polunsuun sisäpuolella, katse kohtaukseen päin (polkua pitkin sisään). */
+export function entrySpawn(layout: SceneLayout, inset = ENTRY_INSET): { x: number; z: number; yaw: number } {
+  const e = layout.exits[0];
+  if (!e) return { x: layout.arena.x, z: layout.arena.z, yaw: 0 };
+  const o = outDir(e);
+  return { x: e.x - o.x * inset, z: e.z - o.z * inset, yaw: Math.atan2(-o.x, -o.z) };
+}
+
+/**
+ * Vastustajaryhmän tulopaikat: arenan keskeltä katsoen pelaajan vastakkaisella puolella, vierekkäin
+ * kehän tangentin suuntaisesti. Kehä on `approach` (metsässä alueen ulkopuolella) tai alueen reuna.
+ * `jitter` (−0,5…0,5) kääntää tulosuuntaa satunnaisesti; jokainen katsoo valmiiksi pelaajaa kohti.
+ */
+export function approachSpawns(layout: SceneLayout, player: Vec2, count: number, jitter: number, spacing = 1.8): { x: number; z: number; yaw: number }[] {
+  const { arena } = layout;
+  const dx = player.x - arena.x, dz = player.z - arena.z;
+  // Keskellä seisovalle mikä tahansa suunta käy: jitter valitsee sen.
+  const base = Math.hypot(dx, dz) > 1.5 ? Math.atan2(-dx, -dz) : jitter * Math.PI * 2;
+  const a = base + jitter;
+  const r = layout.approach ?? arena.radius - 1;
+  const cx = arena.x + Math.sin(a) * r, cz = arena.z + Math.cos(a) * r;
+  // Tangentti (kehää pitkin): (cos a, −sin a).
+  const tx = Math.cos(a), tz = -Math.sin(a);
+  const out: { x: number; z: number; yaw: number }[] = [];
+  for (let i = 0; i < count; i++) {
+    const k = (i - (count - 1) / 2) * spacing;
+    const x = cx + tx * k, z = cz + tz * k;
+    out.push({ x, z, yaw: Math.atan2(player.x - x, player.z - z) });
+  }
+  return out;
+}
+
 // ---------- Data ----------
 
 const R = 11;
-function circleScene(exit: SceneExit): SceneLayout {
-  return { bounds: circlePolygon(0, 0, R), arena: { x: 0, z: 0, radius: R }, exits: [exit] };
+function circleScene(exit: SceneExit, approach?: number): SceneLayout {
+  return { bounds: circlePolygon(0, 0, R), arena: { x: 0, z: 0, radius: R }, exits: [exit], approach };
 }
 
 /**
@@ -179,11 +217,13 @@ const WILDS_BOUNDS: Vec2[] = [
 ];
 
 export const SCENE_LAYOUTS: Record<SceneId, SceneLayout> = {
-  clearing: circleScene(ringExit("south", 200, 11.4, 2.6, "s")),
+  // Aukion puut alkavat 13,2 m:stä (world.ts treeMin): vastustajat tulevat puiden välistä.
+  clearing: circleScene(ringExit("south", 200, 11.4, 2.6, "s"), 14.5),
   homestead: circleScene(ringExit("gate", 0, 13.4, 2.4, "s")),
   yard: circleScene(ringExit("gate", 0, 13.4, 2.4, "s")),
-  lakeside: circleScene(ringExit("path", 205, 11.4, 2.4, "n")),
-  lakeruin: circleScene(ringExit("path", 205, 11.4, 2.4, "n")),
+  // Ranta: polku tulee kaakosta mökin itäpuolelta, jotta saapuessa näkyy tuli ja järvi (mökki ei peitä).
+  lakeside: circleScene(ringExit("path", 150, 11.4, 2.4, "n")),
+  lakeruin: circleScene(ringExit("path", 150, 11.4, 2.4, "n")),
   cairnfield: circleScene(ringExit("path", 180, 11.4, 2.4, "n")),
   wilds: {
     bounds: WILDS_BOUNDS,

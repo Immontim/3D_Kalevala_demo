@@ -6,7 +6,7 @@ import { t } from "../i18n";
 import { effectiveStats } from "../stats";
 import { TALKABLES, TALK_ZONE, pickTarget } from "../interact";
 import { ARENA, groundHeight } from "../world";
-import { clampToWalkable, sceneLayout } from "../sceneLayout";
+import { clampToWalkable, sceneLayout, walkableDepth } from "../sceneLayout";
 import { separateDiscBodies } from "../collision";
 import { Actor, setState } from "./actor";
 import { emitBlood, emitSparks } from "./effects";
@@ -343,6 +343,14 @@ export function updateCombatant(a: Actor, dt: number) {
 /** Kohtauksen kuljettava alue (data: sceneLayout.ts). */
 const LAYOUT = sceneLayout(ARENA);
 
+/** Metsästä saapuva vastustaja kulkee alueen ulkopuolella, kunnes on kokonaan sisällä (tai aika loppuu). */
+function arriving(a: Actor): boolean {
+  const ai = a.ai;
+  if (!ai || ai.arriveUntil < 0) return false;
+  if (g.gameTime > ai.arriveUntil || walkableDepth(LAYOUT, a.pos.x, a.pos.z) >= a.radius + 0.1) ai.arriveUntil = -1;
+  return ai.arriveUntil >= 0;
+}
+
 /** Pitää taistelijat kuljettavalla alueella ja erillään toisistaan. */
 export function keepApartAndInside(actors: Actor[]) {
   const alive = actors.filter((a) => a.state !== "dead");
@@ -350,6 +358,7 @@ export function keepApartAndInside(actors: Actor[]) {
   // vasten: seinä ei anna periksi, joten liike palautuu lopulta toiseen hahmoon.
   for (let pass = 0; pass < 5; pass++) {
     for (const a of alive) {
+      if (arriving(a)) continue;
       const c = clampToWalkable(LAYOUT, a.pos.x, a.pos.z, a.radius + 0.1);
       a.pos.x = c.x; a.pos.z = c.z;
     }

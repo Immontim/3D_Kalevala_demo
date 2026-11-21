@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { SCENE_IDS } from "./app/route";
 import {
-  SCENE_LAYOUTS, circlePolygon, clampToWalkable, exitCrossed, nearestExit, ringExit, sceneLayout, walkableDepth,
-  type SceneLayout,
+  ENTRY_INSET, SCENE_LAYOUTS, approachSpawns, circlePolygon, clampToWalkable, entrySpawn, exitCrossed, nearestExit, ringExit,
+  sceneLayout, walkableDepth, type SceneLayout,
 } from "./sceneLayout";
 
 const square: SceneLayout = {
@@ -115,5 +115,55 @@ describe("kohtausdata", () => {
       const l = sceneLayout(id);
       expect(walkableDepth(l, l.arena.x, l.arena.z)).toBeGreaterThan(1);
     }
+  });
+});
+
+describe("entrySpawn: aloitus polunsuulla", () => {
+  it("on ensimmäisen polunsuun sisäpuolella, kuljettavalla alueella ja katse kohtaukseen", () => {
+    for (const id of SCENE_IDS) {
+      const l = sceneLayout(id);
+      const s = entrySpawn(l);
+      const e = l.exits[0];
+      expect(Math.hypot(s.x - e.x, s.z - e.z)).toBeCloseTo(ENTRY_INSET, 6);
+      expect(walkableDepth(l, s.x, s.z)).toBeGreaterThan(0.5);
+      expect(exitCrossed(l, s.x, s.z)).toBeNull();
+      // Katse osoittaa poispäin portista (sisään).
+      const fx = Math.sin(s.yaw), fz = Math.cos(s.yaw);
+      expect(fx * (s.x - e.x) + fz * (s.z - e.z)).toBeGreaterThan(0);
+    }
+  });
+  it("aukiolla aloitus on etelän polunsuulla, ei keskellä", () => {
+    const s = entrySpawn(sceneLayout("clearing"));
+    expect(Math.hypot(s.x, s.z)).toBeGreaterThan(7);
+    expect(s.z).toBeLessThan(0);
+  });
+});
+
+describe("approachSpawns: vastustajien tulopaikat", () => {
+  const l = sceneLayout("clearing");
+  it("tulevat pelaajan vastakkaiselta puolelta metsästä, kuljettavan alueen ulkopuolelta", () => {
+    const player = { x: 0, z: -8 };
+    const spots = approachSpawns(l, player, 3, 0);
+    expect(spots).toHaveLength(3);
+    for (const p of spots) {
+      expect(p.z).toBeGreaterThan(10);
+      expect(walkableDepth(l, p.x, p.z)).toBeLessThan(0);
+      expect(Math.hypot(p.x - player.x, p.z - player.z)).toBeGreaterThan(20);
+    }
+  });
+  it("katsovat valmiiksi pelaajaa kohti ja ovat vierekkäin", () => {
+    const player = { x: 3, z: -6 };
+    const spots = approachSpawns(l, player, 3, 0.3);
+    for (const p of spots) {
+      const toX = player.x - p.x, toZ = player.z - p.z, len = Math.hypot(toX, toZ);
+      expect(Math.sin(p.yaw) * toX / len + Math.cos(p.yaw) * toZ / len).toBeCloseTo(1, 6);
+    }
+    expect(Math.hypot(spots[1].x - spots[0].x, spots[1].z - spots[0].z)).toBeCloseTo(1.8, 6);
+  });
+  it("ilman metsäkehää (aidattu piha) tulopaikka on alueen reunalla sisäpuolella", () => {
+    const yard = sceneLayout("homestead");
+    const [p] = approachSpawns(yard, { x: 0, z: 8 }, 1, 0);
+    expect(walkableDepth(yard, p.x, p.z)).toBeGreaterThan(0.5);
+    expect(p.z).toBeLessThan(-8);
   });
 });

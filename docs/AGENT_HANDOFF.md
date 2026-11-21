@@ -6,13 +6,23 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `b8ac51e`)
+Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `ae23d7e`)
 
-- **Koodiversio v06.01.00** branchissa `codex/map-time-satiety` (tarkista merge-tila `git merge-base`illa).
-  Koodi valmis; ei deployattu eikä omistaja ole käsin testannut. Ajettu: `bun run test` 99 tiedostoa /
-  1173 testiä, `bunx tsc --noEmit`, `bun run lint`, `bun run build` (3D-chunk 861 kt, gzip 235 kt) ja
-  `git diff --check` läpi. Visuaalista savutestiä ei saatu: in-app-selain ei tavoittanut localhostia,
-  avoimen Chromen ohjausta ei hyväksytty ja erillinen headless-Chrome ei tuottanut kuvakaappausta.
+- **Koodiversio v06.02.00** branchissa `claude/path-entry-spawns` (tarkista merge-tila `git merge-base`illa).
+  Koodi valmis ja savutestattu in-app-selaimessa; ei deployattu eikä omistaja ole käsin testannut. Ajettu:
+  `bun run test` 99 tiedostoa / 1178 testiä, `bunx tsc --noEmit`, `bun run lint`, `bun run build` (3D-chunk
+  861 kt) ja `git diff --check` läpi. Selaimessa katsottu aukio (aallot 1 ja 5), piha, taistelupiha, ranta ja
+  palanut ranta: 60 FPS (800 px:n paneeli), ei pelin konsolivirheitä.
+- **Saapuminen polunsuulta (v06.02).** `sceneLayout.entrySpawn(layout, inset)` = ensimmäisen polunsuun portista
+  `ENTRY_INSET` 3,5 m sisään, katse sisään. `world.ts` `SPAWN`: kalmisto ja erämaa käsin (jo polulla), pihat
+  inset 6,4 (kameran `camMaxR` 12,2 aidan sisällä, muuten kamera painuu maahan), ranta katsoo `LAKE_FIRE`a.
+  Rannan polunsuu siirrettiin 205° → 150° (mökin itäpuolelle); polku ja puuton kaista seuraavat dataa.
+- **Aaltojen tulo (v06.02).** `sceneLayout.approachSpawns`: ryhmä vierekkäin (1,8 m) arenan keskeltä katsoen
+  pelaajan vastakkaisella puolella ± satunnainen 0,5 rad, kehällä `SceneLayout.approach` (vain aukio, 14,5 m;
+  puut alkavat 13,2 m) tai alueen reunalla (r − 1). `addEnemy` kääntää vihollisen heti pelaajaa kohti.
+  Alueen ulkopuolella syntynyt saa `ai.arriveUntil`in (12 s): `melee.keepApartAndInside` ei rajaa häntä,
+  kunnes hän on alueen sisällä. `ENEMY_AI.strafeRange` 5: kauempaa ei kierrellä. Aukiolla 1. aallon urho on
+  sankarin luona noin 7 s:ssa.
 - **Kohtausmalli (`src/sceneLayout.ts`, puhdas).** Jokaisella kohtauksella on `SceneLayout`: kuljettava
   monikulmio `bounds`, taistelun `arena` (keskus + säde, vihollisten tulopaikat) ja polunsuut `exits`
   (portti, ulos-suunta, leveys, `mapDir`). Kuljettava alue = monikulmio TAI polunsuun käytävä (5 m sisään,
@@ -230,9 +240,6 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `b8ac51e`)
 - **UI ja kielituki.** Kartan pellavapohja, kirjontakehykset, paperinukke,
   kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
   tyypitetyissä FI/EN-sanakirjoissa.
-- **Tarkistukset 2026-11-21 (v06.01.00):** `bun run test` (99 tiedostoa, 1173 testiä),
-  `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja `git diff --check` läpäisty. Build
-  varoittaa vain suuresta 3D-chunkista (861 kt, gzip 235 kt).
 - **Riippuvuustarkistus:** 2026-11-20: ei mitään odottamassa. `bun audit` on puhdas ja
   `bun outdated --no-cache` ei listaa paketteja.
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
@@ -284,7 +291,9 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `b8ac51e`)
   sävy on pikselimittauksella viritetty arvio. Instanssinippuja ei rajata näkökentän mukaan (kaikki
   etäisyyden sisällä piirretään). Aukioiden varvut ja heinät ovat yhä kiinteitä kehiä origon ympärillä.
 - Polunsuun käytävä ei katso kohtauksen omia esteitä (esim. pihan aita portin vieressä); polku on
-  piirretty vain maaston väriin. Viholliset eivät vielä pakene polunsuista. Pako ei muuta kampanjaa:
+  piirretty vain maaston väriin. Aloitus on aina ensimmäisellä polunsuulla, ei sillä, jonka suunnasta
+  kartalta tultiin (kartta ei vielä välitä tulosuuntaa). Metsästä tuleva vihollinen voi juuttua runkoon;
+  12 s:n jälkeen hänet rajataan aukiolle (näkyvä hyppäys). Vihje "Polku vie pois" näkyy heti alussa. Viholliset eivät vielä pakene polunsuista. Pako ei muuta kampanjaa:
   leiri jää kartalle ja aallot alkavat alusta.
 - Moottori on v0: ei ajastimia, `unless`-peruutusta eikä efektien ketjureaktioita.
   Tuntematon engine-versionumero luetaan sallivasti; semantiikkamuutos tarvitsee versionhaaran.
@@ -293,8 +302,8 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `b8ac51e`)
 
 ## Seuraava tehtävä
 
-Omistaja testaa v06:n peliläppärillä (selain GTX:llä, laturissa): erämaa, aukio ja ranta, FPS oikeasta
-alakulmasta, polunsuusta poistuminen kartan kautta, kamera ja lehvästö metsässä sekä kartalla päivä- ja
+Omistaja testaa v06:n peliläppärillä (selain GTX:llä, laturissa): erämaa, aukio ja ranta (uusi saapuminen
+polulta ja aaltojen tulo metsästä), FPS oikeasta alakulmasta, polunsuusta poistuminen kartan kautta, kamera ja lehvästö metsässä sekä kartalla päivä- ja
 kylläisyysrytmi eri maastoissa. Palautteen mukaan säädetään ensin suorituskykyä tai matkatasapainoa.
 
 ## Ei vielä aloiteta

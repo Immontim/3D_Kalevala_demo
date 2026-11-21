@@ -12,9 +12,11 @@ export interface Ai {
   /** Uupunut: vetäytyy keräämään voimia. */ resting: boolean;
   /** Pelaajan paikka sellaisena kuin vastustaja sen hahmottaa: seuraa oikeaa paikkaa reaktioviiveen verran jäljessä. */
   seen: THREE.Vector3;
+  /** Metsästä saapuva saa olla kuljettavan alueen ulkopuolella tähän pelin aikaan asti (−1 = ei saavu). */
+  arriveUntil: number;
 }
 
-export function newAi(): Ai { return { decide: 1.2, strafeDir: Math.random() < 0.5 ? 1 : -1, reactedTo: -1, counter: false, reorient: false, resting: false, seen: g.player.pos.clone() }; }
+export function newAi(): Ai { return { decide: 1.2, strafeDir: Math.random() < 0.5 ? 1 : -1, reactedTo: -1, counter: false, reorient: false, resting: false, seen: g.player.pos.clone(), arriveUntil: -1 }; }
 // Tekoälyn luvut ovat taulukossa ENEMY_AI (combat.ts).
 
 
@@ -122,7 +124,8 @@ export function updateAi(e: Actor, dt: number) {
     const move = new THREE.Vector3();
     if (dist > want + 0.3) move.add(dir);
     else if (dist < want - 0.4) move.sub(dir);
-    move.addScaledVector(side, 0.45);
+    // Kaukaa tullaan suoraan kohti; kiertely alkaa vasta lähellä, ettei ryhmä saavu vinossa kaaressa.
+    if (dist < ENEMY_AI.strafeRange) move.addScaledVector(side, 0.45);
     // Väli toisiin vastustajiin: ryhmä levittäytyy eikä seiso jonossa.
     for (const o of g.enemies) {
       if (o === e) continue;
