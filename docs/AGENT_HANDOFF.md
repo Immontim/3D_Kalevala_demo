@@ -6,7 +6,7 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `2e60ff7`)
+Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `6218fc1`)
 
 - **Koodiversio v06.04.00** branchissa `claude/hunting-bow` (tarkista merge-tila `git merge-base`illa).
   Koodi valmis, ei deployattu, omistaja ei ole käsin testannut. Claude testasi in-app-selaimessa
@@ -31,6 +31,9 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `2e60ff7`)
   `AIM_*` oikean olan yli, FOV 40, pystykulma −45…50°. Asennot `POSES.bowCarry/bowAim/bowDraw` +
   `bowPose()`, jousi vasemmassa kädessä `Fighter.setBow/setBowMode` (`BOW_ROLL` π), jänne seuraa
   oikeaa nyrkkiä (`fistWorld`). Mallit ovat koodissa (`hunt/models.ts`), eivät Blenderissä.
+- **Tallennuksen hylkäys (v06.03.01).** Aikakentät tarkistetaan `validWorldTime`illa (äärellinen, ≥ 0).
+  Kelvoton tallennus kopioidaan raakana avaimelle `laulun-miekka.campaign.rejected` (vain viimeisin),
+  `console.error` ja kartan `map.saveRejected`. Lataus on tarkoituksella tiukka, jotta vika näkyy.
 - **Saapuminen polunsuulta (v06.02).** `sceneLayout.entrySpawn(layout, inset)` = ensimmäisen polunsuun portista
   `ENTRY_INSET` 3,5 m sisään, katse sisään. `world.ts` `SPAWN`: kalmisto ja erämaa käsin (jo polulla), pihat
   inset 6,4 (kameran `camMaxR` 12,2 aidan sisällä, muuten kamera painuu maahan), ranta katsoo `LAKE_FIRE`a.
@@ -206,7 +209,8 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `2e60ff7`)
 - **Kampanjatallennus** (`campaign.ts`, `storage.ts`) käyttää skeemaa 6 ja
   avainta `laulun-miekka.campaign.v6`. Terrain-muisti ja `knownSiteIds` säilyvät erikseen.
   Vanhat hunger-, sukupuoli-, maailmanesine- ja virtuaalivarustetiedot migroidaan häviöttömästi;
-  kelvollinen vanha tila palautetaan myös, jos migraation kirjoitus estyy.
+  kelvollinen vanha tila palautetaan myös, jos migraation kirjoitus estyy. **Uusi aikakenttä tarkistetaan
+  `validWorldTime`illa**, ei kokonaislukuna (kartan aika on murtolukuja).
 - **Matkan asetukset.** Esc-dialogissa ovat FI/GB-kieli, sukupuoli, vahvistettava uudelleenaloitus
   ja 3D-oikotiet kohtaustyyppeineen. Mies on uuden ja migroidun kampanjan oletus.
 - **Paikat.** `sites.ts` omistaa liikkumisen (`fixed|mobile`), elinkaaren
@@ -289,14 +293,15 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `2e60ff7`)
   laskuriin, ja ruoanlaittoa ei ole.
 - Moottori on v0: ei ajastimia, `unless`-peruutusta eikä efektien ketjureaktioita.
   Tuntematon engine-versionumero luetaan sallivasti; semantiikkamuutos tarvitsee versionhaaran.
-- Rikkinäistä tallennetta ei kopioida talteen ennen korvaamista (ROADMAPin riski);
-  moottorilohkossa salliva luku vain pudottaa tuntemattoman.
+- Hylätty tallennus näkyy pelaajalle vain alapalkin viestinä, joka häviää ensimmäisestä liikkeestä. Talteen
+  jää vain viimeisin hylätty. Palautustyökalua ei ole: matka palautetaan käsin `raw`-kentästä, kun vika
+  on korjattu. Moottorilohkossa salliva luku vain pudottaa tuntemattoman.
 
 ## Seuraava tehtävä
 
 Omistaja testaa metsästyksen (v06.04) erämaassa hiirellä: tähtäyksen tuntuma (kamera, tähtäin, putoama),
 jäniksen pakoetäisyys 12 m ja poiminta. Palautteen perusteella viritetään `ARCHERY`- ja `SPECIES.hare`-arvot.
-Sen jälkeen jäniksen, jousen ja nuolen Blender-mallit (BLENDER_HANDOFF).
+Sen jälkeen jäniksen, jousen ja nuolen Blender-mallit (BLENDER_HANDOFF). Samalla pihan ruoan luvaton otto ei saa enää nollata matkaa (v06.03.01).
 
 ## Ei vielä aloiteta
 

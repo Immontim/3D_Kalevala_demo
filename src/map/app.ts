@@ -13,7 +13,7 @@ import { createWorldMapState, mapCell, moveOnMap, type MapDirection } from "./do
 import { PROTOTYPE_MAP } from "./prototype";
 import { yardMeadowMap } from "./yardMeadows";
 import { discoverVisibleSites, mapSiteDefinition, mapSiteDisplay, sceneForMapSite, siteIdAt } from "./sites";
-import { clearCampaign, loadCampaign, newCampaign, saveCampaign } from "./storage";
+import { clearCampaign, loadCampaignReport, newCampaign, saveCampaign } from "./storage";
 import { riverTile, shoreEdgeTurns, terrainFrame, waterShoreMask, type AtlasFrame } from "./tiles";
 import { consumeSceneReturn } from "./transition";
 import type { MapDir } from "../sceneLayout";
@@ -573,12 +573,14 @@ export function initMap() {
   // 3D-puoli kirjoittaa toistaiseksi tyhjän paluukuorman. Kulutuskohta on
   // valmiina myöhemmille ruoka- ja esinepalkinnoille ilman reittirefaktorointia.
   const sceneReturn = consumeSceneReturn();
-  campaign = loadCampaign();
+  const loaded = loadCampaignReport();
+  campaign = loaded.campaign;
   journeyMap = yardMeadowMap(PROTOTYPE_MAP, campaign.world.worldSeed, campaign.world.siteInstances);
   ensureRevealed();
   saveCampaign(campaign);
   buildUi(root);
-  setMessage(currentSiteMessage());
+  // Hylätty tallennus kerrotaan pelaajalle: hiljainen uusi matka peittäisi tallennusvirheen.
+  setMessage(loaded.rejected ? t("map.saveRejected") : currentSiteMessage());
   renderMap();
   renderUi();
   // Poistuttiin polunsuusta: sankari astuu yhden ruudun polun suuntaan. Tukittu suunta ei tee mitään.

@@ -563,7 +563,7 @@ function validLegacyWorld(value: unknown): value is ParsedCampaignWorld {
   const { width, height, x, y, worldMinutes, discovered } = value;
   if (!integerBetween(width, 1, 512) || !integerBetween(height, 1, 512)) return false;
   if (!integerBetween(x, 0, width - 1) || !integerBetween(y, 0, height - 1)) return false;
-  if (typeof worldMinutes !== "number" || !Number.isFinite(worldMinutes) || worldMinutes < 0) return false;
+  if (!validWorldTime(worldMinutes)) return false;
   return Array.isArray(discovered)
     && discovered.length === width * height
     && discovered.every((cell) => typeof cell === "boolean");
@@ -621,7 +621,7 @@ function validSceneItemState(value: unknown): value is SceneItemState {
   for (const theft of value.thefts) {
     if (!isRecord(theft) || theft.type !== "theft" || !validId(theft.instanceId, 160)
       || theftIds.has(theft.instanceId) || !validId(theft.siteId, 80) || !isItemId(theft.itemId)
-      || !integerBetween(theft.quantity, 1, 999) || !integerBetween(theft.atWorldMinutes, 0, Number.MAX_SAFE_INTEGER)
+      || !integerBetween(theft.quantity, 1, 999) || !validWorldTime(theft.atWorldMinutes)
       || (theft.ownerId !== undefined && !validId(theft.ownerId, 80))) return false;
     theftIds.add(theft.instanceId);
   }
@@ -853,6 +853,15 @@ function validId(value: unknown, max: number): value is string {
 
 function finiteCoordinate(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= 10_000;
+}
+
+/**
+ * Maailman aika ja kaikki siitä otetut aikaleimat: ei-negatiivinen äärellinen luku. Kartan liike kuluttaa
+ * päivän murto-osia, joten aika ei ole kokonaisluku. Sama tarkistus kaikille aikakentille, jotta aikaleima
+ * ei voi kaataa tallennusta, jonka oma aika kelpaa.
+ */
+function validWorldTime(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
 function integerBetween(value: unknown, min: number, max: number): value is number {
