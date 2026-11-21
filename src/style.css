@@ -374,3 +374,6 @@ body.freecam #song, body.freecam #choice, body.freecam #flash { display: none; }
   font-size: 14px; text-align: center; pointer-events: none; }
 #freecamHint b { color: var(--bronze); font-weight: 400; }
 #freecamHint.hidden { display: none; }
+
+/* Polunsuusta poistumisen häivytys: musta peite, jonka läpinäkyvyyttä ohjaa src/engine/exit.ts. */
+#exitFade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 40; }

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import forestUrl from "../assets/forest.glb?url";
+import forestLodUrl from "../assets/forest_lod.glb?url";
 import homesteadUrl from "../assets/homestead.glb?url";
 import householdUrl from "../assets/household.glb?url";
 import yardUrl from "../assets/yard.glb?url";
@@ -27,6 +28,9 @@ import { t, type TextKey } from "./i18n";
 import { addTalkable, removeTalkable } from "./interact";
 import { birdLevelAtDistance } from "./ambience";
 import { SCENE_IDS, type SceneId } from "./app/route";
+import { Forest, ScatterField, placeForestWall, type ScatterItem, type TreeSpot } from "./forest";
+import { addFoliageFade } from "./engine/foliageFade";
+import { sceneLayout, walkableDepth, type Vec2 } from "./sceneLayout";
 
 // Taistelualueet kangasmetsässä: maasto, männyt, kuuset, koivut, varvut ja kivet
 // sekä alueen oma keskus (nuotioaukion kota tai pihapiirin rakennukset). Mallit
@@ -44,6 +48,7 @@ export const ARENAS: Record<ArenaId, { name: string; desc: string }> = {
   lakeside: { name: t("arena.lakeside.name"), desc: t("arena.lakeside.desc") },
   lakeruin: { name: t("arena.lakeruin.name"), desc: t("arena.lakeruin.desc") },
   cairnfield: { name: t("arena.cairnfield.name"), desc: t("arena.cairnfield.desc") },
+  wilds: { name: t("arena.wilds.name"), desc: t("arena.wilds.desc") },
 };
 const ARENA_STORE = "laulun-miekka.arena.v1";
 
@@ -136,7 +141,7 @@ export function removeNpcFromScene(npcId: string, collision: CollisionWorld): bo
 
 /** Rauhallinen paikka: kohtaus alkaa ilman vastustajia. Paikka voi silti muuttua vihamieliseksi,
  *  koska vastustajat tuo kohtaus (Encounter), ei paikka. */
-export const ARENA_PEACEFUL = ARENA === "yard" || ARENA === "lakeside" || ARENA === "lakeruin" || ARENA === "cairnfield";
+export const ARENA_PEACEFUL = ARENA === "yard" || ARENA === "lakeside" || ARENA === "lakeruin" || ARENA === "cairnfield" || ARENA === "wilds";
 /** Pihan rakennukset, aita ja portti ovat yhteiset taistelupihalle ja rauhalliselle pihalle. */
 const HAS_YARD = ARENA === "homestead" || ARENA === "yard";
 /** Järven ranta: mökki, laituri ja vesi (lakeside.glb). */
@@ -147,6 +152,10 @@ const CAIRN = ARENA === "cairnfield";
 const LAKE = LAKESIDE || CAIRN;
 /** Sama ranta tuhon jälkeen (lakeruin.glb): mökki poltettu, tietäjä kuollut, vene ja koira poissa, tulet sammuneet. */
 const RUIN = ARENA === "lakeruin";
+/** Erämaa: laaja (200 x 200 m) metsä, jonka keskellä suoniitty ja reunalla paloaukea; ei rakennuksia eikä tulta. */
+const WILDS = ARENA === "wilds";
+/** Kohtauksen kuljettava alue ja polunsuut (sceneLayout.ts). */
+const LAYOUT = sceneLayout(ARENA);
 
 /** Rakennuksen pohja maassa: suorakaide, jonka etusivu (ovi) osoittaa suuntaan yaw. */
 interface Footprint { x: number; z: number; yaw: number; hx: number; front: number; back: number; }
@@ -306,6 +315,13 @@ const SITES: Record<ArenaId, Site> = {
       { x: LOUHI_AT.x, z: LOUHI_AT.z, r: 1.0 },
     ],
   },
+  wilds: {
+    // Erämaa: ei nuotiota eikä rakennuksia; metsä ja kasvillisuus tulevat erämaan omasta sijoittelusta.
+    fire: { x: -380, z: -380 }, flat0: 0, flat1: 60, rough: 0.5,
+    treeMin: 0, shrub0: 0, shrub1: 4, dirtR: 0, camMaxR: Infinity,
+    footprints: [],
+    circles: [],
+  },
 };
 const SITE = SITES[ARENA];
 /** Sumun väri; sama väri sekoitetaan kaukorannan siluetteihin. Hävitetyllä rannalla utuisempi, kalmistolla vaalea ja kostea. */
@@ -318,8 +334,8 @@ const FIRE = SITE.fire;
  * mittakaavan mukaan. Uusi kohtaus ei siis tarvitse käsin merkittyjä törmäyksiä.
  */
 export type PropColliderTemplate =
-  | { kind: "circle"; radius: number; blocksMelee?: boolean }
-  | { kind: "box"; halfX: number; halfZ: number; blocksMelee?: boolean };
+  | { kind: "circle"; radius: number; blocksMelee?: boolean; blocksCamera?: boolean }
+  | { kind: "box"; halfX: number; halfZ: number; blocksMelee?: boolean; blocksCamera?: boolean };
 
 export const PROP_COLLIDERS: Record<string, PropColliderTemplate> = {
   rock_1: { kind: "circle", radius: 0.7, blocksMelee: true },
@@ -328,15 +344,15 @@ export const PROP_COLLIDERS: Record<string, PropColliderTemplate> = {
   rock_4: { kind: "circle", radius: 0.65, blocksMelee: true },
   rock_5: { kind: "circle", radius: 0.75, blocksMelee: true },
   rock_6: { kind: "circle", radius: 0.7, blocksMelee: true },
-  pine_a: { kind: "circle", radius: 0.3, blocksMelee: true },
-  pine_b: { kind: "circle", radius: 0.34, blocksMelee: true },
-  pine_c: { kind: "circle", radius: 0.3, blocksMelee: true },
-  spruce_a: { kind: "circle", radius: 0.3, blocksMelee: true },
-  spruce_b: { kind: "circle", radius: 0.28, blocksMelee: true },
-  spruce_young: { kind: "circle", radius: 0.22, blocksMelee: true },
-  birch_a: { kind: "circle", radius: 0.22, blocksMelee: true },
-  birch_b: { kind: "circle", radius: 0.24, blocksMelee: true },
-  kota: { kind: "circle", radius: 2.25, blocksMelee: true },
+  pine_a: { kind: "circle", radius: 0.3, blocksMelee: true, blocksCamera: true },
+  pine_b: { kind: "circle", radius: 0.34, blocksMelee: true, blocksCamera: true },
+  pine_c: { kind: "circle", radius: 0.3, blocksMelee: true, blocksCamera: true },
+  spruce_a: { kind: "circle", radius: 0.3, blocksMelee: true, blocksCamera: true },
+  spruce_b: { kind: "circle", radius: 0.28, blocksMelee: true, blocksCamera: true },
+  spruce_young: { kind: "circle", radius: 0.22, blocksMelee: true, blocksCamera: true },
+  birch_a: { kind: "circle", radius: 0.22, blocksMelee: true, blocksCamera: true },
+  birch_b: { kind: "circle", radius: 0.24, blocksMelee: true, blocksCamera: true },
+  kota: { kind: "circle", radius: 2.25, blocksMelee: true, blocksCamera: true },
   aita: { kind: "box", halfX: 1.02, halfZ: 0.12, blocksMelee: true },
   portinpieli: { kind: "circle", radius: 0.13, blocksMelee: true },
   pino: { kind: "box", halfX: 1.15, halfZ: 0.45, blocksMelee: true },
@@ -361,7 +377,10 @@ export const PROP_COLLIDERS: Record<string, PropColliderTemplate> = {
   roykkio_b: { kind: "box", halfX: 1.9, halfZ: 1.0, blocksMelee: false },
   roykkio_c: { kind: "circle", radius: 1.65, blocksMelee: false },
   roykkio_d: { kind: "circle", radius: 0.95, blocksMelee: false },
-  karsikko: { kind: "circle", radius: 0.34, blocksMelee: true },
+  karsikko: { kind: "circle", radius: 0.34, blocksMelee: true, blocksCamera: true },
+  // Erämaan reunat ja paloaukea (forest_lod.glb): juurakon levy ja pystyyn kuollut mänty.
+  juurakko: { kind: "circle", radius: 1.15, blocksMelee: true, blocksCamera: true },
+  kelo_pysty: { kind: "circle", radius: 0.3, blocksMelee: true, blocksCamera: true },
 };
 
 function addPropCollider(
@@ -376,9 +395,9 @@ function addPropCollider(
   const def = PROP_COLLIDERS[name];
   if (!def) return;
   if (def.kind === "circle") {
-    collision.add({ id, kind: "circle", x, z, radius: def.radius * scale, blocksMovement: true, blocksMelee: !!def.blocksMelee });
+    collision.add({ id, kind: "circle", x, z, radius: def.radius * scale, blocksMovement: true, blocksMelee: !!def.blocksMelee, blocksCamera: !!def.blocksCamera });
   } else {
-    collision.add({ id, kind: "box", x, z, yaw, halfX: def.halfX * scale, halfZ: def.halfZ * scale, blocksMovement: true, blocksMelee: !!def.blocksMelee });
+    collision.add({ id, kind: "box", x, z, yaw, halfX: def.halfX * scale, halfZ: def.halfZ * scale, blocksMovement: true, blocksMelee: !!def.blocksMelee, blocksCamera: !!def.blocksCamera });
   }
 }
 
@@ -387,7 +406,7 @@ function addFootprintCollider(collision: CollisionWorld, id: string, f: Footprin
   const [x, z] = fromLocal(f, 0, center);
   collision.add({
     id, kind: "box", x, z, yaw: f.yaw, halfX: f.hx, halfZ: (f.front + f.back) / 2,
-    blocksMovement: true, blocksMelee: true,
+    blocksMovement: true, blocksMelee: true, blocksCamera: true,
   });
 }
 
@@ -409,6 +428,8 @@ function blocked(x: number, z: number, pad: number) {
     if (Math.hypot(x - BOAT_AT.x, z - BOAT_AT.z) < 2.3 + pad) return true;
   }
   for (const c of SITE.circles) if (Math.hypot(x - c.x, z - c.z) < c.r + pad) return true;
+  // Polunsuun polku pysyy avoimena: ei puita eikä kiviä, varvikko ja heinä harvenevat reunoille.
+  if (pathDist(x, z) < 1.0 + Math.max(0, pad)) return true;
   for (const f of SITE.footprints) {
     const [lx, lz] = toLocal(f, x, z);
     if (Math.abs(lx) < f.hx + pad && lz < f.front + pad && lz > -f.back - pad) return true;
@@ -437,8 +458,88 @@ function noise2(x: number, y: number) {
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
 
+// ---------- Polut ja erämaa ----------
+/** Mutkitteleva polku tiheänä murtoviivana: pisteiden väliin lisätään sivuttaista kohinaa. */
+function wigglePath(points: Vec2[], seed: number): Vec2[] {
+  const out: Vec2[] = [];
+  let along = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i], b = points[i + 1];
+    const len = Math.hypot(b.x - a.x, b.z - a.z), steps = Math.max(1, Math.ceil(len / 2));
+    const nx = -(b.z - a.z) / len, nz = (b.x - a.x) / len;
+    for (let s = 0; s < steps; s++) {
+      const k = s / steps;
+      // Alussa ei siirtymää, jotta polku osuu polunsuuhun (ja pihan porttiin).
+      const w = (noise2(along * 0.06 + seed, seed) - 0.5) * 5 * THREE.MathUtils.clamp((along - 6) / 10, 0, 1);
+      out.push({ x: a.x + (b.x - a.x) * k + nx * w, z: a.z + (b.z - a.z) * k + nz * w });
+      along += len / steps;
+    }
+  }
+  out.push(points[points.length - 1]);
+  return out;
+}
+
+/** Polut: erämaassa polunsuilta suoniitylle, muualla polunsuulta suoraan metsään. */
+const PATHS: Vec2[][] = WILDS
+  ? [
+    wigglePath([{ x: 14, z: -101 }, { x: 8, z: -60 }, { x: 2, z: -34 }, { x: -2, z: -18 }], 1.3),
+    wigglePath([{ x: 101, z: 18 }, { x: 60, z: 12 }, { x: 34, z: 6 }, { x: 20, z: 3 }], 4.1),
+    wigglePath([{ x: -36, z: 101 }, { x: -28, z: 60 }, { x: -16, z: 36 }, { x: -10, z: 22 }], 7.7),
+    // Paloaukealle haarautuva polku.
+    wigglePath([{ x: 18, z: -16 }, { x: 34, z: -28 }, { x: 46, z: -36 }], 2.9),
+  ]
+  : LAYOUT.exits.map((e, i) => {
+    const dx = Math.sin(e.yaw), dz = Math.cos(e.yaw);
+    return wigglePath([{ x: e.x - dx * 4, z: e.z - dz * 4 }, { x: e.x + dx * 70, z: e.z + dz * 70 }], 3.3 + i);
+  });
+
+/** Lyhin etäisyys polun keskiviivaan (m). */
+function pathDist(x: number, z: number): number {
+  let best = Infinity;
+  for (const p of PATHS) {
+    for (let i = 0; i < p.length - 1; i++) {
+      const a = p[i], b = p[i + 1];
+      if (Math.abs(x - a.x) > best + 3 && Math.abs(x - b.x) > best + 3) continue;
+      if (Math.abs(z - a.z) > best + 3 && Math.abs(z - b.z) > best + 3) continue;
+      const vx = b.x - a.x, vz = b.z - a.z, wx = x - a.x, wz = z - a.z;
+      const t = THREE.MathUtils.clamp((wx * vx + wz * vz) / (vx * vx + vz * vz || 1), 0, 1);
+      best = Math.min(best, Math.hypot(wx - vx * t, wz - vz * t));
+    }
+  }
+  return best;
+}
+
+/** Erämaan suoniitty 0..1: matala, märkä ja puuton painanne keskellä, repaleinen reuna. */
+function bogMix(x: number, z: number) {
+  const ex = (x + 6) / 30, ez = (z - 4) / 23;
+  const k = Math.hypot(ex, ez) + (noise2(x * 0.06 + 2, z * 0.06) - 0.5) * 0.35;
+  return 1 - THREE.MathUtils.smoothstep(k, 0.72, 1.02);
+}
+/** Erämaan paloaukea 0..1 (kaakossa): kaatuneita ja pystyyn kuolleita puita, mustaa maata. */
+const BURN = { x: 52, z: -40 };
+function burnMix(x: number, z: number) {
+  const k = Math.hypot(x - BURN.x, (z - BURN.z) * 1.2) / 24 + (noise2(x * 0.08, z * 0.08 + 6) - 0.5) * 0.4;
+  return 1 - THREE.MathUtils.smoothstep(k, 0.7, 1.0);
+}
+/** Erämaan loivat moreenikumpareet ilman pientä pinnanvaihtelua. */
+function wildsRaw(x: number, z: number) {
+  return noise2(x * 0.017 + 4, z * 0.017) * 7.5 + noise2(x * 0.055 + 3, z * 0.055) * 1.8;
+}
+/** Suon pinnan taso: suon keskikohdan maasto hieman painettuna. */
+const BOG_LEVEL = wildsRaw(-6, 4) - 0.45;
+function wildsHeight(x: number, z: number) {
+  // Suon ympäristö loivenee kohti suon tasoa (ei jyrkkää kuoppaa), kauempana maasto kumpuilee vapaasti.
+  const k = Math.hypot((x + 6) / 30, (z - 4) / 23);
+  const flat = (1 - THREE.MathUtils.smoothstep(k, 0.9, 2.6)) * 0.85;
+  const base = wildsRaw(x, z) * (1 - flat) + (BOG_LEVEL + 0.45) * flat + noise2(x * 0.24, z * 0.24) * 0.3;
+  const bog = bogMix(x, z);
+  // Suon pinta on lähes tasainen; mättäät antavat vähän pintaa.
+  return base * (1 - bog) + (BOG_LEVEL + noise2(x * 0.4, z * 0.4) * 0.25) * bog;
+}
+
 /** Maaston pinta ilman rakennelmia (maastoverkko, rantakaistan laskenta). */
 function terrainHeight(x: number, z: number): number {
+  if (WILDS) return wildsHeight(x, z);
   const r = Math.hypot(x, z);
   const n = noise2(x * 0.08, z * 0.08) * 2.2 + noise2(x * 0.3, z * 0.3) * 0.35;
   // Aukio on lähes tasainen, reunoilla maasto kumpuilee.
@@ -475,7 +576,9 @@ const BOAT_AT = LAKESIDE
 /** Sankarin aloituspaikka ja katseen suunta (yaw 0 = +z, π = -z). Rannalla hän astuu laiturin
  *  juurelta katsomaan keittotulta: mökki jää vasemmalle ja järvi oikealle. */
 export const SPAWN = LAKESIDE ? { x: JETTY_AT.x, z: JETTY_AT.z - 1.5, yaw: Math.PI - 0.7 }
-  : CAIRN ? { x: -0.6, z: -9.5, yaw: 0.1 } : { x: 0, z: -3, yaw: 0 };
+  : CAIRN ? { x: -0.6, z: -9.5, yaw: 0.1 }
+  // Erämaa: pohjoisen polunsuun sisäpuolella, katse polkua pitkin metsään.
+  : WILDS ? { x: 10, z: -76, yaw: -0.1 } : { x: 0, z: -3, yaw: 0 };
 
 /** Korkeus, jolla hahmot kävelevät: maasto, ja laiturin päällä sen kansi. */
 export function groundHeight(x: number, z: number): number {
@@ -549,11 +652,13 @@ export interface GroundTex { mossDiff: THREE.Texture; mossNor: THREE.Texture; di
 // ---------- Maasto: kolmen skannatun pinnan sekoitus ----------
 function buildGround(scene: THREE.Scene, maxAniso: number): GroundTex {
   // Järven rannalla maasto ulottuu kauemmas (lahti aukeaa järvenselälle).
-  const size = LAKE ? 360 : 180, seg = LAKE ? 300 : 200;
+  // Erämaassa maasto jatkuu 80 m kuljettavan alueen (±100 m) yli; sen takana on horisonttimetsä.
+  const size = WILDS ? 380 : LAKE ? 360 : 180, seg = WILDS ? 256 : LAKE ? 300 : 200;
   const geo = new THREE.PlaneGeometry(size, size, seg, seg);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position as THREE.BufferAttribute;
   const splat = new Float32Array(pos.count * 3);
+  const burnt = new Float32Array(pos.count);
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), z = pos.getZ(i);
     pos.setY(i, terrainHeight(x, z));
@@ -569,15 +674,25 @@ function buildGround(scene: THREE.Scene, maxAniso: number): GroundTex {
       dirt = Math.max(dirt, 1 - THREE.MathUtils.smoothstep(out + (noise2(x * 0.7, z * 0.7) - 0.5) * 1.2, 0.3, 2.2));
     }
     if (LAKE) dirt = Math.max(dirt, (1 - THREE.MathUtils.smoothstep(pos.getY(i), WATER_LEVEL - 0.15, WATER_LEVEL + 0.3)) * 0.95);   // rantahiekka ja pohja
+    // Polut: kulunut maa keskellä, reunat repaleisia.
+    const pd = pathDist(x, z) + (noise2(x * 0.8, z * 0.8) - 0.5) * 0.5;
+    dirt = Math.max(dirt, (1 - THREE.MathUtils.smoothstep(pd, 0.35, 1.15)) * 0.92);
+    if (WILDS) {
+      // Erämaassa ei ole tallattua aukiota; suolla sammal, paloaukealla hiiltynyt maa.
+      dirt = Math.max((1 - THREE.MathUtils.smoothstep(pd, 0.35, 1.15)) * 0.92, burnMix(x, z) * (0.55 + noise2(x * 0.5, z * 0.5) * 0.4));
+      burnt[i] = burnMix(x, z) * (0.75 + noise2(x * 0.3 + 1, z * 0.3) * 0.25);
+    }
     dirt = THREE.MathUtils.clamp(dirt, 0, 1);
     const m = moisture(x, z) + (noise2(x * 0.9, z * 0.9) - 0.5) * 0.25;
     // Kalmisto on sammaleista ja jäkäläistä kalliokangasta: sammal alkaa heti ja havunneulaset jäävät vähäisiksi.
     const mossLo = CAIRN ? 0.28 : 0.42, mossHi = CAIRN ? 0.5 : 0.62;
-    const moss = THREE.MathUtils.smoothstep(m, mossLo, mossHi) * THREE.MathUtils.smoothstep(r, SITE.shrub0 - 0.5, SITE.shrub1) * (1 - dirt);
+    let moss = THREE.MathUtils.smoothstep(m, mossLo, mossHi) * THREE.MathUtils.smoothstep(r, SITE.shrub0 - 0.5, SITE.shrub1) * (1 - dirt);
+    if (WILDS) moss = Math.max(moss, bogMix(x, z) * (1 - dirt));
     const needles = Math.max(0.05, 1 - moss - dirt) * (CAIRN ? 0.55 : 1);
     splat.set([needles, moss, dirt], i * 3);
   }
   geo.setAttribute("splat", new THREE.BufferAttribute(splat, 3));
+  geo.setAttribute("burnt", new THREE.BufferAttribute(burnt, 1));
   geo.computeVertexNormals();
 
   const loader = new THREE.TextureLoader();
@@ -604,8 +719,8 @@ function buildGround(scene: THREE.Scene, maxAniso: number): GroundTex {
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
-      .replace("#include <common>", "#include <common>\nattribute vec3 splat;\nvarying vec3 vSplat;\nvarying vec2 vGuv;")
-      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvSplat = splat;\nvGuv = position.xz;");
+      .replace("#include <common>", "#include <common>\nattribute vec3 splat;\nattribute float burnt;\nvarying vec3 vSplat;\nvarying float vBurnt;\nvarying vec2 vGuv;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvSplat = splat;\nvBurnt = burnt;\nvGuv = position.xz;");
     shader.fragmentShader = shader.fragmentShader
       .replace(
         "#include <common>",
@@ -613,6 +728,7 @@ function buildGround(scene: THREE.Scene, maxAniso: number): GroundTex {
         uniform sampler2D tN, tM, tD, nN, nM, nD;
         uniform vec2 uHoleC, uHoleDir, uHoleHalf;
         varying vec3 vSplat;
+        varying float vBurnt;
         varying vec2 vGuv;
         vec3 gW;
         vec2 gUvA, gUvB;`,
@@ -630,7 +746,9 @@ function buildGround(scene: THREE.Scene, maxAniso: number): GroundTex {
         gW = vSplat * vec3(0.75 + cN.r, 0.6 + cM.g * 2.2, 0.7 + cD.r);
         gW = pow(gW, vec3(3.0));
         gW /= (gW.x + gW.y + gW.z + 1e-5);
-        diffuseColor.rgb *= cN * gW.x * 1.05 + cM * vec3(0.92, 1.08, 0.8) * gW.y + cD * vec3(0.72, 0.76, 0.78) * gW.z;`,
+        diffuseColor.rgb *= cN * gW.x * 1.05 + cM * vec3(0.92, 1.08, 0.8) * gW.y + cD * vec3(0.72, 0.76, 0.78) * gW.z;
+        // Paloaukea: hiiltynyt, harmaanmusta maa (laikuittain, kuvion mukaan).
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.2, 0.19, 0.18), clamp(vBurnt * (1.1 + cD.r), 0.0, 1.0));`,
       )
       .replace(
         "#include <normal_fragment_maps>",
@@ -806,7 +924,7 @@ function buildFire(scene: THREE.Scene) {
   group.position.set(FIRE.x, fy, FIRE.z);
   group.scale.setScalar(fs);
   scene.add(group);
-  if (RUIN || CAIRN) {
+  if (RUIN || CAIRN || WILDS) {
     // Tuhon jälkeen tuli on sammunut (tuhka on mallissa); kalmistolla ei ole tulta lainkaan: ei liekkiä, hehkua, kipinöitä, savua eikä valoa.
     const dead = new THREE.PointLight(0xff8a3c, 0, 16, 1.5);
     dead.visible = false;
@@ -942,6 +1060,12 @@ function prepareMaterials(protos: Map<string, Proto>, maxAniso: number) {
         else if (/Daub/.test(m.name)) m.color.setRGB(0.95, 1.0, 1.04);
         else if (/Turf/.test(m.name)) m.color.setRGB(0.8, 0.8, 0.8);
       }
+      if (m.name === "M_BarkLOD") {
+        // Kaukopuun runko on tasavärinen keskiarvo kaarnasta: ilman kaarnan uurteita ja varjoja se näyttää vaaleammalta.
+        m.color.setScalar(0.62);
+        m.roughness = 1;
+        m.metalness = 0;
+      }
       if (/Blood/.test(m.name)) {
         // Verilammikko on litteä läikkä maan päällä: nostetaan syvyydessä, ettei maaston epätasaisuus syö sitä.
         m.metalness = 0;
@@ -972,10 +1096,21 @@ function prepareMaterials(protos: Map<string, Proto>, maxAniso: number) {
           shader.fragmentShader = shader.fragmentShader.replace(
             "#include <normal_fragment_begin>", "#undef DOUBLE_SIDED\n#include <normal_fragment_begin>");
         };
+        // Kaukopuun kortit (forest_lod.glb) saavat valoa ylöspäin kallistetuilla normaaleilla eikä niissä
+        // ole latvuksen sisäistä varjoa: tummennus sovittaa ne täysien puiden sävyyn vaihtorajalla.
+        if (/FoliageLOD/.test(m.name)) { m.color.setRGB(LOD_TINT[0], LOD_TINT[1], LOD_TINT[2]); m.roughness = 1; }
+        // Kameran lähellä ja sankarin edessä oleva lehvästö harvenee (engine/foliageFade.ts).
+        addFoliageFade(m);
       }
     }
   }
 }
+
+/** Kaukopuiden lehvästön sävykerroin (RGB), katso prepareMaterials. Viritetty vertailukuvista. */
+const LOD_TINT = [0.28, 0.38, 0.32] as const;
+
+/** Puulajit, jotka piirretään Forest-järjestelmällä (forest.glb + kaukopuut forest_lod.glb). */
+const TREE_TYPES = new Set(["pine_a", "pine_b", "pine_c", "spruce_a", "spruce_b", "spruce_young", "birch_a", "birch_b"]);
 
 function populate(
   scene: THREE.Scene,
@@ -993,13 +1128,26 @@ function populate(
     if (!opts.wetOk && wet(x, z)) return;                     // ei puita, kiviä tai heinää veteen
     dummy.position.set(x, opts.y ?? groundHeight(x, z) - sink, z);
     dummy.rotation.set(tilt * (r() - 0.5), yaw, tilt * (r() - 0.5));
+    const name = key.split("@")[0];
+    // Erämaassa kaukana kuljettavan alueen ulkopuolella oleville ei tarvita törmäystä.
+    if (!WILDS || walkableDepth(LAYOUT, x, z) > -4) addPropCollider(collision, `prop:${name}:${colliderId++}`, name, x, z, scale, yaw);
+    if (TREE_TYPES.has(name)) {
+      // Puut piirtää Forest (lähellä täysi malli, kaukana kevennetty), ei kiinteä nippu.
+      treeSpots.push({ type: name, x, y: dummy.position.y, z, scale, yaw, tiltX: dummy.rotation.x, tiltZ: dummy.rotation.z });
+      return;
+    }
+    if (WILDS && /^(rock_|log$|juurakko$|kelo_pysty$)/.test(name)) {
+      // Erämaan kivet ja kelot piirretään vain pelaajan lähellä (sumu peittää kauempana).
+      propSpots.push({ type: name, x, y: dummy.position.y, z, scale, yaw, tiltX: dummy.rotation.x, tiltZ: dummy.rotation.z });
+      return;
+    }
     dummy.scale.setScalar(scale);
     dummy.updateMatrix();
     if (!batches.has(key)) batches.set(key, []);
     batches.get(key)!.push(dummy.matrix.clone());
-    const name = key.split("@")[0];
-    addPropCollider(collision, `prop:${name}:${colliderId++}`, name, x, z, scale, yaw);
   };
+  const treeSpots: TreeSpot[] = [];
+  const propSpots: TreeSpot[] = [];
   const putSceneItem = (def: SceneItemPlacement) => {
     if (takenSceneItems.has(def.id)) return;
     const parts = protos.get(def.model);
@@ -1037,7 +1185,7 @@ function populate(
   const trees: { x: number; z: number }[] = [];
   const tryTree = (x: number, z: number) => {
     const d = Math.hypot(x, z);
-    if (d < SITE.treeMin || blocked(x, z, 1.5)) return;
+    if (d < SITE.treeMin || blocked(x, z, 1.5) || pathDist(x, z) < 2.2) return;
     if (trees.some((t) => Math.hypot(t.x - x, t.z - z) < 2.6)) return;
     // Kalmisto: näkymä järvelle jää auki, mäntymetsä on harvaa ja kumpareen ympärillä on tilaa.
     if (CAIRN && ((z > 7 && Math.abs(x) < 14) || Math.hypot(x - 1, z - 3) < 13 || r() < 0.4)) return;
@@ -1052,17 +1200,19 @@ function populate(
     // Lähipuut heittävät varjon, kaukaiset eivät (säästää varjorenderöintiä).
     put(type + (d < 34 ? "@near" : "@far"), x, z, 0.85 + r() * 0.35, r() * Math.PI * 2, 0.05, 0.05);
   };
-  for (let i = 0; i < 26; i++) {
+  // Erämaa sijoittelee omat puunsa, kivensä ja kelonsa; alla olevat aukion kehät ohitetaan (0 kierrosta).
+  if (WILDS) placeWilds(put, protos);
+  for (let i = 0; i < (WILDS ? 0 : 26); i++) {
     const a = (i / 26) * Math.PI * 2 + r() * 0.2, d = SITE.treeMin + 0.4 + r() * 3.5;
     tryTree(Math.cos(a) * d, Math.sin(a) * d);
   }
-  for (let i = 0; i < 520; i++) {
+  for (let i = 0; i < (WILDS ? 0 : 520); i++) {
     const a = r() * Math.PI * 2, d = SITE.treeMin + 1.8 + Math.pow(r(), 0.8) * 62;
     tryTree(Math.cos(a) * d, Math.sin(a) * d);
   }
 
   // Kivet, kelot ja risut.
-  for (let i = 0; i < 46; i++) {
+  for (let i = 0; i < (WILDS ? 0 : 46); i++) {
     const a = r() * Math.PI * 2;
     const d = SITE.treeMin - 2.2 + (i < 9 ? 0.6 + r() * 2 : 3 + r() * 38);      // treeMin - 2,2 = aukion reuna
     const x = Math.cos(a) * d, z = Math.sin(a) * d;
@@ -1072,12 +1222,12 @@ function populate(
   }
   if (ARENA === "clearing") put("rock_3@near", OFFERING.x, OFFERING.z, 1.3, 0.7, 0.62);   // uhrikivi: sammaloitunut siirtolohkare
   if (LAKESIDE) put("istuinhirsi@near", FIRE.x - 1.75, FIRE.z + 0.35, 1, Math.PI / 2 + 0.2, 0.02);     // istuinhirsi keittotulella
-  else if (!CAIRN) put("log@near", FIRE.x + 1.9, FIRE.z + 1.3, 0.75, 2.2, 0.02);       // istuinpuu nuotiolla
-  for (let i = 0; i < 7; i++) {
+  else if (!CAIRN && !WILDS) put("log@near", FIRE.x + 1.9, FIRE.z + 1.3, 0.75, 2.2, 0.02);       // istuinpuu nuotiolla
+  for (let i = 0; i < (WILDS ? 0 : 7); i++) {
     const a = r() * 6.28, d = SITE.treeMin + 0.8 + r() * 26;
     put("log@near", Math.cos(a) * d, Math.sin(a) * d, 0.7 + r() * 0.5, r() * 6.28, 0.04, 0.1);
   }
-  for (let i = 0; i < 110; i++) {
+  for (let i = 0; i < (WILDS ? 0 : 110); i++) {
     const a = r() * 6.28, d = 6 + r() * 34;
     const x = Math.cos(a) * d, z = Math.sin(a) * d;
     if (blocked(x, z, 0)) continue;
@@ -1085,7 +1235,7 @@ function populate(
   }
 
   // Varvikko: mustikka kosteassa, puolukka ja kanerva kuivalla kankaalla.
-  for (let i = 0; i < 26000; i++) {
+  for (let i = 0; i < (WILDS ? 0 : 26000); i++) {
     const a = r() * 6.28, d = SITE.shrub0 + Math.pow(r(), 0.9) * 34;
     const x = Math.cos(a) * d + (r() - 0.5), z = Math.sin(a) * d + (r() - 0.5);
     if (blocked(x, z, -0.6)) continue;
@@ -1099,7 +1249,7 @@ function populate(
     put(key, x, z, 0.8 + r() * 0.6, r() * 6.28, 0.01, 0.15);
   }
   // Heinätupsut aukion laidoilla ja valoisissa kohdissa, saniaisia kosteissa painanteissa.
-  for (let i = 0; i < 3200; i++) {
+  for (let i = 0; i < (WILDS ? 0 : 3200); i++) {
     const a = r() * 6.28, d = 3.5 + Math.pow(r(), 0.8) * 26;
     const x = Math.cos(a) * d, z = Math.sin(a) * d;
     if (blocked(x, z, ARENA === "clearing" ? -0.4 : 0.4)) continue;
@@ -1107,14 +1257,14 @@ function populate(
     if (CAIRN && r() < 0.6) continue;                        // kalliokangas: harvaa heinää, enemmän sammalta ja kiveä
     put(d < ARENA_RADIUS ? "grass_d" : `grass_${"abcd"[Math.floor(r() * 4)]}`, x, z, 0.8 + r() * 0.7, r() * 6.28, 0.01);
   }
-  for (let i = 0; i < 140; i++) {
+  for (let i = 0; i < (WILDS ? 0 : 140); i++) {
     const a = r() * 6.28, d = SITE.treeMin - 1.2 + r() * 28;
     const x = Math.cos(a) * d, z = Math.sin(a) * d;
     if (moisture(x, z) < 0.5 || blocked(x, z, 0)) continue;
     put(r() < 0.5 ? "fern_a" : "fern_b", x, z, 0.9 + r() * 0.8, r() * 6.28, 0.01);
   }
 
-  if (!CAIRN) put(LAKESIDE ? (RUIN ? "keittopaikka_sammunut@near" : "keittopaikka@near") : "campfire@near", FIRE.x, FIRE.z, 1, LAKESIDE ? 0 : 0.4, 0.02);
+  if (!CAIRN && !WILDS) put(LAKESIDE ? (RUIN ? "keittopaikka_sammunut@near" : "keittopaikka@near") : "campfire@near", FIRE.x, FIRE.z, 1, LAKESIDE ? 0 : 0.4, 0.02);
   if (ARENA === "clearing") {
     put("kota@near", KOTA.x, KOTA.z, 1, 2.45, 0.05);     // oviaukko aukiolle päin
   } else if (CAIRN) {
@@ -1122,6 +1272,8 @@ function populate(
     put("kuppikivi@near", CUPSTONE.x, CUPSTONE.z, 1, CUPSTONE.yaw, 0.12);
     for (const c of CAIRNS_AT) put(`${c.key}@near`, c.x, c.z, c.s, c.yaw, 0.03);
     put("karsikko@near", KARSIKKO.x, KARSIKKO.z, 1, 0.6, 0.15);
+  } else if (WILDS) {
+    // Erämaassa ei rakennuksia (placeWilds).
   } else if (LAKESIDE) {
     // Mökki oven kanssa rantaan päin, laituri, vene ja ruovikko; pihalla halkopino, pölkky, penkki ja kuivausteline.
     place(RUIN ? "mokki_palanut@near" : "mokki@near", CABIN, 0.04);
@@ -1259,7 +1411,175 @@ function populate(
       tris += ((p.geometry.index?.count ?? p.geometry.attributes.position.count) / 3) * mats.length;
     }
   }
-  return { trees: trees.length, tris: Math.round(tris + dynamicTris), sceneItems: sceneItems.size };
+  // Puut: lähellä täysi malli varjoineen, kaukana kevennetty (forest_lod.glb).
+  // Erämaassa kaukopuita ei piirretä sumun taakse (yli 135 m: sumu peittää yli 90 %). Pienissä
+  // kohtauksissa aukion reunametsä (13–40 m) pysyy täysinä puina, jottei vaihtokaista osu siihen.
+  const forest = new Forest(scene, treeSpots, (n) => protos.get(n), (n) => protos.get(n),
+    WILDS ? { nearR: 38, band: 5, farR: 135 } : { nearR: 48, band: 6 });
+  const props = propSpots.length ? new Forest(scene, propSpots, (n) => protos.get(n), () => undefined, { farR: 60, farBand: 10 }) : null;
+  // Horisonttimetsä sumun taakse: erämaassa neliönä alueen ympärillä, aukioilla kehänä metsän takana
+  // (rannoilla vain maan puolella).
+  const wallPts = WILDS ? squareWall(178) : ringWall(LAKE ? 92 : 84).filter((p) => !LAKE || p.z < shoreZ(p.x) - 8);
+  const walls = placeForestWall(scene, protos.get("metsaseina") ?? [], wallPts);
+  const scatter = WILDS
+    ? new ScatterField(scene, (n) => protos.get(n), wildsCover, { tile: 12, radius: 34, band: 6, step: 0.8 })
+    : null;
+  return {
+    stats: { trees: treeSpots.length, tris: Math.round(tris + dynamicTris), sceneItems: sceneItems.size, walls },
+    forest, scatter, props,
+  };
+}
+
+type WallPoint = { x: number; z: number; y: number; yaw: number; scale: number };
+/** Horisonttisuikaleet kehälle säteellä R, katse keskustaan. */
+function ringWall(R: number): WallPoint[] {
+  const n = Math.ceil((2 * Math.PI * R) / 52);
+  return Array.from({ length: n }, (_, i) => {
+    const a = (i / n) * Math.PI * 2, x = Math.sin(a) * R, z = Math.cos(a) * R;
+    return { x, z, y: groundHeight(x, z) - 1.2, yaw: a + Math.PI, scale: 1 };
+  });
+}
+/** Horisonttisuikaleet neliön reunoille (puolileveys H), katse sisään. */
+function squareWall(H: number): WallPoint[] {
+  const pts: WallPoint[] = [];
+  for (let s = -H; s <= H; s += 58) {
+    for (const [x, z, yaw] of [[s, -H, 0], [s, H, Math.PI], [-H, s, Math.PI / 2], [H, s, -Math.PI / 2]] as const) {
+      pts.push({ x, z, y: groundHeight(x, z) - 1.2, yaw, scale: 1.1 });
+    }
+  }
+  return pts;
+}
+
+type PutFn = (key: string, x: number, z: number, scale: number, yaw: number, sink?: number, tilt?: number, opts?: { wetOk?: boolean; y?: number }) => void;
+
+/**
+ * Erämaan puut, kivet, kelot ja juurakot. Metsä jatkuu 70 m kuljettavan alueen yli kaukopuina.
+ * Rajalla on tiheä nuori kuusikko, kiviä ja kaatuneiden puiden juurakoita: luonnollinen este, jonka
+ * takana näkymätön raja pitää pelaajan alueella. Polut ja suoniitty jäävät puuttomiksi.
+ */
+function placeWilds(put: PutFn, protos: Map<string, Proto>) {
+  const r = rand(4711);
+  const pick = (a: readonly string[]) => a[Math.floor(r() * a.length)];
+  const SPRUCE = ["spruce_a", "spruce_b", "spruce_a", "spruce_young"], PINE = ["pine_a", "pine_b", "pine_c"], BIRCH = ["birch_a", "birch_b"];
+  // Pystyyn kuolleet, hiiltyneet männyt paloaukealle: männyn runko ja oksat ilman neulasia.
+  const bark = (protos.get("pine_a") ?? []).filter((p) => !/Foliage/.test(p.material.name));
+  if (bark.length) {
+    protos.set("kelo_pysty", bark.map((p) => {
+      const m = (p.material as THREE.MeshStandardMaterial).clone();
+      m.color.multiplyScalar(0.42);
+      return { geometry: p.geometry, material: m };
+    }));
+  }
+  const cell = 4.2, ext = 172;
+  for (let gx = -ext; gx < ext; gx += cell) {
+    for (let gz = -ext; gz < ext; gz += cell) {
+      const x = gx + cell / 2 + (r() - 0.5) * cell * 0.7, z = gz + cell / 2 + (r() - 0.5) * cell * 0.7;
+      const k = r(), k2 = r(), yaw = r() * Math.PI * 2, sc = r();
+      // Polku on puuton noin 3,6 m:n leveydeltä keskiviivasta, jotta latvukset eivät sulje sitä tunneliksi.
+      if (pathDist(x, z) < 3.6) continue;
+      const depth = walkableDepth(LAYOUT, x, z);
+      const bog = bogMix(x, z), burn = burnMix(x, z);
+      const edge = depth < 4 && depth > -6;
+      let p = edge ? 0.95 : 0.4 + noise2(x * 0.035 + 9, z * 0.035) * 0.55;
+      p *= 1 - THREE.MathUtils.smoothstep(bog, 0.12, 0.55);
+      p *= 1 - THREE.MathUtils.smoothstep(burn, 0.15, 0.5);
+      if (k > p) {
+        // Suolla harvakseltaan kitukasvuisia mäntyjä ja koivuja.
+        if (bog > 0.35 && bog < 0.97 && k2 < 0.06) put(k2 < 0.03 ? pick(PINE) : pick(BIRCH), x, z, 0.42 + sc * 0.25, yaw, 0.05, 0.12);
+        continue;
+      }
+      const m = moisture(x, z), h = wildsHeight(x, z);
+      let type: string;
+      if (edge && k2 < 0.55) type = "spruce_young";
+      else if (bog > 0.03 || burn > 0.03 || k2 < 0.07) type = k2 < 0.6 ? pick(BIRCH) : pick(PINE);
+      else if (m > 0.48 || h < 2.5) type = k2 < 0.86 ? pick(SPRUCE) : pick(PINE);
+      else type = k2 < 0.78 ? pick(PINE) : pick(SPRUCE);
+      put(type, x, z, (edge ? 0.75 : 0.85) + sc * 0.4, yaw, 0.05, 0.05);
+    }
+  }
+  // Reunatiheikkö: tiheä nuori kuusikko rajan molemmin puolin (ei polunsuilla).
+  for (let gx = -104; gx < 104; gx += 2.4) {
+    for (let gz = -104; gz < 104; gz += 2.4) {
+      const x = gx + (r() - 0.5) * 1.6, z = gz + (r() - 0.5) * 1.6, k = r(), sc = r(), yaw = r() * 6.28;
+      const depth = walkableDepth(LAYOUT, x, z);
+      if (depth > 2.2 || depth < -3.5 || k > 0.62 || pathDist(x, z) < 4.2) continue;
+      put("spruce_young", x, z, 0.5 + sc * 0.45, yaw, 0.05, 0.1);
+    }
+  }
+  // Kivet: siellä täällä metsässä, isoja lohkareita rajalla.
+  for (let i = 0; i < 520; i++) {
+    const x = (r() - 0.5) * 212, z = (r() - 0.5) * 212, s = r(), kind = 1 + Math.floor(r() * 6), yaw = r() * 6.28;
+    const depth = walkableDepth(LAYOUT, x, z);
+    if (pathDist(x, z) < 1.8 || bogMix(x, z) > 0.6 || depth < -8) continue;
+    const edge = depth < 3;
+    if (!edge && i % 2) continue;
+    put(`rock_${kind}@near`, x, z, edge ? 0.8 + s * 1.0 : 0.25 + s * 0.8, yaw, 0.08, 0.3);
+  }
+  // Kaatuneet puut (kelot) ja juurakot: metsässä, rajalla ja paljon paloaukealla.
+  for (let i = 0; i < 260; i++) {
+    const x = (r() - 0.5) * 206, z = (r() - 0.5) * 206, s = r(), yaw = r() * 6.28, k = r();
+    const depth = walkableDepth(LAYOUT, x, z), burn = burnMix(x, z);
+    if (pathDist(x, z) < 2.6 || bogMix(x, z) > 0.5 || depth < -6) continue;
+    const edge = depth < 3;
+    if (!edge && burn < 0.3 && k < 0.7) continue;
+    put(k < 0.45 || edge ? "juurakko@near" : "log@near", x, z, 0.85 + s * 0.35, yaw, 0.06, 0.06);
+  }
+  // Paloaukea: pystyyn kuolleet männyt ja nuoret koivut.
+  for (let i = 0; i < 140; i++) {
+    const a = r() * 6.28, d = Math.sqrt(r()) * 26, s = r(), yaw = r() * 6.28, k = r();
+    const x = BURN.x + Math.sin(a) * d, z = BURN.z + Math.cos(a) * d;
+    if (burnMix(x, z) < 0.35 || pathDist(x, z) < 2.4) continue;
+    if (k < 0.28) put("kelo_pysty@near", x, z, 0.75 + s * 0.35, yaw, 0.1, 0.08);
+    else if (k < 0.62) put(k < 0.53 ? "birch_a" : "birch_b", x, z, 0.35 + s * 0.25, yaw, 0.05, 0.1);
+  }
+}
+
+/** Erämaan aluskasvillisuus yhdelle ruudulle (ScatterField): varvut, heinät, saniaiset ja risut. */
+function wildsCover(tx: number, tz: number, size: number): ScatterItem[] {
+  const r = rand(((Math.imul(tx + 1000, 73856093) ^ Math.imul(tz + 1000, 19349663)) >>> 0) % 2147483646 + 1);
+  const out: ScatterItem[] = [];
+  const obj = new THREE.Object3D();
+  const add = (key: string, x: number, z: number, scale: number, tilt: number) => {
+    obj.position.set(x, groundHeight(x, z) - 0.01, z);
+    obj.rotation.set(tilt * (r() - 0.5), r() * 6.28, tilt * (r() - 0.5));
+    obj.scale.setScalar(scale);
+    obj.updateMatrix();
+    out.push({ key, matrix: obj.matrix.clone() });
+  };
+  const grass = (s: number) => `grass_${"abcd"[Math.floor(s * 4)]}`;
+  const x0 = tx * size, z0 = tz * size, tries = Math.round(size * size * 1.9);
+  for (let i = 0; i < tries; i++) {
+    const x = x0 + r() * size, z = z0 + r() * size, k = r(), s = r(), q = r();
+    const pd = pathDist(x, z);
+    if (pd < 0.6 || walkableDepth(LAYOUT, x, z) < -30) continue;
+    const bog = bogMix(x, z), burn = burnMix(x, z);
+    const m = moisture(x, z) + (q - 0.5) * 0.2;
+    if (pd < 2.2) {
+      // Polun pientareet: heinää ja puolukkaa.
+      if (k < 0.35) add(grass(s), x, z, 0.8 + s * 0.6, 0);
+      else if (k < 0.5) add("lingon_patch", x, z, 0.8 + s * 0.5, 0.15);
+    } else if (bog > 0.5) {
+      // Suoniitty: kanervaa, heinää ja mustikkaa mättäillä.
+      if (k < 0.32) add("heather_patch", x, z, 0.9 + s * 0.6, 0.15);
+      else if (k < 0.58) add(grass(s), x, z, 0.9 + s * 0.7, 0);
+      else if (k < 0.66) add("bilberry_patch2", x, z, 0.8 + s * 0.5, 0.15);
+    } else if (burn > 0.35) {
+      // Paloaukea: heinä ja puolukka valtaavat, välissä risuja.
+      if (k < 0.3) add(grass(s), x, z, 0.8 + s * 0.8, 0);
+      else if (k < 0.45) add("lingon_patch", x, z, 0.7 + s * 0.5, 0.15);
+      else if (k < 0.5) add(`twig_${"abc"[Math.floor(s * 3)]}`, x, z, 0.7 + s * 0.8, 0.2);
+    } else if (k < 0.7) {
+      // Metsänpohja: sama varpujen valinta kuin aukioiden ympärillä.
+      let key: string;
+      if (m > 0.5) key = q < 0.8 ? (q < 0.4 ? "bilberry_patch" : "bilberry_patch2") : "lingon_patch";
+      else if (m > 0.36) key = q < 0.5 ? "lingon_patch" : q < 0.93 ? "bilberry_patch2" : "heather_patch";
+      else key = q < 0.14 ? "heather_patch" : q < 0.75 ? "lingon_patch" : "bilberry_patch";
+      add(key, x, z, 0.8 + s * 0.6, 0.15);
+    } else if (k < 0.74 && m > 0.5) add(s < 0.5 ? "fern_a" : "fern_b", x, z, 0.9 + s * 0.8, 0);
+    else if (k < 0.77) add(grass(s), x, z, 0.7 + s * 0.6, 0);
+    else if (k < 0.785) add(`twig_${"abc"[Math.floor(s * 3)]}`, x, z, 0.6 + s * 0.8, 0.2);
+  }
+  return out;
 }
 
 // Nyrkin otekanavat lepoasennossa (piste ja suunta mallin koordinaateissa). Miehen oikea käsi
@@ -1503,7 +1823,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   // Loppukesän ilta-aurinko: lämmin sivuvalo, viileä taivaanvalo, utu metsän syvyydessä.
   const sunPos = new THREE.Vector3(-22, 24, -15);
   scene.background = new THREE.Color(0xc8cfc9);
-  scene.fog = new THREE.FogExp2(FOG_COLOR, RUIN ? 0.0125 : CAIRN ? 0.0115 : 0.0105);     // tuhon jälkeen ja kalmistolla utuisempaa
+  scene.fog = new THREE.FogExp2(FOG_COLOR, RUIN ? 0.0125 : CAIRN || WILDS ? 0.0115 : 0.0105);     // tuhon jälkeen ja kalmistolla utuisempaa
   const sky = buildSky(scene, sunPos.clone().normalize());
   const envScene = new THREE.Scene();
   envScene.add(sky.clone());
@@ -1521,6 +1841,22 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.05;
   scene.add(sun);
+  // Varjokamera seuraa pelaajaa (update), joten kohteen pitää olla kohtauksessa.
+  scene.add(sun.target);
+  const sunOffset = sunPos.clone();
+  const texel = (sc.right - sc.left) / sun.shadow.mapSize.x;
+  const lightF = sunOffset.clone().normalize().negate();
+  const lightR = new THREE.Vector3().crossVectors(lightF, new THREE.Vector3(0, 1, 0)).normalize();
+  const lightU = new THREE.Vector3().crossVectors(lightR, lightF);
+  const snapped = new THREE.Vector3();
+  /** Varjo pelaajan ympärille; siirto napsautetaan varjokartan tekseleihin, ettei reunoja värisytä. */
+  const followShadow = (p: THREE.Vector3) => {
+    const a = Math.round(p.dot(lightR) / texel) * texel, b = Math.round(p.dot(lightU) / texel) * texel, c = p.dot(lightF);
+    snapped.copy(lightR).multiplyScalar(a).addScaledVector(lightU, b).addScaledVector(lightF, c);
+    sun.target.position.copy(snapped);
+    sun.position.copy(snapped).add(sunOffset);
+  };
+  let forest: Forest | null = null, scatter: ScatterField | null = null, props: Forest | null = null;
 
   const groundTex = buildGround(scene, maxAniso);
   const water = LAKE ? buildWater(scene, envMap) : null;
@@ -1544,11 +1880,11 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   };
   const fire = buildFire(scene);
   const collision = new CollisionWorld();
-  if (!CAIRN) collision.add({
+  if (!CAIRN && !WILDS) collision.add({
     id: "campfire", kind: "circle", x: FIRE.x, z: FIRE.z, radius: COLLISION.fireCoreRadius,
     blocksMovement: true, blocksMelee: true,
   });
-  if (!RUIN && !CAIRN) collision.addHazard({
+  if (!RUIN && !CAIRN && !WILDS) collision.addHazard({
     // Rantakohtauksen keittotuli on pieni ja rauhallinen: kivikehän vierestä ei pala.
     id: "campfire", kind: "circle", x: FIRE.x, z: FIRE.z, radius: LAKE ? COLLISION.fireHazardRadius * 0.45 : COLLISION.fireHazardRadius,
     damagePerSecond: COLLISION.fireDamagePerSecond,
@@ -1574,10 +1910,10 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   }
 
   const loader = new GLTFLoader();
-  const files = ARENA === "yard" ? [forestUrl, homesteadUrl, householdUrl, yardUrl]
+  const files = [forestLodUrl, ...(ARENA === "yard" ? [forestUrl, homesteadUrl, householdUrl, yardUrl]
     : CAIRN ? [forestUrl, cairnfieldUrl]
     : LAKESIDE ? [forestUrl, homesteadUrl, householdUrl, lakesideUrl, ...(RUIN ? [lakeruinUrl] : [])]
-      : HAS_YARD ? [forestUrl, homesteadUrl] : [forestUrl];
+      : HAS_YARD ? [forestUrl, homesteadUrl] : [forestUrl])];
   const ready = Promise.all(files.map((u) => loader.loadAsync(u))).then((gltfs) => {
     for (const gltf of gltfs) {
       for (const child of gltf.scene.children) {
@@ -1590,10 +1926,20 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
       }
     }
     prepareMaterials(protos, maxAniso);
-    const stats = populate(scene, protos, collision, runtimeSceneItems, takenSceneItemIds);
+    const built = populate(scene, protos, collision, runtimeSceneItems, takenSceneItemIds);
+    forest = built.forest;
+    scatter = built.scatter;
+    props = built.props;
     // Liitetään tilastot samaan `__world`-olioon, jossa on maailmamoottorin konsoli (engine/worldConsole.ts).
     const host = window as unknown as { __world?: object };
-    Object.assign(host.__world ??= {}, { ...stats, collision: collision.stats() });
+    Object.assign(host.__world ??= {}, { ...built.stats, collision: collision.stats() });
+    // Getteri määritellään erikseen: Object.assign kopioisi vain sen hetkisen arvon.
+    Object.defineProperty(host.__world, "forest", {
+      configurable: true,
+      get: () => ({ ...forest?.stats(), props: props?.stats(), cover: scatter?.stats() }),
+    });
+    // Savutesteihin: metsän lähisäteen säätö (vertailukuvat täysi/kaukopuu).
+    Object.assign(host.__world, { forestNear: (r: number, band?: number) => forest?.setNear(r, band) });
     if (ARENA === "yard") return populateYardLife(scene, collision);
     if (CAIRN) return populateCairnLife(scene, collision);
     if (LAKESIDE) return populateLakeLife(scene, collision);
@@ -1621,11 +1967,20 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
       // Järven kaukainen vastaranta on yli 300 m päässä: kameran kantama pidennetään.
       const persp = camera as THREE.PerspectiveCamera;
       if (LAKE && persp.far < 700) { persp.far = 700; persp.updateProjectionMatrix(); }
+      // Taivaspallo kulkee kameran mukana: laajassa kohtauksessa sen kaukainen laita jäisi muuten
+      // kameran kantaman (300 m) taakse ja taustaväri näkyisi puiden välistä.
+      sky.position.copy(camera.position);
       fire.update(dt, camera);
       houseSmoke?.(dt);
       water?.update(dt);
       loon?.(dt);
       updateFolk(dt, focus ?? null);
+      if (focus) {
+        followShadow(focus);
+        forest?.update(focus);
+        props?.update(focus);
+        scatter?.update(focus);
+      }
     },
   };
 }

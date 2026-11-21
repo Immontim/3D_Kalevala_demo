@@ -43,3 +43,5 @@ export const lakesideVisit: Encounter = makeVisit("lakeside.title", "lakeside.su
 export const lakeruinVisit: Encounter = makeVisit("lakeruin.title", "lakeruin.sub");
 /** Kalmisto järven rannalla: kuppikivi, röykkiöt ja Louhi. */
 export const cairnfieldVisit: Encounter = makeVisit("cairnfield.title", "cairnfield.sub");
+/** Erämaa: laaja metsä (200 x 200 m), josta poistutaan polunsuista. */
+export const wildsVisit: Encounter = makeVisit("wilds.title", "wilds.sub");
