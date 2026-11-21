@@ -16,6 +16,18 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; col
 #gazePrompt { display: none; margin-top: 10px; padding: 4px 9px; border: 1px solid rgba(113, 73, 39, 0.75); border-radius: 3px; background: rgba(35, 25, 18, 0.78); font-size: 15px; white-space: nowrap; }
 #gazeFocus.target #gazeDot { width: 10px; height: 10px; margin-top: -5px; border-color: #ffd27a; background: rgba(181, 119, 43, 0.7); box-shadow: 0 0 7px rgba(255, 210, 122, 0.72); }
 #gazeFocus.target #gazePrompt { display: inline-block; }
+/* Jousen tähtäin: neljä viivaa, joiden väli kapenee jännityksen mukana (--spread), ja keskipiste. */
+#crosshair { position: absolute; left: 50%; top: 50%; z-index: 8; width: 0; height: 0; --spread: 16px; }
+#crosshair i { position: absolute; background: rgba(243, 221, 176, 0.9); box-shadow: 0 0 2px #17100b; transition: transform 60ms linear; }
+#crosshair i:nth-child(1), #crosshair i:nth-child(2) { width: 2px; height: 7px; left: -1px; }
+#crosshair i:nth-child(3), #crosshair i:nth-child(4) { width: 7px; height: 2px; top: -1px; }
+#crosshair i:nth-child(1) { top: calc(-1 * var(--spread) - 7px); }
+#crosshair i:nth-child(2) { top: var(--spread); }
+#crosshair i:nth-child(3) { left: calc(-1 * var(--spread) - 7px); }
+#crosshair i:nth-child(4) { left: var(--spread); }
+#crosshair b { position: absolute; left: -2px; top: -2px; width: 4px; height: 4px; border-radius: 50%; background: rgba(243, 221, 176, 0.95); box-shadow: 0 0 2px #17100b; }
+#crosshair.full i, #crosshair.full b { background: #ffd27a; }
+#huntHud { position: absolute; right: 18px; bottom: 44px; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; color: #f3ddb0; font-size: 15px; text-shadow: 0 1px 3px #17100b, 0 0 5px #17100b; }
 #gazeFocus.theft #gazeDot { border-color: #e88d72; background: rgba(146, 50, 32, 0.75); box-shadow: 0 0 7px rgba(216, 83, 54, 0.72); }
 #gazeFocus.theft #gazePrompt { border-color: rgba(161, 66, 43, 0.9); color: #ffd1bd; }
 #gazeFocus.blocked #gazeDot { border-color: #a99d86; background: rgba(73, 67, 57, 0.72); box-shadow: none; }
@@ -284,6 +296,8 @@ body.mode-scene > #mapRoot { display: none !important; }
 .inventory-equipment-slot .inventory-item-icon { width: 48px; height: 48px; transform: scale(0.75); transform-origin: center; margin: -6px; }
 .inventory-item-icon.item-barley_flatbread { background-position: 0 0; }
 .inventory-item-icon.item-dried_fish { background-position: -48px 0; }
+/* Jäniksenliha: väliaikainen CSS-kuvake, kunnes inventaarioatlakseen piirretään oma ruutu. */
+.item-hare_meat, .inventory-item-icon.item-hare_meat { background: radial-gradient(ellipse 36% 26% at 46% 54%, #b5483f 0 70%, #7e2a26 72% 100%, transparent 101%), radial-gradient(circle at 78% 34%, #efe4cf 0 12%, transparent 13%), linear-gradient(35deg, transparent 58%, #e6dac2 59% 66%, transparent 67%); }
 .inventory-item-icon.item-birch_bark_pack { background-position: -96px 0; }
 .inventory-item-icon.item-sword { background-position: -144px 0; }
 .inventory-item-icon.item-sky_iron_sword { background-position: 0 -48px; }

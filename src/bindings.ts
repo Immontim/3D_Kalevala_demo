@@ -8,7 +8,7 @@
 import { t } from "./i18n";
 
 export type SongSlotAction = "song1" | "song2" | "song3" | "song4" | "song5";
-export type Action = "slash" | "overhead" | "thrust" | "block" | "dodge" | "song" | "lock" | SongSlotAction;
+export type Action = "slash" | "overhead" | "thrust" | "block" | "dodge" | "song" | "lock" | "bow" | SongSlotAction;
 /** Laulun pikavalinnat valintaringin paikoille vasemmalta oikealle. */
 export const SONG_SLOT_ACTIONS: readonly SongSlotAction[] = ["song1", "song2", "song3", "song4", "song5"];
 
@@ -20,6 +20,7 @@ export const ACTIONS: { id: Action; label: string }[] = [
   { id: "dodge", label: t("bindings.action.dodge") },
   { id: "song", label: t("bindings.action.song") },
   { id: "lock", label: t("bindings.action.lock") },
+  { id: "bow", label: t("bindings.action.bow") },
   { id: "song1", label: t("bindings.action.song1") },
   { id: "song2", label: t("bindings.action.song2") },
   { id: "song3", label: t("bindings.action.song3") },
@@ -39,6 +40,7 @@ export const DEFAULT_BINDINGS: Bindings = {
   dodge: ["ShiftLeft", "ShiftRight"],
   song: ["KeyQ", ""],
   lock: ["Tab", "Mouse1"],
+  bow: ["KeyX", ""],
   song1: ["F1", ""],
   song2: ["F2", ""],
   song3: ["F3", ""],

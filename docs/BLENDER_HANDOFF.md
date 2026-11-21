@@ -6,7 +6,7 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-21 (Claude, Windows; pohja main 2b4653d)
+Päivitetty: 2026-11-21 (Claude, Windows; pohja main 2e60ff7)
 
 - **Metsän LOD- ja reuna-assetit** (`assets/forest_lod.glb`, 1,6 Mt; `assets-src/blender/forest_lod.py`;
   mainissa). Peli lataa tiedoston kaikissa 3D-kohtauksissa v06.00.00:sta alkaen (AGENT_HANDOFF). Skripti lukee
@@ -26,11 +26,6 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja main 2b4653d)
     vaaleampia ja harmaampia. Korjattu toistaiseksi pelin puolella (`world.ts` `LOD_TINT` lehvästölle
     0,28/0,38/0,32 ja `M_BarkLOD` × 0,62); pikselimittaus vertailukuvista, ei vielä täydellinen vastaavuus.
     Juurakko (2 230 kolmiota) on raskas, joten erämaa piirtää sen vain alle 60 m:n päähän.
-- **Mainissa** ovat `assets/forest.glb`,
-  `characters.glb`, `bog.glb`, `homestead.glb`, `household.glb`,
-  `yard.glb`, `villagers.glb`, `villagers_f.glb` ja `assets/animals/`.
-  `characters.glb` sisältää sankarin rauhan varustuksen (ks. alla). Se,
-  mitä peli niistä lataa, on `docs/AGENT_HANDOFF.md`:ssä.
 - **Järvenrannan kohtaus** (`assets/lakeside.glb`, noin 0,9 Mt / 9 300
   kolmiota; `assets-src/blender/lakeside.py`, ajetaan taustalla ja lukee
   ensin `homestead.py`:n ja `household.py`:n; Blender on
@@ -72,8 +67,6 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja main 2b4653d)
   (0,385; -0,058; 0,769), suunta (-0,283; -0,795; -0,537); oikea käsi on
   peilikuva x:n suhteen. Jousen kahva uppoaa suljettuun nyrkkiin, mikä
   näyttää otteelta, mutta kuvista tätä ei ole tarkistettu.
-- **Hihat ja ranteet.** Pitkän hihan (`torso_parts`, loppu 0,97) leikkasi aiemmin vartalon z-alaraja 0,95 ("katkennut
-  ranne"); käsivarren verteksejä rajaa nyt vain `arm_t`. Sankarin hiha (0,78) ei muuttunut.
 - **Sormiluut** (`char_rig.py`: `finger_setup`, `add_fingers`, `FINGER_*`): `finger1..3_L/R` kummallakin luurangolla
   (`RIG`, `RIG_F`), vanhempana `hand_*`. Lepoasento on edelleen nyrkki (verkko ei muuttunut); luun paikallinen Z on
   koukistusakseli ja sormet aukeavat kiertämällä luita +1,25/+1,5/+0,9 rad. Sormiverteksit jaetaan `hand_*`n painosta
@@ -206,7 +199,6 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja main 2b4653d)
     käsin kansioon `assets-src/_downloads/` (ei Gitissä). `.blend`-tiedostot
     eivät ole Gitissä, eikä lähdemallien tuontia SRC-kokoelmaan ole
     skriptattu.
-  - Assetti- tai dokumenttimuutos ei nosta pelin versionumeroa.
 
 ## Tunnetut rajoitteet ja riskit
 
@@ -235,13 +227,20 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja main 2b4653d)
 
 ## Koodin väliaikaiset korvikkeet (odottavat malleja)
 
+- **Metsästys (v06.04, `src/hunt/models.ts`)**: jousi (1,44 m, kahva origossa, lavat ±z, jänne −y käden
+  kehyksessä; jänne on koodin Line, joka seuraa oikeaa kättä), nuoli (0,78 m, perä origossa, kärki +z) ja
+  jänis (noin 0,55 m, origo maassa, kuono +z; yhdistetty vartalo + kaksi korvaa niveltyvinä solmuina,
+  verteksivärit). Blender-versiot samoilla mitoilla, origoilla ja suunnilla; jänikselle loikka-, pako- ja
+  kuolinasento tai luut (peli liikuttaa nyt vain vartaloa ja korvia). Miessankarilla ei ole nuoliviiniä.
+
 - **Loukkaantunut jousineito**: `lying`-asento (kuin kuollut tietäjä), ei jousta. Tarvitaan istuva/kyljellään-asento.
 - **Nuori urho kyläläisenä**: `char_urho` ilman aseita (`spawnVillager`); anna tarvittaessa oma rauhan asento.
 
 ## Seuraava Blender-tehtävä
 
-Ei kiireellistä. Jos omistaja näkee kaukopuiden vaihtorajan pelissä: leivo `forest_lod.py`:ssä atlas
-valaistuna (tai tummemmaksi) ja pudota pelin `LOD_TINT`-korjaus. Muuta:
+Metsästyksen mallit omistajan v06.04-testin jälkeen: metsäjänis (kesäturkki, mustat korvankärjet),
+pronssi-/rautakautinen jousi ja nuoli (korvikkeiden mitat yllä) sekä miessankarin nuoliviini. Muuta: jos
+omistaja näkee kaukopuiden vaihtorajan, leivo `forest_lod.py`:n atlas valaistuna ja pudota `LOD_TINT`;
 legacy-hahmojen poisto omistajan käsisavutestin jälkeen (säästää noin 1,7 Mt kummassakin), sormien
 viimeistely, koiran kävelyleike, istuva tietäjä ja loukkaantuneen jousineidon asento.
 
@@ -249,5 +248,4 @@ viimeistely, koiran kävelyleike, istuva tietäjä ja loukkaantuneen jousineidon
 
 - Isännän malli.
 - Kuvakortti-impostorit (useita kulmia) tai uudet LOD-tasot ennen kuin omistaja on mitannut FPS:n peliläppärillä.
-- Metsästyksen assetit (jänis, jousi aseena, nuolet, nuoliviini) ennen perusta- ja metsävaihetta.
 - Dialogianimaatiot ennen omistajan palautetta rauhallisesta pihasta.

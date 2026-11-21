@@ -23,6 +23,23 @@ import { ARENA } from "../world";
 let focusedId: string | null = null;
 let lockedId: string | null = null;
 
+/**
+ * Kohtauksen aikainen poimittava, joka ei ole tallennettu maailmanesine: ammuttu nuoli tai kaadettu
+ * riista. Kohdistus ja tartuntaele ovat samat kuin esineillä; oton vaikutus on poimittavan oma.
+ */
+export interface Pickable extends GazeTarget {
+  label: string;
+  /** Mahtuuko poimittava (viini tai inventaario). */
+  room(): boolean;
+  fullText: string;
+  /** Poimii; false = ei onnistunut (esim. tallennus epäonnistui). */
+  take(): boolean;
+}
+let pickableSource: () => Pickable[] = () => [];
+/** Poimittavien lähde (hunt.ts). Lista luetaan joka ruudulla. */
+export function setPickableSource(source: () => Pickable[]) { pickableSource = source; }
+let pickables: Pickable[] = [];
+
 /** Kutsutaan, kun kampanjan tilanomistaja on alustettu: piilottaa jo otetut esineet. */
 export function configureSceneItems() {
   focusedId = null;
@@ -85,7 +102,8 @@ export function updateSceneItemFocus(active: boolean) {
   const hero = g.player.pos;
   const origin = gazeOrigin(hero);
   const direction = gazeDirection(aim.yaw, aim.pitch);
-  const focused = pickGazeTarget(hero, aim.yaw, aim.pitch, eligibleItems());
+  pickables = pickableSource();
+  const focused = pickGazeTarget<GazeTarget>(hero, aim.yaw, aim.pitch, [...eligibleItems(), ...pickables]);
   focusedId = focused?.id ?? null;
 
   // Kohteen kohdalla piste pysyy edelleen katseakselilla, mutta samalla syvyydellä kuin esine.
@@ -107,6 +125,14 @@ export function updateSceneItemFocus(active: boolean) {
   if (!focused) {
     el.classList.remove("theft", "blocked");
     $("gazePrompt").textContent = "";
+    return;
+  }
+  const pick = pickables.find((p) => p.id === focused.id);
+  if (pick) {
+    const room = pick.room();
+    el.classList.remove("theft");
+    el.classList.toggle("blocked", !room);
+    $("gazePrompt").textContent = room ? t("interact.take", { item: pick.label }) : pick.fullText;
     return;
   }
   const item = world.sceneItem(focused.id);
@@ -132,6 +158,14 @@ export function takeLockedSceneItem() {
   const id = lockedId;
   lockedId = null;
   if (!id) return;
+  const pick = pickableSource().find((p) => p.id === id);
+  if (pick) {
+    const distance = Math.hypot(pick.x - g.player.pos.x, pick.z - g.player.pos.z);
+    if (distance > ITEM_TAKE_RANGE) return;
+    if (!pick.room()) { showMsg(pick.fullText, "", 1.5); return; }
+    if (pick.take()) focusedId = null;
+    return;
+  }
   const item = world.sceneItem(id);
   const def = item ? definitionOf(item) : null;
   if (!item || !def || blockedByBuilding(item)) return;

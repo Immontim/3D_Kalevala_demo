@@ -207,7 +207,37 @@ export const POSES: Record<string, Pose> = {
     spineYaw: 0, spinePitch: -0.12, rShX: 0, rShZ: -1.12, rEl: -0.2, rHandX: 1.57, rHandY: 0,
     lShX: 0, lShZ: 1.12, lEl: -0.2, crouch: 0.02, headPitch: -0.32, stride: 0.05,
   },
+  // Jousi (metsästys). Kanto: jousi vasemmassa kädessä kyljellä, lavat eteen-taakse.
+  bowCarry: {
+    spineYaw: 0, spinePitch: 0.02, rShX: 0.05, rShZ: -0.17, rEl: -0.32, rHandX: 0.1, rHandY: 0,
+    lShX: -0.15, lShZ: 0.2, lEl: -0.55, crouch: 0, headPitch: 0, stride: 0.04,
+  },
+  // Tähtäys: vasen käsi suorana eteen (jousi pystyssä), oikea käsi jänteellä nuolen perässä.
+  bowAim: {
+    spineYaw: 0, spinePitch: 0.02, rShX: -1.35, rShZ: -0.35, rEl: -1.55, rHandX: 0, rHandY: 0,
+    lShX: -1.55, lShZ: 0.08, lEl: -0.06, crouch: 0.04, headPitch: 0, stride: 0.16,
+  },
+  // Täysi jännitys: oikea käsi vedetty poskelle, kyynärpää olkapään korkeudella taakse.
+  bowDraw: {
+    spineYaw: 0, spinePitch: 0.02, rShX: -1.45, rShZ: -1.0, rEl: -2.5, rHandX: 0, rHandY: 0,
+    lShX: -1.58, lShZ: 0.08, lEl: -0.02, crouch: 0.05, headPitch: 0, stride: 0.18,
+  },
 };
+
+const bowOut: Pose = { ...POSES.bowAim };
+/** Jousen asento: aim 0..1 (kanto -> tähtäys), draw 0..1 (jännitys) ja pystykulma elev (rad, + = ylös). */
+export function bowPose(aim: number, draw: number, elev: number): Pose {
+  const a = POSES.bowCarry, b = POSES.bowAim, c = POSES.bowDraw;
+  for (const key of KEYS) {
+    const aimed = b[key] + (c[key] - b[key]) * draw;
+    bowOut[key] = a[key] + (aimed - a[key]) * aim;
+  }
+  // Kädet nousevat ja laskevat tähtäyskulman mukana; selkä taipuu vähän.
+  bowOut.lShX -= elev * 0.85 * aim;
+  bowOut.rShX -= elev * 0.85 * aim;
+  bowOut.spinePitch -= elev * 0.15 * aim;
+  return bowOut;
+}
 
 /** Rauhan eleet. Aika t alkaa eleen alusta (s). Palauttaa asennon, johon hahmo liukuu. */
 export type Gesture = "talk" | "use";
@@ -403,6 +433,10 @@ export class Fighter {
   /** Oma kello ja vaihe, jotta kaksi hahmoa ei huoju samassa tahdissa. */
   private idleT = Math.random() * 100;
   private disposed = false;
+  /** Metsästysjousi vasemmassa kädessä (koodimalli, hunt/models.ts) ja onko jousi käytössä. */
+  private bowObj: THREE.Object3D | null = null;
+  private bowHolder: THREE.Group | null = null;
+  private bowMode = false;
   sink = 0; // suohon vajoaminen metreinä
   fall = 0; // 0..1 kaatuminen
   /** Asento, johon hahmo kaatuu. Valitaan kuolinhetkellä (setFallen). */
@@ -592,7 +626,46 @@ export class Fighter {
       this.helmet = helmet;
     } else helmet?.removeFromParent();
     this.applySheath();
+    this.attachBow();
     this.apply();
+  }
+
+  /** Antaa hahmolle jousen (tai poistaa sen). Jousi kiinnitetään vasempaan käteen, kun malli on ladattu. */
+  setBow(obj: THREE.Object3D | null) {
+    if (this.bowObj && this.bowObj !== obj) this.bowObj.removeFromParent();
+    this.bowObj = obj;
+    this.attachBow();
+  }
+
+  /** Jousi esiin tai pois: esillä ollessa keihäs piilotetaan ja kädet seuraavat jousen asentoja. */
+  setBowMode(on: boolean) {
+    this.bowMode = on;
+    if (this.bowHolder) this.bowHolder.visible = on;
+    if (this.weaponModel && this.look.loadout === "spear") this.weaponModel.visible = !on;
+  }
+
+  get bowReady() { return this.bowMode && !!this.bowHolder; }
+
+  /** Nyrkin keskikohta maailmassa (oikea käsi vetää jännettä). null, jos malli ei ole vielä ladattu. */
+  fistWorld(side: "L" | "R", out: THREE.Vector3): THREE.Vector3 | null {
+    const hand = this.bones.get(`hand_${side}`);
+    if (!hand) return null;
+    const cInv = qB.copy(hand.canon).invert();
+    return hand.bone.localToWorld(out.set(GRIP.x, GRIP.y, GRIP.z).applyQuaternion(cInv));
+  }
+
+  private attachBow() {
+    if (!this.rig || !this.bowObj) return;
+    const hand = this.bones.get("hand_L")!;
+    const cInv = hand.canon.clone().invert();
+    const holder = this.bowHolder ?? new THREE.Group();
+    // Käden virtuaalikehys kuten miekalla: kahva nyrkin otekanavaan, lavat kehyksen z-akselille.
+    holder.quaternion.copy(cInv).multiply(qA.setFromEuler(eul.set(0, 0, BOW_ROLL)));
+    holder.position.copy(vTmp.set(GRIP.x, GRIP.y, GRIP.z).applyQuaternion(cInv));
+    holder.add(this.bowObj);
+    if (!holder.parent) hand.bone.add(holder);
+    holder.visible = this.bowMode;
+    this.bowHolder = holder;
   }
 
   /**
@@ -1086,8 +1159,8 @@ export class Fighter {
     // Kämmenet: rauhassa ja eleissä sormet ovat rennosti auki, taistelussa ase- ja kilpikäsi puristaa nyrkkiin.
     const freeHands = target === POSES.rest || target === POSES.restSpear || gesture;
     const openAmt = gesture ? 0.9 : 0.7;
-    const goalR = freeHands && this.look.loadout !== "spear" ? openAmt : 0;
-    const goalL = freeHands ? openAmt : this.look.loadout === "sword" ? 0.35 : 0;
+    const goalR = this.bowMode ? 0.12 : freeHands && this.look.loadout !== "spear" ? openAmt : 0;
+    const goalL = this.bowMode ? 0 : freeHands ? openAmt : this.look.loadout === "sword" ? 0.35 : 0;
     const kh = 1 - Math.exp(-9 * dt);
     this.handOpen.R += (goalR - this.handOpen.R) * kh;
     this.handOpen.L += (goalL - this.handOpen.L) * kh;
@@ -1098,8 +1171,8 @@ export class Fighter {
     if (dt > 1e-6) this.strideVel += ((this.pose.stride - strideWas) / dt - this.strideVel) * (1 - Math.exp(-30 * dt));
     if (this.look.loadout === "spear") {
       const st = SPEAR_HOLD.get(spearTarget);
-      this.spearW += ((st ? 1 : 0) - this.spearW) * k;
-      this.spearLeftW += ((spearTarget === POSES.restSpear ? 0 : 1) - this.spearLeftW) * k;
+      this.spearW += ((st && !this.bowMode ? 1 : 0) - this.spearW) * k;
+      this.spearLeftW += ((spearTarget === POSES.restSpear || this.bowMode ? 0 : 1) - this.spearLeftW) * k;
       if (st) {
         const h = spearHold(st);
         this.hold.grip.lerp(h.grip, k);
@@ -1280,6 +1353,8 @@ const GRIP_CHANNEL = { p: new THREE.Vector3(-0.383, 0.795, 0.112), d: new THREE.
 // Aseen paikka kädessä virtuaalisessa käsikehyksessä (käsi suorana alas: y alas rannetta pitkin).
 const GRIP = { x: 0, y: -0.085, z: 0.0 };
 const HAND_TWIST = 0;
+/** Jousen kierto lapojen akselin ympäri vasemmassa kädessä: jänne ampujaan päin (tarkistettu kuvista). */
+const BOW_ROLL = Math.PI;
 
 interface ShieldUniforms {
   uNotch: { value: number };

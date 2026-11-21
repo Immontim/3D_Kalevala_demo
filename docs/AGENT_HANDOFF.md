@@ -6,14 +6,31 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `1ffb1e4`)
+Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `2e60ff7`)
 
-- **Koodiversio v06.03.00** branchissa `codex/map-bridge-and-clearings` (tarkista merge-tila `git merge-base`illa).
-  Koodi valmis, ei deployattu. Codex testasi käsin in-app-selaimessa näppäimillä sillan ylityksen,
-  pohjoisen aukeat ja pihaniityn ennen sivun uudelleenlatausta ja sen jälkeen. Konsoli oli puhdas.
-  Kartta piirtyy tapahtumista, joten sillä ei ole jatkuvaa FPS-silmukkaa. Omistaja ei ole vielä käsin
-  testannut. `bun install --frozen-lockfile`, `bun run test` (1181/1181), `bunx tsc --noEmit`,
-  `bun run lint`, `bun run build` ja `git diff --check` läpi. Build varoitti 861 kt:n 3D-chunkista.
+- **Koodiversio v06.04.00** branchissa `claude/hunting-bow` (tarkista merge-tila `git merge-base`illa).
+  Koodi valmis, ei deployattu, omistaja ei ole käsin testannut. Claude testasi in-app-selaimessa
+  (`?scene=wilds`, paneeli piilossa, joten peli ajettiin `__game.step`illä ja syöte `__game.huntInput`illa
+  sekä oikeilla X-, hiiri- ja B-tapahtumilla): jousi esiin, tähtäys, jännitys, kaksi osumaa jänikseen,
+  ohilaukaus säikäytti jäniksen, lihan ja nuolten poiminta, inventaarion kuvake, näppäinlista. Konsoli
+  puhdas. `bun run test` (380/380), `bunx tsc --noEmit`, `bun run lint`, `bun run build` läpi.
+  Piirto `__game.renderBench()`: 2,5–6 ms/ruutu 1024×768 kotikoneella (~150 piirtokutsua, 1,35–1,7 milj.
+  kolmiota varjoineen); tähtäys lisää 6 kutsua. Peliläppärillä ei mitattu.
+- **Metsästys (v06.04, `src/hunt/` puhdas + `engine/hunt.ts`).** Vain `HUNTING` = erämaa. Toiminto `bow`
+  (oletus X, sidottavissa) ottaa jousen esiin rauhassa; vihollinen pakottaa sen pois. Jousi esillä:
+  `strikeHeld.slash` (vasen) jännittää, `blockHeld` (oikea) tähtää, ja jännitys tähtää aina; oikea painike
+  poimii vain kohdistetun (`focusedSceneItemId`). `archery.ts`: `ARCHERY` (viini 15, 0,85 s, 20–52 m/s,
+  pelillinen painovoima 4,9), `stepArrow`, `traceSegment` (maa + `CollisionWorld.firstProjectileHit` +
+  eläinpallot). Tähtäyspiste = kameran säde lähimpään osumaan; nuoli lähtee jänteeltä sitä kohti.
+  Esteillä on uusi `top` (`PROP_COLLIDERS.height` × mittakaava; puuttuva = rajaton, eli puut). `prey.ts`:
+  `SPECIES.hare` (näkö 12 m / 360°, kuulo `acuity`), tilat graze/hop/alert/flee/dead; ärsykkeet `sight`
+  (sankari) ja `sound` (nuolen isku 5 m). Seitsemän jänistä `HARE_SPOTS`issa, piirto alle 75 m:n päähän.
+  Poimittavat (`sceneItems.ts` `Pickable`, `setPickableSource`): nuoli alle 2,2 m korkeudella ja ruho
+  (`hare_meat` inventaarioon `campaignStore().update`lla, ruhon nuolet viiniin). Viini ja saalislaskuri
+  ovat moduulin tilaa, joten ne nollautuvat sivun latauksessa (omistaja hyväksyi). Kamera: `camera.ts`
+  `AIM_*` oikean olan yli, FOV 40, pystykulma −45…50°. Asennot `POSES.bowCarry/bowAim/bowDraw` +
+  `bowPose()`, jousi vasemmassa kädessä `Fighter.setBow/setBowMode` (`BOW_ROLL` π), jänne seuraa
+  oikeaa nyrkkiä (`fistWorld`). Mallit ovat koodissa (`hunt/models.ts`), eivät Blenderissä.
 - **Saapuminen polunsuulta (v06.02).** `sceneLayout.entrySpawn(layout, inset)` = ensimmäisen polunsuun portista
   `ENTRY_INSET` 3,5 m sisään, katse sisään. `world.ts` `SPAWN`: kalmisto ja erämaa käsin (jo polulla), pihat
   inset 6,4 (kameran `camMaxR` 12,2 aidan sisällä, muuten kamera painuu maahan), ranta katsoo `LAKE_FIRE`a.
@@ -113,16 +130,11 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `1ffb1e4`)
   (puhe-ele -> `npc.talked` -> dialogi, jos `findDialogue(ARENA, npcId)`; pelilogiikka seisoo; numero/
   klikkaus, Esc sulkee). Tietäjä (`lakeside`): `sage.permission` + `setSceneItemTakeMode`; luvaton
   otto -> `sage.theft-noticed` (lippu, laskuri, viesti), anteeksipyyntö, loki säilyy.
-- **Rauhallisten 3D-kohtausten esineet.** `sceneInteraction.ts` valitsee
-  sankarin katseakselilta enintään 2,8 m:n päässä olevan esineen. HUDin pieni
-  piste projisoidaan maailmaan; osuva piste näyttää esineen nimen, varkauden ja
-  täyden inventaarion. Käytä-ele lukitsee painallushetken kohteen ja ratkaisee
-  oton eleen keskellä. Tallennus tehdään ennen 3D-juuren poistamista; epäonnistunut
-  tallennus jättää esineen paikalleen. `world.ts`:n dynaamiset esineet jakavat
-  GLB-prototyyppien geometrian ja materiaalit, eikä niillä ole liikecollidereita.
-  Instanssit: `lakeside.sage-pack` (sama myös `lakeruin`issa) sekä pihassa
-  `<pihan tunniste>.table-flatbread` (3 rieskaa) ja `.table-dried-fish` (3 kalaa).
-  Pöydän muut astiat jäävät paikoilleen ruoan ottamisen jälkeen.
+- **Rauhallisten 3D-kohtausten esineet.** `sceneInteraction.ts` valitsee katseakselilta enintään 2,8 m:n
+  päässä olevan esineen (tai `Pickable`n); HUDin piste näyttää nimen, varkauden ja täyden inventaarion.
+  Käytä-ele lukitsee painallushetken kohteen ja ratkaisee oton eleen keskellä. Tallennus ennen 3D-juuren
+  poistoa; epäonnistunut tallennus jättää esineen paikalleen. Instanssit: `lakeside.sage-pack` (myös
+  `lakeruin`) sekä pihassa `<pihan tunniste>.table-flatbread` (3) ja `.table-dried-fish` (3).
 - **Esinedomain ja pysyvyys.** Kampanjaskeema 6 ja avain
   `laulun-miekka.campaign.v6`; v5 migroidaan menettämättä etenemistä tai varusteita.
   `CampaignWorld.sceneItems` tallentaa otetut instanssit, `allowed|theft`-
@@ -131,34 +143,13 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `1ffb1e4`)
   on nyt kytketty tietäjän dialogiin (yllä). Pudotus-UI:ta tai pudotettujen mallien
   luontia ei vielä ole. Uusi matka alkaa kolmella ohrarieskalla ilman kalaa;
   tuohikontti on tavallinen yhden kappaleen esine.
-- **Kalmisto `cairnfield` (v03.10.00)**, rauhallinen kohtaus (`SCENE_KINDS`:
-  friendly). Esc-dialogin oikotie, aloitusvalikon paikanvalinta, `?scene=cairnfield`
-  ja karttapaikka `cairnfield` (v03.12.00, ruutu 16,16 kaakon vaaran kalliolla;
-  ikoni `assets/map/cairn-site.png`; koillisen kallio on joen takana, ei kuljettava).
-  `world.ts`: `CAIRN`-lippu; `LAKE` = `LAKESIDE || CAIRN` (vesi, kaukoranta, rantakaistan
-  maasto), mökki/laituri/vene `LAKESIDE`ssä. Maasto: kallionokka (`terrainHeight`:
-  loiva kumpare keskipisteessä (1, 4), +1,15 m, ja matalia kalliokumpuja), `shoreZ`
-  siirtää rannan z ≈ 21:een ja vetää sen sivuille, joten järvi on kumpareen takana ja
-  sivuilla. Sijoittelu vakioina `world.ts`:n alussa: `CUPSTONE` (1,2; 3,0),
-  `CAIRNS_AT` (kuusi röykkiötä, kehällä r ≤ 12), `KARSIKKO` (−11,6; 9,2), `LOUHI_AT`
-  (−9,9; 7,5; katse kuppikiveen), `DARK_SOIL` (musta maa: kuusi canvas-tekstuurilla
-  piirrettyä läikkää, jotka seuraavat maastoa; ei mallia). Aloitus (−0,6; −9,5) katse
-  järvelle. Mallit `cairnfield.glb`:stä (BLENDER_HANDOFF); törmäykset
-  `PROP_COLLIDERS`ista (kuppikivi laatikko, röykkiöt ympyrä/laatikko ilman
-  `blocksMelee`, karsikko ympyrä) ja Louhi ympyrä. Puut harvaa (koivu 40 %, mänty,
-  vähän kuusta), ei puita järvinäkymän kaistalla (z > 7, |x| < 14) eikä kumpareen
-  13 m:n sisällä. Heinää 40 %, sammalta ja varvikkoa enemmän, valo ja sumu vaaleaa
-  (`FOG_COLOR`). Ei tulta (`buildFire` palauttaa sammuneen), ei tulen törmäystä.
-  Louhi: `populateCairnLife`, `louhi.glb` `spawnVillager`illä (kädet kuten emännällä),
-  puhuteltava (`folk.louhi`). Kaukainen vesilintu `buildLoon` (koodigeometria, ei
-  sumua, sukeltaa 70 s kierroksella). **Ääni:** `Sfx.birds(dt, taso)` (`audio.ts`),
-  taso `birdSongLevel` (`ambience.ts`, testattu): hiljaa alle 4 m kuppikivestä, täysi
-  yli 11 m; muissa kohtauksissa taso 0 eli ei lintuja. Veden ääntä ei ole, vain
-  vanha tuulikohina. Tarkistettu pelissä: 60 FPS (1024×768 in-app, 1,15 milj.
-  kolmiota), ei konsolivirheitä, rauha/ranta/aukio latautuvat ennallaan. **Ei
-  tarkistettu:** käveleminen törmäyksiä vasten (in-app-selain ei saanut näppäimiä
-  perille; laatikon `yaw`-konventio tarkistettu koodista), ääni kuultuna, tarkka
-  FPS suurella näytöllä.
+- **Kalmisto `cairnfield`** (friendly; Esc-oikotie, aloitusvalikko, `?scene=cairnfield`, karttapaikka ruutu
+  16,16). `world.ts`: `CAIRN`-lippu; `LAKE` = `LAKESIDE || CAIRN` (vesi, kaukoranta, rantakaista). Maasto on
+  kallionokka (`terrainHeight`, `shoreZ` z ≈ 21). Sijoittelu vakioina `world.ts`:n alussa: `CUPSTONE`,
+  `CAIRNS_AT`, `KARSIKKO`, `LOUHI_AT`, `DARK_SOIL` (canvas-läikät). Mallit `cairnfield.glb`:stä, törmäykset
+  `PROP_COLLIDERS`ista. Louhi `populateCairnLife`issa (`folk.louhi`), vesilintu `buildLoon`. Ääni:
+  `Sfx.birds` tasolla `birdSongLevel` (vain kalmistolla). Tarkistettu 60 FPS:ssä in-app; törmäyksiä vasten
+  kävelyä ja ääntä ei ole tarkistettu.
 - **Taisteluvaraukset (Louhi suohon):** kuppikiven ympärillä on röykkeistä vapaa
   noin 5 m:n alue, ja suoloitsun efekti (`bog`, `effects.ts`) on jo olemassa. Puuttuu
   vielä vihollistyyppi `louhi` (nyt vain NPC), hänen taistelumalli ja animaatiot
@@ -182,8 +173,9 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `1ffb1e4`)
   sammunutta tulta. Järvi jatkuu horisonttiin, vastaranta on sumuinen maisema ja syvä vesi estää kulun;
   laiturilla voi kävellä. Tietäjä, koira, mökki, vene ja tuli törmäävät. Tarkat mallit ja mitat ovat
   `BLENDER_HANDOFF.md`:ssä, sijoittelu ja maastosäännöt `world.ts`:ssä.
-- **Dev-palvelin työpuusta:** in-app-esikatselu lukee pääkansion `.claude/launch.json`in; työpuuta varten
-  `bun --cwd=<työpuu> run dev --port 5174 --strictPort` (palauta launch.json, sulje lopuksi).
+- **Dev-palvelin työpuusta:** Clauden in-app-esikatselu (`preview_start` "dev") lukee työpuun oman
+  `.claude/launch.json`in ja palvelee työpuun koodia. Piilotettu paneeli hidastaa rAF:n ~3 FPS:iin: aja peliä
+  `__game.step(n)`illä ja mittaa piirto `__game.renderBench()`illä.
 - **Laulun tahmaus heikolla koneella:** CSS-suotimen siirto shaderiin (v05.00.01) on yhä vahvistamatta.
 - **Sovellusrakenne.** URL ilman `scene`-parametria käynnistää 2D-kartan;
   `?scene=<id>&return=map` lataa dynaamisesti `src/scene3d.ts`:n ja Three.js-
@@ -280,7 +272,7 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `1ffb1e4`)
 - Järven rannan vesi on yksinkertainen: ei rantavaahtoa, syvyysväriä eikä
   aaltoja laiturin kohdalla. Kaukorannalla ei ole kasvillisuutta kaukaa
   nähtynä; rantakohtauksen koira ei käyskentele (ei kävelyleikettä).
-- **FPS:ää ei ole mitattu v06:lla** (in-app-paneeli oli piilossa). Laatuasetusta ei ole (pikselitiheys,
+- **FPS:** omistajan mukaan peliläppärillä v06 on "siedettävä"; tarkkaa lukua ei ole. Laatuasetusta ei ole (pikselitiheys,
   MSAA 4×, hehku, 4096 px:n varjokartta). Vaihtokaistan pikselikuvio voi näkyä liikkeessä; kaukopuiden
   sävy on pikselimittauksella viritetty arvio. Instanssinippuja ei rajata näkökentän mukaan (kaikki
   etäisyyden sisällä piirretään). Aukioiden varvut ja heinät ovat yhä kiinteitä kehiä origon ympärillä.
@@ -289,6 +281,12 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `1ffb1e4`)
   kartalta tultiin (kartta ei vielä välitä tulosuuntaa). Metsästä tuleva vihollinen voi juuttua runkoon;
   12 s:n jälkeen hänet rajataan aukiolle (näkyvä hyppäys). Vihje "Polku vie pois" näkyy heti alussa. Viholliset eivät vielä pakene polunsuista. Pako ei muuta kampanjaa:
   leiri jää kartalle ja aallot alkavat alusta.
+- Metsästys: jänis voi loikata tähtäämisen ja laukaisun välissä (osumista vaatii ennakointia). Jänne ja
+  nuoli ovat tasossa, joten täydellä jännityksellä nuolen perä on vasemman korvan kohdalla, ja oikea käsi on
+  hieman sivussa. Naissankarin selässä oleva kilpi peittää tähdätessä ruudun vasemman alakulman. Jäniksen
+  pako ei katso polunsuita (pysyy alueella `clampToWalkable`illa). Ohilaukausten nuolet puissa yli 2,2 m:n
+  korkeudella jäävät menetetyiksi. Jousi ei ole inventaarion esine. Saalista ei tallenneta kampanjan
+  laskuriin, ja ruoanlaittoa ei ole.
 - Moottori on v0: ei ajastimia, `unless`-peruutusta eikä efektien ketjureaktioita.
   Tuntematon engine-versionumero luetaan sallivasti; semantiikkamuutos tarvitsee versionhaaran.
 - Rikkinäistä tallennetta ei kopioida talteen ennen korvaamista (ROADMAPin riski);
@@ -296,9 +294,9 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `1ffb1e4`)
 
 ## Seuraava tehtävä
 
-Omistaja testaa v06:n peliläppärillä (selain GTX:llä, laturissa): erämaa, aukio ja ranta (uusi saapuminen
-polulta ja aaltojen tulo metsästä), FPS oikeasta alakulmasta, polunsuusta poistuminen kartan kautta,
-kamera ja lehvästö metsässä sekä kartalla sillan näkyvyys ja niittyjen vaikutus matkarytmiin.
+Omistaja testaa metsästyksen (v06.04) erämaassa hiirellä: tähtäyksen tuntuma (kamera, tähtäin, putoama),
+jäniksen pakoetäisyys 12 m ja poiminta. Palautteen perusteella viritetään `ARCHERY`- ja `SPECIES.hare`-arvot.
+Sen jälkeen jäniksen, jousen ja nuolen Blender-mallit (BLENDER_HANDOFF).
 
 ## Ei vielä aloiteta
 
@@ -311,8 +309,8 @@ kamera ja lehvästö metsässä sekä kartalla sillan näkyvyys ja niittyjen vai
 - 3D-kohtausten mount/dispose ilman sivun uudelleenlatausta.
 - Git LFS (omistajan päätös 2026-11-10: ei vielä).
 - Isojen skannattujen puiden lataus ja kevennys.
-- Metsästys (jousi, nuolet, nuoliviini, jänis), kylä/markkinat ja vihollisten pako ennen omistajan
-  v06-testiä.
+- Kylä ja markkinat sekä vihollisten pako. Jousi taisteluaseena (vasta metsästyksen palautteen jälkeen),
+  uudet riistalajit ja ruoanlaitto.
 - Erämaan karttapaikka (karttagrafiikka on Codexin alaa); erämaa on toistaiseksi testikohtaus.
 - Aseiden laatuerot ja vahingon hajonta.
 
@@ -344,6 +342,12 @@ kamera ja lehvästö metsässä sekä kartalla sillan näkyvyys ja niittyjen vai
 - 3D-kohtauksen kuljettava alue on enintään 200 × 200 m; maisema jatkuu rajan yli. Kohtauksesta poistutaan
   polunsuista (ei koko reunalta); sankari (myöhemmin vihollisetkin) saa paeta kesken taistelun, ja
   häivytyksen aikana vieressä oleva vihollinen voi vielä osua (2026-11-21).
-- Jousi on ensin metsästysase, myöhemmin myös taisteluun; nuolet ovat kohtauksessa rajattu resurssi
-  (alkuun nuoliviini, 15 nuolta), voidaan lykätä (2026-11-21).
-- Vertailukone on vanha peliläppäri (i5, 8 Gt, GTX 16 -sarja), ei työläppäri (2026-11-21).
+- Jousi on ensin metsästysase, myöhemmin myös taisteluun. Viinissä on 15 nuolta kohtausta kohti, ja se
+  täyttyy automaattisesti kohtausten välillä; poistumalla täyttäminen sallitaan toistaiseksi. Ammutut
+  nuolet saa poimia samassa kohtauksessa (2026-11-21).
+- Jousi: oikea painike tähtää, vasen jännittää, tähdätään aina (ei lonkalta); jousi esiin/pois X,
+  sidottavissa Esc-valikossa (2026-11-21).
+- Riista: alkuun pako 12 m:stä, mutta näkö ja kuulo pidetään erillisinä; jänis ei ole ainoa riista.
+  Saalis poimitaan kaadetusta eläimestä lihana, joka on toistaiseksi syötävää (2026-11-21).
+- Vertailukone on vanha peliläppäri (i5, 8 Gt, GTX 16 -sarja), mutta se on vain referenssi: omistaja
+  pelaa ja kehittää tehokkaammalla koneella (2026-11-21).

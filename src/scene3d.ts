@@ -22,7 +22,8 @@ import {
   configureMapToSceneTransition,
   createMapToSceneTransition,
 } from "./map/transition";
-import { configureSceneItems } from "./engine/sceneItems";
+import { configureSceneItems, setPickableSource } from "./engine/sceneItems";
+import { huntPickables, initHunt } from "./engine/hunt";
 import { initCampaignStore, worldRuntime } from "./engine/store";
 import { initWorldConsole } from "./engine/worldConsole";
 import { initDialogue } from "./engine/dialogue";
@@ -59,6 +60,8 @@ export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   configureSceneItems();
   initEffects();
   spawnHero();
+  initHunt();
+  setPickableSource(huntPickables);
   g.encounter = !ARENA_PEACEFUL ? skirmish : ARENA === "lakeside" ? lakesideVisit : ARENA === "lakeruin" ? lakeruinVisit : ARENA === "cairnfield" ? cairnfieldVisit : ARENA === "wilds" ? wildsVisit : visit;
   initInput();
   initDialogue();

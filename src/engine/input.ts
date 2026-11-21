@@ -11,6 +11,8 @@ import { choosing, songState } from "./song";
 import { closeDialogue, dialogueOpen } from "./dialogue";
 import { DEG, aim, bindUi, g, inputs, keys } from "./state";
 import { canvas } from "./view";
+import { hunt } from "./hunt";
+import { ARCHERY } from "../hunt/archery";
 
 // ---------- Syöte ----------
 
@@ -43,6 +45,7 @@ export function pressCode(code: string): boolean {
   else if (a === "dodge") inputs.dodgeQueued = true;
   else if (a === "song") inputs.songQueued = true;
   else if (a === "lock") { aim.lockOn = !aim.lockOn; aim.target = null; }
+  else if (a === "bow") inputs.bowQueued = true;
   else if (a === "slash" || a === "overhead" || a === "thrust") pressStrike(a);
   else inputs.pickQueued = SONG_SLOT_ACTIONS.indexOf(a);
   return true;
@@ -64,7 +67,7 @@ export function clearInputs() {
   if (g.player.state === "windup" && g.player.charging) setState(g.player, "idle");
   releaseStrikes();
   inputs.strikeQueued = null;
-  inputs.dodgeQueued = inputs.songQueued = inputs.beatQueued = false;
+  inputs.dodgeQueued = inputs.songQueued = inputs.beatQueued = inputs.bowQueued = false;
   inputs.pickQueued = null;
 }
 
@@ -119,9 +122,12 @@ export function initInput() {
     // Vapaa kamera: hiiri katsoo lukittuna tai nappi pohjassa (jos lukitus ei ole saatavilla).
     if (freeCam.active) { if (document.pointerLockElement === canvas || e.buttons) lookFreeCam(freeCam.cam, e.movementX, e.movementY); return; }
     if (!g.running || paused || choosing || dialogueOpen || songState || document.pointerLockElement !== canvas) return;
-    const k = CONTROLS.mouseSens * DEG;
+    // Jousella tähdätessä kamera on lähempänä ja kapeampi: hiiri hieman hitaammin ja laajempi pystykulma.
+    const bowAim = hunt.aiming;
+    const k = CONTROLS.mouseSens * DEG * (bowAim ? 0.75 : 1);
     if (!lockTarget()) aim.yaw -= e.movementX * k;
-    aim.pitch = Math.max(CONTROLS.pitchMin * DEG, Math.min(CONTROLS.pitchMax * DEG, aim.pitch + e.movementY * k));
+    const lo = (bowAim ? ARCHERY.aimPitchMin : CONTROLS.pitchMin) * DEG, hi = (bowAim ? ARCHERY.aimPitchMax : CONTROLS.pitchMax) * DEG;
+    aim.pitch = Math.max(lo, Math.min(hi, aim.pitch + e.movementY * k));
   });
   // Hiiren lisänapit (4 ja 5) eivät saa selata sivuhistoriaa kesken pelin.
   for (const type of ["mousedown", "mouseup", "auxclick"] as const) {

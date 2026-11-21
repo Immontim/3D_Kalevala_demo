@@ -5,7 +5,7 @@ import { setState } from "./engine/actor";
 import { tmpB } from "./engine/animate";
 import { peace } from "./engine/encounter";
 import { addEnemy, focusEnemy, lockTarget, startEncounter } from "./engine/enemies";
-import { bindings } from "./engine/input";
+import { bindings, strikeHeld } from "./engine/input";
 import { killActor } from "./engine/melee";
 import { exitState } from "./engine/exit";
 import { pause, paused, resume, simulate } from "./engine/loop";
@@ -13,11 +13,12 @@ import { setShowcase, showcase } from "./engine/showcase";
 import { ENEMIES, currentWave, skipToWave, skirmish } from "./engine/skirmish";
 import { choosing, slotEls, songState } from "./engine/song";
 import { aim, fx, g, inputs } from "./engine/state";
-import { scene, world } from "./engine/view";
+import { composer, renderer, scene, world } from "./engine/view";
 import { FALLEN, POSES } from "./fighter";
 import { Modifier, withModifier } from "./stats";
 import { changedValues } from "./tuning";
 import { meterOff } from "./ui/pauseMenu";
+import { hunt, huntDebug } from "./engine/hunt";
 import { ARENA, groundHeight } from "./world";
 
 export function initDebug() {
@@ -29,6 +30,32 @@ export function initDebug() {
       return { pos: g.player.pos.toArray().map((v) => +v.toFixed(2)), yaw: +g.player.yaw.toFixed(2), dist: d.enemy ? +d.enemy.pos.distanceTo(g.player.pos).toFixed(2) : null, ai: d.enemy?.ai ? { ...d.enemy.ai } : null, player: g.player.state, playerAttack: `${g.player.attack.kind}/${g.player.attack.weight}`, playerHp: g.player.hp, weapon: g.player.weapon.id, weaponDamage: g.player.weapon.damage, playerStamina: +g.player.stamina.toFixed(2), enemyStamina: d.enemy ? +d.enemy.stamina.toFixed(2) : null, playerShield: g.player.shieldHp, stance: g.player.stance, enemy: d.enemy?.state, enemyYaw: d.enemy ? +d.enemy.yaw.toFixed(2) : null, enemyPos: d.enemy ? [+d.enemy.pos.x.toFixed(2), +d.enemy.pos.z.toFixed(2)] : null, enemyAttack: d.enemy ? `${d.enemy.attack.kind}/${d.enemy.attack.weight}` : null, enemyShield: d.enemy?.shieldHp, enemyHp: d.enemy?.hp, song: g.songPower, wave: currentWave(), enemies: g.enemies.length, timeScale: g.timeScale };
     },
     get events() { return [...g.events]; },
+    /**
+     * Piirron mittaus ilman requestAnimationFramea (toimii myös piilotetussa paneelissa): n ruutua, joista
+     * jokainen odottaa näytönohjaimen valmistumista. Palauttaa ms/ruutu, piirtokutsut ja kolmiot.
+     */
+    renderBench(n = 60) {
+      const gl = renderer.getContext(), px = new Uint8Array(4);
+      renderer.info.autoReset = false;
+      renderer.info.reset();
+      composer.render();
+      const calls = renderer.info.render.calls, tris = renderer.info.render.triangles;
+      renderer.info.autoReset = true;
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      const t0 = performance.now();
+      for (let i = 0; i < n; i++) { simulate(1 / 60); composer.render(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); }
+      const ms = (performance.now() - t0) / n;
+      return { msPerFrame: +ms.toFixed(2), fps: Math.round(1000 / ms), calls, tris, size: [renderer.domElement.width, renderer.domElement.height] };
+    },
+    /** Metsästys: jousi, viini, saalis, nuolet ja eläinten tilat. */
+    get hunt() { return huntDebug(); },
+    /** Savutesti: jousi esiin (bow), tähtäys (aim) ja jännitys (draw) ilman hiirtä. Arvo false vapauttaa. */
+    huntInput(o: { bow?: boolean; aim?: boolean; draw?: boolean }) {
+      if (o.bow !== undefined && o.bow !== hunt.bowOut) inputs.bowQueued = true;
+      // Oikean painikkeen painallus on myös "käytä" (poiminta), kuten oikealla hiirellä.
+      if (o.aim !== undefined) { inputs.blockHeld = o.aim; if (o.aim) inputs.useQueued = true; }
+      if (o.draw !== undefined) strikeHeld.slash = o.draw;
+    },
     /** Katse ja lukitus (savutestit): yaw ja pitch radiaaneina. */
     get look() { return { camYaw: +aim.yaw.toFixed(3), camPitch: +aim.pitch.toFixed(3), lockOn: aim.lockOn, locked: !!lockTarget(), playerYaw: +g.player.yaw.toFixed(3), enemyYaw: d.enemy ? +d.enemy.yaw.toFixed(3) : null }; },
     setLook(yaw: number, pitch = aim.pitch) { aim.yaw = yaw; aim.pitch = pitch; },

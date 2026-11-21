@@ -60,6 +60,8 @@ export const inputs = {
   dodgeQueued: false,
   songQueued: false,
   beatQueued: false,
+  /** Jousi esiin tai pois (metsästyskohtaus). */
+  bowQueued: false,
   /** Laulun pikavalinta: valintaringin paikka 0–4, tai null. */
   pickQueued: null as number | null,
 };
