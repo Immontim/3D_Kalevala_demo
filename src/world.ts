@@ -30,7 +30,7 @@ import { birdLevelAtDistance } from "./ambience";
 import { SCENE_IDS, type SceneId } from "./app/route";
 import { Forest, ScatterField, placeForestWall, type ScatterItem, type TreeSpot } from "./forest";
 import { addFoliageFade } from "./engine/foliageFade";
-import { sceneLayout, walkableDepth, type Vec2 } from "./sceneLayout";
+import { entrySpawn, sceneLayout, walkableDepth, type Vec2 } from "./sceneLayout";
 
 // Taistelualueet kangasmetsässä: maasto, männyt, kuuset, koivut, varvut ja kivet
 // sekä alueen oma keskus (nuotioaukion kota tai pihapiirin rakennukset). Mallit
@@ -573,12 +573,17 @@ const BOAT_AT = LAKESIDE
   })()
   : { x: 0, z: 0, y: 0, yaw: 0 };
 
-/** Sankarin aloituspaikka ja katseen suunta (yaw 0 = +z, π = -z). Rannalla hän astuu laiturin
- *  juurelta katsomaan keittotulta: mökki jää vasemmalle ja järvi oikealle. */
-export const SPAWN = LAKESIDE ? { x: JETTY_AT.x, z: JETTY_AT.z - 1.5, yaw: Math.PI - 0.7 }
-  : CAIRN ? { x: -0.6, z: -9.5, yaw: 0.1 }
+/** Sankarin aloituspaikka ja katseen suunta (yaw 0 = +z, π = -z). Kohtaukseen saavutaan polunsuulta:
+ *  ensimmäisen polunsuun sisäpuolella, katse kohtaukseen (sceneLayout.entrySpawn). Kalmiston ja erämaan
+ *  paikat on sommiteltu käsin saman polunsuun kohdalle. */
+export const SPAWN = CAIRN ? { x: -0.6, z: -9.5, yaw: 0.1 }
   // Erämaa: pohjoisen polunsuun sisäpuolella, katse polkua pitkin metsään.
-  : WILDS ? { x: 10, z: -76, yaw: -0.1 } : { x: 0, z: -3, yaw: 0 };
+  : WILDS ? { x: 10, z: -76, yaw: -0.1 }
+  // Rannalla katse keittotulelle ja järvelle: mökki jää oikealle.
+  : LAKESIDE ? (() => { const e = entrySpawn(LAYOUT); return { ...e, yaw: Math.atan2(LAKE_FIRE.x - e.x, LAKE_FIRE.z - e.z) }; })()
+  // Pihalla portti on aidan kohdalla ja kamera pysyy aidan sisällä (camMaxR): aloitus syvemmällä portista.
+  : HAS_YARD ? entrySpawn(LAYOUT, 6.4)
+  : entrySpawn(LAYOUT);
 
 /** Korkeus, jolla hahmot kävelevät: maasto, ja laiturin päällä sen kansi. */
 export function groundHeight(x: number, z: number): number {

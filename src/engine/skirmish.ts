@@ -5,14 +5,15 @@ import { WAVES } from "../combat";
 import { FighterLook } from "../fighter";
 import { t } from "../i18n";
 import { FINAL_WAVE, aiLevelForWave, waveEnemies } from "../waves";
-import { ARENA } from "../world";
-import { clampToWalkable, sceneLayout } from "../sceneLayout";
+import { ARENA, groundHeight } from "../world";
+import { approachSpawns, clampToWalkable, sceneLayout, walkableDepth } from "../sceneLayout";
 import { $ } from "./dom";
 import { addEnemy, clearEnemies } from "./enemies";
 import { Encounter } from "./encounter";
 import { renewPlayerShield } from "./hero";
 import { showMsg } from "./hud";
 import { g } from "./state";
+import { world } from "./view";
 import { finishVictory } from "./victory";
 
 export const ENEMIES: { name: string; look: FighterLook }[] = [
@@ -39,26 +40,27 @@ let victoryAt = -1;
 const VICTORY_DELAY = 3.2;
 
 const LAYOUT = sceneLayout(ARENA);
+/** Metsästä tulevan on päästävä aukiolle tässä ajassa; muuten hänet siirretään reunalle. */
+const ARRIVE_TIMEOUT = 12;
 
 function nextWave() {
   wave++;
   const group = waveEnemies(wave);
   const size = group.length;
-  // Ryhmä ilmestyy aukion reunalta noin kuuden metrin päähän pelaajasta, vierekkäin.
-  const mid = Math.atan2(-g.player.pos.x, -g.player.pos.z) + (Math.random() - 0.5);
+  // Ryhmä tulee vierekkäin pelaajan vastakkaiselta puolelta: aukiolla metsästä puiden välistä,
+  // muualla kuljettavan alueen reunalta (sceneLayout.approachSpawns).
+  const spots = approachSpawns(LAYOUT, g.player.pos, size, Math.random() - 0.5);
   let first = "";
   group.forEach((member, i) => {
     const def = enemyDef(member.character, member.loadout);
-    const a = mid + (i - (size - 1) / 2) * 0.45;
-    const pos = g.player.pos.clone().add(new THREE.Vector3(Math.sin(a) * 6, 0, Math.cos(a) * 6));
-    // Tulopaikka arenan ympyrän sisään ja sitten kuljettavalle alueelle.
-    const dx = pos.x - LAYOUT.arena.x, dz = pos.z - LAYOUT.arena.z;
-    const r = Math.hypot(dx, dz), max = LAYOUT.arena.radius - 1;
-    if (r > max) { pos.x = LAYOUT.arena.x + (dx * max) / r; pos.z = LAYOUT.arena.z + (dz * max) / r; }
-    const c = clampToWalkable(LAYOUT, pos.x, pos.z, 0.6);
-    pos.x = c.x; pos.z = c.z;
+    // Ilman metsäkehää kuljettavalle alueelle, ja sitten puun tai rakennuksen sisältä ulos.
+    let { x, z } = spots[i];
+    if (LAYOUT.approach === undefined) ({ x, z } = clampToWalkable(LAYOUT, x, z, 0.6));
+    ({ x, z } = world.collision.depenetrateDisc(x, z, 0.6));
+    const pos = new THREE.Vector3(x, groundHeight(x, z), z);
     // Perusarvot joka aallossa: taso 0 ja ei ryhmäkerrointa. Vain tekoälyn taito kasvaa hitaasti.
-    addEnemy({ name: def.name, look: def.look, level: 0, aiLevel: aiLevelForWave(wave) }, pos);
+    const enemy = addEnemy({ name: def.name, look: def.look, level: 0, aiLevel: aiLevelForWave(wave) }, pos);
+    if (enemy.ai && walkableDepth(LAYOUT, x, z) < enemy.radius + 0.1) enemy.ai.arriveUntil = g.gameTime + ARRIVE_TIMEOUT;
     first ||= def.name;
   });
   $("wave").textContent = t("wave.titleOf", { wave, total: FINAL_WAVE });

@@ -23,6 +23,8 @@ export interface EnemyDef {
 export function addEnemy(def: EnemyDef, pos: THREE.Vector3): Actor {
   const a = makeActor(def.look, pos, def.level, 0xff6a3a);
   a.name = def.name;
+  // Saapuu rintama valmiiksi pelaajaa kohti: hidas kääntyjä ei ehtisi kääntyä ennen kohtaamista.
+  a.yaw = Math.atan2(g.player.pos.x - pos.x, g.player.pos.z - pos.z);
   if (def.aiLevel !== undefined) a.level = def.aiLevel;
   if (def.hpScale !== undefined && def.hpScale !== 1) {
     a.base = { ...a.base, maxHp: Math.round(a.base.maxHp * def.hpScale) };

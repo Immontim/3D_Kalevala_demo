@@ -194,6 +194,8 @@ export const ENEMY_AI = {
   distBash: 1.35,
   /** Liikenopeuden kertoimet: kaukaa lähestyessä ja keihäsmiehen perääntyessä. */
   chaseScale: 1.42,
+  /** Kiertely (sivuaskel) vain tätä lähempänä; kauempaa juostaan suoraan kohti. */
+  strafeRange: 5,
   spearRetreatScale: 1.25,
   /** Päätösten väli sekunteina (vähintään + satunnainen lisä) ja hyökkäyksen todennäköisyys. */
   decideMin: 0.5,
