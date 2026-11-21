@@ -17,6 +17,7 @@ import { applyActiveMapTransition } from "../map/transition";
 import { focusedSceneItemId, lockFocusedSceneItem } from "./sceneItems";
 import { bowActive, hunt, rebindHeroBow } from "./hunt";
 import { ARCHERY } from "../hunt/archery";
+import { dodgeDirection } from "../sidestep";
 
 // Sankarin varusteet valitaan aloitusikkunassa, ja valinta tallentuu selaimeen.
 export const LOADOUT_STORE = "laulun-miekka.loadout.v1";
@@ -123,10 +124,13 @@ export function updatePlayer(dt: number) {
       openChoice();
       return;
     }
-    if (inputs.dodgeQueued && p.dodgeCd <= 0) {
+    // Väistö on sivu- tai taka-askel: se vaatii vasemman, oikean tai taaksepäin-näppäimen. Pelkkä
+    // väistönappi tai väistö eteenpäin ei tee mitään (eteenpäin liikkuva osa jätetään pois).
+    const step = inputs.dodgeQueued && p.dodgeCd <= 0 ? dodgeDirection(keys.has("KeyA"), keys.has("KeyD"), keys.has("KeyS")) : null;
+    if (step) {
       setState(p, "dodge");
       p.dodgeCd = COMBAT.dodgeCooldown;
-      p.dodgeDir.copy(move.lengthSq() > 0 ? move.normalize() : right.clone().negate());
+      p.dodgeDir.copy(right).multiplyScalar(step.x).addScaledVector(fwd, -step.back);
       return;
     }
     // Rauhassa iskunappi puhuu ja torjuntanappi käyttää; kumpikin on lyhyt ele paikallaan seisten.

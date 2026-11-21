@@ -46,8 +46,9 @@ export function syncVisual(a: Actor, dt: number) {
   f.root.position.copy(a.pos);
   f.root.rotation.y = a.yaw;
   const { pose, rate } = targetPose(a);
-  if (a.state === "dodge") f.root.rotation.z = Math.sin((a.stateTime / COMBAT.dodgeTime) * Math.PI) * 0.25;
-  else f.root.rotation.z = 0;
+  // Väistö on askel: jalat astuvat (Fighter.setSidestep), eikä koko hahmoa enää kallisteta.
+  f.root.rotation.z = 0;
+  f.setSidestep(a.state === "dodge" ? Math.min(1, a.stateTime / COMBAT.dodgeTime) : null, a.dodgeDir, COMBAT.dodgeDistance);
   const sinkTarget = a.state === "rooted" ? 0.55 : 0;
   f.sink += (sinkTarget - f.sink) * (1 - Math.exp(-4 * dt));
   if (a.state === "dead") f.fall = Math.min(1, f.fall + dt * 1.6);

@@ -8,6 +8,7 @@ import { TALKABLES, TALK_ZONE, pickTarget } from "../interact";
 import { ARENA, groundHeight } from "../world";
 import { clampToWalkable, sceneLayout, walkableDepth } from "../sceneLayout";
 import { separateDiscBodies } from "../collision";
+import { sidestepPose } from "../sidestep";
 import { Actor, setState } from "./actor";
 import { emitBlood, emitSparks } from "./effects";
 import { STYLE_NAME, flash, showMsg } from "./hud";
@@ -330,9 +331,14 @@ export function updateCombatant(a: Actor, dt: number) {
   } else if (a.state === "stagger") {
     if (a.stateTime >= COMBAT.staggerTime) setState(a, "idle");
   } else if (a.state === "dodge") {
-    const moved = world.collision.moveDisc(a.pos.x, a.pos.z, a.dodgeDir.x * COMBAT.dodgeSpeed * dt, a.dodgeDir.z * COMBAT.dodgeSpeed * dt, a.radius, "stop");
+    // Vartalo kulkee askeleen käyrää pitkin samassa tahdissa kuin jalat (fighter.ts), jottei maassa oleva jalka liu'u.
+    const T = COMBAT.dodgeTime;
+    const step = (sidestepPose(a.stateTime / T).body - sidestepPose((a.stateTime - dt) / T).body) * COMBAT.dodgeDistance;
+    const moved = world.collision.moveDisc(a.pos.x, a.pos.z, a.dodgeDir.x * step, a.dodgeDir.z * step, a.radius, "stop");
     a.pos.x = moved.x;
     a.pos.z = moved.z;
+    // Askel ei ole kävelyä: askellus ei käynnisty väistön nopeudesta.
+    a.moveSpeed = 0;
     if (a.stateTime >= COMBAT.dodgeTime) setState(a, "idle");
   } else if (a.state === "rooted") {
     a.rootTime -= dt;
