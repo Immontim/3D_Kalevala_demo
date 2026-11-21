@@ -1,6 +1,6 @@
 // Taistelijan tila näkyväksi: asento, paikka, terän hehku ja miekan vana.
 import * as THREE from "three";
-import { COMBAT } from "../combat";
+import { COMBAT, blockPoseRate } from "../combat";
 import { GESTURE_TIME, POSES, gesturePose } from "../fighter";
 import { groundHeight } from "../world";
 import { Actor } from "./actor";
@@ -21,7 +21,8 @@ export function targetPose(a: Actor) {
       return { pose, rate: 3.2 / (a.timing.release * COMBAT.strikePoint) };
     }
     case "recovery": return { pose: POSES.guard, rate: 5 };
-    case "block": return { pose: a.stance === "slash" ? POSES.blockSide : a.stance === "thrust" ? POSES.blockThrust : POSES.block, rate: 22 };
+    // Nousunopeus tulee varustuksen BLOCK_RAISE-ajasta, jota myös vastustajan torjuntareaktio käyttää.
+    case "block": return { pose: a.stance === "slash" ? POSES.blockSide : a.stance === "thrust" ? POSES.blockThrust : POSES.block, rate: blockPoseRate(a.loadout) };
     // Rauhan eleet. Keihäsmies tekee eleen vasemmalla kädellä, jotta keihäs pysyy oikeassa kädessä.
     case "talk": case "use": return { pose: gesturePose(a.state, Math.min(a.stateTime, GESTURE_TIME[a.state].total), a.loadout === "spear" ? "L" : "R"), rate: 16 };
     case "stagger": return { pose: POSES.stagger, rate: 14 };

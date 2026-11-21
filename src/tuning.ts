@@ -87,6 +87,8 @@ export const FIELDS: readonly Field[] = [
   ...character(t("tune.group.pohja"), "pohja"), reaction(t("tune.group.pohja"), "pohja"),
   { group: t("tune.group.controls"), label: t("tune.field.mouseSens"), path: "controls.mouseSens", min: 0.01, max: 1, step: 0.01 },
   { group: t("tune.group.controls"), label: t("tune.field.attackTurn"), path: "enemyAi.attackTurnScale", min: 0, max: 1, step: 0.05 },
+  { group: t("tune.group.controls"), label: t("tune.field.advanceChance"), path: "enemyAi.advanceChance", min: 0, max: 1, step: 0.05 },
+  { group: t("tune.group.controls"), label: t("tune.field.advanceScale"), path: "enemyAi.advanceScale", min: 0, max: 1.5, step: 0.05 },
   { group: t("tune.group.waves"), label: t("tune.field.hpPerWave"), path: "waves.hpPerWave", min: 0, max: 200, step: 5 },
   { group: t("tune.group.waves"), label: t("tune.field.powerPerWave"), path: "waves.powerPerWave", min: 0, max: 20, step: 0.5 },
   { group: t("tune.group.waves"), label: t("tune.field.restHp"), path: "waves.restHp", min: 0, max: 1000, step: 5 },

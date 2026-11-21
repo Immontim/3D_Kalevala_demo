@@ -38,6 +38,15 @@ import {
   ARMOUR,
   damageAfterArmour,
   helmetAbsorbsOverhead,
+  BLOCK_RAISE,
+  BLOCK_RAISE_DONE,
+  ENEMY_AI,
+  advancesInWindup,
+  blockPoseRate,
+  blockReactionDelay,
+  rollsAdvance,
+  threatenedBy,
+  timeToImpact,
 } from "./combat";
 
 const sword = WEAPONS.sword;
@@ -339,6 +348,55 @@ describe("usea vastustaja", () => {
     // Oma edellinen isku ei viivytä: yksin taisteleva lyö kuten ennen.
     expect(mayStartAttack(false, 10, 10.4, true)).toBe(true);
     expect(mayStartAttack(true, 10, 0, true)).toBe(false);
+  });
+});
+
+describe("vastustajan torjuntareaktio ja etenevä nosto", () => {
+  const deg = Math.PI / 180;
+  it("torjunta-asennon animaatio valmistuu BLOCK_RAISE-ajassa (sama tahti kuin ennen, nopeus ~22)", () => {
+    for (const l of ["sword", "sword_shield", "spear"] as const) {
+      expect(blockPoseRate(l)).toBeCloseTo(22, 0);
+      expect(1 - Math.exp(-blockPoseRate(l) * BLOCK_RAISE[l])).toBeCloseTo(BLOCK_RAISE_DONE, 5);
+    }
+  });
+  it("osumahetki lasketaan noston jäljellä olevasta ajasta ja iskun osumakohdasta", () => {
+    const t = swordThrust.timing;
+    expect(timeToImpact(0, t)).toBeCloseTo(t.windup + t.release * COMBAT.strikePoint);
+    expect(timeToImpact(t.windup + 1, t)).toBeCloseTo(t.release * COMBAT.strikePoint);
+  });
+  it("jokainen arpa antaa eri viiveen, ja asento ehtii aina nousta ennen nopeinta iskua", () => {
+    const impact = timeToImpact(0, swordThrust.timing);
+    const raise = BLOCK_RAISE.sword;
+    const a = blockReactionDelay(impact, raise, 0)!, b = blockReactionDelay(impact, raise, 1)!;
+    expect(a).toBeCloseTo(ENEMY_AI.blockDelayMin);
+    expect(b).toBeCloseTo(ENEMY_AI.blockDelayMax);
+    expect(b + raise).toBeLessThanOrEqual(impact);
+  });
+  it("viiveen yläraja lyhenee myöhään, ja liian myöhään (tai liian hitaalla asennolla) ei torjuta", () => {
+    expect(blockReactionDelay(0.2, 0.086, 1)).toBeCloseTo(0.2 - 0.086);
+    expect(blockReactionDelay(0.1, 0.086, 0.5)).toBeNull();
+    // Tuleva hidas keihästorjunta: sama isku ei enää ehdi.
+    expect(blockReactionDelay(0.3, 0.29, 0)).toBeNull();
+  });
+  it("vain iskun edessä oleva harkitsee torjuntaa", () => {
+    expect(threatenedBy(0, overhead.arc)).toBe(true);
+    expect(threatenedBy(overhead.arc + (ENEMY_AI.threatMargin - 1) * deg, overhead.arc)).toBe(true);
+    expect(threatenedBy(-(overhead.arc + (ENEMY_AI.threatMargin + 1) * deg), overhead.arc)).toBe(false);
+    expect(threatenedBy(Math.PI / 2 + 0.1, slash.arc)).toBe(false);
+  });
+  it("etenevä nosto arvotaan iskukohtaisesti, ei kilpityönnölle", () => {
+    expect(rollsAdvance("slash", ENEMY_AI.advanceChance - 0.01)).toBe(true);
+    expect(rollsAdvance("thrust", ENEMY_AI.advanceChance)).toBe(false);
+    expect(rollsAdvance("bash", 0)).toBe(false);
+  });
+  it("eteneminen vain kantaman reunalla ja pelaajan ollessa edessä", () => {
+    const r = spearThrust.range;
+    expect(advancesInWindup(true, r, r, 0)).toBe(true);
+    expect(advancesInWindup(false, r, r, 0)).toBe(false);
+    expect(advancesInWindup(true, r - ENEMY_AI.advanceKeep - 0.01, r, 0)).toBe(false);
+    expect(advancesInWindup(true, r, r, (ENEMY_AI.advanceArc + 1) * deg)).toBe(false);
+    // Keihäsmies pysähtyy kauas: ei koskaan alle oman minimietäisyytensä.
+    expect(r - ENEMY_AI.advanceKeep).toBeGreaterThan(spearThrust.minRange);
   });
 });
 
