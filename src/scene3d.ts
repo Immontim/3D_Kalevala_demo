@@ -45,6 +45,7 @@ export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   PLAYER_LOOK.helmet = campaign.player.equipment.head === "iron_helmet";
   PLAYER_LOOK.ringMail = campaign.player.equipment.torso === "ring_mail";
   PLAYER_LOOK.greaves = campaign.player.equipment.legs === "iron_greaves";
+  PLAYER_LOOK.shoes = campaign.player.equipment.feet === "leather_shoes";
   loadSavedTuning(); // ennen kuin yhtään hahmoa luodaan
   // Pihakohtaus saa instanssinsa parametrit (esinetunnisteet, jousineito) kampanjasta ennen rakentamista.
   if (route.scene === "yard") {

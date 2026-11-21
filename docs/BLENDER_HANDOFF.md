@@ -6,7 +6,7 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-20 (Claude, Windows; pohja main 2db0950)
+Päivitetty: 2026-11-21 (Codex, Windows; pohja main c792089)
 
 - **Mainissa** (pohja `3191123`) ovat `assets/forest.glb`,
   `characters.glb`, `bog.glb`, `homestead.glb`, `household.glb`,
@@ -80,8 +80,8 @@ Päivitetty: 2026-11-20 (Claude, Windows; pohja main 2db0950)
   `_jousineito_core`): nykyisten täysien `char_hero`n ja `char_jousineito`n **rinnalle** (ne ovat verteksi
   verteksiltä ennallaan, tarkistettu tiivisteellä) samalla luurangolla (23 luuta, yksi skin), painoilla ja
   lepoasennolla. Solmut: `char_hero_base` / `_mail` / `_greaves` / `_shoes` (`characters.glb`) ja
-  `char_jousineito_base` / `_mail` / `_greaves` / `_shoes` (`villagers_f.glb`); peli poistaa ne, koska nimi alkaa
-  `char_` (`Fighter.build`), kunnes Codexin runtime-integraatio ottaa ne käyttöön. Kolmiot: hero base 27 600,
+  `char_jousineito_base` / `_mail` / `_greaves` / `_shoes` (`villagers_f.glb`). `Fighter.build` valitsee nyt
+  kampanjavarusteiden mukaiset osat kummallekin sankarille. Kolmiot: hero base 27 600,
   mail 2 800, greaves 260, shoes 4 700; jousineito base 28 500, mail 3 200, greaves 260, shoes 4 700. Tiedostot
   kasvoivat: `characters.glb` 5,3 -> 7,1 Mt ja `villagers_f.glb` 3,2 -> 5,0 Mt (base kopioi kokonaisen hahmon);
   koko asussa miehellä ~35 400 kolmiota (legacy 28 200). Sisältö:
@@ -98,14 +98,14 @@ Päivitetty: 2026-11-20 (Claude, Windows; pohja main 2db0950)
   ylälyönti- ja sivuasentoon ja mittaa kerrosten välin; vyö-, huotra-, viini- ja kengän yläreunan päällekkäisyydet ovat
   tarkoituksellisia. Ääriasennoissa (jalka eteen yli 0,35 rad) sininen tunika pistää rengashelman läpi etureidestä
   **kuten legacyssakin**; naisen säärisuojat jäävät baggy-housujen alle polven kohdalla. Katsottu: edestä, sivulta,
-  takaa ja yläviistosta lepoasennossa sekä kolmessa ääriasennossa molemmilla; peliin ladattuna kumpikin sukupuoli
-  näkyy ennallaan eikä uusia solmuja näy.
+  takaa ja yläviistosta lepoasennossa sekä kolmessa ääriasennossa molemmilla. Runtime-integraation jälkeinen
+  varusteiden vaihtuminen odottaa omistajan käsisavutestiä.
 - **Taivaanrautamiekka** (`sword_sky_iron`, `characters.glb`, 600 kolmiota): sama origo, suunta, terän pituus (0,74 m)
   ja kahvan geometria (y -0,05..0,055, säde 1,4 -> 1,3 cm) kuin `sword`illa, joten käsikiinnitystä ei tarvitse
   muuttaa. Lehtimäinen terä (leveimmillään 6 cm), kuusikulmainen poikkileikkaus, tumma siniharmaa meteoriittirauta
   verteksiväreinä (kerroslinjat, kiillotetut terät, satunnaisia kuoppia), kaareva pronssiristikahva, kuusikulmainen
-  nuppi ja kierretty nahkakahva. Ei hohtoa. Peli poistaa sen (`sword*`-nimi menee `equip`iin muttei käytetä); käyttöön
-  vain Codexin integraatiolla.
+  nuppi ja kierretty nahkakahva. Ei hohtoa. `Fighter.build` valitsee mallin, kun `look.skyIron` on tosi;
+  vanhoille asseteille jää värjätty perusmiekka varapoluksi.
 - **Pihapiiri** tehdään skriptillä `assets-src/blender/homestead.py` →
   `build_homestead()`: `talo`, `kuoppatalo`, `aitta`, `katos`, `aita`,
   `portinpieli`, `pino`, `polkky`, `haasia` ja `ruukku`. Kuoppatalon
@@ -211,15 +211,13 @@ Päivitetty: 2026-11-20 (Claude, Windows; pohja main 2db0950)
 
 ## Koodin väliaikaiset korvikkeet (odottavat malleja)
 
-- **Taivaanrautamiekka** (V6): peli käyttää vielä perusmiekan mallia sävytettynä (`fighter.ts`, `look.skyIron`).
-  Oma malli `sword_sky_iron` on `characters.glb`:ssä (ks. yllä), odottaa integraatiota.
 - **Loukkaantunut jousineito**: `lying`-asento (kuin kuollut tietäjä), ei jousta. Tarvitaan istuva/kyljellään-asento.
 - **Nuori urho kyläläisenä**: `char_urho` ilman aseita (`spawnVillager`); anna tarvittaessa oma rauhan asento.
 
 ## Seuraava Blender-tehtävä
 
-Ei avointa Blender-tehtävää. Odottaa Codexin runtime-integraatiota (modulaariset osat ja `sword_sky_iron`);
-sen jälkeen legacy-hahmot voi poistaa tiedostoista (säästää noin 1,7 Mt kummassakin). Muuta: sormien viimeistely,
+Ei avointa Blender-tehtävää. Modulaariset osat ja `sword_sky_iron` on integroitu; legacy-hahmot voi poistaa
+vasta omistajan käsisavutestin jälkeen (säästää noin 1,7 Mt kummassakin). Muuta: sormien viimeistely,
 koiran kävelyleike, istuva tietäjä ja loukkaantuneen jousineidon asento.
 
 ## Ei vielä aloiteta

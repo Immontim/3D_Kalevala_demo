@@ -205,6 +205,7 @@ export function initPauseMenu() {
       PLAYER_LOOK.helmet = state.player.equipment.head === "iron_helmet";
       PLAYER_LOOK.ringMail = state.player.equipment.torso === "ring_mail";
       PLAYER_LOOK.greaves = state.player.equipment.legs === "iron_greaves";
+      PLAYER_LOOK.shoes = state.player.equipment.feet === "leather_shoes";
       refreshHeroLook();
     },
   });

@@ -263,12 +263,13 @@ export interface FighterLook {
   loadout: Loadout;
   /** Naissankari: vartalo on jousineito (assets/villagers_f.glb) ilman jousta; aseet ja kypärä tulevat characters.glb:stä. */
   female?: boolean;
-  /** Miekka on taivaanrautamiekka: sama malli, tumma sinertävä teräs (V6; oma Blender-malli odottaa). */
+  /** Miekka on taivaanrautamiekka: oma Blender-malli, vanhoilla asseteilla värjätty varamalli. */
   skyIron?: boolean;
-  /** Modulaariset varusteet; vaikuttavat taisteluun myös ennen uusien 3D-mallien valmistumista. */
+  /** Modulaariset varusteet. Rengaspaita ja säärisuojat vaikuttavat myös taistelulaskentaan. */
   helmet?: boolean;
   ringMail?: boolean;
   greaves?: boolean;
+  shoes?: boolean;
 }
 
 // ---------- Blender-hahmot (assets/characters.glb) ----------
@@ -446,10 +447,18 @@ export class Fighter {
     const gear = female ? SkeletonUtils.clone(source) : clone;
     const rig = clone.getObjectByName("RIG") ?? clone;
     // Kantohihna (char_<hahmo>_hihna) on oma kappaleensa samassa luurangossa; näkyy vain rauhan varustuksessa.
-    const bodyName = female ? "char_jousineito" : `char_${this.look.character}`;
-    const strapName = `${bodyName}_hihna`;
+    const bodyPrefix = female ? "char_jousineito" : `char_${this.look.character}`;
+    const modularBase = `${bodyPrefix}_base`;
+    const useModularHero = this.look.character === "hero" && !!clone.getObjectByName(modularBase);
+    const bodyName = useModularHero ? modularBase : bodyPrefix;
+    const strapName = `${bodyPrefix}_hihna`;
     // Naissankarin huotra (char_jousineito_huotra) on oma kappale kuten kantohihna: aina näkyvissä.
-    const keep = new Set<string>([bodyName, strapName, `${bodyName}_huotra`]);
+    const keep = new Set<string>([bodyName, strapName, `${bodyPrefix}_huotra`]);
+    if (useModularHero) {
+      if (this.look.ringMail) keep.add(`${bodyPrefix}_mail`);
+      if (this.look.greaves) keep.add(`${bodyPrefix}_greaves`);
+      if (this.look.shoes !== false) keep.add(`${bodyPrefix}_shoes`);
+    }
     const equip: Record<string, THREE.Object3D> = {};
     const gearRig = gear.getObjectByName("RIG") ?? gear;
     let gearHelmet: THREE.Object3D | null = null;
@@ -530,7 +539,9 @@ export class Fighter {
     this.weapon.quaternion.copy(cInv).multiply(qA.setFromEuler(eul.set(0, HAND_TWIST, 0)));
     this.weapon.position.copy(vTmp.set(GRIP.x, GRIP.y, GRIP.z).applyQuaternion(cInv));
     if (this.look.loadout === "spear") this.prepareSpearGrip(clone);
-    const weaponModel = equip[this.look.loadout === "spear" ? "spear" : "sword"];
+    const weaponName = this.look.loadout === "spear" ? "spear" : this.look.skyIron ? "sword_sky_iron" : "sword";
+    const weaponModel = equip[weaponName] ?? equip[this.look.loadout === "spear" ? "spear" : "sword"];
+    const skyIronFallback = this.look.skyIron && weaponName !== weaponModel?.name;
     if (weaponModel) {
       weaponModel.position.set(0, 0, this.look.loadout === "spear" ? SPEAR_SLIDE : 0);
       weaponModel.traverse((o) => {
@@ -540,7 +551,7 @@ export class Fighter {
         if (mat.metalness > 0.5) {
           // Oma kopio, jotta vihollisen terän hehku ei sytytä muiden teriä.
           const own = mat.clone();
-          if (this.look.skyIron) { own.color.set(0x38425c); own.roughness = Math.min(own.roughness, 0.3); own.metalness = 1; }
+          if (skyIronFallback) { own.color.set(0x38425c); own.roughness = Math.min(own.roughness, 0.3); own.metalness = 1; }
           if (envMap) own.envMap = envMap;
           envTargets.add(own);
           m.material = own;
