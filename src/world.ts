@@ -959,6 +959,9 @@ function prepareMaterials(protos: Map<string, Proto>, maxAniso: number) {
       if (/Foliage|Grass|Fern/.test(m.name)) {
         // Alfaleikatut oksakortit: ei läpinäkyvyyslajittelua, pehmeät reunat MSAA:lla.
         m.transparent = false;
+        // GLTFLoader sammuttaa syvyyskirjoituksen BLEND-materiaaleilta. Ilman sitä myöhemmin piirretty
+        // (vesi, rungot, kaukaiset puut) maalautuu lähempien oksien päälle kuvakulmasta riippuen.
+        m.depthWrite = true;
         m.alphaTest = 0.42;
         m.alphaToCoverage = true;
         m.side = THREE.DoubleSide;

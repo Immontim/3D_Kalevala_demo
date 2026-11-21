@@ -6,11 +6,20 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `b2c04bc`)
+Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `2319d5e`)
 
-- **Mainin koodiversio on v05.00.00.** Inventaario- ja varustetyö sekä Vitest 5.1.1 on
-  mergattu. Ei deployattu eikä käsin testattu: in-app-selain ei saanut yhteyttä käynnissä
-  olleeseen localhost-palvelimeen. Automaattitarkistukset ja GLB-solmujen tarkistus on ajettu.
+- **Koodiversio v05.00.01** branchissa `claude/foliage-depth-song-filter` (tarkista merge-tila
+  `git merge-base --is-ancestor`). Koodi valmis, savutestattu in-app-selaimessa (lakeside, clearing);
+  ei deployattu, omistaja ei ole käsin testannut. Ajettu: `bun run test` 799/799, `bunx tsc --noEmit`,
+  `bun run lint`, `bun run build` läpi. Inventaario v05.00.00 on yhä käsin testaamatta.
+- **Lehvästön syvyys.** `M_Foliage`, `M_Grass` ja `M_Fern` ovat glTF:ssä BLEND, ja GLTFLoader
+  sammuttaa niiltä `depthWrite`n. `prepareMaterials` tekee niistä alfaleikattuja ja palauttaa nyt myös
+  `depthWrite = true`. Ilman sitä vesi, rungot ja kaukaiset puunipat maalautuivat lähioksien päälle
+  kuvakulmasta riippuen ("puut zoomaavat").
+- **Laulun ilme on jälkikäsittelyssä.** Laulun ja laulunvalinnan haalistus + ruskea reunavinjetti
+  ovat `engine/view.ts`:n grade-shaderissa (`uSong`, `setSongLook`, `updateSongLook` 0,4 s).
+  Vanha CSS-suodin `#c.singing` ja `#vignette`-elementti poistettiin, koska selain ajoi suotimen koko
+  ruudulle joka ruutu (epäilty syy lauluosion tahmaukseen heikolla läppärillä; ei vielä vahvistettu).
 - **Paperinukke ja inventaario.** Skeema 6, avain `laulun-miekka.campaign.v6`, 12 tavarapaikkaa ja
   seitsemän varustepaikkaa. Kartta ja 3D:n pause käyttävät samaa `ui/inventoryView.ts`-näkymää.
   Rauhassa varusteita voi vaihtaa ja ruokaa syödä; taistelussa näkymä on vain luettavissa.
@@ -323,8 +332,12 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `b2c04bc`)
 - Järven rannan vesi on yksinkertainen: ei rantavaahtoa, syvyysväriä eikä
   aaltoja laiturin kohdalla. Kaukorannalla ei ole kasvillisuutta kaukaa
   nähtynä; rantakohtauksen koira ei käyskentele (ei kävelyleikettä).
-- 3D-chunk on noin 829 kt ja metsä noin 2 milj. kolmiota. LOD-malleja tai
-  laatuasetusta ei ole; 60 FPS on mitattu tehokoneella.
+- 3D-chunk on noin 829 kt; rantakohtauksessa 1,26 milj. kolmiota (puut 2–2,7 k kpl, ~400 puuta).
+  LOD-malleja tai laatuasetusta ei ole; 60 FPS on mitattu tehokoneella. Metsä on aukiokohtainen:
+  puut, varvut ja heinät sijoitetaan kehänä origon ympärille, kaikki instanssinipat piirretään aina
+  (`frustumCulled = false`), `@near`/`@far`-jako ja varjokamera (±34 m) ovat origon, eivät pelaajan,
+  mukaan. Kuljettavan alueen laajennus vaatii ruutujaon, etäisyys-LODin/impostorit, pelaajaa
+  seuraavat varjot ja kameran estekäsittelyn metsässä.
 - Moottori on v0: ei ajastimia, `unless`-peruutusta eikä efektien ketjureaktioita.
   Tuntematon engine-versionumero luetaan sallivasti; semantiikkamuutos tarvitsee versionhaaran.
 - Rikkinäistä tallennetta ei kopioida talteen ennen korvaamista (ROADMAPin riski);
@@ -332,8 +345,8 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `b2c04bc`)
 
 ## Seuraava tehtävä
 
-Pelaa inventaarion käsisavutesti: vaihda mies- ja naissankarilla kengät, rengaspaita, säärisuojat,
-ase ja kilpi rauhallisessa 3D-kohtauksessa, varmista taistelun lukittu näkymä sekä kypärän ylälyöntisuoja.
+Suunnittele omistajan kanssa 3D-kohtausten kuljettavan alueen laajennus (myös metsään): tavoitekoko,
+metsän ruutujako ja LOD/impostorit, kamera metsässä. Ei toteutusta ennen omistajan hyväksymää suunnitelmaa.
 
 ## Ei vielä aloiteta
 
@@ -346,6 +359,7 @@ ase ja kilpi rauhallisessa 3D-kohtauksessa, varmista taistelun lukittu näkymä 
 - 3D-kohtausten mount/dispose ilman sivun uudelleenlatausta.
 - Git LFS (omistajan päätös 2026-11-10: ei vielä).
 - Isojen skannattujen puiden lataus ja kevennys.
+- Metsän LOD, impostorit tai ruutujako ennen kuin laajennussuunnitelma on hyväksytty.
 - Aseiden laatuerot ja vahingon hajonta.
 
 ## Pysyvät päätökset
