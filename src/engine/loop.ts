@@ -3,7 +3,7 @@ import { SONG } from "../songLogic";
 import { stepFreeCam } from "../freecam";
 import { t } from "../i18n";
 import { mapUrl, parseAppRoute } from "../app/route";
-import { openTune, renderBinds } from "../ui/pauseMenu";
+import { openTune, renderBinds, showTab, type PauseTab } from "../ui/pauseMenu";
 import { ARENA, birdSongLevel, groundHeight } from "../world";
 import { removeActor } from "./actor";
 import { updateAi } from "./ai";
@@ -170,13 +170,14 @@ export let paused = false;
 export let pausedAt = 0;
 export let pointerLockWorked = false;
 
-export function pause() {
+export function pause(tab: PauseTab = "binds") {
   if (!g.running || paused || g.gameOver) return;
   paused = true;
   pausedAt = performance.now();
   clearInputs();
   renderBinds();
   openTune();
+  showTab(tab);
   $("pause").classList.remove("hidden");
   $("hud").classList.add("arrange");
 }

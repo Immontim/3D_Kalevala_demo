@@ -15,12 +15,12 @@ import { g } from "./state";
 import { finishVictory } from "./victory";
 
 export const ENEMIES: { name: string; look: FighterLook }[] = [
-  { name: t("enemy.urho"), look: { character: "urho", loadout: "sword" } },
-  { name: t("enemy.pohja"), look: { character: "pohja", loadout: "sword" } },
-  { name: t("enemy.urhoSpear"), look: { character: "urho", loadout: "spear" } },
-  { name: t("enemy.pohjaShield"), look: { character: "pohja", loadout: "sword_shield" } },
-  { name: t("enemy.urhoShield"), look: { character: "urho", loadout: "sword_shield" } },
-  { name: t("enemy.pohjaSpear"), look: { character: "pohja", loadout: "spear" } },
+  { name: t("enemy.urho"), look: { character: "urho", loadout: "sword", helmet: true } },
+  { name: t("enemy.pohja"), look: { character: "pohja", loadout: "sword", helmet: true, ringMail: true, greaves: true } },
+  { name: t("enemy.urhoSpear"), look: { character: "urho", loadout: "spear", helmet: true } },
+  { name: t("enemy.pohjaShield"), look: { character: "pohja", loadout: "sword_shield", helmet: true, ringMail: true, greaves: true } },
+  { name: t("enemy.urhoShield"), look: { character: "urho", loadout: "sword_shield", helmet: true } },
+  { name: t("enemy.pohjaSpear"), look: { character: "pohja", loadout: "spear", helmet: true, ringMail: true, greaves: true } },
 ];
 
 /** Aallon vihollisen nimi ja ulkonäkö nimilistasta (hahmo + varustus). */

@@ -1,6 +1,6 @@
 // Lähitaistelu: iskun kulku, osuman seuraukset ja törmäykset.
 import * as THREE from "three";
-import { ActionState, BASH, COMBAT, StrikeStyle, StrikeWeight, angleBetween, bashPushStep, graceAfter, graceCovers, inStrikeZone, attackPhase, enemyAttackTiming, lungeProgress, makeAttack, resolveHit, shieldWear, staminaAfterBlock, staminaTick, strikeCost, strikeDamage, strikeLands, strikeTier, styleFor, weakened } from "../combat";
+import { ActionState, BASH, COMBAT, StrikeStyle, StrikeWeight, angleBetween, bashPushStep, damageAfterArmour, graceAfter, graceCovers, helmetAbsorbsOverhead, inStrikeZone, attackPhase, enemyAttackTiming, lungeProgress, makeAttack, resolveHit, shieldWear, staminaAfterBlock, staminaTick, strikeCost, strikeDamage, strikeLands, strikeTier, styleFor, weakened } from "../combat";
 import { FALLEN, GESTURE_TIME, Gesture } from "../fighter";
 import { t } from "../i18n";
 import { effectiveStats } from "../stats";
@@ -128,11 +128,24 @@ export function resolveStrike(att: Actor, def: Actor) {
   else if (graceAfter(res) > 0) { def.graceUntil = g.gameTime + graceAfter(res); def.graceFrom = att; }
   const contact = att.pos.clone().lerp(def.pos, 0.55).setY(groundHeight(def.pos.x, def.pos.z) + 1.3);
   const isPlayer = att === g.player;
-  g.events.push(`${isPlayer ? "pelaaja" : "vihollinen"}:${atk.kind}/${atk.weight}:${res}${graced ? "+suoja" : ""}`);
-  if (g.events.length > 30) g.events.shift();
-
   const heavy = atk.weight === "heavy";
-  def.hp -= strikeDamage(att.stats.power, atk, res, defState) * def.stats.damageTaken;
+  const unarmouredDamage = strikeDamage(att.stats.power, atk, res, defState) * def.stats.damageTaken;
+  const damage = damageAfterArmour(unarmouredDamage, def.armour.ringMail, def.armour.greaves);
+  const helmetSaved = res === "hit" && helmetAbsorbsOverhead(
+    atk.kind as StrikeStyle,
+    atk.weight,
+    def.fighter.hasHelmet,
+    def.hp - damage <= 0,
+    Math.random(),
+  );
+  if (helmetSaved) {
+    const away = toDef.clone().setY(0).normalize();
+    const side = new THREE.Vector3(away.z, 0, -away.x);
+    const prop = def.fighter.knockHelmet(away.addScaledVector(side, Math.random() - 0.5));
+    if (prop) { scene.add(prop.group); g.debris.push(prop); }
+  } else def.hp -= damage;
+  g.events.push(`${isPlayer ? "pelaaja" : "vihollinen"}:${atk.kind}/${atk.weight}:${res}${graced ? "+suoja" : ""}${helmetSaved ? "+kypärä" : ""}`);
+  if (g.events.length > 30) g.events.shift();
   // Kilpi kuluu torjutuista iskuista: puolivälissä siihen tulee lovi, lopussa se hajoaa.
   const wear = shieldWear(atk, res, defender);
   if (wear > 0 && def.shield) {
@@ -153,23 +166,21 @@ export function resolveStrike(att: Actor, def: Actor) {
   if (died) killActor(def, Math.abs(angleToAttacker) > Math.PI / 2);
 
   if (res === "hit") {
-    sfx.hit();
-    fx.hitstop = heavy ? 0.11 : 0.07;
-    fx.shake = (isPlayer ? 0.12 : 0.22) * (heavy ? 1.5 : atk.kind === "bash" ? 0.7 : 1);
-    emitBlood(contact, heavy ? 32 : 20, 2.8);
-    if (isPlayer) g.songPower = Math.min(COMBAT.songMax, g.songPower + COMBAT.songGainHit);
-    else flash("#b33a2e", heavy ? 0.45 : atk.kind === "bash" ? 0.15 : 0.35);
-    // Tehoste: sivallus tai ylälyönti voi lennättää vastustajan kypärän päästä. Ei vaikuta peliin.
-    if (isPlayer && def.fighter.hasHelmet && (atk.kind === "slash" || atk.kind === "overhead")
-      && Math.random() < (died ? 1 : heavy ? 0.6 : 0.25)) {
-      const away = toDef.clone().setY(0).normalize();
-      const side = new THREE.Vector3(away.z, 0, -away.x);
-      // Sivallus vie kypärän sivulle, ylälyönti taakse.
-      const dir = atk.kind === "slash" ? side.multiplyScalar(-1).addScaledVector(away, 0.4) : away.addScaledVector(side, Math.random() - 0.5);
-      const prop = def.fighter.knockHelmet(dir);
-      if (prop) { scene.add(prop.group); g.debris.push(prop); sfx.clang(false); }
+    if (helmetSaved) {
+      sfx.clang(false);
+      emitSparks(contact, 42, 5);
+      fx.hitstop = heavy ? 0.12 : 0.08;
+      fx.shake = 0.16;
+      if (!isPlayer) flash("#d9a441", 0.18);
+    } else {
+      sfx.hit();
+      fx.hitstop = heavy ? 0.11 : 0.07;
+      fx.shake = (isPlayer ? 0.12 : 0.22) * (heavy ? 1.5 : atk.kind === "bash" ? 0.7 : 1);
+      emitBlood(contact, heavy ? 32 : 20, 2.8);
+      if (isPlayer) g.songPower = Math.min(COMBAT.songMax, g.songPower + COMBAT.songGainHit);
+      else flash("#b33a2e", heavy ? 0.45 : atk.kind === "bash" ? 0.15 : 0.35);
     }
-    if (!isPlayer && defState === "block" && !died) showMsg(t("combat.wrongBlock"), t("combat.strikePassed", { strike: STYLE_NAME[atk.kind] }), 0.9);
+    if (!helmetSaved && !isPlayer && defState === "block" && !died) showMsg(t("combat.wrongBlock"), t("combat.strikePassed", { strike: STYLE_NAME[atk.kind] }), 0.9);
     // Lyhyt horjahdus keskeyttää noston; kilpityöntö pysäyttää myös jo alkaneen iskun.
     const interrupts = atk.kind === "bash" ? defState !== "rooted" : defState === "idle" || defState === "block" || defState === "windup";
     if (!died && interrupts) {

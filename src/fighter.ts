@@ -265,6 +265,10 @@ export interface FighterLook {
   female?: boolean;
   /** Miekka on taivaanrautamiekka: sama malli, tumma sinertävä teräs (V6; oma Blender-malli odottaa). */
   skyIron?: boolean;
+  /** Modulaariset varusteet; vaikuttavat taisteluun myös ennen uusien 3D-mallien valmistumista. */
+  helmet?: boolean;
+  ringMail?: boolean;
+  greaves?: boolean;
 }
 
 // ---------- Blender-hahmot (assets/characters.glb) ----------
@@ -570,12 +574,12 @@ export class Fighter {
     // Kypärä on oma kappaleensa: se kiinnitetään pääluuhun lepoasennossa, jolloin se istuu
     // kuten Blenderissä ja voidaan myöhemmin irrottaa lentämään.
     const helmet = clone.getObjectByName(`helmet_${this.look.character}`);
-    if (helmet) {
+    if (helmet && this.look.helmet !== false) {
       this.root.updateMatrixWorld(true);
       const headBone = this.bones.get("head")!.bone;
       if (helmet.parent !== headBone) headBone.attach(helmet);
       this.helmet = helmet;
-    }
+    } else helmet?.removeFromParent();
     this.applySheath();
     this.apply();
   }

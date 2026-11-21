@@ -3,7 +3,8 @@ import * as THREE from "three";
 import { COMBAT, Loadout, SHIELDS, STYLES, canStrikeHeavy, exhausted, makeAttack, styleFor, turnToward } from "../combat";
 import { CONTROLS } from "../controls";
 import { FighterLook } from "../fighter";
-import { makeActor, setState } from "./actor";
+import { effectiveStats } from "../stats";
+import { makeActor, removeActor, setState } from "./actor";
 import { bearing } from "./camera";
 import { lockTarget } from "./enemies";
 import { strikeHeld } from "./input";
@@ -48,6 +49,25 @@ export function spawnHero() {
   applyActiveMapTransition(g.player, g.gameTime);
   // Rauhallisessa paikassa sankari näkyy jo aloitusikkunan taustalla ase huotrassa.
   g.player.fighter.setSheathed(ARENA_PEACEFUL);
+}
+
+/** Rakentaa sankarin 3D-mallin uudelleen vaihdetuilla varusteilla menettämättä paikkaa tai vointia. */
+export function refreshHeroLook() {
+  const previous = g.player;
+  const position = previous.pos.clone();
+  const yaw = previous.yaw;
+  const hp = previous.hp;
+  const stamina = previous.stamina;
+  const mods = previous.mods.map((modifier) => ({ ...modifier }));
+  removeActor(previous);
+  const next = makeActor(PLAYER_LOOK, position, 0, 0xffd27a);
+  next.yaw = yaw;
+  next.mods = mods;
+  next.stats = effectiveStats(next.base, next.mods, g.gameTime);
+  next.hp = Math.min(hp, next.stats.maxHp);
+  next.stamina = Math.min(stamina, next.stats.maxStamina);
+  next.fighter.setSheathed(ARENA_PEACEFUL);
+  g.player = next;
 }
 
 /** Rauha: kohtaus on rauhallinen eikä kentällä ole vastustajia. Silloin miekka on huotrassa ja

@@ -7,6 +7,11 @@ import { paused, restart, resume } from "../engine/loop";
 import { bindUi } from "../engine/state";
 import { DEFAULTS, FIELDS, applyChanges, changedValues, exportTuning, parseTuningText } from "../tuning";
 import { VERSION } from "../version";
+import { mountInventoryView, type InventoryView } from "./inventoryView";
+import { campaignStore } from "../engine/store";
+import { combatLoadout, isSkyIron } from "../map/campaign";
+import { PLAYER_LOOK, refreshHeroLook } from "../engine/hero";
+import { ARENA_PEACEFUL } from "../world";
 
 // Säätövälilehdellä tehdyt muutokset ovat tallessa selaimen muistissa ja otetaan käyttöön
 // ennen kuin yhtään hahmoa luodaan.
@@ -129,11 +134,15 @@ export function openTune() {
   refreshTune();
 }
 
-export function showTab(tune: boolean) {
-  $("paneTune").classList.toggle("hidden", !tune);
-  $("paneBinds").classList.toggle("hidden", tune);
-  $("tabTune").classList.toggle("on", tune);
-  $("tabBinds").classList.toggle("on", !tune);
+export type PauseTab = "binds" | "tune" | "inventory";
+
+export function showTab(tab: PauseTab) {
+  for (const name of ["Binds", "Tune", "Inventory"] as const) {
+    const active = name.toLowerCase() === tab;
+    $(`pane${name}`).classList.toggle("hidden", !active);
+    $(`tab${name}`).classList.toggle("on", active);
+  }
+  $("pause").classList.toggle("showing-inventory", tab === "inventory");
 }
 
 // Mittarit (oma ja vastustajan) voi tauon aikana raahata haluamaansa kohtaan. Paikka on siirtymä
@@ -176,8 +185,30 @@ export function initPauseMenu() {
   });
   renderBinds();
 
-  $("tabBinds").addEventListener("click", () => showTab(false));
-  $("tabTune").addEventListener("click", () => showTab(true));
+  $("tabBinds").addEventListener("click", () => showTab("binds"));
+  $("tabTune").addEventListener("click", () => showTab("tune"));
+  $("tabInventory").addEventListener("click", () => showTab("inventory"));
+
+  let inventoryView: InventoryView;
+  inventoryView = mountInventoryView($("pauseInventory"), {
+    getState: () => campaignStore().get(),
+    editable: ARENA_PEACEFUL,
+    commit(next) {
+      return campaignStore().update(() => next).ok;
+    },
+    onChange(state) {
+      const loadout = combatLoadout(state.player.equipment);
+      if (!loadout) return;
+      PLAYER_LOOK.loadout = loadout;
+      PLAYER_LOOK.skyIron = isSkyIron(state.player.equipment);
+      PLAYER_LOOK.female = state.player.gender === "female";
+      PLAYER_LOOK.helmet = state.player.equipment.head === "iron_helmet";
+      PLAYER_LOOK.ringMail = state.player.equipment.torso === "ring_mail";
+      PLAYER_LOOK.greaves = state.player.equipment.legs === "iron_greaves";
+      refreshHeroLook();
+    },
+  });
+  campaignStore().subscribe(() => inventoryView.render());
 
   tuneText.addEventListener("input", () => {
     const parsed = parseTuningText(tuneText.value);

@@ -35,6 +35,9 @@ import {
   shouldShieldBash,
   bashPushStep,
   weakened,
+  ARMOUR,
+  damageAfterArmour,
+  helmetAbsorbsOverhead,
 } from "./combat";
 
 const sword = WEAPONS.sword;
@@ -360,5 +363,27 @@ describe("taivaanrautamiekka (V6)", () => {
     }
     expect(sky.blockArc).toBe(base.blockArc);
     expect(sky.styles).toEqual(base.styles);
+  });
+});
+
+describe("puettavat suojavarusteet", () => {
+  it("rengaspaita ja säärisuojat vähentävät vahinkoa erikseen ja yhdessä", () => {
+    expect(damageAfterArmour(100, false, false)).toBe(100);
+    expect(damageAfterArmour(100, true, false)).toBeCloseTo(100 * ARMOUR.ringMailDamage);
+    expect(damageAfterArmour(100, false, true)).toBeCloseTo(100 * ARMOUR.greavesDamage);
+    expect(damageAfterArmour(100, true, true)).toBeCloseTo(80.75);
+  });
+
+  it("vain ylälyönti voi irrottaa kypärän ja irtoamistodennäköisyys riippuu painosta", () => {
+    expect(helmetAbsorbsOverhead("slash", "heavy", true, true, 0)).toBe(false);
+    expect(helmetAbsorbsOverhead("overhead", "heavy", false, true, 0)).toBe(false);
+    expect(helmetAbsorbsOverhead("overhead", "light", true, false, 0.24)).toBe(true);
+    expect(helmetAbsorbsOverhead("overhead", "light", true, false, 0.25)).toBe(false);
+    expect(helmetAbsorbsOverhead("overhead", "heavy", true, false, 0.59)).toBe(true);
+    expect(helmetAbsorbsOverhead("overhead", "heavy", true, false, 0.6)).toBe(false);
+  });
+
+  it("muuten kuolettava ylälyönti irrottaa kypärän varmasti", () => {
+    expect(helmetAbsorbsOverhead("overhead", "light", true, true, 0.999999)).toBe(true);
   });
 });

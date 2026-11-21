@@ -5,7 +5,7 @@
 // säädettävissä polulla, esim. "characters.hero.hp" tai "weapons.spear.reach". Taukoikkunan
 // säätövälilehti näyttää näistä vain osan (FIELDS); loput voi muuttaa JSON-tekstin kautta.
 
-import { CHARACTERS, COMBAT, ENEMY_AI, SHIELDS, STAMINA, STRIKES, WAVES, WEAPONS } from "./combat";
+import { ARMOUR, CHARACTERS, COMBAT, ENEMY_AI, SHIELDS, STAMINA, STRIKES, WAVES, WEAPONS } from "./combat";
 import { SONG } from "./songLogic";
 import { CONTROLS } from "./controls";
 import { t } from "./i18n";
@@ -18,6 +18,7 @@ export const ROOTS: Record<string, Tree> = {
   waves: WAVES,
   stamina: STAMINA,
   combat: COMBAT,
+  armour: ARMOUR,
   weapons: WEAPONS as unknown as Tree,
   strikes: STRIKES as unknown as Tree,
   shields: SHIELDS as unknown as Tree,

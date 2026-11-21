@@ -2,8 +2,6 @@ import atlasUrl from "../../assets/map/kalevala-map-atlas-v2.png?url";
 import lakeShoreEdgeUrl from "../../assets/map/lake-shore-edge.png?url";
 import riverFordOverlayUrl from "../../assets/map/river-ford-overlay.png?url";
 import femaleMapHeroUrl from "../../assets/map/map-hero-female.png?url";
-import femalePaperDollUrl from "../../assets/map/paper-doll-hero.png?url";
-import malePaperDollUrl from "../../assets/map/paper-doll-hero-male.png?url";
 import cairnSiteUrl from "../../assets/map/cairn-site.png?url";
 import redHandUrl from "../../assets/map/red-hand-site.png?url";
 import femaleSatietyFacesUrl from "../../assets/map/satiety-faces.png?url";
@@ -11,18 +9,7 @@ import maleSatietyFacesUrl from "../../assets/map/satiety-faces-male.png?url";
 import { VERSION } from "../version";
 import { getLanguage, setLanguage, t } from "../i18n";
 import { mapUrl, sceneKind, sceneUrl, type SceneId } from "../app/route";
-import {
-  combatLoadout,
-  consumeFood,
-  ITEMS,
-  isSkyIron,
-  ownsMainHand,
-  setEquipped,
-  setPlayerGender,
-  type CampaignState,
-  type FoodId,
-  type PlayerGender,
-} from "./campaign";
+import { setPlayerGender, type CampaignState, type PlayerGender } from "./campaign";
 import { createWorldMapState, mapCell, moveOnMap, type MapDirection } from "./domain";
 import { PROTOTYPE_MAP } from "./prototype";
 import { discoverVisibleSites, mapSiteDefinition, mapSiteDisplay, sceneForMapSite, siteIdAt } from "./sites";
@@ -32,6 +19,7 @@ import { consumeSceneReturn } from "./transition";
 import { endingSummary, isWon, shouldShowEnding } from "./ending";
 import { withFlag } from "../world/state";
 import { mapCalendarTime, mapCellVisibility, satietyBand } from "./uiState";
+import { mountInventoryView, type InventoryView } from "../ui/inventoryView";
 
 const TILE = 48;
 const VIEW_COLS = 17;
@@ -50,6 +38,7 @@ let facing: MapDirection = "down";
 let settingsOpen = false;
 let settingsReturnFocus: HTMLElement | null = null;
 let message = "";
+let inventoryView: InventoryView | null = null;
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) {
   const el = document.createElement(tag);
@@ -76,13 +65,8 @@ function buildUi(root: HTMLElement) {
   mapFrame.append(canvas);
 
   const paper = h("aside", "map-panel map-paper");
-  const armourSlots = [
-    "map.slot.headwear", "map.slot.shirt", "map.slot.gloves", "map.slot.trousers", "map.slot.shoes",
-  ] as const;
-  const armourSlotHtml = armourSlots
-    .map((key) => `<div class="paper-armour-slot"><i aria-hidden="true">◇</i><span>${t(key)}</span></div>`)
-    .join("");
-  paper.innerHTML = `<h2>${t("map.paperDoll")}</h2><div class="paper-figure"><div class="paper-armour" aria-label="${t("map.clothingSlots")}">${armourSlotHtml}</div><div class="hero-portrait" aria-hidden="true"></div><div class="paper-hands"><label class="paper-hand paper-main-hand"><span>${t("map.mainHand")}</span><select id="mainHand"><option value="sword">${t("map.item.sword")}</option><option value="spear">${t("map.item.spear")}</option></select></label><label class="paper-hand paper-off-hand"><span>${t("map.offHand")}</span><select id="offHand"><option value="round_shield">${t("map.item.roundShield")}</option><option value="">${t("map.empty")}</option></select></label></div></div><div id="equipmentSummary" class="equipment-summary"></div><h3>${t("map.items")}</h3><div id="inventorySlots" class="inventory-slots"></div><p class="paper-hint">${t("map.foodHint")}</p>`;
+  const inventoryRoot = h("div");
+  paper.append(inventoryRoot);
   layout.append(status, mapFrame, paper);
 
   const footer = h("footer", "map-footer");
@@ -107,6 +91,16 @@ function buildUi(root: HTMLElement) {
   ending.setAttribute("aria-labelledby", "endingTitle");
   ending.innerHTML = `<div class="map-modal-card ending-card"><div class="ending-band" aria-hidden="true"></div><div class="ending-ornament" aria-hidden="true">◆ ❖ ◆</div><h2 id="endingTitle">${t("ending.title")}</h2><p class="ending-subtitle">${t("ending.subtitle")}</p><div class="ending-ornament small" aria-hidden="true">❖</div><div class="ending-columns"><section><h3>${t("ending.statsTitle")}</h3><ul id="endingStats" class="ending-list"></ul></section><section><h3>${t("ending.sideTitle")}</h3><ul id="endingSide" class="ending-list"></ul></section></div><div class="ending-actions"><button id="endingContinue" type="button">${t("ending.continue")}</button><button id="endingNew" type="button">${t("ending.newJourney")}</button></div><div class="ending-ornament" aria-hidden="true">◆ ❖ ◆</div><div class="ending-band" aria-hidden="true"></div><p class="ending-version">${t("map.title")} · ${VERSION}</p></div>`;
   root.append(header, layout, footer, settings, ending);
+  inventoryView = mountInventoryView(inventoryRoot, {
+    getState: () => campaign,
+    editable: true,
+    commit(next) {
+      if (!saveCampaign(next)) return false;
+      campaign = next;
+      return true;
+    },
+    onChange: () => { renderUi(); renderMap(); },
+  });
   root.querySelector("#endingContinue")!.addEventListener("click", () => closeEnding());
   root.querySelector("#endingNew")!.addEventListener("click", () => { closeEnding(false); restartJourney(false); });
   root.querySelector("#showEnding")?.addEventListener("click", () => { toggleSettings(false); openEnding(); });
@@ -126,23 +120,6 @@ function buildUi(root: HTMLElement) {
   });
   root.querySelectorAll<HTMLButtonElement>("[data-scene]").forEach((button) => {
     button.addEventListener("click", () => openScene(button.dataset.scene as SceneId));
-  });
-  root.querySelector<HTMLSelectElement>("#mainHand")!.addEventListener("change", (event) => {
-    const value = (event.target as HTMLSelectElement).value as "sword" | "sky_iron_sword" | "spear";
-    if (!ownsMainHand(campaign, value)) { renderUi(); return; }
-    campaign = setEquipped(campaign, "mainHand", value);
-    if (value === "spear") campaign = setEquipped(campaign, "offHand", null);
-    persistAndRender();
-  });
-  root.querySelector<HTMLSelectElement>("#offHand")!.addEventListener("change", (event) => {
-    const value = (event.target as HTMLSelectElement).value as "round_shield" | "";
-    if (value && campaign.player.equipment.mainHand === "spear") {
-      setMessage(t("map.shieldNeedsSword"));
-      renderUi();
-      return;
-    }
-    campaign = setEquipped(campaign, "offHand", value || null);
-    persistAndRender();
   });
 }
 
@@ -326,14 +303,6 @@ function selectGender(gender: PlayerGender) {
   renderUi();
 }
 
-function useFood(itemId: FoodId) {
-  const result = consumeFood(campaign, itemId);
-  if (!result.consumed) return;
-  campaign = result.state;
-  setMessage(t("map.ate", { item: t(ITEMS[itemId].nameKey) }));
-  persistAndRender();
-}
-
 function persistAndRender() {
   saveCampaign(campaign);
   renderMap();
@@ -370,7 +339,6 @@ function renderUi() {
   const root = document.getElementById("mapRoot")!;
   const female = campaign.player.gender === "female";
   root.dataset.gender = campaign.player.gender;
-  root.style.setProperty("--paper-doll", `url(${JSON.stringify(female ? femalePaperDollUrl : malePaperDollUrl)})`);
   root.style.setProperty("--satiety-faces", `url(${JSON.stringify(female ? femaleSatietyFacesUrl : maleSatietyFacesUrl)})`);
   root.querySelectorAll<HTMLButtonElement>("[data-gender]").forEach((button) => {
     const selected = button.dataset.gender === campaign.player.gender;
@@ -389,44 +357,7 @@ function renderUi() {
     : t("map.moonDay", { moon: calendar.moon, day: calendar.day });
   drawMoon();
 
-  const loadout = combatLoadout(campaign.player.equipment);
-  const loadoutName = isSkyIron(campaign.player.equipment) ? t("map.item.skyIronSword")
-    : loadout === "sword_shield" ? t("loadout.swordShield.name")
-    : loadout === "sword" ? t("loadout.sword.name")
-      : loadout === "spear" ? t("loadout.spear.name") : t("map.noWeapon");
-  document.getElementById("equipmentSummary")!.textContent = loadoutName;
-  const main = document.getElementById("mainHand") as HTMLSelectElement;
-  const off = document.getElementById("offHand") as HTMLSelectElement;
-  // Taivaanrautamiekka ilmestyy valintaan vasta, kun se on saatu (inventaariossa).
-  const hasSky = ownsMainHand(campaign, "sky_iron_sword");
-  const skyOption = main.querySelector<HTMLOptionElement>('option[value="sky_iron_sword"]');
-  if (hasSky && !skyOption) {
-    const option = document.createElement("option");
-    option.value = "sky_iron_sword";
-    option.textContent = t("map.item.skyIronSword");
-    main.insertBefore(option, main.querySelector('option[value="spear"]'));
-  } else if (!hasSky && skyOption) skyOption.remove();
-  main.value = campaign.player.equipment.mainHand ?? "";
-  off.value = campaign.player.equipment.offHand ?? "";
-
-  const slots = document.getElementById("inventorySlots")!;
-  slots.innerHTML = "";
-  for (let i = 0; i < campaign.player.inventory.capacity; i++) {
-    const stack = campaign.player.inventory.stacks[i];
-    const slot = h("button", "inventory-slot");
-    slot.type = "button";
-    if (stack) {
-      const itemName = t(ITEMS[stack.itemId].nameKey);
-      slot.title = itemName;
-      slot.setAttribute("aria-label", t("map.itemQuantity", { item: itemName, quantity: stack.quantity }));
-      slot.append(h("span", `atlas-icon item-${stack.itemId}`), h("b", "", String(stack.quantity)));
-      if (ITEMS[stack.itemId].satietyGain) slot.addEventListener("click", () => useFood(stack.itemId as FoodId));
-    } else {
-      slot.disabled = true;
-      slot.setAttribute("aria-label", t("map.emptyItemSlot"));
-    }
-    slots.append(slot);
-  }
+  inventoryView?.render();
   document.getElementById("mapMessage")!.textContent = message;
 }
 

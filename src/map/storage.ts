@@ -3,8 +3,9 @@ import { PROTOTYPE_MAP_ID, PROTOTYPE_START } from "./prototype";
 import { completeSiteInstances, newSiteInstances } from "./siteInstances";
 import { legacyKnownSiteIds } from "./sites";
 
-export const CAMPAIGN_STORE = "laulun-miekka.campaign.v5";
-export const PREVIOUS_CAMPAIGN_STORE = "laulun-miekka.campaign.v4";
+export const CAMPAIGN_STORE = "laulun-miekka.campaign.v6";
+export const PREVIOUS_CAMPAIGN_STORE = "laulun-miekka.campaign.v5";
+export const VERSION4_CAMPAIGN_STORE = "laulun-miekka.campaign.v4";
 export const VERSION3_CAMPAIGN_STORE = "laulun-miekka.campaign.v3";
 export const LEGACY_CAMPAIGN_STORE = "laulun-miekka.campaign.v2";
 export const EARLIEST_CAMPAIGN_STORE = "laulun-miekka.campaign.v1";
@@ -44,11 +45,14 @@ function compatible(state: CampaignState): boolean {
 export function loadCampaign(storage?: CampaignStorage): CampaignState {
   try {
     const target = storage ?? localStorage;
-    const stores = [CAMPAIGN_STORE, PREVIOUS_CAMPAIGN_STORE, VERSION3_CAMPAIGN_STORE, LEGACY_CAMPAIGN_STORE, EARLIEST_CAMPAIGN_STORE];
+    const stores = [CAMPAIGN_STORE, PREVIOUS_CAMPAIGN_STORE, VERSION4_CAMPAIGN_STORE, VERSION3_CAMPAIGN_STORE, LEGACY_CAMPAIGN_STORE, EARLIEST_CAMPAIGN_STORE];
     for (const store of stores) {
       const parsed = parseCampaign(target.getItem(store));
       if (!parsed || !compatible(parsed)) continue;
-      let campaign = store === CAMPAIGN_STORE ? parsed : {
+      const inferLegacyKnowledge = store === VERSION3_CAMPAIGN_STORE
+        || store === LEGACY_CAMPAIGN_STORE
+        || store === EARLIEST_CAMPAIGN_STORE;
+      let campaign = !inferLegacyKnowledge ? parsed : {
         ...parsed,
         world: {
           ...parsed.world,
@@ -95,6 +99,7 @@ export function clearCampaign(storage?: CampaignStorage): boolean {
     const target = storage ?? localStorage;
     target.removeItem(CAMPAIGN_STORE);
     target.removeItem(PREVIOUS_CAMPAIGN_STORE);
+    target.removeItem(VERSION4_CAMPAIGN_STORE);
     target.removeItem(VERSION3_CAMPAIGN_STORE);
     target.removeItem(LEGACY_CAMPAIGN_STORE);
     target.removeItem(EARLIEST_CAMPAIGN_STORE);
