@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { TERRAIN_IDS, mapCell, mapCellTravel } from "./domain";
 import {
   CAIRNFIELD_POSITION,
-  FORD_POSITION,
+  BRIDGE_POSITION,
   LAKESIDE_POSITION,
   PROTOTYPE_MAP,
   PROTOTYPE_START,
@@ -10,6 +10,7 @@ import {
   YARD_POSITION,
 } from "./prototype";
 import { mapSiteDefinition } from "./sites";
+import { EAST, WEST, riverConnections } from "./tiles";
 
 describe("prototyyppikartta", () => {
   it("sisältää 20 × 20 ruutua ja kaikki seitsemän maastoa", () => {
@@ -64,19 +65,20 @@ describe("prototyyppikartta", () => {
     for (const target of targets) expect(visited.has(target)).toBe(true);
   });
 
-  it("sijoittaa yhden kivisen kahlaamon vaakasuoraan jokiosuuteen", () => {
-    const fords = PROTOTYPE_MAP.cells.filter((cell) => cell.crossingId === "ford");
-    expect(fords).toHaveLength(1);
-    expect(mapCell(PROTOTYPE_MAP, FORD_POSITION.x, FORD_POSITION.y)).toMatchObject({
+  it("sijoittaa yhden sillan vaakasuoraan jokiosuuteen", () => {
+    const bridges = PROTOTYPE_MAP.cells.filter((cell) => cell.crossingId === "bridge");
+    expect(bridges).toHaveLength(1);
+    expect(mapCell(PROTOTYPE_MAP, BRIDGE_POSITION.x, BRIDGE_POSITION.y)).toMatchObject({
       terrainId: "river",
-      crossingId: "ford",
+      crossingId: "bridge",
     });
-    expect(RIVER_ROUTE).toContainEqual([FORD_POSITION.x, FORD_POSITION.y]);
-    expect(mapCellTravel(mapCell(PROTOTYPE_MAP, FORD_POSITION.x, FORD_POSITION.y - 1)!).passable).toBe(true);
-    expect(mapCellTravel(mapCell(PROTOTYPE_MAP, FORD_POSITION.x, FORD_POSITION.y + 1)!).passable).toBe(true);
+    expect(RIVER_ROUTE).toContainEqual([BRIDGE_POSITION.x, BRIDGE_POSITION.y]);
+    expect(riverConnections(PROTOTYPE_MAP, BRIDGE_POSITION.x, BRIDGE_POSITION.y)).toBe(EAST | WEST);
+    expect(mapCellTravel(mapCell(PROTOTYPE_MAP, BRIDGE_POSITION.x, BRIDGE_POSITION.y - 1)!).passable).toBe(true);
+    expect(mapCellTravel(mapCell(PROTOTYPE_MAP, BRIDGE_POSITION.x, BRIDGE_POSITION.y + 1)!).passable).toBe(true);
     for (const [x, y] of RIVER_ROUTE) {
       const cell = mapCell(PROTOTYPE_MAP, x, y)!;
-      expect(mapCellTravel(cell).passable).toBe(x === FORD_POSITION.x && y === FORD_POSITION.y);
+      expect(mapCellTravel(cell).passable).toBe(x === BRIDGE_POSITION.x && y === BRIDGE_POSITION.y);
     }
   });
 

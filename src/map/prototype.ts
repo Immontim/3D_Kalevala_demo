@@ -9,8 +9,8 @@ export const YARD_POSITION = LEGACY_YARD_POSITION;
 export const LAKESIDE_POSITION = MAP_SITE_DEFINITIONS.lakeside.position;
 /** Kaakon vaaran kalliokumpu veden rannalla: kalmisto (rauhallinen 3D-kohtaus). */
 export const CAIRNFIELD_POSITION = MAP_SITE_DEFINITIONS.cairnfield.position;
-/** Kivinen kahlaamo ylittää vaakasuoran uoman pohjois–eteläsuunnassa. */
-export const FORD_POSITION = { x: 13, y: 11 } as const;
+/** Puusilta ylittää vaakasuoran uoman pohjois–eteläsuunnassa. */
+export const BRIDGE_POSITION = { x: 13, y: 11 } as const;
 
 const LEGEND: Record<string, TerrainId> = {
   w: "water",
@@ -37,20 +37,20 @@ const ROWS = [
   "wwwwwwwwwwwwwwwwwwww",
   "wwwfffffwwwwwrrrrwww",
   "wwfffffffwwwrrrrrwww",
-  "wfffdddfffwwrrrffffw",
-  "wffddddffffwrrffffff",
-  "wffdddffffwwffffbfff",
-  "wfffffffmmwwfffbbbff",
-  "wwffffmmmmwwffbbbbfw",
-  "wwwffmmmmmmwfffbbffw",
-  "wwffmmmmmmmmffffffww",
-  "wfffmmmmmmmmmmfffffw",
-  "wffmmmmmmmmmmmmffffw",
-  "wfffmmmmmmmmmmmffffw",
-  "wwffmmmmmmmmmmffffww",
-  "wwwfffmmmmmmmmfffwww",
-  "wwwwfffmmmmmmfffwwww",
-  "wwwbbfffmmmmfffrrwww",
+  "wfffdmdfffwwrrrffffw",
+  "wffddddmfffwrrffffff",
+  "wffdddmmffwwffffbfff",
+  "wffffffffmwwfffbbbff",
+  "wwffffffmmwwffbbbbfw",
+  "wwwfffdfmmmwfffbbffw",
+  "wwffffddfmmfffffffww",
+  "wfffffdddfmmfmfffffw",
+  "wffffffddfmmfmfffffw",
+  "wfffffmfdfmmfmfffffw",
+  "wwffffmmfmmfffffffww",
+  "wwwffffffmmmfffffwww",
+  "wwwwffffffmmffffwwww",
+  "wwwbbfffffmffffrrwww",
   "wwbbbbffffffffrrrrww",
   "wwwbbbfffffffrrrrwww",
   "wwwwwwwwwwwwwwwwwwww",
@@ -62,7 +62,7 @@ if (ROWS.length !== MAP_HEIGHT || ROWS.some((row) => row.length !== MAP_WIDTH)) 
 
 const cells: MapCell[] = ROWS.flatMap((row, y) => [...row].map((symbol, x) => ({
   terrainId: RIVER_CELLS.has(`${x},${y}`) ? "river" : LEGEND[symbol],
-  ...(x === FORD_POSITION.x && y === FORD_POSITION.y ? { crossingId: "ford" as const } : {}),
+  ...(x === BRIDGE_POSITION.x && y === BRIDGE_POSITION.y ? { crossingId: "bridge" as const } : {}),
   ...(x === LAKESIDE_POSITION.x && y === LAKESIDE_POSITION.y ? { siteId: "lakeside" } : {}),
   ...(x === CAIRNFIELD_POSITION.x && y === CAIRNFIELD_POSITION.y ? { siteId: "cairnfield" } : {}),
 })));

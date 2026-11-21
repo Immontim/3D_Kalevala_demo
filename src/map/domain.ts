@@ -7,7 +7,7 @@ export const MAP_HEIGHT = 20;
 
 export const TERRAIN_IDS = ["meadow", "forest", "deepForest", "bog", "rock", "water", "river"] as const;
 export type TerrainId = (typeof TERRAIN_IDS)[number];
-export const CROSSING_IDS = ["ford"] as const;
+export const CROSSING_IDS = ["bridge"] as const;
 export type CrossingId = (typeof CROSSING_IDS)[number];
 
 export interface TerrainDefinition {
@@ -33,7 +33,7 @@ export const TERRAINS: Record<TerrainId, TerrainDefinition> = {
 
 /** Joen tai muun esteen paikallinen ylitystapa ilman uutta maastolajia. */
 export const CROSSINGS: Record<CrossingId, Pick<TerrainDefinition, "passable" | "minuteCost">> = {
-  ford: { passable: true, minuteCost: WORLD_MINUTES_PER_DAY * 0.4 },
+  bridge: { passable: true, minuteCost: WORLD_MINUTES_PER_DAY * 0.4 },
 };
 
 export const MAP_RULES = {
@@ -44,7 +44,7 @@ export const MAP_RULES = {
 
 export interface MapCell {
   terrainId: TerrainId;
-  /** Maaston kulkusäännön korvaava paikallinen ylitys, esimerkiksi kivinen kahlaamo. */
+  /** Maaston kulkusäännön korvaava paikallinen ylitys, esimerkiksi puusilta. */
   crossingId?: CrossingId;
   /** Maastosta erillinen merkityspaikka, esimerkiksi rauhallinen pihapiiri. */
   siteId?: string;
