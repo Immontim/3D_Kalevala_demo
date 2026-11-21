@@ -6,41 +6,42 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `7b46582`)
+Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `ea47761`)
 
-- **Koodiversio v06.05.00** branchissa `claude/enemy-reaction-variety` (tarkista merge-tila `git merge-base`illa).
-  Koodi valmis, ei deployattu, omistaja ei ole käsin testannut. Claude ajoi aukiolla `__game.step`illä
-  (moduulit konsoliin `import('/src/engine/state.ts')`): 150 lyöntiä; edessä olevien torjunta nousi
-  0,05–0,18 s noston alusta, kahden torjujan ero keskim. 0,05 s, sivulla oleva ei torjunut. Etenevä nosto
-  osui 1,4 m/s peruuttavaan, ei 3,4 m/s. Konsoli puhdas. `bunx vitest run --dir src` (391/391; juuresta
-  `bun run test` poimii myös työpuiden testit), `bunx tsc --noEmit`, `bun run lint`, `bun run build` läpi.
-- **Vihollisen torjuntareaktio ja etenevä nosto (v06.05, `engine/ai.ts`, säännöt `combat.ts`).** Pelaajan
-  noston aikana kukin vastustaja, joka on `threatenedBy` (iskun kaari + `ENEMY_AI.threatMargin` 25°) ja alle
-  3,2 m:n päässä, arpoo torjunnan kerran iskua kohti; nousu ajastetaan `ai.blockAt`iin viiveellä
-  `blockReactionDelay` (0,03–0,16 s, katkaistu niin, että `BLOCK_RAISE` ehtii ennen `timeToImpact`ia; muuten
-  ei torjuta). Odottava ei aloita omaa iskua, ja odotus raukeaa tilan vaihtuessa. `BLOCK_RAISE` (s, 85 %
-  valmis) määrää myös torjunta-asennon animaationopeuden `blockPoseRate` kaikille saman varustuksen
-  kantajille, myös sankarille. Iskun alussa `rollsAdvance` (45 %, ei kilpityöntö) asettaa `ai.advance`:
-  noston aikana astutaan katseen suuntaan `advanceScale` 0,6 × kävely, kun `advancesInWindup` (pelaaja yli
-  `range − advanceKeep` 0,6 m ja alle 50° sivulla). Paneelissa vain `advanceChance` ja `advanceScale`.
+- **Koodiversio v06.06.00** branchissa `claude/hunting-grounds` (tarkista merge-tila `git merge-base`illa).
+  Koodi valmis, ei deployattu, omistaja ei ole käsin testannut. Claude testasi in-app-selaimessa uudella
+  matkalla (`__map.move`/`enterSite`): 4 apajaa, ei tunnettuja; apaja näkyi vasta viistosti viereisestä
+  ruudusta, sisään meno poisti sen tallennuksesta, erämaassa 9 jänistä (1 suo, 2 paloaukea), päivänä 20
+  syntyi piilossa oleva `hunt-c1`. Konsoli puhdas. `bun run test` (404/404), `bunx tsc --noEmit`,
+  `bun run lint`, `bun run build` läpi. FPS:ää ei mitattu (enintään 2 jänistä lisää, 3 meshiä kukin).
+- **Metsästysapajat (v06.06, `map/huntGrounds.ts` puhdas).** Apaja on `SiteInstance` `kind: "hunt"`
+  (`sites.ts` → `wilds`, `lifetime: "temporary"`). `CampaignWorld.huntCycle` = viimeisin käsitelty 20 päivän
+  jakso; −1 (vanha tallennus) → `ensureHuntGrounds` arpoo 3–6 alkuapajaa kerran (`newCampaign` ja
+  `completeSiteInstances`) ja asettaa jakson nykyiseen. `advanceHuntGrounds` (kartan `move` ja käynnistys):
+  jokaista uutta jaksoa kohti `hunt-c<jakso>`; jos aktiivisia on 6, listan ensimmäinen (vanhin) poistetaan
+  ensin myös `knownSiteIds`ista. `huntCandidates`: niitty/metsä/umpimetsä/suo, ei ylitystä, saavutettava,
+  Chebyshev ≥ 2 kaikista muista paikoista (kiinteät + kaikki instanssit, myös lukittu leiri) ja sankarista.
+  Apaja ei ole valmiiksi tunnettu, joten `mapSiteDisplay` näyttää sen vasta 3 × 3 -näössä. `enterSite`
+  kuluttaa sen (`removeHuntGround`) ennen siirtymää. Kuvake `assets/map/hunt-site.png`. Satunnaistettu
+  tietäjän paikka huomioidaan, kun se on instanssi tai `MAP_SITE_DEFINITIONS`issa.
+- **Vihollisen torjuntareaktio ja etenevä nosto (v06.05, `engine/ai.ts`, säännöt `combat.ts`).** Uhattu
+  (`threatenedBy` + `ENEMY_AI.threatMargin` 25°, alle 3,2 m) vastustaja arpoo torjunnan kerran iskua kohti
+  viiveellä `blockReactionDelay` (0,03–0,16 s, vain jos `BLOCK_RAISE` ehtii ennen `timeToImpact`ia).
+  `BLOCK_RAISE` määrää myös torjunta-asennon nopeuden (`blockPoseRate`). `rollsAdvance` (45 %, ei
+  kilpityöntö): noston aikana astutaan eteen `advanceScale` 0,6 × kävely (`advancesInWindup`). Paneelissa
+  `advanceChance` ja `advanceScale`.
 - **Metsästys (v06.04, `src/hunt/` puhdas + `engine/hunt.ts`).** Vain `HUNTING` = erämaa. Toiminto `bow`
-  (oletus X, sidottavissa) ottaa jousen esiin rauhassa; vihollinen pakottaa sen pois. Jousi esillä:
-  `strikeHeld.slash` (vasen) jännittää, `blockHeld` (oikea) tähtää, ja jännitys tähtää aina; oikea painike
-  poimii vain kohdistetun (`focusedSceneItemId`). `archery.ts`: `ARCHERY` (viini 15, 0,85 s, 20–52 m/s,
-  pelillinen painovoima 4,9), `stepArrow`, `traceSegment` (maa + `CollisionWorld.firstProjectileHit` +
-  eläinpallot). Tähtäyspiste = kameran säde lähimpään osumaan; nuoli lähtee jänteeltä sitä kohti.
-  Esteillä on uusi `top` (`PROP_COLLIDERS.height` × mittakaava; puuttuva = rajaton, eli puut). `prey.ts`:
-  `SPECIES.hare` (näkö 12 m / 360°, kuulo `acuity`), tilat graze/hop/alert/flee/dead; ärsykkeet `sight`
-  (sankari) ja `sound` (nuolen isku 5 m). Seitsemän jänistä `HARE_SPOTS`issa, piirto alle 75 m:n päähän.
-  Poimittavat (`sceneItems.ts` `Pickable`, `setPickableSource`): nuoli alle 2,2 m korkeudella ja ruho
-  (`hare_meat` inventaarioon `campaignStore().update`lla, ruhon nuolet viiniin). Viini ja saalislaskuri
-  ovat moduulin tilaa, joten ne nollautuvat sivun latauksessa (omistaja hyväksyi). Kamera: `camera.ts`
-  `AIM_*` oikean olan yli, FOV 40, pystykulma −45…50°. Asennot `POSES.bowCarry/bowAim/bowDraw` +
-  `bowPose()`, jousi vasemmassa kädessä `Fighter.setBow/setBowMode` (`BOW_ROLL` π), jänne seuraa
-  oikeaa nyrkkiä (`fistWorld`). Mallit ovat koodissa (`hunt/models.ts`), eivät Blenderissä.
-- **Tallennuksen hylkäys (v06.03.01).** Aikakentät tarkistetaan `validWorldTime`illa (äärellinen, ≥ 0).
-  Kelvoton tallennus kopioidaan raakana avaimelle `laulun-miekka.campaign.rejected` (vain viimeisin),
-  `console.error` ja kartan `map.saveRejected`. Lataus on tarkoituksella tiukka, jotta vika näkyy.
+  (X) ottaa jousen esiin rauhassa; vasen (`strikeHeld.slash`) jännittää ja tähtää, oikea (`blockHeld`)
+  tähtää ja poimii kohdistetun. `ARCHERY` (viini 15, 0,85 s, 20–52 m/s, painovoima 4,9); `traceSegment`
+  = maa + `CollisionWorld.firstProjectileHit` (esteen `top` = `PROP_COLLIDERS.height`; puuttuva = puu,
+  rajaton) + eläinpallot. `SPECIES.hare`: näkö 12 m, kuulo (nuolen isku 5 m), pako 6,8 m/s.
+  `hunt/spawns.ts` `pickHareSpots` arpoo joka käynnillä 7–9 jänistä (1–3 suo, 1–3 paloaukea `WILDS_ZONES`,
+  ei 22 m:n päähän saapumisesta). Poimittavat (`sceneItems.ts` `Pickable`): nuoli alle 2,2 m ja ruho
+  (`hare_meat`, ruhon nuolet viiniin). Viini ja saalis ovat moduulin tilaa. Tähtäyskamera `camera.ts`
+  `AIM_*`; asennot `bowPose()`, jousi `Fighter.setBow/setBowMode`, jänne seuraa `fistWorld`ia. Mallit
+  koodissa (`hunt/models.ts`).
+- **Tallennuksen hylkäys (v06.03.01).** Kelvoton tallennus kopioidaan avaimelle `laulun-miekka.campaign.rejected`
+  ja kartta näyttää `map.saveRejected`; lataus on tarkoituksella tiukka, jotta vika näkyy.
 - **Saapuminen polunsuulta (v06.02).** `sceneLayout.entrySpawn(layout, inset)` = ensimmäisen polunsuun portista
   `ENTRY_INSET` 3,5 m sisään, katse sisään. `world.ts` `SPAWN`: kalmisto ja erämaa käsin (jo polulla), pihat
   inset 6,4 (kameran `camMaxR` 12,2 aidan sisällä, muuten kamera painuu maahan), ranta katsoo `LAKE_FIRE`a.
@@ -283,7 +284,9 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `7b46582`)
   hieman sivussa. Naissankarin selässä oleva kilpi peittää tähdätessä ruudun vasemman alakulman. Jäniksen
   pako ei katso polunsuita (pysyy alueella `clampToWalkable`illa). Ohilaukausten nuolet puissa yli 2,2 m:n
   korkeudella jäävät menetetyiksi. Jousi ei ole inventaarion esine. Saalista ei tallenneta kampanjan
-  laskuriin, ja ruoanlaittoa ei ole.
+  laskuriin, ja ruoanlaittoa ei ole. Apaja kuluu jo lähtiessä; 3D-sivun uudelleenlataus toistaa kohtauksen
+  täydellä viinillä. Erämaa aloitusvalikosta tai Esc-oikotieltä ei kuluta mitään (testikäyttö).
+  Tiheällä kartalla apaja voi jäädä syntymättä (ei kelvollista ruutua), mikä ei näy pelaajalle.
 - Moottori on v0: ei ajastimia, `unless`-peruutusta eikä efektien ketjureaktioita.
   Tuntematon engine-versionumero luetaan sallivasti; semantiikkamuutos tarvitsee versionhaaran.
 - Hylätty tallennus näkyy pelaajalle vain alapalkin viestinä, joka häviää ensimmäisestä liikkeestä. Talteen
@@ -292,10 +295,9 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `7b46582`)
 
 ## Seuraava tehtävä
 
-Omistaja pelitestaa v06.05:n aalloissa 3–5 (useampi vihollinen): näyttääkö torjunta luontevalta, ja onko
-etenevä nosto sopivan vaarallinen. Viritys paneelista (`advanceChance`, `advanceScale`) tai `ENEMY_AI`-arvoista.
-Metsästyksen (v06.04) käsitesti on yhä tekemättä (`ARCHERY`, `SPECIES.hare`), samoin jäniksen, jousen ja
-nuolen Blender-mallit (BLENDER_HANDOFF).
+Omistaja pelaa uuden matkan kartalla: löytyvätkö apajat sopivasti, onko 3–6 alussa ja yksi 20 päivässä
+oikea tahti, ja tuntuvatko 7–9 jänistä ja hitaampi pako (6,8 m/s) hyvältä. Säätö `HUNT_RULES`,
+`HARE_SPAWN` ja `SPECIES.hare`. v06.05:n torjunta- ja etenemistesti aalloissa 3–5 on yhä tekemättä.
 
 ## Ei vielä aloiteta
 
@@ -310,7 +312,6 @@ nuolen Blender-mallit (BLENDER_HANDOFF).
 - Isojen skannattujen puiden lataus ja kevennys.
 - Kylä ja markkinat sekä vihollisten pako. Jousi taisteluaseena (vasta metsästyksen palautteen jälkeen),
   uudet riistalajit ja ruoanlaitto.
-- Erämaan karttapaikka (karttagrafiikka on Codexin alaa); erämaa on toistaiseksi testikohtaus.
 - Aseiden laatuerot ja vahingon hajonta.
 
 ## Pysyvät päätökset
@@ -346,6 +347,10 @@ nuolen Blender-mallit (BLENDER_HANDOFF).
   nuolet saa poimia samassa kohtauksessa (2026-11-21).
 - Jousi: oikea painike tähtää, vasen jännittää, tähdätään aina (ei lonkalta); jousi esiin/pois X,
   sidottavissa Esc-valikossa (2026-11-21).
+- Metsästysapajat: kertakäyttöisiä (kuluvat sisään mentäessä), uudella matkalla 3–6, 20 päivän välein
+  yksi lisää ja enintään 6 (täynnä vanhin väistyy). Eivät koskaan valmiiksi näkyvissä: paljastuvat vasta
+  viereisestä ruudusta, myös tutkitulla alueella; eivät toisen 3D-paikan viereen. Jäniksiä 7–9, joista
+  1–3 suolla ja 1–3 paloaukealla (2026-11-21).
 - Riista: alkuun pako 12 m:stä, mutta näkö ja kuulo pidetään erillisinä; jänis ei ole ainoa riista.
   Saalis poimitaan kaadetusta eläimestä lihana, joka on toistaiseksi syötävää (2026-11-21).
 - Vertailukone on vanha peliläppäri (i5, 8 Gt, GTX 16 -sarja), mutta se on vain referenssi: omistaja

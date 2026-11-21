@@ -141,8 +141,9 @@ export interface SceneItemState {
 }
 
 /** Kartalle konkretisoitu paikkainstanssi. Tallennetaan tulos eikä vain siementä (generaattori muuttuu). */
-export type SiteInstanceKind = "yard" | "camp";
-export const SITE_INSTANCE_KINDS: readonly SiteInstanceKind[] = ["yard", "camp"];
+/** "hunt" = kertakäyttöinen metsästysapaja (erämaakohtaus), joka katoaa kartalta, kun sinne mennään. */
+export type SiteInstanceKind = "yard" | "camp" | "hunt";
+export const SITE_INSTANCE_KINDS: readonly SiteInstanceKind[] = ["yard", "camp", "hunt"];
 
 export interface SiteInstance {
   /** Pysyvä tunniste, myös 3D-esineiden etuliite: "yard" (vanhan tallennuksen piha), "yard-b" ja vainolaisten leiri "camp". */
@@ -171,6 +172,11 @@ export interface CampaignWorld {
   worldSeed: number;
   /** Konkretisoidut satunnaiset paikat. Tyhjä lista = vielä sijoittamatta (täydennetään latauksessa). */
   siteInstances: SiteInstance[];
+  /**
+   * Metsästysapajien 20 päivän jaksoista viimeisin käsitelty (huntGrounds.ts). −1 = alkuapajia ei ole
+   * vielä arvottu (tallennus ennen v06.06:ta): ne arvotaan latauksessa kerran.
+   */
+  huntCycle: number;
 }
 
 export function createSceneItemState(): SceneItemState {
@@ -209,6 +215,7 @@ export interface CampaignStart {
   knownSiteIds?: readonly string[];
   worldSeed?: number;
   siteInstances?: readonly SiteInstance[];
+  huntCycle?: number;
 }
 
 /** Uusi kampanja alkaa kolmella rieskalla ja nykyistä 3D-oletusta vastaavilla varusteilla. */
@@ -236,6 +243,7 @@ export function createCampaign(start: CampaignStart = {}): CampaignState {
       sceneItems: createSceneItemState(),
       worldSeed: start.worldSeed ?? 0,
       siteInstances: (start.siteInstances ?? []).map((instance) => ({ ...instance })),
+      huntCycle: start.huntCycle ?? -1,
     },
     player: {
       gender: "male",
@@ -553,7 +561,7 @@ export function parseCampaign(value: unknown): CampaignState | null {
   return null;
 }
 
-type SiteGenerationFields = "worldSeed" | "siteInstances";
+type SiteGenerationFields = "worldSeed" | "siteInstances" | "huntCycle";
 type Version4CampaignWorld = Omit<CampaignWorld, "sceneItems" | SiteGenerationFields>;
 type LegacyCampaignWorld = Omit<CampaignWorld, "knownSiteIds" | "sceneItems" | SiteGenerationFields>;
 type ParsedCampaignWorld = LegacyCampaignWorld & { knownSiteIds?: unknown; sceneItems?: unknown };
@@ -587,11 +595,12 @@ function withEmptySceneItems(world: Version4CampaignWorld): CampaignWorld {
     sceneItems: createSceneItemState(),
     worldSeed: 0,
     siteInstances: [],
+    huntCycle: -1,
   };
 }
 
 function withEmptySiteKnowledge(world: LegacyCampaignWorld): CampaignWorld {
-  return { ...world, discovered: [...world.discovered], knownSiteIds: [], sceneItems: createSceneItemState(), worldSeed: 0, siteInstances: [] };
+  return { ...world, discovered: [...world.discovered], knownSiteIds: [], sceneItems: createSceneItemState(), worldSeed: 0, siteInstances: [], huntCycle: -1 };
 }
 
 function validSceneItemState(value: unknown): value is SceneItemState {
@@ -782,7 +791,7 @@ function migrateLegacyPlayer(player: LegacyCampaignPlayer): CampaignPlayer {
  */
 type ParsedCampaign = Omit<CampaignState, "engine" | "world"> & {
   engine?: unknown;
-  world: Omit<CampaignWorld, SiteGenerationFields> & { worldSeed?: unknown; siteInstances?: unknown };
+  world: Omit<CampaignWorld, SiteGenerationFields> & { worldSeed?: unknown; siteInstances?: unknown; huntCycle?: unknown };
 };
 
 /** Pudottaa virheelliset ja päällekkäiset instanssit; ei koskaan hylkää koko kampanjaa. */
@@ -812,6 +821,8 @@ function cloneCampaign(state: ParsedCampaign): CampaignState {
       knownSiteIds: [...state.world.knownSiteIds],
       worldSeed: integerBetween(state.world.worldSeed, 0, 0xffffffff) ? state.world.worldSeed as number : 0,
       siteInstances: parseSiteInstances(state.world.siteInstances, state.world.width, state.world.height),
+      // Salliva: puuttuva tai kelvoton jakso = alkuapajat arvotaan latauksessa uudelleen.
+      huntCycle: integerBetween(state.world.huntCycle, -1, 1_000_000) ? state.world.huntCycle as number : -1,
       sceneItems: {
         takenInstanceIds: [...state.world.sceneItems.takenInstanceIds],
         takeModeOverrides: state.world.sceneItems.takeModeOverrides.map((entry) => ({ ...entry })),

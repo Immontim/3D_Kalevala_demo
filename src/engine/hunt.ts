@@ -10,10 +10,11 @@ import {
 } from "../hunt/archery";
 import { ARROW_LEN, buildArrow, buildBow, buildHare, type BowModel, type HareModel } from "../hunt/models";
 import { SPECIES, type Prey, type Stimulus, killPrey, spawnPrey, updatePrey } from "../hunt/prey";
+import { pickHareSpots } from "../hunt/spawns";
 import { ITEMS, tryAddItem } from "../map/campaign";
 import { t } from "../i18n";
-import { clampToWalkable, sceneLayout } from "../sceneLayout";
-import { ARENA, groundHeight } from "../world";
+import { clampToWalkable, sceneLayout, walkableDepth } from "../sceneLayout";
+import { ARENA, SPAWN, WILDS_ZONES, groundHeight } from "../world";
 import { $ } from "./dom";
 import { heroAtPeace } from "./hero";
 import { showMsg } from "./hud";
@@ -26,10 +27,11 @@ import { camera, scene, world } from "./view";
 /** Kohtaukset, joissa jousi on käytössä. Alkuun vain erämaa (testikohtaus). */
 export const HUNTING = ARENA === "wilds";
 
-/** Jänisten paikat erämaassa: aloituspolun varrella, suoniityn reunoilla ja paloaukealla. */
-const HARE_SPOTS: readonly [number, number][] = [
-  [16, -56], [-22, -14], [14, 20], [44, -30], [-48, 36], [58, 34], [-30, -60],
-];
+/** Jänikset eivät synny näin lähelle saapumispaikkaa (m): muuten ensimmäinen pakenisi heti. */
+const HARE_AVOID_SPAWN = 22;
+/** Vapaasti arvottavien jänisten alue ja vähimmäisetäisyys kohtauksen rajasta (m). */
+const HARE_ANYWHERE = { x: 0, z: 0, rx: 85, rz: 85 };
+const HARE_EDGE_MARGIN = 8;
 
 /** Jäniksen piirtoetäisyys (m): kauempaa 0,5 m:n eläintä ei erota sumun läpi. */
 const HARE_DRAW_RANGE = 75;
@@ -75,7 +77,20 @@ export function initHunt() {
   nocked = buildArrow();
   nocked.visible = false;
   scene.add(nocked);
-  for (const [i, [x0, z0]] of HARE_SPOTS.entries()) {
+  // Jokainen käynti arpoo eläimet uusiin paikkoihin (tasapainon luvut: hunt/spawns.ts).
+  const spots = pickHareSpots({
+    rng: Math.random,
+    bog: WILDS_ZONES.bog,
+    burn: WILDS_ZONES.burn,
+    anywhere: HARE_ANYWHERE,
+    valid: (x, z) => {
+      if (walkableDepth(layout, x, z) < HARE_EDGE_MARGIN) return false;
+      const free = world.collision.depenetrateDisc(x, z, 0.4);
+      return Math.hypot(free.x - x, free.z - z) < 0.05;
+    },
+    avoid: { x: SPAWN.x, z: SPAWN.z, radius: HARE_AVOID_SPAWN },
+  });
+  for (const [i, { x: x0, z: z0 }] of spots.entries()) {
     const free = world.collision.depenetrateDisc(x0, z0, 0.4);
     const p = spawnPrey(`hare-${i + 1}`, "hare", free.x, free.z, rng() * Math.PI * 2);
     const model = buildHare();

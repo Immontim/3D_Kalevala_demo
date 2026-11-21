@@ -520,6 +520,11 @@ function bogMix(x: number, z: number) {
 }
 /** Erämaan paloaukea 0..1 (kaakossa): kaatuneita ja pystyyn kuolleita puita, mustaa maata. */
 const BURN = { x: 52, z: -40 };
+/** Erämaan riistan arvonta-alueet (metsästys): suoniityn ja paloaukean ydin ellipseinä. */
+export const WILDS_ZONES = {
+  bog: { x: -6, z: 4, rx: 19, rz: 14 },
+  burn: { x: BURN.x, z: BURN.z, rx: 16, rz: 13 },
+} as const;
 function burnMix(x: number, z: number) {
   const k = Math.hypot(x - BURN.x, (z - BURN.z) * 1.2) / 24 + (noise2(x * 0.08, z * 0.08 + 6) - 0.5) * 0.4;
   return 1 - THREE.MathUtils.smoothstep(k, 0.7, 1.0);
