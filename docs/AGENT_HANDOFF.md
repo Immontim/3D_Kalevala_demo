@@ -6,13 +6,14 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `ae23d7e`)
+Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `1ffb1e4`)
 
-- **Koodiversio v06.02.00** branchissa `claude/path-entry-spawns` (tarkista merge-tila `git merge-base`illa).
-  Koodi valmis ja savutestattu in-app-selaimessa; ei deployattu eikä omistaja ole käsin testannut. Ajettu:
-  `bun run test` 99 tiedostoa / 1178 testiä, `bunx tsc --noEmit`, `bun run lint`, `bun run build` (3D-chunk
-  861 kt) ja `git diff --check` läpi. Selaimessa katsottu aukio (aallot 1 ja 5), piha, taistelupiha, ranta ja
-  palanut ranta: 60 FPS (800 px:n paneeli), ei pelin konsolivirheitä.
+- **Koodiversio v06.03.00** branchissa `codex/map-bridge-and-clearings` (tarkista merge-tila `git merge-base`illa).
+  Koodi valmis, ei deployattu. Codex testasi käsin in-app-selaimessa näppäimillä sillan ylityksen,
+  pohjoisen aukeat ja pihaniityn ennen sivun uudelleenlatausta ja sen jälkeen. Konsoli oli puhdas.
+  Kartta piirtyy tapahtumista, joten sillä ei ole jatkuvaa FPS-silmukkaa. Omistaja ei ole vielä käsin
+  testannut. `bun install --frozen-lockfile`, `bun run test` (1181/1181), `bunx tsc --noEmit`,
+  `bun run lint`, `bun run build` ja `git diff --check` läpi. Build varoitti 861 kt:n 3D-chunkista.
 - **Saapuminen polunsuulta (v06.02).** `sceneLayout.entrySpawn(layout, inset)` = ensimmäisen polunsuun portista
   `ENTRY_INSET` 3,5 m sisään, katse sisään. `world.ts` `SPAWN`: kalmisto ja erämaa käsin (jo polulla), pihat
   inset 6,4 (kameran `camMaxR` 12,2 aidan sisällä, muuten kamera painuu maahan), ranta katsoo `LAKE_FIRE`a.
@@ -63,7 +64,7 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `ae23d7e`)
   shoes-solmuja ja Taivaanrautamiekka omaa `sword_sky_iron`-malliaan. Rengaspaita kertoo vahingon
   0,85:llä, säärisuojat 0,95:llä. Vain ylälyönti voi irrottaa kypärän; silloin koko isku torjutaan.
   Sama sääntö on pelaajalla ja vihollisilla. Tarkat arvot ovat `combat.ts`in `ARMOUR`-vakiossa.
-- V1-V7 ja Codexin kahlaamo on mergattu. **MVP:n koko pelikaari on nyt koodissa.**
+- **MVP:n koko pelikaari on koodissa.**
 - **Leirin aallot ja voitto (V7).** `src/waves.ts` (puhdas): `CAMPAIGN_WAVES` 5 kiinteää aaltoa
   omistajan listan mukaan (urho/miekka; pohja/miekka+kilpi; urho/keihäs + pohja/miekka; pohja/keihäs +
   pohja/miekka+kilpi; urho/keihäs + pohja/miekka+kilpi + pohja/miekka), `FINAL_WAVE`, `TOTAL_ENEMIES` (9).
@@ -93,10 +94,11 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `ae23d7e`)
   (`SongState.lesson`: ei hidastusta, säe näkyy etukäteen) -> `endLesson` lähettää `song.performed`
   (lesson); sääntö `sage.song-learned` antaa lipun `song.sleep.learned`. Epäonnistuminen ei rankaise
   (raja `SONG.minHits` 4/8). `songLogic.songSlots(flags)` sijoittaa laulun paikkaan F3.
-- **Satunnaiset pihapiirit (V3, mergattu).** Kampanjan `world.siteInstances` (`yard`/`yard-b`,
-  `archer`) ja `worldSeed`; skeema 5/v5. Vanha piha = `yard` (`yard.table-*`), toinen
-  `yard-b.table-*`. `map/placement.ts`, `map/siteInstances.ts`, `sites.ts` `siteIdAt`;
-  kartta välittää `?site=<id>`, `scene3d.ts` `setSiteInstance`, jousineito vain `archer`-pihaan.
+- **Satunnaiset pihapiirit.** `map/siteInstances.ts` tallentaa siemenen ja paikat (`yard`/`yard-b`).
+  `yardMeadows.ts` kasvattaa taloruudusta 3–9 sivuttain kiinni olevaa niittyruutua viiden ruudun
+  levyisellä alueella. Metsät ja nykyinen niitty käyvät, ranta ja muut paikat rajaavat kasvua.
+  `map/app.ts` johtaa saman kartan piirtoon ja liikkeeseen tallennusta avatessa ja matkaa aloittaessa.
+  Kartta välittää `?site=<id>` 3D:lle. Jousineito kuuluu `archer`-pihaan.
 - **CampaignStore (V1).** `map/campaignStore.ts`: 3D:n yksi tilan omistaja, `update(fn)`
   tallentaa ennen käyttöönottoa; 3D:ssä `engine/store.ts` (`campaignStore()`,
   `worldRuntime()`). Kartta (`map/app.ts`) lataa kampanjan omaan muuttujaansa.
@@ -197,14 +199,12 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `ae23d7e`)
 - **Karttadata ja säännöt** ovat puhtaassa `src/map/domain.ts`:ssä. Kuusi
   aiempaa maastoa (niitty, metsä, umpimetsä, suo, kallio ja vesi) sekä uusi
   joki. Kohderuudun `minuteCost` lisää maailmanaikaa; estynyt liike ei kuluta
-  aikaa. Vesi ja joki ovat jalan kulkukelvottomia paitsi joen kivinen kahlaamo
-  (13,11). `crossingId` on terrainista erillinen,
-  joten myöhempi silta voi käyttää samaa sääntöä. Joki kiemurtelee keskisen
-  järven etelälaidasta itäiseen ulkoveteen. Kiinteät paikat: aloitus (10,14),
-  punainen käsi (13,14), rantamökki (9,6), kalmisto (16,16); pihat ovat instansseja.
+  aikaa. Ainoa kuljettava vesiruutu on pohjois–eteläsuuntainen puusilta (13,11),
+  joka piirretään jokitiilen päälle `bridgeArt.ts`:ssä. Pohjoisen metsässä on yhden ja
+  kolmen ruudun niityt. Keskustan metsikkö pilkkoo perusniittyä.
 - **Aika ja kylläisyys.** Erillistä karttavoimaa ei ole. Piilotettu `worldMinutes` sallii päivän
   murto-osat; vanhojen tallennusten jo kertynyt aika, 180 yksikön kuunkierto ja 28 päivää säilyvät.
-  Kohderuudun kulku: niitty 1/6 päivää, metsä 1/4, umpimetsä 1/3, kallio 1/2, suo 0,7 ja kahlaamo
+  Kohderuudun kulku: niitty 1/6 päivää, metsä 1/4, umpimetsä 1/3, kallio 1/2, suo 0,7 ja silta
   0,4 päivää. Kylläisyys vähenee 3,6 pistettä päivässä (niittyliike 0,6); 100 → 0 kestää noin 28
   päivää ilman ruokaa. Arvo ei tapa tai estä liikkumista. Kuun kuva näyttää kahdeksan vaihetta;
   tavallinen liike ei näytä kustannusta.
@@ -224,8 +224,7 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `ae23d7e`)
   nääntyneenä 40; vaikutus on idempotentti eikä koske ystävällisiä kohtauksia. Paluukuorma
   `laulun-miekka.scene-return.v1` kulutetaan kerran; `rewards` on vielä tyhjä varaus.
 - **Karttagrafiikka ja sankari.** `kalevala-map-atlas-v2.png` sisältää kaksi terrainvariaatiota
-  ja naapureista kierrettävät jokipalat. 48 px:n `lake-shore-edge.png` pyöristää rannat ja
-  `river-ford-overlay.png` piirtää kahlaamon.
+  ja naapureista kierrettävät jokipalat. 48 px:n `lake-shore-edge.png` pyöristää rannat.
   Naisella ovat `paper-doll-hero.png`, `satiety-faces.png` ja nelisuuntainen
   `map-hero-female.png`; sininen viitta erottaa hänet kartalla. Miehellä ovat
   `paper-doll-hero-male.png`, `satiety-faces-male.png` ja atlaksen nykyiset
@@ -247,18 +246,13 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `ae23d7e`)
 
 ## Tunnetut rajoitteet ja riskit
 
-- Uusi karttavauhti ja 3,6 kylläisyyspistettä/päivä eivät ole vielä pelitestattuja. Suon 0,7 päivän
-  ja kahlaamon 0,4 päivän hinnat säilyttävät niiden vanhan suhteen kallioon, eivät ole omistajan
-  erikseen päättämiä. Ruokien arvot sekä 50/0-rajat ja 20/40-rangaistukset jäivät ennalleen.
-- Prototyyppikartta on käsin tehty; vain pihojen paikat ja jousineidon talo
-  arvotaan. Tallennettu piha jää paikalleen, vaikka Codex muuttaisi karttamaastoa
-  myöhemmin: jos pihan ruutu muuttuu kulkukelvottomaksi, sille ei ole korjausta.
-  Sijoitteluluvut (etäisyydet, 150 aikayksikköä) ovat arvio; nopeampi matkanteko tekee aikarajasta
-  aiempaa väljemmän, joten löydettävyys selviää pelaamalla.
+- Karttavauhti, kylläisyys 3,6 pistettä/päivä ja uudet niityt kaipaavat pidempää pelitestiä.
+  Pihaniitty voi liittyä valmiiseen aukeaan, jolloin aukea kokonaisuutena on yli yhdeksän ruutua.
+  Tallennetut pihat jäävät paikoilleen myös tulevissa maastomuutoksissa.
 - Liikkuvien ja väliaikaisten kohtaamisten luokitus sekä piirron piilotussääntö
   ovat valmiina, mutta niiden instanssilistaa, liikeratoja tai poistumistiloja
   ei ole vielä toteutettu.
-- Jokigrafiikka tukee suoria, kaarteita, päitä ja yhtä kahlaamoa, mutta ei
+- Jokigrafiikka tukee suoria, kaarteita, päitä ja yhtä siltaa, mutta ei
   vielä haaroja, siltoja, koskia, venettä tai vesianimaatiota.
 - Vanha v3-tallennus voi ensimmäisellä latauksella asettaa sankarin ruutuun,
   joka on tässä karttaversiossa muuttunut joeksi. Sankari pääsee poistumaan
@@ -303,8 +297,8 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `ae23d7e`)
 ## Seuraava tehtävä
 
 Omistaja testaa v06:n peliläppärillä (selain GTX:llä, laturissa): erämaa, aukio ja ranta (uusi saapuminen
-polulta ja aaltojen tulo metsästä), FPS oikeasta alakulmasta, polunsuusta poistuminen kartan kautta, kamera ja lehvästö metsässä sekä kartalla päivä- ja
-kylläisyysrytmi eri maastoissa. Palautteen mukaan säädetään ensin suorituskykyä tai matkatasapainoa.
+polulta ja aaltojen tulo metsästä), FPS oikeasta alakulmasta, polunsuusta poistuminen kartan kautta,
+kamera ja lehvästö metsässä sekä kartalla sillan näkyvyys ja niittyjen vaikutus matkarytmiin.
 
 ## Ei vielä aloiteta
 

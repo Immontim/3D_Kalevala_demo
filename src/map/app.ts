@@ -1,6 +1,5 @@
 import atlasUrl from "../../assets/map/kalevala-map-atlas-v2.png?url";
 import lakeShoreEdgeUrl from "../../assets/map/lake-shore-edge.png?url";
-import riverFordOverlayUrl from "../../assets/map/river-ford-overlay.png?url";
 import femaleMapHeroUrl from "../../assets/map/map-hero-female.png?url";
 import cairnSiteUrl from "../../assets/map/cairn-site.png?url";
 import redHandUrl from "../../assets/map/red-hand-site.png?url";
@@ -12,6 +11,7 @@ import { mapUrl, sceneKind, sceneUrl, type SceneId } from "../app/route";
 import { setPlayerGender, type CampaignState, type PlayerGender } from "./campaign";
 import { createWorldMapState, mapCell, moveOnMap, type MapDirection } from "./domain";
 import { PROTOTYPE_MAP } from "./prototype";
+import { yardMeadowMap } from "./yardMeadows";
 import { discoverVisibleSites, mapSiteDefinition, mapSiteDisplay, sceneForMapSite, siteIdAt } from "./sites";
 import { clearCampaign, loadCampaign, newCampaign, saveCampaign } from "./storage";
 import { riverTile, shoreEdgeTurns, terrainFrame, waterShoreMask, type AtlasFrame } from "./tiles";
@@ -21,6 +21,7 @@ import { endingSummary, isWon, shouldShowEnding } from "./ending";
 import { withFlag } from "../world/state";
 import { mapCalendarTime, mapCellVisibility, satietyBand } from "./uiState";
 import { mountInventoryView, type InventoryView } from "../ui/inventoryView";
+import { drawBridge } from "./bridgeArt";
 
 const TILE = 48;
 const VIEW_COLS = 17;
@@ -35,6 +36,7 @@ const FEMALE_HERO_FRAME: Record<MapDirection, number> = {
 };
 
 let campaign: CampaignState;
+let journeyMap = PROTOTYPE_MAP;
 let facing: MapDirection = "down";
 let settingsOpen = false;
 let settingsReturnFocus: HTMLElement | null = null;
@@ -125,7 +127,7 @@ function buildUi(root: HTMLElement) {
 }
 
 function ensureRevealed() {
-  const state = createWorldMapState(PROTOTYPE_MAP, campaign.world, {
+  const state = createWorldMapState(journeyMap, campaign.world, {
     worldMinutes: campaign.world.worldMinutes,
     satiety: campaign.player.satiety,
     discovered: campaign.world.discovered,
@@ -136,7 +138,7 @@ function ensureRevealed() {
       ...campaign.world,
       discovered: [...state.discovered],
       knownSiteIds: discoverVisibleSites(
-        PROTOTYPE_MAP,
+        journeyMap,
         campaign.world.knownSiteIds,
         state,
         campaign.world.siteInstances,
@@ -149,7 +151,7 @@ function ensureRevealed() {
 }
 
 function currentMapState() {
-  return createWorldMapState(PROTOTYPE_MAP, campaign.world, {
+  return createWorldMapState(journeyMap, campaign.world, {
     worldMinutes: campaign.world.worldMinutes,
     satiety: campaign.player.satiety,
     discovered: campaign.world.discovered,
@@ -158,7 +160,7 @@ function currentMapState() {
 
 function move(direction: MapDirection) {
   facing = direction;
-  const result = moveOnMap(PROTOTYPE_MAP, currentMapState(), direction);
+  const result = moveOnMap(journeyMap, currentMapState(), direction);
   if (!result.moved) {
     setMessage(t("map.blocked"));
     renderMap();
@@ -173,7 +175,7 @@ function move(direction: MapDirection) {
       worldMinutes: result.state.worldMinutes,
       discovered: [...result.state.discovered],
       knownSiteIds: discoverVisibleSites(
-        PROTOTYPE_MAP,
+        journeyMap,
         campaign.world.knownSiteIds,
         result.state,
         campaign.world.siteInstances,
@@ -183,7 +185,7 @@ function move(direction: MapDirection) {
     },
     player: { ...campaign.player, satiety: result.state.satiety },
   };
-  setMessage(siteMessage(siteIdAt(PROTOTYPE_MAP, campaign.world.siteInstances, result.state.x, result.state.y), ""));
+  setMessage(siteMessage(siteIdAt(journeyMap, campaign.world.siteInstances, result.state.x, result.state.y), ""));
   persistAndRender();
 }
 
@@ -198,7 +200,7 @@ function siteMessage(siteId: string | undefined, fallback: string) {
 }
 
 function enterSite() {
-  const siteId = siteIdAt(PROTOTYPE_MAP, campaign.world.siteInstances, campaign.world.x, campaign.world.y);
+  const siteId = siteIdAt(journeyMap, campaign.world.siteInstances, campaign.world.x, campaign.world.y);
   const scene = sceneForMapSite(siteId, campaign.world.siteInstances, campaign.engine.flags);
   // Instanssin tunniste välitetään 3D:lle, jotta sama pihakohtaus saa instanssin omat parametrit.
   const instance = campaign.world.siteInstances.find((entry) => entry.id === siteId);
@@ -282,6 +284,7 @@ function restartJourney(confirmFirst = true) {
   if (confirmFirst && !confirm(t("map.newJourneyConfirm"))) return;
   clearCampaign();
   campaign = newCampaign();
+  journeyMap = yardMeadowMap(PROTOTYPE_MAP, campaign.world.worldSeed, campaign.world.siteInstances);
   ensureRevealed();
   const saved = saveCampaign(campaign);
   toggleSettings(false);
@@ -368,9 +371,6 @@ atlas.addEventListener("load", renderMap);
 const lakeShoreEdge = new Image();
 lakeShoreEdge.src = lakeShoreEdgeUrl;
 lakeShoreEdge.addEventListener("load", renderMap);
-const riverFordOverlay = new Image();
-riverFordOverlay.src = riverFordOverlayUrl;
-riverFordOverlay.addEventListener("load", renderMap);
 const redHand = new Image();
 redHand.src = redHandUrl;
 redHand.addEventListener("load", renderMap);
@@ -475,16 +475,16 @@ function renderMap() {
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = "#16130f";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  const maxX = PROTOTYPE_MAP.width - VIEW_COLS;
-  const maxY = PROTOTYPE_MAP.height - VIEW_ROWS;
+  const maxX = journeyMap.width - VIEW_COLS;
+  const maxY = journeyMap.height - VIEW_ROWS;
   const originX = Math.max(0, Math.min(maxX, campaign.world.x - Math.floor(VIEW_COLS / 2)));
   const originY = Math.max(0, Math.min(maxY, campaign.world.y - Math.floor(VIEW_ROWS / 2)));
   const knownSiteIds = new Set(campaign.world.knownSiteIds);
   for (let vy = 0; vy < VIEW_ROWS; vy++) {
     for (let vx = 0; vx < VIEW_COLS; vx++) {
       const x = originX + vx, y = originY + vy;
-      const cell = mapCell(PROTOTYPE_MAP, x, y)!;
-      const i = y * PROTOTYPE_MAP.width + x;
+      const cell = mapCell(journeyMap, x, y)!;
+      const i = y * journeyMap.width + x;
       const visibility = mapCellVisibility(
         campaign.world.discovered[i],
         campaign.world,
@@ -496,20 +496,20 @@ function renderMap() {
         continue;
       }
       if (cell.terrainId === "river") {
-        const tile = riverTile(PROTOTYPE_MAP, x, y);
+        const tile = riverTile(journeyMap, x, y);
         sprite(ctx, tile.frame, vx * TILE, vy * TILE, tile.quarterTurns);
-        if (cell.crossingId === "ford") {
-          imageTile(ctx, riverFordOverlay, vx * TILE, vy * TILE, tile.quarterTurns);
+        if (cell.crossingId === "bridge") {
+          drawBridge(ctx, vx * TILE, vy * TILE, tile.quarterTurns);
         }
       } else {
         sprite(ctx, terrainFrame(cell.terrainId, x, y), vx * TILE, vy * TILE);
         if (cell.terrainId === "water") {
-          for (const turns of shoreEdgeTurns(waterShoreMask(PROTOTYPE_MAP, x, y))) {
+          for (const turns of shoreEdgeTurns(waterShoreMask(journeyMap, x, y))) {
             imageTile(ctx, lakeShoreEdge, vx * TILE, vy * TILE, turns);
           }
         }
       }
-      const siteId = siteIdAt(PROTOTYPE_MAP, campaign.world.siteInstances, x, y);
+      const siteId = siteIdAt(journeyMap, campaign.world.siteInstances, x, y);
       const siteDisplay = mapSiteDisplay(siteId, {
         active: true,
         known: siteId !== undefined && knownSiteIds.has(siteId),
@@ -555,7 +555,7 @@ function onKeyDown(event: KeyboardEvent) {
 }
 
 function currentSiteMessage() {
-  const siteId = siteIdAt(PROTOTYPE_MAP, campaign.world.siteInstances, campaign.world.x, campaign.world.y);
+  const siteId = siteIdAt(journeyMap, campaign.world.siteInstances, campaign.world.x, campaign.world.y);
   return siteMessage(siteId, t("map.welcome"));
 }
 
@@ -574,6 +574,7 @@ export function initMap() {
   // valmiina myöhemmille ruoka- ja esinepalkinnoille ilman reittirefaktorointia.
   const sceneReturn = consumeSceneReturn();
   campaign = loadCampaign();
+  journeyMap = yardMeadowMap(PROTOTYPE_MAP, campaign.world.worldSeed, campaign.world.siteInstances);
   ensureRevealed();
   saveCampaign(campaign);
   buildUi(root);
@@ -583,7 +584,7 @@ export function initMap() {
   // Poistuttiin polunsuusta: sankari astuu yhden ruudun polun suuntaan. Tukittu suunta ei tee mitään.
   if (sceneReturn?.exitDir) {
     const dir = EXIT_TO_MAP_DIR[sceneReturn.exitDir];
-    if (moveOnMap(PROTOTYPE_MAP, currentMapState(), dir).moved) move(dir);
+    if (moveOnMap(journeyMap, currentMapState(), dir).moved) move(dir);
   }
   window.addEventListener("keydown", onKeyDown);
   if (shouldShowEnding(campaign)) openEnding();

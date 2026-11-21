@@ -44,7 +44,7 @@ describe("maailmankartan määrittely", () => {
     expect(TERRAINS.deepForest.minuteCost * 3).toBeCloseTo(WORLD_MINUTES_PER_DAY);
     expect(TERRAINS.rock.minuteCost * 2).toBeCloseTo(WORLD_MINUTES_PER_DAY);
     expect(TERRAINS.bog.minuteCost).toBeCloseTo(WORLD_MINUTES_PER_DAY * 0.7);
-    expect(CROSSINGS.ford.minuteCost).toBeCloseTo(WORLD_MINUTES_PER_DAY * 0.4);
+    expect(CROSSINGS.bridge.minuteCost).toBeCloseTo(WORLD_MINUTES_PER_DAY * 0.4);
   });
 
   it("hylkää vääränkokoisen kartan", () => {
@@ -108,11 +108,11 @@ describe("karttaliike, aika ja kylläisyys", () => {
     expect(result.state).toBe(start);
   });
 
-  it("kivinen kahlaamo tekee vain oman jokiruutunsa kuljettavaksi", () => {
-    const map = mapWith([{ x: 11, y: 10, terrainId: "river", crossingId: "ford" }]);
+  it("puusilta tekee vain oman jokiruutunsa kuljettavaksi", () => {
+    const map = mapWith([{ x: 11, y: 10, terrainId: "river", crossingId: "bridge" }]);
     const start = createWorldMapState(map, { x: 10, y: 10 }, { worldMinutes: 50, satiety: 88 });
     const result = moveOnMap(map, start, "right");
-    expect(result).toMatchObject({ moved: true, minutesSpent: CROSSINGS.ford.minuteCost });
+    expect(result).toMatchObject({ moved: true, minutesSpent: CROSSINGS.bridge.minuteCost });
     expect(result.state).toMatchObject({ x: 11, y: 10 });
     expect(result.state.worldMinutes).toBeCloseTo(50 + WORLD_MINUTES_PER_DAY * 0.4);
     expect(result.state.satiety).toBeCloseTo(88 - 1.44);
