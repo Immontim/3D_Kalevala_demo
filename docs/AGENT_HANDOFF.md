@@ -6,13 +6,11 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `c792089`)
+Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `b2c04bc`)
 
-- **Branchin `codex/inventory-paper-doll` koodiversio on v05.00.00.** Koodi valmis,
-  ei deployattu eikä käsin testattu: in-app-selain ei saanut yhteyttä käynnissä olleeseen
-  localhost-palvelimeen. Automaattitarkistukset ja GLB-solmujen tarkistus on ajettu.
-  Branch sisältää myös erillisen Vitest 5.1.1 -commitin `32db996`; tarkista merge-tila:
-  `git merge-base --is-ancestor codex/inventory-paper-doll origin/main`.
+- **Mainin koodiversio on v05.00.00.** Inventaario- ja varustetyö sekä Vitest 5.1.1 on
+  mergattu. Ei deployattu eikä käsin testattu: in-app-selain ei saanut yhteyttä käynnissä
+  olleeseen localhost-palvelimeen. Automaattitarkistukset ja GLB-solmujen tarkistus on ajettu.
 - **Paperinukke ja inventaario.** Skeema 6, avain `laulun-miekka.campaign.v6`, 12 tavarapaikkaa ja
   seitsemän varustepaikkaa. Kartta ja 3D:n pause käyttävät samaa `ui/inventoryView.ts`-näkymää.
   Rauhassa varusteita voi vaihtaa ja ruokaa syödä; taistelussa näkymä on vain luettavissa.
@@ -22,13 +20,6 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `c792089`)
   shoes-solmuja ja Taivaanrautamiekka omaa `sword_sky_iron`-malliaan. Rengaspaita kertoo vahingon
   0,85:llä, säärisuojat 0,95:llä. Vain ylälyönti voi irrottaa kypärän; silloin koko isku torjutaan.
   Sama sääntö on pelaajalla ja vihollisilla. Tarkat arvot ovat `combat.ts`in `ARMOUR`-vakiossa.
-Päivitetty: 2026-11-20 (Codex, Windows; pohja `origin/main` `2db0950`)
-
-- **Branchin `codex/deps-vitest-5-1-1` koodiversio on v04.06.01.** Vitest on päivitetty
-  versiosta 5.1.0 versioon 5.1.1. Koodi valmis, ei deployattu; testit ja build on ajettu.
-  In-app-selain ei saanut yhteyttä elävään paikalliseen preview-palvelimeen (localhost-aikakatkaisu),
-  joten tämän branchin selaintarkistus jäi ympäristösyystä tekemättä. Tarkista merge-tila:
-  `git merge-base --is-ancestor codex/deps-vitest-5-1-1 origin/main`.
 - V1-V7 ja Codexin kahlaamo on mergattu. **MVP:n koko pelikaari on nyt koodissa.**
 - **Leirin aallot ja voitto (V7).** `src/waves.ts` (puhdas): `CAMPAIGN_WAVES` 5 kiinteää aaltoa
   omistajan listan mukaan (urho/miekka; pohja/miekka+kilpi; urho/keihäs + pohja/miekka; pohja/keihäs +
@@ -287,10 +278,6 @@ Päivitetty: 2026-11-20 (Codex, Windows; pohja `origin/main` `2db0950`)
   varoittaa vain suuresta 3D-chunkista (840 kt, gzip 227 kt). GLB-tarkistus löysi kaikki mies- ja
   naissankarin modulaariset solmut sekä `sword_sky_iron`in; Node-ympäristön tekstuurivaroitukset
   eivät koske selaimen Vite-latausta.
-- **Tarkistukset 2026-11-20 (v04.06.01):** `bun ci`, `bun audit`, `bun outdated --no-cache`,
-  `bun run test` (26 tiedostoa, 312 testiä), `bunx tsc --noEmit`, `bun run lint` ja `bun run build`
-  läpäisty; build
-  varoittaa vain suuresta 3D-chunkista (839 kt, gzip 226 kt).
 - **Riippuvuustarkistus:** 2026-11-20: ei mitään odottamassa. `bun audit` on puhdas ja
   `bun outdated --no-cache` ei listaa paketteja.
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
@@ -347,9 +334,6 @@ Päivitetty: 2026-11-20 (Codex, Windows; pohja `origin/main` `2db0950`)
 
 Pelaa inventaarion käsisavutesti: vaihda mies- ja naissankarilla kengät, rengaspaita, säärisuojat,
 ase ja kilpi rauhallisessa 3D-kohtauksessa, varmista taistelun lukittu näkymä sekä kypärän ylälyöntisuoja.
-Laajenna paperinukke ja inventaario yhteiseksi 2D/3D-näkymäksi: versionoidut vaatepaikat,
-turvallinen varusteiden vaihto, omat ruoka- ja taivaanrautamiekan ikonit sekä tauotettu käyttö
-rauhallisissa 3D-kohtauksissa. Taistelussa sama näkymä on vain luettavissa.
 
 ## Ei vielä aloiteta
 
