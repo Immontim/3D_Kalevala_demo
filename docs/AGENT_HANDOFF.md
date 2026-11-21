@@ -22,6 +22,13 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `c792089`)
   shoes-solmuja ja Taivaanrautamiekka omaa `sword_sky_iron`-malliaan. Rengaspaita kertoo vahingon
   0,85:llä, säärisuojat 0,95:llä. Vain ylälyönti voi irrottaa kypärän; silloin koko isku torjutaan.
   Sama sääntö on pelaajalla ja vihollisilla. Tarkat arvot ovat `combat.ts`in `ARMOUR`-vakiossa.
+Päivitetty: 2026-11-20 (Codex, Windows; pohja `origin/main` `2db0950`)
+
+- **Branchin `codex/deps-vitest-5-1-1` koodiversio on v04.06.01.** Vitest on päivitetty
+  versiosta 5.1.0 versioon 5.1.1. Koodi valmis, ei deployattu; testit ja build on ajettu.
+  In-app-selain ei saanut yhteyttä elävään paikalliseen preview-palvelimeen (localhost-aikakatkaisu),
+  joten tämän branchin selaintarkistus jäi ympäristösyystä tekemättä. Tarkista merge-tila:
+  `git merge-base --is-ancestor codex/deps-vitest-5-1-1 origin/main`.
 - V1-V7 ja Codexin kahlaamo on mergattu. **MVP:n koko pelikaari on nyt koodissa.**
 - **Leirin aallot ja voitto (V7).** `src/waves.ts` (puhdas): `CAMPAIGN_WAVES` 5 kiinteää aaltoa
   omistajan listan mukaan (urho/miekka; pohja/miekka+kilpi; urho/keihäs + pohja/miekka; pohja/keihäs +
@@ -280,6 +287,10 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `c792089`)
   varoittaa vain suuresta 3D-chunkista (840 kt, gzip 227 kt). GLB-tarkistus löysi kaikki mies- ja
   naissankarin modulaariset solmut sekä `sword_sky_iron`in; Node-ympäristön tekstuurivaroitukset
   eivät koske selaimen Vite-latausta.
+- **Tarkistukset 2026-11-20 (v04.06.01):** `bun ci`, `bun audit`, `bun outdated --no-cache`,
+  `bun run test` (26 tiedostoa, 312 testiä), `bunx tsc --noEmit`, `bun run lint` ja `bun run build`
+  läpäisty; build
+  varoittaa vain suuresta 3D-chunkista (839 kt, gzip 226 kt).
 - **Riippuvuustarkistus:** 2026-11-20: ei mitään odottamassa. `bun audit` on puhdas ja
   `bun outdated --no-cache` ei listaa paketteja.
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
@@ -336,6 +347,9 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `c792089`)
 
 Pelaa inventaarion käsisavutesti: vaihda mies- ja naissankarilla kengät, rengaspaita, säärisuojat,
 ase ja kilpi rauhallisessa 3D-kohtauksessa, varmista taistelun lukittu näkymä sekä kypärän ylälyöntisuoja.
+Laajenna paperinukke ja inventaario yhteiseksi 2D/3D-näkymäksi: versionoidut vaatepaikat,
+turvallinen varusteiden vaihto, omat ruoka- ja taivaanrautamiekan ikonit sekä tauotettu käyttö
+rauhallisissa 3D-kohtauksissa. Taistelussa sama näkymä on vain luettavissa.
 
 ## Ei vielä aloiteta
 
