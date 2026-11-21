@@ -6,6 +6,7 @@ import { groundHeight } from "../world";
 import { Actor } from "./actor";
 import { choosing, songState } from "./song";
 import { g } from "./state";
+import { heroBowPose } from "./hunt";
 
 export function targetPose(a: Actor) {
   const k = a.attack.kind, hv = a.attack.weight === "heavy";
@@ -27,7 +28,13 @@ export function targetPose(a: Actor) {
     case "rooted": return { pose: POSES.rooted, rate: 6 };
     case "dead": return { pose: POSES.stagger, rate: 6 };
     case "dodge": return { pose: POSES.guard, rate: 10 };
-    default: return a === g.player && (songState || choosing) ? { pose: POSES.sing, rate: 4.5 } : { pose: POSES.guard, rate: 8 };
+    default: {
+      if (a === g.player && !songState && !choosing) {
+        const bow = heroBowPose();
+        if (bow) return { pose: bow, rate: 14 };
+      }
+      return a === g.player && (songState || choosing) ? { pose: POSES.sing, rate: 4.5 } : { pose: POSES.guard, rate: 8 };
+    }
   }
 }
 

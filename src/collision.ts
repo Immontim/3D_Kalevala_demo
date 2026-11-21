@@ -23,6 +23,9 @@ interface ColliderBase {
   blocksMelee: boolean;
   /** Estääkö kohde kameran näköyhteyden (puiden rungot, rakennukset). */
   blocksCamera?: boolean;
+  /** Esteen yläpinnan korkeus maailmassa (m). Puuttuva = ulottuu ylös asti (puut, rakennukset).
+   *  Vain lentävät kappaleet (nuolet) katsovat korkeutta; liike ja lyönnit ovat tasossa. */
+  top?: number;
 }
 
 export interface CircleCollider extends ColliderBase {
@@ -156,6 +159,45 @@ function segmentBox(x0: number, z0: number, x1: number, z1: number, c: BoxCollid
   return lo >= EPS && lo <= 1 - EPS ? lo : hi >= EPS && hi <= 1 - EPS ? hi : null;
 }
 
+/** Janan sisäänmeno- ja ulostulo-osuus ympyrälle (0..1 rajattuna), tai null, jos jana ei koske. */
+function circleSpan(x0: number, z0: number, x1: number, z1: number, c: CircleCollider): [number, number] | null {
+  const dx = x1 - x0, dz = z1 - z0;
+  const fx = x0 - c.x, fz = z0 - c.z;
+  const a = dx * dx + dz * dz;
+  const cc = fx * fx + fz * fz - c.radius * c.radius;
+  if (a <= EPS) return cc <= 0 ? [0, 1] : null;
+  const b = 2 * (fx * dx + fz * dz);
+  const disc = b * b - 4 * a * cc;
+  if (disc < 0) return null;
+  const root = Math.sqrt(disc);
+  const t0 = Math.max(0, (-b - root) / (2 * a)), t1 = Math.min(1, (-b + root) / (2 * a));
+  return t0 <= t1 ? [t0, t1] : null;
+}
+
+function boxSpan(x0: number, z0: number, x1: number, z1: number, c: BoxCollider): [number, number] | null {
+  const sin = Math.sin(c.yaw), cos = Math.cos(c.yaw);
+  const ax = (x0 - c.x) * cos - (z0 - c.z) * sin, az = (x0 - c.x) * sin + (z0 - c.z) * cos;
+  const bx = (x1 - c.x) * cos - (z1 - c.z) * sin, bz = (x1 - c.x) * sin + (z1 - c.z) * cos;
+  let lo = 0, hi = 1;
+  for (const [p, d, half] of [[ax, bx - ax, c.halfX], [az, bz - az, c.halfZ]] as const) {
+    if (Math.abs(d) <= EPS) {
+      if (p < -half || p > half) return null;
+      continue;
+    }
+    let t0 = (-half - p) / d, t1 = (half - p) / d;
+    if (t0 > t1) [t0, t1] = [t1, t0];
+    lo = Math.max(lo, t0);
+    hi = Math.min(hi, t1);
+    if (lo > hi) return null;
+  }
+  return [lo, hi];
+}
+
+/** Lentävän kappaleen osuma kiinteään esteeseen. */
+export interface ProjectileHit extends SegmentHit {
+  y: number;
+}
+
 export class CollisionWorld {
   private colliders: StaticCollider[] = [];
   private hazards: HazardZone[] = [];
@@ -258,6 +300,31 @@ export class CollisionWorld {
         : segmentBox(x0, z0, x1, z1, { ...c, halfX: c.halfX + pad, halfZ: c.halfZ + pad });
       if (t === null || (best && t >= best.t)) continue;
       best = { collider: c, x: x0 + (x1 - x0) * t, z: z0 + (z1 - z0) * t, t };
+    }
+    return best;
+  }
+
+  /**
+   * Lentävän kappaleen (nuoli) 3D-jana esteitä vasten: esteet ovat pystysuoria lieriöitä ja laatikoita,
+   * joiden yläpinta on `top` (puuttuva = rajaton). Mukana kaikki kiinteät esteet (liike-, lyönti- tai
+   * kameraeste). Jana voi myös laskeutua matalan esteen päälle ylhäältä.
+   */
+  firstProjectileHit(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number): ProjectileHit | null {
+    const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+    const radius = Math.hypot(x1 - x0, z1 - z0) / 2 + GRID_SIZE;
+    let best: ProjectileHit | null = null;
+    for (const c of this.nearby(mx, mz, radius)) {
+      if (!c.blocksMovement && !c.blocksMelee && !c.blocksCamera) continue;
+      const span = c.kind === "circle" ? circleSpan(x0, z0, x1, z1, c) : boxSpan(x0, z0, x1, z1, c);
+      if (!span) continue;
+      const top = c.top ?? Infinity;
+      const yIn = y0 + (y1 - y0) * span[0], yOut = y0 + (y1 - y0) * span[1];
+      let t: number;
+      if (yIn <= top) t = span[0];
+      else if (yOut <= top) t = span[0] + (span[1] - span[0]) * ((yIn - top) / Math.max(EPS, yIn - yOut));
+      else continue;
+      if (best && t >= best.t) continue;
+      best = { collider: c, x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t, z: z0 + (z1 - z0) * t, t };
     }
     return best;
   }

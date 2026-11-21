@@ -179,6 +179,45 @@ export class Sfx {
     o.stop(ctx.currentTime + 1);
   }
 
+  /** Jänteen napsahdus laukaisussa: matala värähtely ja lyhyt suhahdus. strength 0..1 = jännitys. */
+  bowRelease(strength: number) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, now = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = "triangle";
+    o.frequency.setValueAtTime(140 + 60 * strength, now);
+    o.frequency.exponentialRampToValueAtTime(70, now + 0.12);
+    const g = ctx.createGain();
+    this.env(g, 0.25 + 0.2 * strength, 0.002, 0.14);
+    o.connect(g).connect(this.master);
+    o.start();
+    o.stop(now + 0.2);
+    const n = this.noise(0.2);
+    const f = ctx.createBiquadFilter();
+    f.type = "bandpass";
+    f.Q.value = 2;
+    f.frequency.setValueAtTime(2400, now);
+    f.frequency.exponentialRampToValueAtTime(900, now + 0.18);
+    const g2 = ctx.createGain();
+    this.env(g2, 0.12 + 0.1 * strength, 0.01, 0.16);
+    n.connect(f).connect(g2).connect(this.master);
+    n.start();
+  }
+
+  /** Nuoli iskeytyy: puuhun kova tömähdys, maahan ja eläimeen pehmeämpi. */
+  arrowImpact(hard: boolean) {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const n = this.noise(0.08);
+    const f = ctx.createBiquadFilter();
+    f.type = "lowpass";
+    f.frequency.value = hard ? 1600 : 500;
+    const g = ctx.createGain();
+    this.env(g, hard ? 0.35 : 0.22, 0.001, hard ? 0.07 : 0.1);
+    n.connect(f).connect(g).connect(this.master);
+    n.start();
+  }
+
   /** Tick, joka kertoo tahdin lähestyvän. */
   tick() {
     if (!this.ctx) return;

@@ -334,16 +334,16 @@ const FIRE = SITE.fire;
  * mittakaavan mukaan. Uusi kohtaus ei siis tarvitse käsin merkittyjä törmäyksiä.
  */
 export type PropColliderTemplate =
-  | { kind: "circle"; radius: number; blocksMelee?: boolean; blocksCamera?: boolean }
-  | { kind: "box"; halfX: number; halfZ: number; blocksMelee?: boolean; blocksCamera?: boolean };
+  | { kind: "circle"; radius: number; blocksMelee?: boolean; blocksCamera?: boolean; height?: number }
+  | { kind: "box"; halfX: number; halfZ: number; blocksMelee?: boolean; blocksCamera?: boolean; height?: number };
 
 export const PROP_COLLIDERS: Record<string, PropColliderTemplate> = {
-  rock_1: { kind: "circle", radius: 0.7, blocksMelee: true },
-  rock_2: { kind: "circle", radius: 0.7, blocksMelee: true },
-  rock_3: { kind: "circle", radius: 0.8, blocksMelee: true },
-  rock_4: { kind: "circle", radius: 0.65, blocksMelee: true },
-  rock_5: { kind: "circle", radius: 0.75, blocksMelee: true },
-  rock_6: { kind: "circle", radius: 0.7, blocksMelee: true },
+  rock_1: { kind: "circle", radius: 0.7, blocksMelee: true, height: 0.9 },
+  rock_2: { kind: "circle", radius: 0.7, blocksMelee: true, height: 0.9 },
+  rock_3: { kind: "circle", radius: 0.8, blocksMelee: true, height: 1.0 },
+  rock_4: { kind: "circle", radius: 0.65, blocksMelee: true, height: 0.8 },
+  rock_5: { kind: "circle", radius: 0.75, blocksMelee: true, height: 0.9 },
+  rock_6: { kind: "circle", radius: 0.7, blocksMelee: true, height: 0.9 },
   pine_a: { kind: "circle", radius: 0.3, blocksMelee: true, blocksCamera: true },
   pine_b: { kind: "circle", radius: 0.34, blocksMelee: true, blocksCamera: true },
   pine_c: { kind: "circle", radius: 0.3, blocksMelee: true, blocksCamera: true },
@@ -353,33 +353,34 @@ export const PROP_COLLIDERS: Record<string, PropColliderTemplate> = {
   birch_a: { kind: "circle", radius: 0.22, blocksMelee: true, blocksCamera: true },
   birch_b: { kind: "circle", radius: 0.24, blocksMelee: true, blocksCamera: true },
   kota: { kind: "circle", radius: 2.25, blocksMelee: true, blocksCamera: true },
-  aita: { kind: "box", halfX: 1.02, halfZ: 0.12, blocksMelee: true },
-  portinpieli: { kind: "circle", radius: 0.13, blocksMelee: true },
-  pino: { kind: "box", halfX: 1.15, halfZ: 0.45, blocksMelee: true },
-  polkky: { kind: "circle", radius: 0.55, blocksMelee: true },
-  haasia: { kind: "box", halfX: 1.95, halfZ: 0.65, blocksMelee: true },
-  ruukku: { kind: "circle", radius: 0.2, blocksMelee: false },
+  aita: { kind: "box", halfX: 1.02, halfZ: 0.12, blocksMelee: true, height: 1.2 },
+  portinpieli: { kind: "circle", radius: 0.13, blocksMelee: true, height: 2.0 },
+  pino: { kind: "box", halfX: 1.15, halfZ: 0.45, blocksMelee: true, height: 1.3 },
+  polkky: { kind: "circle", radius: 0.55, blocksMelee: true, height: 0.6 },
+  haasia: { kind: "box", halfX: 1.95, halfZ: 0.65, blocksMelee: true, height: 3.0 },
+  ruukku: { kind: "circle", radius: 0.2, blocksMelee: false, height: 0.5 },
   // Clauden talousesineet eivät ole vielä kohtauksessa, mutta tuleva koodisijoittelu
   // saa törmäykset ilman kohtauskohtaista käsityötä.
-  pukkipoyta: { kind: "box", halfX: 1.18, halfZ: 0.42, blocksMelee: true },
-  penkki: { kind: "box", halfX: 0.98, halfZ: 0.3, blocksMelee: true },
-  kanakoppi: { kind: "box", halfX: 0.8, halfZ: 0.65, blocksMelee: true },
-  pata: { kind: "circle", radius: 0.5, blocksMelee: false },
-  tuohikontti: { kind: "circle", radius: 0.2, blocksMelee: false },
+  pukkipoyta: { kind: "box", halfX: 1.18, halfZ: 0.42, blocksMelee: true, height: 0.8 },
+  penkki: { kind: "box", halfX: 0.98, halfZ: 0.3, blocksMelee: true, height: 0.5 },
+  kanakoppi: { kind: "box", halfX: 0.8, halfZ: 0.65, blocksMelee: true, height: 1.6 },
+  pata: { kind: "circle", radius: 0.5, blocksMelee: false, height: 0.6 },
+  tuohikontti: { kind: "circle", radius: 0.2, blocksMelee: false, height: 0.6 },
   // Järven rannan esineet (lakeside.glb); mökki, laituri ja nuotio saavat törmäyksensä erikseen.
-  istuinhirsi: { kind: "box", halfX: 0.66, halfZ: 0.2, blocksMelee: false },
-  vene: { kind: "box", halfX: 0.36, halfZ: 1.7, blocksMelee: true },
-  haasia_kaatunut: { kind: "box", halfX: 1.9, halfZ: 0.7, blocksMelee: false },
-  lyhde: { kind: "circle", radius: 0.25, blocksMelee: false },
+  istuinhirsi: { kind: "box", halfX: 0.66, halfZ: 0.2, blocksMelee: false, height: 0.45 },
+  vene: { kind: "box", halfX: 0.36, halfZ: 1.7, blocksMelee: true, height: 0.7 },
+  haasia_kaatunut: { kind: "box", halfX: 1.9, halfZ: 0.7, blocksMelee: false, height: 1.0 },
+  lyhde: { kind: "circle", radius: 0.25, blocksMelee: false, height: 1.0 },
   // Kalmisto (cairnfield.glb): röykkiöt ovat matalia, joten niiden yli lyödään, mutta päälle ei astuta.
-  kuppikivi: { kind: "box", halfX: 1.02, halfZ: 0.76, blocksMelee: true },
-  roykkio_a: { kind: "circle", radius: 1.45, blocksMelee: false },
-  roykkio_b: { kind: "box", halfX: 1.9, halfZ: 1.0, blocksMelee: false },
-  roykkio_c: { kind: "circle", radius: 1.65, blocksMelee: false },
-  roykkio_d: { kind: "circle", radius: 0.95, blocksMelee: false },
+  kuppikivi: { kind: "box", halfX: 1.02, halfZ: 0.76, blocksMelee: true, height: 0.7 },
+  roykkio_a: { kind: "circle", radius: 1.45, blocksMelee: false, height: 1.0 },
+  roykkio_b: { kind: "box", halfX: 1.9, halfZ: 1.0, blocksMelee: false, height: 1.0 },
+  roykkio_c: { kind: "circle", radius: 1.65, blocksMelee: false, height: 1.1 },
+  roykkio_d: { kind: "circle", radius: 0.95, blocksMelee: false, height: 0.8 },
   karsikko: { kind: "circle", radius: 0.34, blocksMelee: true, blocksCamera: true },
   // Erämaan reunat ja paloaukea (forest_lod.glb): juurakon levy ja pystyyn kuollut mänty.
-  juurakko: { kind: "circle", radius: 1.15, blocksMelee: true, blocksCamera: true },
+  // height = esteen korkeus metreinä mittakaavassa 1 (nuolet lentävät matalan esteen yli); puuttuva = rajaton.
+  juurakko: { kind: "circle", radius: 1.15, blocksMelee: true, blocksCamera: true, height: 2.2 },
   kelo_pysty: { kind: "circle", radius: 0.3, blocksMelee: true, blocksCamera: true },
 };
 
@@ -391,13 +392,15 @@ function addPropCollider(
   z: number,
   scale: number,
   yaw: number,
+  y: number,
 ) {
   const def = PROP_COLLIDERS[name];
   if (!def) return;
+  const top = def.height === undefined ? {} : { top: y + def.height * scale };
   if (def.kind === "circle") {
-    collision.add({ id, kind: "circle", x, z, radius: def.radius * scale, blocksMovement: true, blocksMelee: !!def.blocksMelee, blocksCamera: !!def.blocksCamera });
+    collision.add({ id, kind: "circle", x, z, radius: def.radius * scale, blocksMovement: true, blocksMelee: !!def.blocksMelee, blocksCamera: !!def.blocksCamera, ...top });
   } else {
-    collision.add({ id, kind: "box", x, z, yaw, halfX: def.halfX * scale, halfZ: def.halfZ * scale, blocksMovement: true, blocksMelee: !!def.blocksMelee, blocksCamera: !!def.blocksCamera });
+    collision.add({ id, kind: "box", x, z, yaw, halfX: def.halfX * scale, halfZ: def.halfZ * scale, blocksMovement: true, blocksMelee: !!def.blocksMelee, blocksCamera: !!def.blocksCamera, ...top });
   }
 }
 
@@ -1135,7 +1138,7 @@ function populate(
     dummy.rotation.set(tilt * (r() - 0.5), yaw, tilt * (r() - 0.5));
     const name = key.split("@")[0];
     // Erämaassa kaukana kuljettavan alueen ulkopuolella oleville ei tarvita törmäystä.
-    if (!WILDS || walkableDepth(LAYOUT, x, z) > -4) addPropCollider(collision, `prop:${name}:${colliderId++}`, name, x, z, scale, yaw);
+    if (!WILDS || walkableDepth(LAYOUT, x, z) > -4) addPropCollider(collision, `prop:${name}:${colliderId++}`, name, x, z, scale, yaw, dummy.position.y);
     if (TREE_TYPES.has(name)) {
       // Puut piirtää Forest (lähellä täysi malli, kaukana kevennetty), ei kiinteä nippu.
       treeSpots.push({ type: name, x, y: dummy.position.y, z, scale, yaw, tiltX: dummy.rotation.x, tiltZ: dummy.rotation.z });

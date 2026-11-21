@@ -14,7 +14,9 @@ import { DEG, aim, g, inputs, keys, sfx } from "./state";
 import { t } from "../i18n";
 import { ARENA_PEACEFUL, SPAWN, groundHeight } from "../world";
 import { applyActiveMapTransition } from "../map/transition";
-import { lockFocusedSceneItem } from "./sceneItems";
+import { focusedSceneItemId, lockFocusedSceneItem } from "./sceneItems";
+import { bowActive, hunt, rebindHeroBow } from "./hunt";
+import { ARCHERY } from "../hunt/archery";
 
 // Sankarin varusteet valitaan aloitusikkunassa, ja valinta tallentuu selaimeen.
 export const LOADOUT_STORE = "laulun-miekka.loadout.v1";
@@ -68,6 +70,7 @@ export function refreshHeroLook() {
   next.stamina = Math.min(stamina, next.stats.maxStamina);
   next.fighter.setSheathed(ARENA_PEACEFUL);
   g.player = next;
+  rebindHeroBow();
 }
 
 /** Rauha: kohtaus on rauhallinen eikä kentällä ole vastustajia. Silloin miekka on huotrassa ja
@@ -127,7 +130,10 @@ export function updatePlayer(dt: number) {
       return;
     }
     // Rauhassa iskunappi puhuu ja torjuntanappi käyttää; kumpikin on lyhyt ele paikallaan seisten.
-    if (calm && p.state === "idle") {
+    // Jousi esillä: vasen painike jännittää ja oikea tähtää (hunt.ts); oikea poimii vain kohdistetun esineen.
+    if (calm && p.state === "idle" && bowActive()) {
+      if (inputs.useQueued && focusedSceneItemId()) { lockFocusedSceneItem(); startGesture(p, "use"); return; }
+    } else if (calm && p.state === "idle") {
       if (inputs.strikeQueued) { startGesture(p, "talk"); return; }
       if (inputs.useQueued) { lockFocusedSceneItem(); startGesture(p, "use"); return; }
     }
@@ -143,7 +149,7 @@ export function updatePlayer(dt: number) {
     if (inputs.blockHeld && !tired && !calm && p.state === "idle") { setState(p, "block"); p.blockStart = g.gameTime; }
     if ((!inputs.blockHeld || tired || calm) && p.state === "block") setState(p, "idle");
   }
-  const walk = p.stats.moveSpeed;
+  const walk = p.stats.moveSpeed * (hunt.aiming ? ARCHERY.aimMoveScale : 1);
   // Puhuessa voi kävellä hitaasti; tartuntaan pysähdytään.
   const speed = p.state === "idle" ? walk : p.state === "talk" ? walk * 0.5 : p.state === "block" || p.state === "windup" || p.state === "recovery" ? walk * COMBAT.guardMoveScale : 0;
   if (speed > 0) moveActor(p, move, speed, dt);

@@ -27,6 +27,7 @@ import { worldRuntime } from "./store";
 import { updateSceneItemFocus } from "./sceneItems";
 import { closeDialogue, dialogueOpen } from "./dialogue";
 import { updateExit } from "./exit";
+import { hunt, rebindHeroBow, updateHunt, updateHuntVisuals } from "./hunt";
 
 export function onPlayerDeath() {
   g.gameOver = true;
@@ -42,6 +43,7 @@ function resetField() {
   for (const d of g.debris) d.dispose();
   g.debris.length = 0;
   spawnHero();
+  rebindHeroBow();
   aim.yaw = 0;
   aim.pitch = 0;
   g.songPower = 0;
@@ -113,6 +115,7 @@ export function simulate(realDt: number) {
     updateSong();
     updatePlayer(dt);
     updateCombatant(g.player, dt);
+    updateHunt(dt);
     // Kopio listasta: kesken kierroksen kaatunut vastustaja poistuu elävien listalta.
     for (const e of [...g.enemies]) {
       if (e.state === "dead") continue;
@@ -152,8 +155,9 @@ export function simulate(realDt: number) {
   updateSparks(dt);
   fx.shake = Math.max(0, fx.shake - realDt * 1.2);
   if (freeCam.active) stepFreeCam(freeCam.cam, (code) => keys.has(code), realDt);
+  updateHuntVisuals();
   updateCamera(realDt);
-  updateSceneItemFocus(g.running && !paused && !choosing && !dialogueOpen && songState === null && !freeCam.active && !g.gameOver && heroAtPeace());
+  updateSceneItemFocus(g.running && !paused && !choosing && !dialogueOpen && songState === null && !freeCam.active && !g.gameOver && heroAtPeace() && !hunt.aiming);
   updateHud();
 
 
@@ -161,7 +165,7 @@ export function simulate(realDt: number) {
 
   inputs.strikeQueued = null;
   inputs.useQueued = false;
-  inputs.dodgeQueued = inputs.songQueued = inputs.beatQueued = false;
+  inputs.dodgeQueued = inputs.songQueued = inputs.beatQueued = inputs.bowQueued = false;
   inputs.pickQueued = null;
 }
 

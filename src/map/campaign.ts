@@ -10,7 +10,7 @@ const LEGACY_INVENTORY_CAPACITY = 8;
 export const SATIETY_MAX = 100;
 
 export type PlayerGender = "male" | "female";
-export type FoodId = "barley_flatbread" | "dried_fish";
+export type FoodId = "barley_flatbread" | "dried_fish" | "hare_meat";
 export type EquipmentSlot = "head" | "torso" | "hands" | "legs" | "feet" | "mainHand" | "offHand";
 export type EquipmentItemId =
   | "iron_helmet"
@@ -44,6 +44,13 @@ export const ITEMS: Record<ItemId, ItemDefinition> = {
     nameKey: "map.item.driedFish",
     stackMax: 4,
     satietyGain: 38,
+  },
+  // Metsästyssaalis (jänis). Syötävä sellaisenaan, kunnes ruoanlaittoa on.
+  hare_meat: {
+    id: "hare_meat",
+    nameKey: "map.item.hareMeat",
+    stackMax: 4,
+    satietyGain: 30,
   },
   birch_bark_pack: {
     id: "birch_bark_pack",

@@ -5,6 +5,14 @@ import { aim, fx, g } from "./state";
 import { applyFreeCam, freeCam } from "./freecam";
 import { camera, world } from "./view";
 import { updateFoliageFade } from "./foliageFade";
+import { aimCameraBlend, aimDirection } from "./hunt";
+import { ARCHERY } from "../hunt/archery";
+import { groundHeight } from "../world";
+
+/** Tähtäyskamera: oikean olan sivulle, olkapään korkeudelle ja näin kauas taakse (m). */
+const AIM_SIDE = 0.55;
+const AIM_UP = 1.76;
+const AIM_BACK = 2.6;
 
 // ---------- Katse ja lukitus ----------
 // Hiiri kääntää katsetta (camYaw, camPitch), ja sankari kääntyy katseen suuntaan omalla
@@ -41,6 +49,16 @@ export function updateCamera(dt: number) {
   const pitch = singing ? 0 : aim.pitch;
   const desired = g.player.pos.clone().addScaledVector(dir, -back * Math.cos(pitch)).addScaledVector(right, singing ? -1.6 : -1.3)
     .setY(g.player.pos.y + height + back * Math.sin(pitch));
+  // Jousella tähdätessä kamera on oikean olan yli ja katsoo tarkasti tähtäyssuuntaan (tähtäin = ruudun keskusta).
+  const bowAim = aimCameraBlend();
+  const aimDir = aimDirection(new THREE.Vector3());
+  if (bowAim > 0.001) {
+    const shoulder = g.player.pos.clone().addScaledVector(right, AIM_SIDE).setY(g.player.pos.y + AIM_UP);
+    const aimed = shoulder.addScaledVector(aimDir, -AIM_BACK);
+    // Ylös tähdätessä kamera laskeutuu: se ei saa painua maan alle.
+    aimed.y = Math.max(aimed.y, groundHeight(aimed.x, aimed.z) + 0.35);
+    desired.lerp(aimed, bowAim);
+  }
   world.clearCamera(desired);
   // Puiden rungot ja rakennukset: vedä kamera pivotista (sankarin pää) kohti sankaria, jos
   // väliin jää este. Pehmennetään puomin pituutta, ei sijaintia, jottei kamera heilu sivuun.
@@ -64,14 +82,21 @@ export function updateCamera(dt: number) {
   }
   const ahead = locked ? locked.pos : g.player.pos.clone().addScaledVector(dir, 3);
   const look = g.player.pos.clone().lerp(ahead, 0.6).setY(g.player.pos.y + 1.2);
-  camLook.lerp(look, 1 - Math.exp(-8 * dt));
+  if (bowAim > 0.001) {
+    // Tähtäyksessä katse ja paikka seuraavat hiirtä viiveettä: viive siirtäisi tähtäintä.
+    const aimLook = camPos.clone().addScaledVector(aimDir, 20);
+    look.lerp(aimLook, bowAim);
+    if (bowAim > 0.98) { camPos.copy(desired); camLook.copy(look); }
+    else { camPos.lerp(desired, 1 - Math.exp(-14 * dt)); camLook.lerp(look, 1 - Math.exp(-14 * dt)); }
+  } else camLook.lerp(look, 1 - Math.exp(-8 * dt));
   camera.position.copy(camPos);
   if (fx.shake > 0) {
     camera.position.x += (Math.random() - 0.5) * fx.shake;
     camera.position.y += (Math.random() - 0.5) * fx.shake;
   }
   camera.lookAt(camLook);
-  camera.fov += ((singing ? 46 : 55) - camera.fov) * (1 - Math.exp(-3 * dt));
+  const fov = singing ? 46 : 55 + (ARCHERY.aimFov - 55) * bowAim;
+  camera.fov += (fov - camera.fov) * (1 - Math.exp(-(bowAim > 0.001 ? 10 : 3) * dt));
   camera.updateProjectionMatrix();
   updateFoliageFade(camera, g.player.pos);
 }
