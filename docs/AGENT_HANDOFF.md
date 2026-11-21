@@ -6,13 +6,13 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `2b4653d`)
+Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `b8ac51e`)
 
-- **Koodiversio v06.00.00** branchissa `claude/scene-foundation` (tarkista merge-tila `git merge-base`illa).
-  Koodi valmis; ei deployattu eikä omistaja ole käsin testannut. Ajettu: `bun run test` 28 tiedostoa /
-  345 testiä, `bunx tsc --noEmit`, `bun run build` (3D-chunk 861 kt, gzip 235 kt) ja `git diff --check`
-  läpi. In-app-selaimen savutesti (paneeli piilossa, joten FPS ei mitattavissa): erämaa, aukio, ranta ja
-  piha renderöityvät ilman konsolivirheitä; erämaan itäinen polunsuu vie kartalle `exitDir: "e"`.
+- **Koodiversio v06.01.00** branchissa `codex/map-time-satiety` (tarkista merge-tila `git merge-base`illa).
+  Koodi valmis; ei deployattu eikä omistaja ole käsin testannut. Ajettu: `bun run test` 99 tiedostoa /
+  1173 testiä, `bunx tsc --noEmit`, `bun run lint`, `bun run build` (3D-chunk 861 kt, gzip 235 kt) ja
+  `git diff --check` läpi. Visuaalista savutestiä ei saatu: in-app-selain ei tavoittanut localhostia,
+  avoimen Chromen ohjausta ei hyväksytty ja erillinen headless-Chrome ei tuottanut kuvakaappausta.
 - **Kohtausmalli (`src/sceneLayout.ts`, puhdas).** Jokaisella kohtauksella on `SceneLayout`: kuljettava
   monikulmio `bounds`, taistelun `arena` (keskus + säde, vihollisten tulopaikat) ja polunsuut `exits`
   (portti, ulos-suunta, leveys, `mapDir`). Kuljettava alue = monikulmio TAI polunsuun käytävä (5 m sisään,
@@ -165,41 +165,11 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `2b4653d`)
 - **Vapaa kamera** (pause-valikko; `src/freecam.ts`, `engine/freecam.ts`): peli pysyy tauolla, Esc palaa.
 - **Debug:** `__game.gesture`, `findNamed`, `freeze()`/`step(n)`, `setCamera`, `placePlayer`. Monien
   muokkausten jälkeen dev-palvelimen moduulit voivat monistua: käynnistä uudelleen.
-- **Uusi paikka `lakeside` (Järven ranta)**, rauhallinen kohtaus
-  (`SCENE_KINDS`: friendly). Kartalla ruutu (9,6) niityn ja järven rajalla,
-  Esc-dialogin oikotie ja `?scene=lakeside`. `world.ts` rakentaa sen samalla
-  sijoittelulla kuin pihan: mökki `CABIN`, keittopaikka `LAKE_FIRE` (oma liekki
-  pienennettynä `fireScale` 0,62, höyry padasta, valo, kipinät), laituri
-  `JETTY`/`JETTY_AT`, vene `BOAT_AT`, kuivausteline, halkopino, ruovikko.
-  Mallit tulevat `lakeside.glb`:stä (BLENDER_HANDOFF).
-  - **Järvi.** `terrainHeight` sekoittaa maaston `lakeBed`iin
-    (`lakeMix`, rantaviiva `shoreZ(x)`, vesi `WATER_LEVEL` −0,42, järvi +z-
-    puolella). Lahti on kapea mökin kohdalla ja aukeaa laajaksi selkäväksi:
-    `bayHalf(d, puoli)` kasvattaa puolileveyttä etäisyyden mukaan, ja yli 125 m:n
-    päässä maa vajoaa veteen (`sea`). Maastoverkko on 360 m, vesitaso 1800 m,
-    kameran kantama 700 m. Vastaranta on kaksi matalaa harjua 330–480 m:n päässä
-    (`buildFarShore`, ei sumua, väri valmiiksi sekoitettu sumuun). Pelialue on edelleen
-    11 m:n säteellä (`ARENA_RADIUS`), loppu on vain maisemaa. `groundHeight` on kävelykorkeus: laiturin päällä sen kansi,
-    muualla sama kuin maasto. Vesi on yksi taso (`buildWater`, heijastava,
-    värähtelevä normaali); rantakaistan ja pohjan maa on tallattua. Vedessä ei
-    sijoiteta puita, kiviä eikä heinää (`wet()` ja `put`in `wetOk`).
-  - **Hävitetty ranta (`lakeruin`, v03.09.00).** `ArenaId`/`SCENE_IDS` sisältävät
-    `lakeruin`in (friendly, Esc-oikotie, aloitusvalikko; `?scene=lakeruin`). Sama
-    maailma kuin rannalla (`LAKE`), lisäksi `RUIN`-lippu `world.ts`:ssä:
-    `lakeruin.glb`:n `mokki_palanut`, `keittopaikka_sammunut`, `haasia_kaatunut`,
-    `verilammikko`, `verilammikko_pieni`; ei venettä, melaa, koiraa, liekkiä, valoa
-    (`buildFire` palauttaa sammuneen tulen), tulen vaara-aluetta eikä hirviöitä;
-    mökin kohdalla kytevä tumma savu; utuisempi sumu ja himmeämpi valo. Tietäjä
-    makaa selällään (`VillagerDef.lying`: hahmo kaadetaan -90° x:n ympäri, ei
-    elävää animaatiota), `RUIN_SAGE`/`RUIN_BODY` antavat paikan ja suunnan; sauva
-    makaa vieressä, veri rinnan kohdalla ja jälki mökin ovelta. Mökin törmäys on
-    sama laatikko kuin ehjällä mökillä (matalat seinät eivät ole kulkukelpoisia).
-  - **Törmäykset.** `addLakeColliders`: rannan syvän veden reunalle 0,9 m
-    ruudukosta ympyröitä (sankari voi kahlata nilkkaan), laiturille reunalaidat
-    ja pääty. Mökki on `CABIN`-pohjana, vene ja istuinhirsi `PROP_COLLIDERS`ista.
-    Rantakohtauksen tulen vaara-alue on 0,45-kertainen: kivikehän vierestä ei pala.
-  - **Aloitus ja väki.** `SPAWN`: laiturin juurelta katse keittotulelle. Tietäjä sauvoineen tulella,
-    koira kiertää seisoo/istuu/`tassu` (ei kävelyleikettä). Kartalla `LAKESIDE_POSITION`, atlaksen (3,1).
+- **Järven rannat.** `lakeside` on kartan (9,6) rauhallinen mökki-, keittotuli-, laituri-, vene- ja
+  tietäjäkohtaus; `lakeruin` käyttää samaa maastoa mutta palaneita rakennuksia, kuollutta tietäjää ja
+  sammunutta tulta. Järvi jatkuu horisonttiin, vastaranta on sumuinen maisema ja syvä vesi estää kulun;
+  laiturilla voi kävellä. Tietäjä, koira, mökki, vene ja tuli törmäävät. Tarkat mallit ja mitat ovat
+  `BLENDER_HANDOFF.md`:ssä, sijoittelu ja maastosäännöt `world.ts`:ssä.
 - **Dev-palvelin työpuusta:** in-app-esikatselu lukee pääkansion `.claude/launch.json`in; työpuuta varten
   `bun --cwd=<työpuu> run dev --port 5174 --strictPort` (palauta launch.json, sulje lopuksi).
 - **Laulun tahmaus heikolla koneella:** CSS-suotimen siirto shaderiin (v05.00.01) on yhä vahvistamatta.
@@ -218,17 +188,16 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `2b4653d`)
   aiempaa maastoa (niitty, metsä, umpimetsä, suo, kallio ja vesi) sekä uusi
   joki. Kohderuudun `minuteCost` lisää maailmanaikaa; estynyt liike ei kuluta
   aikaa. Vesi ja joki ovat jalan kulkukelvottomia paitsi joen kivinen kahlaamo
-  (13,11), joka maksaa 20 aikayksikköä. `crossingId` on terrainista erillinen,
+  (13,11). `crossingId` on terrainista erillinen,
   joten myöhempi silta voi käyttää samaa sääntöä. Joki kiemurtelee keskisen
   järven etelälaidasta itäiseen ulkoveteen. Kiinteät paikat: aloitus (10,14),
   punainen käsi (13,14), rantamökki (9,6), kalmisto (16,16); pihat ovat instansseja.
-- **Aika ja kylläisyys.** Erillistä karttavoimaa ei ole. Tallennuksen
-  `worldMinutes` on nyt pelaajalta piilotettu tausta-aika: maastokustannukset
-  ja kylläisyyden kulumisnopeus 0,05 / yksikkö säilyivät ennallaan. Yksi
-  kuunkierto on 180 yksikköä ja 28 pelipäivää; kuun kuva näyttää kierron
-  kahdeksan vaihetta. Ensimmäisellä kierrolla UI näyttää ”Päivä x” ja sen
-  jälkeen ”Kuu x, päivä y”. Tavallinen liike ei tulosta siirron aikakustannusta.
-  Kylläisyys 100 = kylläinen ja 0 = nääntynyt; arvo ei tapa tai estä liikkumista.
+- **Aika ja kylläisyys.** Erillistä karttavoimaa ei ole. Piilotettu `worldMinutes` sallii päivän
+  murto-osat; vanhojen tallennusten jo kertynyt aika, 180 yksikön kuunkierto ja 28 päivää säilyvät.
+  Kohderuudun kulku: niitty 1/6 päivää, metsä 1/4, umpimetsä 1/3, kallio 1/2, suo 0,7 ja kahlaamo
+  0,4 päivää. Kylläisyys vähenee 3,6 pistettä päivässä (niittyliike 0,6); 100 → 0 kestää noin 28
+  päivää ilman ruokaa. Arvo ei tapa tai estä liikkumista. Kuun kuva näyttää kahdeksan vaihetta;
+  tavallinen liike ei näytä kustannusta.
   Viisi numerotonta kasvokuvaa:
   80–100 oikein kylläinen, 60–alle 80 kylläinen, 40–alle 60 puolivatsainen,
   yli 20–alle 40 nälkäinen, 0–20 nääntynyt.
@@ -261,11 +230,9 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `2b4653d`)
 - **UI ja kielituki.** Kartan pellavapohja, kirjontakehykset, paperinukke,
   kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
   tyypitetyissä FI/EN-sanakirjoissa.
-- **Tarkistukset 2026-11-21 (v05.00.00):** `bun run test` (27 tiedostoa, 320 testiä),
+- **Tarkistukset 2026-11-21 (v06.01.00):** `bun run test` (99 tiedostoa, 1173 testiä),
   `bunx tsc --noEmit`, `bun run lint`, `bun run build` ja `git diff --check` läpäisty. Build
-  varoittaa vain suuresta 3D-chunkista (840 kt, gzip 227 kt). GLB-tarkistus löysi kaikki mies- ja
-  naissankarin modulaariset solmut sekä `sword_sky_iron`in; Node-ympäristön tekstuurivaroitukset
-  eivät koske selaimen Vite-latausta.
+  varoittaa vain suuresta 3D-chunkista (861 kt, gzip 235 kt).
 - **Riippuvuustarkistus:** 2026-11-20: ei mitään odottamassa. `bun audit` on puhdas ja
   `bun outdated --no-cache` ei listaa paketteja.
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
@@ -273,13 +240,14 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `2b4653d`)
 
 ## Tunnetut rajoitteet ja riskit
 
-- Maastokustannukset, kylläisyyden kulumisnopeus, ruokien arvot, 50/0-rajat
-  ja 20/40-rangaistukset ovat omistajan ensimmäinen päätös, eivät vielä
-  laajasti pelitestattua tasapainoa.
+- Uusi karttavauhti ja 3,6 kylläisyyspistettä/päivä eivät ole vielä pelitestattuja. Suon 0,7 päivän
+  ja kahlaamon 0,4 päivän hinnat säilyttävät niiden vanhan suhteen kallioon, eivät ole omistajan
+  erikseen päättämiä. Ruokien arvot sekä 50/0-rajat ja 20/40-rangaistukset jäivät ennalleen.
 - Prototyyppikartta on käsin tehty; vain pihojen paikat ja jousineidon talo
   arvotaan. Tallennettu piha jää paikalleen, vaikka Codex muuttaisi karttamaastoa
   myöhemmin: jos pihan ruutu muuttuu kulkukelvottomaksi, sille ei ole korjausta.
-  Sijoitteluluvut (etäisyydet, 150 min) ovat arvio; löydettävyys selviää pelaamalla.
+  Sijoitteluluvut (etäisyydet, 150 aikayksikköä) ovat arvio; nopeampi matkanteko tekee aikarajasta
+  aiempaa väljemmän, joten löydettävyys selviää pelaamalla.
 - Liikkuvien ja väliaikaisten kohtaamisten luokitus sekä piirron piilotussääntö
   ovat valmiina, mutta niiden instanssilistaa, liikeratoja tai poistumistiloja
   ei ole vielä toteutettu.
@@ -326,8 +294,8 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `2b4653d`)
 ## Seuraava tehtävä
 
 Omistaja testaa v06:n peliläppärillä (selain GTX:llä, laturissa): erämaa, aukio ja ranta, FPS oikeasta
-alakulmasta, polunsuusta poistuminen kartan kautta, kamera ja lehvästö metsässä. Palautteen mukaan joko
-laatuasetus (jos FPS < 60) tai metsästysvaiheen suunnittelu (jousi, nuolet, jänis).
+alakulmasta, polunsuusta poistuminen kartan kautta, kamera ja lehvästö metsässä sekä kartalla päivä- ja
+kylläisyysrytmi eri maastoissa. Palautteen mukaan säädetään ensin suorituskykyä tai matkatasapainoa.
 
 ## Ei vielä aloiteta
 

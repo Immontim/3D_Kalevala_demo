@@ -556,7 +556,7 @@ function validLegacyWorld(value: unknown): value is ParsedCampaignWorld {
   const { width, height, x, y, worldMinutes, discovered } = value;
   if (!integerBetween(width, 1, 512) || !integerBetween(height, 1, 512)) return false;
   if (!integerBetween(x, 0, width - 1) || !integerBetween(y, 0, height - 1)) return false;
-  if (!Number.isInteger(worldMinutes) || (worldMinutes as number) < 0) return false;
+  if (typeof worldMinutes !== "number" || !Number.isFinite(worldMinutes) || worldMinutes < 0) return false;
   return Array.isArray(discovered)
     && discovered.length === width * height
     && discovered.every((cell) => typeof cell === "boolean");

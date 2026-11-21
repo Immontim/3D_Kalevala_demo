@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { WORLD_MINUTES_PER_DAY } from "./uiState";
 import {
   MAP_HEIGHT,
   MAP_RULES,
@@ -35,6 +36,15 @@ describe("maailmankartan määrittely", () => {
       expect(terrain.minuteCost).toBeGreaterThanOrEqual(0);
       expect(typeof terrain.passable).toBe("boolean");
     }
+  });
+
+  it("skaalaa kulun päivän murto-osiin maaston mukaan", () => {
+    expect(TERRAINS.meadow.minuteCost * 6).toBeCloseTo(WORLD_MINUTES_PER_DAY);
+    expect(TERRAINS.forest.minuteCost * 4).toBeCloseTo(WORLD_MINUTES_PER_DAY);
+    expect(TERRAINS.deepForest.minuteCost * 3).toBeCloseTo(WORLD_MINUTES_PER_DAY);
+    expect(TERRAINS.rock.minuteCost * 2).toBeCloseTo(WORLD_MINUTES_PER_DAY);
+    expect(TERRAINS.bog.minuteCost).toBeCloseTo(WORLD_MINUTES_PER_DAY * 0.7);
+    expect(CROSSINGS.ford.minuteCost).toBeCloseTo(WORLD_MINUTES_PER_DAY * 0.4);
   });
 
   it("hylkää vääränkokoisen kartan", () => {
@@ -103,7 +113,19 @@ describe("karttaliike, aika ja kylläisyys", () => {
     const start = createWorldMapState(map, { x: 10, y: 10 }, { worldMinutes: 50, satiety: 88 });
     const result = moveOnMap(map, start, "right");
     expect(result).toMatchObject({ moved: true, minutesSpent: CROSSINGS.ford.minuteCost });
-    expect(result.state).toMatchObject({ x: 11, y: 10, worldMinutes: 70, satiety: 87 });
+    expect(result.state).toMatchObject({ x: 11, y: 10 });
+    expect(result.state.worldMinutes).toBeCloseTo(50 + WORLD_MINUTES_PER_DAY * 0.4);
+    expect(result.state.satiety).toBeCloseTo(88 - 1.44);
+  });
+
+  it("kuusi niittyliikettä kuluttaa päivän ja 3,6 kylläisyyspistettä", () => {
+    const map = mapWith();
+    let state = createWorldMapState(map, { x: 10, y: 10 });
+    for (const direction of ["right", "left", "right", "left", "right", "left"] as const) {
+      state = moveOnMap(map, state, direction).state;
+    }
+    expect(state.worldMinutes).toBeCloseTo(WORLD_MINUTES_PER_DAY);
+    expect(state.satiety).toBeCloseTo(96.4);
   });
 
   it("kohdetiilin aika kasvattaa maailmanaikaa ja vähentää kylläisyyttä", () => {

@@ -3,7 +3,9 @@ export type SatietyBand = (typeof SATIETY_BANDS)[number];
 
 export const WORLD_MINUTES_PER_MOON = 180;
 export const DAYS_PER_MOON = 28;
+export const WORLD_MINUTES_PER_DAY = WORLD_MINUTES_PER_MOON / DAYS_PER_MOON;
 export const MOON_PHASES = 8;
+const CALENDAR_EPSILON = 1e-9;
 
 export interface MapCalendarTime {
   /** Täysinä kuluneet kuunkierrot; ensimmäisen kierron aikana 0. */
@@ -32,18 +34,21 @@ export function mapCellVisibility(
 /** Kuinka mones pelipäivä on menossa tausta-ajan kohdalla (ensimmäinen päivä = 1); koko matkan päivät yhteensä. */
 export function totalDays(worldMinutes: number): number {
   const time = Math.max(0, Number.isFinite(worldMinutes) ? worldMinutes : 0);
-  return Math.floor(time * DAYS_PER_MOON / WORLD_MINUTES_PER_MOON) + 1;
+  return Math.floor(time / WORLD_MINUTES_PER_DAY + CALENDAR_EPSILON) + 1;
 }
 
 /** Muuntaa tallennuksen tausta-ajan pelilliseksi kuuksi ja päiväksi. */
 export function mapCalendarTime(worldMinutes: number): MapCalendarTime {
   const time = Math.max(0, Number.isFinite(worldMinutes) ? worldMinutes : 0);
-  const moon = Math.floor(time / WORLD_MINUTES_PER_MOON);
-  const withinMoon = time % WORLD_MINUTES_PER_MOON;
+  const elapsedDays = totalDays(time) - 1;
+  const moon = Math.floor(elapsedDays / DAYS_PER_MOON);
+  const day = elapsedDays % DAYS_PER_MOON + 1;
+  const withinMoon = Math.max(0, time - moon * WORLD_MINUTES_PER_MOON);
+  const phase = Math.floor(withinMoon * MOON_PHASES / WORLD_MINUTES_PER_MOON);
   return {
     moon,
-    day: Math.floor(withinMoon * DAYS_PER_MOON / WORLD_MINUTES_PER_MOON) + 1,
-    phase: Math.floor(withinMoon * MOON_PHASES / WORLD_MINUTES_PER_MOON),
+    day,
+    phase: Math.max(0, Math.min(MOON_PHASES - 1, phase)),
   };
 }
 
