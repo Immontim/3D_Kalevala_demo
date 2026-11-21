@@ -27,6 +27,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; col
 #crosshair i:nth-child(4) { left: var(--spread); }
 #crosshair b { position: absolute; left: -2px; top: -2px; width: 4px; height: 4px; border-radius: 50%; background: rgba(243, 221, 176, 0.95); box-shadow: 0 0 2px #17100b; }
 #crosshair.full i, #crosshair.full b { background: #ffd27a; }
+#crosshair.hidden, #huntHud.hidden { display: none; }
 #huntHud { position: absolute; right: 18px; bottom: 44px; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; color: #f3ddb0; font-size: 15px; text-shadow: 0 1px 3px #17100b, 0 0 5px #17100b; }
 #gazeFocus.theft #gazeDot { border-color: #e88d72; background: rgba(146, 50, 32, 0.75); box-shadow: 0 0 7px rgba(216, 83, 54, 0.72); }
 #gazeFocus.theft #gazePrompt { border-color: rgba(161, 66, 43, 0.9); color: #ffd1bd; }

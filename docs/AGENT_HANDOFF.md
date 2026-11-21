@@ -6,14 +6,13 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `ea47761`)
+Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `7d2f55c`)
 
-- **Koodiversio v06.06.00** branchissa `claude/hunting-grounds` (tarkista merge-tila `git merge-base`illa).
-  Koodi valmis, ei deployattu, omistaja ei ole käsin testannut. Claude testasi in-app-selaimessa uudella
-  matkalla (`__map.move`/`enterSite`): 4 apajaa, ei tunnettuja; apaja näkyi vasta viistosti viereisestä
-  ruudusta, sisään meno poisti sen tallennuksesta, erämaassa 9 jänistä (1 suo, 2 paloaukea), päivänä 20
-  syntyi piilossa oleva `hunt-c1`. Konsoli puhdas. `bun run test` (404/404), `bunx tsc --noEmit`,
-  `bun run lint`, `bun run build` läpi. FPS:ää ei mitattu (enintään 2 jänistä lisää, 3 meshiä kukin).
+- **Koodiversio v06.06.01** branchissa `claude/peaceful-crosshair` (tarkista merge-tila `git merge-base`illa).
+  Koodi valmis, ei deployattu, omistaja ei ole käsin testannut. Korjaus: `#crosshair.hidden` ja
+  `#huntHud.hidden` puuttuivat CSS:stä (yleistä `.hidden`-sääntöä ei ole), joten tähtäin näkyi kaikissa
+  kohtauksissa. In-app-selaimessa: pihalla tähtäin ja laskuri piilossa, erämaassa tähtäin näkyy vain
+  tähdätessä. v06.06:n apajat on mergattu (#81); omistajan karttatesti on yhä tekemättä.
 - **Metsästysapajat (v06.06, `map/huntGrounds.ts` puhdas).** Apaja on `SiteInstance` `kind: "hunt"`
   (`sites.ts` → `wilds`, `lifetime: "temporary"`). `CampaignWorld.huntCycle` = viimeisin käsitelty 20 päivän
   jakso; −1 (vanha tallennus) → `ensureHuntGrounds` arpoo 3–6 alkuapajaa kerran (`newCampaign` ja
