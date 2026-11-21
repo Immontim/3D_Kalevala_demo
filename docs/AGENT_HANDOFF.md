@@ -6,19 +6,44 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `8fc9397`)
+Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `2b4653d`)
 
-- **Koodiversio v05.00.02** branchissa `codex/pause-meter-lock`. Koodi valmis; ei deployattu eikä
-  omistaja ole käsin testannut. Ajettu: `bun run test` 1119/1119, `bunx tsc --noEmit`, `bun run lint` ja
-  `bun run build` läpi. Headless-Chromen savutesti clearingissä 1920×1080: ei konsolivirheitä;
-  in-app-selain ei tavoittanut localhostia ja olemassa olevan Chromen ohjausta ei hyväksytty.
-- **Taukomenu ja mittarit.** ESC avaa mittarit aina lukittuina ilman siirtokehyksiä taukodialogin ja
-  tummennuksen alla. `Vapauta mittarit` / `Lukitse mittarit` -nappi vaihtaa `#hud.arrange`-tilan;
-  vain vapautettuja mittareita voi raahata. Paikat tallentuvat entiseen `meters.v1`-avaimeen,
-  lukitus ei muuta niitä, ja napit pysyvät mittarikerroksen päällä klikattavina.
-- **Lehvästö ja laulun ilme.** `prepareMaterials` palauttaa BLEND-lehvästölle `depthWrite = true`n.
-  Laulun haalistus ja vinjetti ovat `engine/view.ts`:n grade-shaderissa 0,4 s siirtymällä; vanha
-  koko ruudun CSS-suodin poistettiin heikomman läppärin tahmausriskin vuoksi (ei vielä vahvistettu).
+- **Koodiversio v06.00.00** branchissa `claude/scene-foundation` (tarkista merge-tila `git merge-base`illa).
+  Koodi valmis; ei deployattu eikä omistaja ole käsin testannut. Ajettu: `bun run test` 28 tiedostoa /
+  345 testiä, `bunx tsc --noEmit`, `bun run build` (3D-chunk 861 kt, gzip 235 kt) ja `git diff --check`
+  läpi. In-app-selaimen savutesti (paneeli piilossa, joten FPS ei mitattavissa): erämaa, aukio, ranta ja
+  piha renderöityvät ilman konsolivirheitä; erämaan itäinen polunsuu vie kartalle `exitDir: "e"`.
+- **Kohtausmalli (`src/sceneLayout.ts`, puhdas).** Jokaisella kohtauksella on `SceneLayout`: kuljettava
+  monikulmio `bounds`, taistelun `arena` (keskus + säde, vihollisten tulopaikat) ja polunsuut `exits`
+  (portti, ulos-suunta, leveys, `mapDir`). Kuljettava alue = monikulmio TAI polunsuun käytävä (5 m sisään,
+  4 m ulos portista). `clampToWalkable` korvasi `ARENA_RADIUS`-ympyrän `melee.ts`:ssä ja `skirmish.ts`:ssä
+  (`ARENA_RADIUS` on yhä `world.ts`:ssä vanhan sijoittelun säteenä). Vanhat kohtaukset ovat 11 m:n
+  ympyröitä, joissa on yksi polunsuu (aukio etelä, pihat portista, rannat ja kalmisto maan puolelle).
+  Konventio: 3D:n −z = pohjoinen, +x = itä.
+- **Polunsuusta poistuminen (`src/engine/exit.ts`).** Portin ylitys aloittaa 1 s:n mustan häivytyksen
+  (`#exitFade`), jonka aikana peli jatkuu (vihollinen voi lyödä; kuolema tai käytävästä palaaminen
+  peruu). Lopuksi `?return=map`-reitillä `createEmptySceneReturn(scene, mapDir)` ja kartalle; muuten
+  aloitusvalikkoon. Kartta (`initMap`) ottaa `exitDir`in ja astuu yhden ruudun siihen suuntaan `move()`lla
+  (estetty askel ei tee mitään). Vihje "Polku vie pois" alle 6 m:n päässä portista. `__game.exitState()`.
+- **Metsä (`src/forest.ts`).** Kaikki puut piirtää `Forest`: alle `nearR`:n täysi malli varjoineen,
+  kauempana `forest_lod.glb`:n kaukopuu; vaihto 5–6 m:n kaistalla vastakkaisilla Bayer-pikselikuvioilla
+  (`aFade`-attribuutti, kloonatut materiaalit). Lista kootaan, kun pelaaja liikkuu 0,8 m. Aukioilla
+  `nearR` 48 (reunametsä pysyy täytenä), erämaassa 38 ja `farR` 135 (sumu). Kaukopuiden sävy korjataan
+  `LOD_TINT`illä ja `M_BarkLOD` × 0,62 (BLENDER_HANDOFF). Horisonttisuikaleet (`metsaseina`): aukioilla
+  kehä 84 m (rannoilla vain maan puolella), erämaassa neliö ±178 m. Varjokamera ja taivaspallo seuraavat
+  pelaajaa/kameraa (varjo napsautetaan tekseleihin). Konsoli: `__world.forest`, `__world.forestNear(r)`,
+  `__game.drawLoad()`, `__game.ground(x, z)`.
+- **Kamera metsässä.** `CollisionWorld.firstCameraHit` + `blocksCamera` (puut, kota, karsikko, juurakko,
+  rakennukset): kamera vetäytyy rungon eteen heti ja palaa hitaasti. `engine/foliageFade.ts`: lehvästö
+  häipyy kuvioiden alle 2,2 m:n päässä kamerasta ja harvenee 80 % kameran ja sankarin rinnan välisellä
+  kapselilla (säde 0,9 m). Varjot pysyvät umpinaisina.
+- **Erämaa `wilds` (friendly, Esc-oikotie, aloitusvalikko, `?scene=wilds`; ei karttapaikkaa).** 200 × 200 m:n
+  kuljettava alue (34-kärkinen monikulmio ±97 m), polunsuut pohjoinen (14, −97), itä (97, 18) ja etelä
+  (−36, 97). Maasto 380 m (`wildsHeight`: moreenikumpareet, suoniitty `bogMix` keskellä tasoitettuna,
+  paloaukea `burnMix` (52, −40) hiiltyneellä maalla). ~4 900 puuta (myös 70 m rajan yli), reunalla tiheä
+  nuori kuusikko, lohkareet ja juurakot; polut puuttomia 3,6 m. Kivet, kelot ja juurakot piirretään alle
+  60 m:n päähän (`Forest` ilman kaukomallia). Aluskasvillisuus `ScatterField`illa 12 m:n ruutuina 34 m:n
+  säteellä, reunalla häivytys. Piirtokuorma alussa ~0,96 milj. kolmiota (ranta nyt 0,92, ennen 1,26).
 - **Paperinukke ja inventaario.** Skeema 6, avain `laulun-miekka.campaign.v6`, 12 tavarapaikkaa ja
   seitsemän varustepaikkaa. Kartta ja 3D:n pause käyttävät samaa `ui/inventoryView.ts`-näkymää.
   Rauhassa varusteita voi vaihtaa ja ruokaa syödä; taistelussa näkymä on vain luettavissa.
@@ -39,13 +64,9 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `8fc9397`)
   `totalDays(worldMinutes)` ja `win.explored` %) -> `mapUrl`. Kaatuminen: `onPlayerDeath` ->
   `player.died` -> `player.deaths`-laskuri. Debug: `__game.killEnemies()`, `skipTo(1..5)`.
   Alkuperäiset `groupSize`/`WAVES.hpPerWave` jäivät `combat.ts`:ään käyttämättöminä (testit).
-- **Loppuruutu** (`map/ending.ts` puhdas `endingSummary`/`shouldShowEnding`; `map/app.ts` `#mapEnding`,
-  CSS `.ending-card`: pellavapohja, kaksoiskehys ja punasininen kirjontanauha): näkyy kartalla
-  voiton jälkeen kerran. Tilasto: pelipäivät (+ kuunkierrot), tutkittu kartta %, opitut laulut x/3,
-  kukistetut 9, kaatumiset (tai "et kaatunut kertaakaan"), luvattomat otot (tai "et ottanut mitään
-  luvatta") ja sivupolut (huhu, Louhi, jousineito, taivaanrautamiekka ✓/–). "Jatka vaellusta"
-  asettaa `campaign.endSeen` (Esc sama), "Aloita uusi matka" nollaa kampanjan; asetuksissa
-  "Katso loppuruutu". Päivät ja kartta jäädytetään voiton hetkeen.
+- **Loppuruutu** (`map/ending.ts` puhdas, `map/app.ts` `#mapEnding`): näkyy kartalla voiton jälkeen kerran
+  (päivät, tutkittu %, laulut, kukistetut, kaatumiset, luvattomat otot, sivupolut); "Jatka vaellusta"
+  asettaa `campaign.endSeen`, asetuksista voi katsoa uudelleen. Päivät ja kartta jäädytetään voittoon.
 - **V6 ja leirin arvonta (mergattu).** Leiri on instanssi `camp` (`placement.ts` `CAMP_PLACEMENT`: reunakaista,
   >= 8 ruutua aloituksesta, <= 600 min, lukossa lipulla `louhi.banished`). Jousineito makaa `archer`-pihassa;
   parannuslaulu rauhassa (`SongDef.peaceTargets`) -> `archer.healed` + `setNpcState` -> seisoo; dialogista
@@ -132,55 +153,18 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `8fc9397`)
   (kävely, kädet ylös) sekä `Encounter`, joka vaihtaa `cairnfieldVisit`in taisteluun.
   `ARENA_RADIUS` 11 m kattaa kuppikiven ja neljä röykkiötä; karsikko ja Louhi ovat
   sen ulkopuolella.
-- **Rauhan kävely ja eleet** (`src/fighter.ts`, `src/interact.ts`,
-  `src/engine/{hero,melee,animate}.ts`). `POSES.rest` on rennompi (kädet
-  hieman irti vartalosta, kyynärpää taipuu); `apply()` heiluttaa käsiä
-  vastakkaisen jalan tahtiin, kun `relax` on 1 (target `rest`/`restSpear`,
-  vakiot `GAIT.armSwing*`). Rauhassa (`heroAtPeace`) iskunappi käynnistää
-  tilan `talk` ja torjuntanappi tilan `use` (`ActionState`; `inputs.useQueued`
-  asetetaan torjuntanapin painalluksesta). Eleet ovat `gesturePose()`
-  -avainkehyksiä (`GESTURE_TIME` kestot), vaikutus ratkeaa `effectAt`-hetkellä
-  `gestureEffect`issä: puhe etsii `pickTarget`illa kohteen `TALK_ZONE`sta
-  (= miekan kevyt sivallus, 2,3 m / ±60°) ja näyttää nimen; käyttö ratkaisee
-  `sceneItems.ts`:ssä painallushetkellä lukitun maailmanesineen. Puhuteltava väki rekisteröidään
-  `world.ts`:n `solid()`ista (`addTalkable`). Puhuessa liike 50 %, tartunnassa 0;
-  vastustajan ilmestyminen keskeyttää eleen. Keihäsmies kantaa keihästä
-  `restSpear`-otteessa (vasen käsi vapaa, `spearLeftW`) ja vilkuttaa vasemmalla.
-- **Naissankari 3D:ssä.** `scene3d.ts` asettaa `PLAYER_LOOK.female` kampanjan
-  sukupuolesta. `Fighter.build` ottaa vartalon, huotran
-  (`char_jousineito_huotra`), kantohihnan (`char_jousineito_hihna`) ja
-  kiinnityspisteet (`mount_huotra_f`, `mount_kilpi_selka_f`) `villagers_f.glb`:stä
-  (`char_jousineito`, jousi pois) sekä varusteet ja kypärän `characters.glb`:stä;
-  kypärä siirretään luurankojen lepoasentojen erotuksen verran
-  (`attachFemaleGear`, kutsutaan ennen kuin klooni liitetään `body`yn; kypärä on
-  pääluun lapsi paikallisilla matriiseilla). **Avoin:** omistaja näki naishahmolla
-  leijuvan mustan kypärän aloitusvalikon aikana (Chrome ja Edge, ei miehellä);
-  syytä ei saatu toistumaan, v03.05.01 korjaa kypärän kiinnityksen mutta ei ole
-  vahvistettu hänen selaimessaan. Keihään otteessa käytetään naisen arvioitua kanavaa
-  (`GRIP_CHANNEL_F`). Ei skaalausta (nainen miehen mittainen). Ulkonäkö, eleet,
-  huotra ja hihna katsottu rannalla ja pihalla (rauha, miekkaisku); keihästä
-  ja ilman kilpeä -asetta naisella ei ole katsottu.
-- **Sormet.** Kaikilla luurangoilla on sormiluut `finger1..3_L/R` (nyrkki on
-  lepoasento). `Fighter.applyFingers` kiertää ne auki paikallisen Z-akselin
-  ympäri (`FINGER_OPEN` rystys/keski/kärki 1,25/1,5/0,9 rad × avaus 0..1,
-  `handOpen`): rauhassa 0,7, eleissä 0,9, taistelussa asekäsi 0 ja kilpikäsi 0
-  (kilvetön miekka 0,35); keihäsmiehen oikea käsi on aina nyrkissä. Kyläläiset
-  (`folk.ts`) avaavat vapaan käden 0,7:ään, esinettä pitävä käsi pysyy nyrkissä.
-  Peukalolla ei ole luuta. Katkenneet ranteet olivat hihamallin vika
-  (BLENDER_HANDOFF), ei animaation.
-- **Vapaa kamera** (pause-valikon nappi, `src/freecam.ts` puhdas liike + testit,
-  `src/engine/freecam.ts` tila, `enterFreeCam`/`exitFreeCam` `loop.ts`:ssä): peli
-  pysyy `paused`-tilassa, `body.freecam` piilottaa pelin käyttöliittymän,
-  `updateCamera` käyttää vapaata kameraa, Esc tai hiiren lukon vapautus palaa
-  valikkoon (`pausedAt` päivitetään, ettei Esc jatka peliä). Konsolin
-  `__game.setCamera` on erillinen ohjelmallinen kamera.
-- **Debug:** `__game.gesture("talk"|"use")` laukaisee eleen, `__game.findNamed("hand_R")`
-  antaa solmujen paikat (kameran kohdistukseen `setCamera`lla), `__game.freeze()`
-  pysäyttää pelin ajan ja `__game.step(n)` etenee
-  n ruutua (kuvakaappaukset tarkasta hetkestä; kuvakaappaus voi laahata
-  sekunnin). Dev-palvelimen moduulit voivat monistua monien muokkausten
-  jälkeen (varusteet eivät vaihdu): käynnistä palvelin uudelleen. 3D lukee
-  varusteet ja sukupuolen kampanjatallennuksesta (`laulun-miekka.campaign.v5`).
+- **Rauhan kävely ja eleet** (`fighter.ts`, `interact.ts`, `engine/{hero,melee,animate}.ts`): rauhassa
+  (`heroAtPeace`) iskunappi = `talk`, torjuntanappi = `use`; eleet ovat `gesturePose()`-avainkehyksiä ja
+  vaikutus ratkeaa `gestureEffect`issä (`TALK_ZONE` 2,3 m / ±60°). Puhuteltava väki `world.ts`:n `solid()`ista.
+- **Naissankari 3D:ssä.** `PLAYER_LOOK.female` kampanjasta; `Fighter.build` ottaa vartalon, huotran ja
+  hihnan `villagers_f.glb`:stä (`char_jousineito`) ja varusteet `characters.glb`:stä (`attachFemaleGear`).
+  **Avoin:** omistajan näkemä leijuva musta kypärä aloitusvalikossa (Chrome/Edge) ei toistunut;
+  v03.05.01:n korjaus vahvistamatta. Keihästä ja kilvetöntä asetta naisella ei ole katsottu.
+- **Sormet.** Luurangoissa `finger1..3_L/R`; `Fighter.applyFingers` (`FINGER_OPEN`, `handOpen`): rauha 0,7,
+  eleet 0,9, taistelussa nyrkki (kilvetön miekka 0,35).
+- **Vapaa kamera** (pause-valikko; `src/freecam.ts`, `engine/freecam.ts`): peli pysyy tauolla, Esc palaa.
+- **Debug:** `__game.gesture`, `findNamed`, `freeze()`/`step(n)`, `setCamera`, `placePlayer`. Monien
+  muokkausten jälkeen dev-palvelimen moduulit voivat monistua: käynnistä uudelleen.
 - **Uusi paikka `lakeside` (Järven ranta)**, rauhallinen kohtaus
   (`SCENE_KINDS`: friendly). Kartalla ruutu (9,6) niityn ja järven rajalla,
   Esc-dialogin oikotie ja `?scene=lakeside`. `world.ts` rakentaa sen samalla
@@ -214,15 +198,11 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `8fc9397`)
     ruudukosta ympyröitä (sankari voi kahlata nilkkaan), laiturille reunalaidat
     ja pääty. Mökki on `CABIN`-pohjana, vene ja istuinhirsi `PROP_COLLIDERS`ista.
     Rantakohtauksen tulen vaara-alue on 0,45-kertainen: kivikehän vierestä ei pala.
-  - **Aloituspaikka.** `SPAWN` (`world.ts`) ja `spawnHero`: rannalla sankari
-    alkaa laiturin juurelta katsomaan keittotulta, muualla ennallaan (0,−3).
-  - **Väki.** Tietäjä sauvoineen seisoo tulen vieressä, koira kiertää
-    seisoo/istuu/`tassu`. Koiralla ei ole kävelyleikettä (lähde: vain
-    play_dead, rollover, shake, sitting, standing), joten se ei käyskentele.
-    Pihan koiralla tassu on nyt myös kierrossa.
-  - **Kartta.** `LAKESIDE_POSITION`, atlaksen ruutu (3,1) (kalliomaalausikoni:
-    mökki, tietäjä, koira, aallot; piirretty koodilla PIL:llä, ei ImageGen).
-- **Dev-palvelin työpuusta:** `bun run dev --port 5174 --strictPort`; sulje lopuksi.
+  - **Aloitus ja väki.** `SPAWN`: laiturin juurelta katse keittotulelle. Tietäjä sauvoineen tulella,
+    koira kiertää seisoo/istuu/`tassu` (ei kävelyleikettä). Kartalla `LAKESIDE_POSITION`, atlaksen (3,1).
+- **Dev-palvelin työpuusta:** in-app-esikatselu lukee pääkansion `.claude/launch.json`in; työpuuta varten
+  `bun --cwd=<työpuu> run dev --port 5174 --strictPort` (palauta launch.json, sulje lopuksi).
+- **Laulun tahmaus heikolla koneella:** CSS-suotimen siirto shaderiin (v05.00.01) on yhä vahvistamatta.
 - **Sovellusrakenne.** URL ilman `scene`-parametria käynnistää 2D-kartan;
   `?scene=<id>&return=map` lataa dynaamisesti `src/scene3d.ts`:n ja Three.js-
   moottorin. Kartta ei pyydä GLB-tiedostoja eikä aja 3D-silmukkaa.
@@ -331,12 +311,13 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `8fc9397`)
 - Järven rannan vesi on yksinkertainen: ei rantavaahtoa, syvyysväriä eikä
   aaltoja laiturin kohdalla. Kaukorannalla ei ole kasvillisuutta kaukaa
   nähtynä; rantakohtauksen koira ei käyskentele (ei kävelyleikettä).
-- 3D-chunk on noin 829 kt; rantakohtauksessa 1,26 milj. kolmiota (puut 2–2,7 k kpl, ~400 puuta).
-  LOD-malleja tai laatuasetusta ei ole; 60 FPS on mitattu tehokoneella. Metsä on aukiokohtainen:
-  puut, varvut ja heinät sijoitetaan kehänä origon ympärille, kaikki instanssinipat piirretään aina
-  (`frustumCulled = false`), `@near`/`@far`-jako ja varjokamera (±34 m) ovat origon, eivät pelaajan,
-  mukaan. Kuljettavan alueen laajennus vaatii ruutujaon, etäisyys-LODin/impostorit, pelaajaa
-  seuraavat varjot ja kameran estekäsittelyn metsässä.
+- **FPS:ää ei ole mitattu v06:lla** (in-app-paneeli oli piilossa). Laatuasetusta ei ole (pikselitiheys,
+  MSAA 4×, hehku, 4096 px:n varjokartta). Vaihtokaistan pikselikuvio voi näkyä liikkeessä; kaukopuiden
+  sävy on pikselimittauksella viritetty arvio. Instanssinippuja ei rajata näkökentän mukaan (kaikki
+  etäisyyden sisällä piirretään). Aukioiden varvut ja heinät ovat yhä kiinteitä kehiä origon ympärillä.
+- Polunsuun käytävä ei katso kohtauksen omia esteitä (esim. pihan aita portin vieressä); polku on
+  piirretty vain maaston väriin. Viholliset eivät vielä pakene polunsuista. Pako ei muuta kampanjaa:
+  leiri jää kartalle ja aallot alkavat alusta.
 - Moottori on v0: ei ajastimia, `unless`-peruutusta eikä efektien ketjureaktioita.
   Tuntematon engine-versionumero luetaan sallivasti; semantiikkamuutos tarvitsee versionhaaran.
 - Rikkinäistä tallennetta ei kopioida talteen ennen korvaamista (ROADMAPin riski);
@@ -344,8 +325,9 @@ Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `8fc9397`)
 
 ## Seuraava tehtävä
 
-Suunnittele omistajan kanssa 3D-kohtausten kuljettavan alueen laajennus (myös metsään): tavoitekoko,
-metsän ruutujako ja LOD/impostorit, kamera metsässä. Ei toteutusta ennen omistajan hyväksymää suunnitelmaa.
+Omistaja testaa v06:n peliläppärillä (selain GTX:llä, laturissa): erämaa, aukio ja ranta, FPS oikeasta
+alakulmasta, polunsuusta poistuminen kartan kautta, kamera ja lehvästö metsässä. Palautteen mukaan joko
+laatuasetus (jos FPS < 60) tai metsästysvaiheen suunnittelu (jousi, nuolet, jänis).
 
 ## Ei vielä aloiteta
 
@@ -358,7 +340,9 @@ metsän ruutujako ja LOD/impostorit, kamera metsässä. Ei toteutusta ennen omis
 - 3D-kohtausten mount/dispose ilman sivun uudelleenlatausta.
 - Git LFS (omistajan päätös 2026-11-10: ei vielä).
 - Isojen skannattujen puiden lataus ja kevennys.
-- Metsän LOD, impostorit tai ruutujako ennen kuin laajennussuunnitelma on hyväksytty.
+- Metsästys (jousi, nuolet, nuoliviini, jänis), kylä/markkinat ja vihollisten pako ennen omistajan
+  v06-testiä.
+- Erämaan karttapaikka (karttagrafiikka on Codexin alaa); erämaa on toistaiseksi testikohtaus.
 - Aseiden laatuerot ja vahingon hajonta.
 
 ## Pysyvät päätökset
@@ -386,3 +370,9 @@ metsän ruutujako ja LOD/impostorit, kamera metsässä. Ei toteutusta ennen omis
 - Moottori: Three.js selaimessa; hostaus aluksi GitHub Pagesissa.
 - `bun.lock` vaatii Bun 1.4 tai uudemman. Kotikoneella Bun 1.4.4.
 - Laulun säkeet otetaan Kalevalasta (1849, vapaa käyttää).
+- 3D-kohtauksen kuljettava alue on enintään 200 × 200 m; maisema jatkuu rajan yli. Kohtauksesta poistutaan
+  polunsuista (ei koko reunalta); sankari (myöhemmin vihollisetkin) saa paeta kesken taistelun, ja
+  häivytyksen aikana vieressä oleva vihollinen voi vielä osua (2026-11-21).
+- Jousi on ensin metsästysase, myöhemmin myös taisteluun; nuolet ovat kohtauksessa rajattu resurssi
+  (alkuun nuoliviini, 15 nuolta), voidaan lykätä (2026-11-21).
+- Vertailukone on vanha peliläppäri (i5, 8 Gt, GTX 16 -sarja), ei työläppäri (2026-11-21).

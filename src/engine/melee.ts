@@ -5,7 +5,8 @@ import { FALLEN, GESTURE_TIME, Gesture } from "../fighter";
 import { t } from "../i18n";
 import { effectiveStats } from "../stats";
 import { TALKABLES, TALK_ZONE, pickTarget } from "../interact";
-import { ARENA_RADIUS, groundHeight } from "../world";
+import { ARENA, groundHeight } from "../world";
+import { clampToWalkable, sceneLayout } from "../sceneLayout";
 import { separateDiscBodies } from "../collision";
 import { Actor, setState } from "./actor";
 import { emitBlood, emitSparks } from "./effects";
@@ -339,16 +340,18 @@ export function updateCombatant(a: Actor, dt: number) {
   }
 }
 
-/** Pitää taistelijat kehän sisällä ja erillään toisistaan. */
+/** Kohtauksen kuljettava alue (data: sceneLayout.ts). */
+const LAYOUT = sceneLayout(ARENA);
+
+/** Pitää taistelijat kuljettavalla alueella ja erillään toisistaan. */
 export function keepApartAndInside(actors: Actor[]) {
   const alive = actors.filter((a) => a.state !== "dead");
   // Useampi kierros ratkaisee tilanteen, jossa toinen hahmo on puristettu seinää
   // vasten: seinä ei anna periksi, joten liike palautuu lopulta toiseen hahmoon.
   for (let pass = 0; pass < 5; pass++) {
     for (const a of alive) {
-      const r = Math.hypot(a.pos.x, a.pos.z);
-      const max = ARENA_RADIUS - a.radius - 0.1;
-      if (r > max) { a.pos.x *= max / r; a.pos.z *= max / r; }
+      const c = clampToWalkable(LAYOUT, a.pos.x, a.pos.z, a.radius + 0.1);
+      a.pos.x = c.x; a.pos.z = c.z;
     }
     for (let i = 0; i < alive.length; i++) {
       for (let j = i + 1; j < alive.length; j++) {

@@ -26,6 +26,7 @@ import { createEmptySceneReturn, saveSceneReturn } from "../map/transition";
 import { worldRuntime } from "./store";
 import { updateSceneItemFocus } from "./sceneItems";
 import { closeDialogue, dialogueOpen } from "./dialogue";
+import { updateExit } from "./exit";
 
 export function onPlayerDeath() {
   g.gameOver = true;
@@ -121,6 +122,7 @@ export function simulate(realDt: number) {
     keepApartAndInside([g.player, ...g.enemies]);
     updateHazards([g.player, ...g.enemies], dt);
     g.encounter.update(dt);
+    updateExit(realDt, toStartMenu);
     for (let i = g.corpses.length - 1; i >= 0; i--) {
       if (g.gameTime > g.corpses[i].removeAt) {
         removeActor(g.corpses[i].actor);

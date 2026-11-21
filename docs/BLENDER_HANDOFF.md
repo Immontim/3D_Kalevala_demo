@@ -6,10 +6,10 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-21 (Claude, Windows; pohja main 8fc9397)
+Päivitetty: 2026-11-21 (Claude, Windows; pohja main 2b4653d)
 
-- **Metsän LOD- ja reuna-assetit** (`assets/forest_lod.glb`, 1,6 Mt; `assets-src/blender/forest_lod.py`,
-  branch `claude/terrain-assets`, tarkista merge-tila). Peli ei vielä lataa tiedostoa. Skripti lukee
+- **Metsän LOD- ja reuna-assetit** (`assets/forest_lod.glb`, 1,6 Mt; `assets-src/blender/forest_lod.py`;
+  mainissa). Peli lataa tiedoston kaikissa 3D-kohtauksissa v06.00.00:sta alkaen (AGENT_HANDOFF). Skripti lukee
   valmiin `forest.glb`:n, joten `forest_clearing.blend`iä ei tarvita; ajo taustalla noin 2 min
   (`blender --background --factory-startup --python ...`, `KALEVALA_PREVIEW=1` kirjoittaa vertailukuvat
   `assets-src/cards/lod_preview/`, joka ei ole Gitissä). Solmut, mitat ja suunnat ovat skriptin alussa:
@@ -21,8 +21,11 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja main 8fc9397)
   - `metsaseina`: 80 × 20 m:n horisonttisuikale samassa atlaksessa (rivi 4), laatoittuu vaakasuunnassa.
   - `juurakko`: kaatuneen puun juurilevy (2 230 kolmiota, `M_Soil` = maaston dirt-tekstuuri,
     juuret `M_Log`) ja +Y:hen laskeva runkotynkä kelon (`log`) tyveksi.
-  - Katsottu Blenderin Cycles-kuvista 70 m:n päästä kahdesta kulmasta täyden puun rinnalla ja
-    reunanäkymänä. Pelissä katsomatta: valaistus ja sävy suhteessa täysiin puihin, LOD-vaihdon näkyvyys.
+  - **Pelissä katsottu (v06.00.00):** muodot ja siluetit vastaavat täysiä puita, mutta valaisemattomana
+    leivottu atlas + ylöspäin kallistetut korttinormaalit tekevät kaukopuista pelin valossa selvästi
+    vaaleampia ja harmaampia. Korjattu toistaiseksi pelin puolella (`world.ts` `LOD_TINT` lehvästölle
+    0,28/0,38/0,32 ja `M_BarkLOD` × 0,62); pikselimittaus vertailukuvista, ei vielä täydellinen vastaavuus.
+    Juurakko (2 230 kolmiota) on raskas, joten erämaa piirtää sen vain alle 60 m:n päähän.
 - **Mainissa** ovat `assets/forest.glb`,
   `characters.glb`, `bog.glb`, `homestead.glb`, `household.glb`,
   `yard.glb`, `villagers.glb`, `villagers_f.glb` ja `assets/animals/`.
@@ -237,14 +240,14 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja main 8fc9397)
 
 ## Seuraava Blender-tehtävä
 
-Ei avointa Blender-tehtävää ennen kuin metsän koodivaihe (tilkut ja LOD-renkaat, ks. AGENT_HANDOFF)
-on katsonut `forest_lod.glb`:n pelissä; sen jälkeen mahdollinen kaukopuiden sävyn viritys. Muuta:
+Ei kiireellistä. Jos omistaja näkee kaukopuiden vaihtorajan pelissä: leivo `forest_lod.py`:ssä atlas
+valaistuna (tai tummemmaksi) ja pudota pelin `LOD_TINT`-korjaus. Muuta:
 legacy-hahmojen poisto omistajan käsisavutestin jälkeen (säästää noin 1,7 Mt kummassakin), sormien
 viimeistely, koiran kävelyleike, istuva tietäjä ja loukkaantuneen jousineidon asento.
 
 ## Ei vielä aloiteta
 
 - Isännän malli.
-- Kuvakortti-impostorit (useita kulmia) tai uudet LOD-tasot ennen kuin `forest_lod.glb` on mitattu pelissä.
+- Kuvakortti-impostorit (useita kulmia) tai uudet LOD-tasot ennen kuin omistaja on mitannut FPS:n peliläppärillä.
 - Metsästyksen assetit (jänis, jousi aseena, nuolet, nuoliviini) ennen perusta- ja metsävaihetta.
 - Dialogianimaatiot ennen omistajan palautetta rauhallisesta pihasta.

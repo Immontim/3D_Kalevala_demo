@@ -16,6 +16,7 @@ import { discoverVisibleSites, mapSiteDefinition, mapSiteDisplay, sceneForMapSit
 import { clearCampaign, loadCampaign, newCampaign, saveCampaign } from "./storage";
 import { riverTile, shoreEdgeTurns, terrainFrame, waterShoreMask, type AtlasFrame } from "./tiles";
 import { consumeSceneReturn } from "./transition";
+import type { MapDir } from "../sceneLayout";
 import { endingSummary, isWon, shouldShowEnding } from "./ending";
 import { withFlag } from "../world/state";
 import { mapCalendarTime, mapCellVisibility, satietyBand } from "./uiState";
@@ -24,7 +25,7 @@ import { mountInventoryView, type InventoryView } from "../ui/inventoryView";
 const TILE = 48;
 const VIEW_COLS = 17;
 const VIEW_ROWS = 13;
-const SCENE_SHORTCUTS = ["yard", "lakeside", "lakeruin", "cairnfield", "clearing", "homestead"] as const satisfies readonly SceneId[];
+const SCENE_SHORTCUTS = ["yard", "lakeside", "lakeruin", "cairnfield", "clearing", "homestead", "wilds"] as const satisfies readonly SceneId[];
 
 const HERO_FRAME: Record<MapDirection, [number, number]> = {
   up: [0, 2], right: [1, 2], down: [2, 2], left: [3, 2],
@@ -558,6 +559,8 @@ function currentSiteMessage() {
   return siteMessage(siteId, t("map.welcome"));
 }
 
+const EXIT_TO_MAP_DIR = { n: "up", e: "right", s: "down", w: "left" } as const satisfies Record<MapDir, MapDirection>;
+
 export function initMap() {
   document.body.classList.add("mode-map");
   document.body.classList.remove("mode-scene");
@@ -577,6 +580,11 @@ export function initMap() {
   setMessage(currentSiteMessage());
   renderMap();
   renderUi();
+  // Poistuttiin polunsuusta: sankari astuu yhden ruudun polun suuntaan. Tukittu suunta ei tee mitään.
+  if (sceneReturn?.exitDir) {
+    const dir = EXIT_TO_MAP_DIR[sceneReturn.exitDir];
+    if (moveOnMap(PROTOTYPE_MAP, currentMapState(), dir).moved) move(dir);
+  }
   window.addEventListener("keydown", onKeyDown);
   if (shouldShowEnding(campaign)) openEnding();
   (window as unknown as { __map: unknown }).__map = {

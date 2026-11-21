@@ -5,7 +5,8 @@ import { WAVES } from "../combat";
 import { FighterLook } from "../fighter";
 import { t } from "../i18n";
 import { FINAL_WAVE, aiLevelForWave, waveEnemies } from "../waves";
-import { ARENA_RADIUS } from "../world";
+import { ARENA } from "../world";
+import { clampToWalkable, sceneLayout } from "../sceneLayout";
 import { $ } from "./dom";
 import { addEnemy, clearEnemies } from "./enemies";
 import { Encounter } from "./encounter";
@@ -37,6 +38,8 @@ let nextWaveAt = -1;
 let victoryAt = -1;
 const VICTORY_DELAY = 3.2;
 
+const LAYOUT = sceneLayout(ARENA);
+
 function nextWave() {
   wave++;
   const group = waveEnemies(wave);
@@ -48,8 +51,12 @@ function nextWave() {
     const def = enemyDef(member.character, member.loadout);
     const a = mid + (i - (size - 1) / 2) * 0.45;
     const pos = g.player.pos.clone().add(new THREE.Vector3(Math.sin(a) * 6, 0, Math.cos(a) * 6));
-    const r = Math.hypot(pos.x, pos.z);
-    if (r > ARENA_RADIUS - 1) pos.multiplyScalar((ARENA_RADIUS - 1) / r);
+    // Tulopaikka arenan ympyrän sisään ja sitten kuljettavalle alueelle.
+    const dx = pos.x - LAYOUT.arena.x, dz = pos.z - LAYOUT.arena.z;
+    const r = Math.hypot(dx, dz), max = LAYOUT.arena.radius - 1;
+    if (r > max) { pos.x = LAYOUT.arena.x + (dx * max) / r; pos.z = LAYOUT.arena.z + (dz * max) / r; }
+    const c = clampToWalkable(LAYOUT, pos.x, pos.z, 0.6);
+    pos.x = c.x; pos.z = c.z;
     // Perusarvot joka aallossa: taso 0 ja ei ryhmäkerrointa. Vain tekoälyn taito kasvaa hitaasti.
     addEnemy({ name: def.name, look: def.look, level: 0, aiLevel: aiLevelForWave(wave) }, pos);
     first ||= def.name;

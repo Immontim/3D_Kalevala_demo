@@ -4,6 +4,7 @@ import {
   applyMapToSceneTransition,
   campaignSatiety,
   consumeSceneReturn,
+  parseSceneReturn,
   createEmptySceneReturn,
   createMapToSceneTransition,
   saveSceneReturn,
@@ -105,5 +106,19 @@ describe("2D- ja 3D-kohtauksen siirtymä", () => {
     expect(campaignSatiety({ satiety: 72 })).toBe(72);
     expect(campaignSatiety({ hunger: 28 })).toBe(72);
     expect(campaignSatiety({})).toBe(100);
+  });
+});
+
+describe("poistumissuunta paluukuoressa", () => {
+  it("säilyttää kelvollisen exitDirin ja pudottaa tuntemattoman", () => {
+    expect(createEmptySceneReturn("wilds", "e")).toEqual({ schemaVersion: 1, scene: "wilds", rewards: [], exitDir: "e" });
+    expect(parseSceneReturn({ schemaVersion: 1, scene: "wilds", rewards: [], exitDir: "n" })?.exitDir).toBe("n");
+    const bad = parseSceneReturn({ schemaVersion: 1, scene: "wilds", rewards: [], exitDir: "up" });
+    expect(bad).toEqual({ schemaVersion: 1, scene: "wilds", rewards: [] });
+  });
+  it("kulkee tallennuksen läpi", () => {
+    const storage = memoryStorage();
+    saveSceneReturn(createEmptySceneReturn("yard", "s"), storage);
+    expect(consumeSceneReturn(storage)?.exitDir).toBe("s");
   });
 });

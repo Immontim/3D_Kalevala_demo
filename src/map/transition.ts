@@ -1,6 +1,7 @@
 // Kartan ja 3D-kohtausten välinen tyypitetty silta. Moduuli ei riipu DOM:sta tai Three.js:stä,
 // joten siirtymän tasapaino ja rajatapaukset voidaan testata ilman 3D-maailman lataamista.
 import type { SceneId, SceneKind } from "../app/route";
+import { MAP_DIRS, type MapDir } from "../sceneLayout";
 import { effectiveStats, withModifier, type Modifier, type Stats } from "../stats";
 
 export interface SceneTransitionBalance {
@@ -37,6 +38,8 @@ export interface SceneToMapTransition {
   schemaVersion: 1;
   scene: SceneId;
   rewards: SceneReward[];
+  /** Polunsuun suunta, jos kohtauksesta poistuttiin polkua pitkin; kartta siirtää sankaria yhden ruudun. */
+  exitDir?: MapDir;
 }
 
 export const SCENE_RETURN_STORAGE_KEY = "laulun-miekka.scene-return.v1";
@@ -77,8 +80,8 @@ export function createMapToSceneTransition(
   };
 }
 
-export function createEmptySceneReturn(scene: SceneId): SceneToMapTransition {
-  return { schemaVersion: 1, scene, rewards: [] };
+export function createEmptySceneReturn(scene: SceneId, exitDir?: MapDir | null): SceneToMapTransition {
+  return exitDir ? { schemaVersion: 1, scene, rewards: [], exitDir } : { schemaVersion: 1, scene, rewards: [] };
 }
 
 /** Tallentaa 3D:n paluukuorman sivunlatauksen yli. Tallennuksen esto ei estä kartalle palaamista. */
@@ -120,7 +123,12 @@ export function parseSceneReturn(value: unknown): SceneToMapTransition | null {
       || !Number.isInteger(reward.quantity) || (reward.quantity as number) < 1) return null;
     rewards.push({ itemId: reward.itemId, quantity: reward.quantity as number });
   }
-  return { schemaVersion: 1, scene: data.scene, rewards };
+  const result: SceneToMapTransition = { schemaVersion: 1, scene: data.scene, rewards };
+  // Tuntematon suunta pudotetaan, mutta muuta kuorta ei hylätä.
+  if (typeof data.exitDir === "string" && (MAP_DIRS as readonly string[]).includes(data.exitDir)) {
+    result.exitDir = data.exitDir as MapDir;
+  }
+  return result;
 }
 
 interface TransitionActor {
@@ -190,5 +198,5 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isSceneId(value: unknown): value is SceneId {
-  return value === "clearing" || value === "homestead" || value === "yard" || value === "lakeside" || value === "lakeruin" || value === "cairnfield";
+  return value === "clearing" || value === "homestead" || value === "yard" || value === "lakeside" || value === "lakeruin" || value === "cairnfield" || value === "wilds";
 }

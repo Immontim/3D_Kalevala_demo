@@ -40,6 +40,19 @@ describe("2,5D-törmäykset", () => {
     expect(hit?.x).toBeCloseTo(-1);
   });
 
+  it("kameran osuma huomioi vain blocksCamera-esteet ja kasvattaa niitä padilla", () => {
+    const world = new CollisionWorld();
+    world.add({ id: "kivi", kind: "circle", x: -2, z: 0, radius: 0.5, blocksMovement: true, blocksMelee: true });
+    world.add({ id: "puu", kind: "circle", x: 0, z: 0, radius: 0.3, blocksMovement: true, blocksMelee: true, blocksCamera: true });
+    const hit = world.firstCameraHit(-4, 0, 4, 0, 0.25);
+    expect(hit?.collider.id).toBe("puu");
+    expect(hit?.x).toBeCloseTo(-0.55);
+    expect(world.firstCameraHit(-4, 0.5, 4, 0.5, 0)).toBeNull();
+    expect(world.firstCameraHit(-4, 0.5, 4, 0.5, 0.25)?.collider.id).toBe("puu");
+    world.add({ id: "talo", kind: "box", x: 0, z: 5, yaw: 0, halfX: 1, halfZ: 1, blocksMovement: true, blocksMelee: true, blocksCamera: true });
+    expect(world.firstCameraHit(0, 8, 0, 3, 0.25)?.z).toBeCloseTo(6.25);
+  });
+
   it("tunnistaa vartalon reunan nuotion vaara-alueella", () => {
     const world = new CollisionWorld();
     world.addHazard({ id: "fire", kind: "circle", x: 0, z: 0, radius: 0.9, damagePerSecond: 10 });

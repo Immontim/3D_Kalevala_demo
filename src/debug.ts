@@ -7,6 +7,7 @@ import { peace } from "./engine/encounter";
 import { addEnemy, focusEnemy, lockTarget, startEncounter } from "./engine/enemies";
 import { bindings } from "./engine/input";
 import { killActor } from "./engine/melee";
+import { exitState } from "./engine/exit";
 import { pause, paused, resume, simulate } from "./engine/loop";
 import { setShowcase, showcase } from "./engine/showcase";
 import { ENEMIES, currentWave, skipToWave, skirmish } from "./engine/skirmish";
@@ -34,6 +35,8 @@ export function initDebug() {
     setLock(on: boolean) { aim.lockOn = on; },
     /** Käytössä oleva paikka ("clearing", "homestead" tai "yard"). */
     get arena() { return ARENA; },
+    /** Polunsuusta poistumisen tila (häivytys). */
+    exitState() { return exitState(); },
     /** Törmäysrekisterin määrä ja pelaajaa juuri koskettavat vaara-alueet. */
     get collision() {
       return {
@@ -130,6 +133,23 @@ export function initDebug() {
       const out: number[][] = [];
       scene.traverse((o) => { if (o.name === name) out.push(o.getWorldPosition(new THREE.Vector3()).toArray().map((v) => +v.toFixed(2))); });
       return out;
+    },
+    /** Kävelykorkeus kohdassa (x, z) (kuvakaappausten kameran asetukseen). */
+    ground(x: number, z: number) { return +groundHeight(x, z).toFixed(3); },
+    /** Piirtokuorma nimetyittäin instanssinipuittain: kolmiot tällä hetkellä (suurimmat ensin). */
+    drawLoad(top = 12) {
+      const sums: Record<string, number> = {};
+      let meshes = 0;
+      scene.traverse((o) => {
+        const im = o as THREE.InstancedMesh;
+        if (!im.isInstancedMesh || !im.visible) return;
+        meshes++;
+        const geo = im.geometry, tris = (geo.index?.count ?? geo.attributes.position.count) / 3;
+        const name = im.name || `static:${(im.material as THREE.Material).name}`;
+        sums[name] = (sums[name] ?? 0) + Math.round(tris * im.count);
+      });
+      const total = Object.values(sums).reduce((a, b) => a + b, 0);
+      return { meshes, total, top: Object.entries(sums).sort((a, b) => b[1] - a[1]).slice(0, top) };
     },
     /** Sekunteja (reaaliaikaa) seuraavaan laulun tahtiin, tai null. */
     get nextBeatIn() {

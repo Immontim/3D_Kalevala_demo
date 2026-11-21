@@ -21,6 +21,8 @@ interface ColliderBase {
   blocksMovement: boolean;
   /** Pysäyttääkö kohde lähitaisteluiskun ennen vastustajaa. */
   blocksMelee: boolean;
+  /** Estääkö kohde kameran näköyhteyden (puiden rungot, rakennukset). */
+  blocksCamera?: boolean;
 }
 
 export interface CircleCollider extends ColliderBase {
@@ -238,6 +240,22 @@ export class CollisionWorld {
     for (const c of this.nearby(mx, mz, radius)) {
       if (!c.blocksMelee) continue;
       const t = c.kind === "circle" ? segmentCircle(x0, z0, x1, z1, c) : segmentBox(x0, z0, x1, z1, c);
+      if (t === null || (best && t >= best.t)) continue;
+      best = { collider: c, x: x0 + (x1 - x0) * t, z: z0 + (z1 - z0) * t, t };
+    }
+    return best;
+  }
+
+  /** Kameran puomin osuma: vain blocksCamera-esteet, joiden kokoa kasvatetaan pad:lla. */
+  firstCameraHit(x0: number, z0: number, x1: number, z1: number, pad = 0): SegmentHit | null {
+    const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+    const radius = Math.hypot(x1 - x0, z1 - z0) / 2 + GRID_SIZE + pad;
+    let best: SegmentHit | null = null;
+    for (const c of this.nearby(mx, mz, radius)) {
+      if (!c.blocksCamera) continue;
+      const t = c.kind === "circle"
+        ? segmentCircle(x0, z0, x1, z1, { ...c, radius: c.radius + pad })
+        : segmentBox(x0, z0, x1, z1, { ...c, halfX: c.halfX + pad, halfZ: c.halfZ + pad });
       if (t === null || (best && t >= best.t)) continue;
       best = { collider: c, x: x0 + (x1 - x0) * t, z: z0 + (z1 - z0) * t, t };
     }
