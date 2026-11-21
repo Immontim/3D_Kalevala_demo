@@ -32,7 +32,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; col
 #dialogueHint { margin-top: 8px; font-size: 12px; color: var(--muted); text-align: right; }
 .bars { display: flex; justify-content: space-between; padding: 16px; gap: 16px; }
 .bar-wrap { width: min(460px, 44vw); }
-/* Tauon aikana mittarit nousevat taukoikkunan tummennuksen päälle ja niitä voi raahata. */
+/* Vain erikseen vapautetut mittarit nousevat taukoikkunan päälle ja niitä voi raahata. */
 #hud.arrange { z-index: 20; }
 #hud.arrange .bar-wrap { pointer-events: auto; cursor: move; touch-action: none; user-select: none; outline: 1px dashed rgba(217, 164, 65, 0.7); outline-offset: 6px; border-radius: 2px; }
 #hud.arrange .bar-wrap:hover { outline-color: #ffd27a; background: rgba(217, 164, 65, 0.08); }
@@ -94,9 +94,12 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; col
 .overlay { position: fixed; inset: 0; display: flex; align-items: safe center; justify-content: center; overflow-y: auto; background: rgba(10, 8, 6, 0.55); padding: 16px; }
 .overlay.hidden { display: none; }
 /* Taukoikkunan voi raahata sivuun; siirrettynä ruutua ei tummenneta. */
-#pause .panel { cursor: move; touch-action: none; user-select: none; }
+#pause { position: absolute; }
+#pause .panel { position: relative; cursor: move; touch-action: none; user-select: none; }
 #pause.moved { background: transparent; overflow: hidden; }
 #pause input, #pause textarea { user-select: text; cursor: text; touch-action: auto; }
+.meter-actions { position: relative; z-index: 21; display: flex; flex-wrap: wrap; gap: 8px; }
+.panel .meter-actions button.secondary { margin-left: 0; }
 /* Taukoikkunan välilehdet ja säätövälilehti. */
 .tabs { display: flex; gap: 6px; margin: 0 0 12px; }
 .panel button.tab { margin: 0; padding: 6px 18px; font-size: 15px; background: transparent; color: var(--bronze); border: 1px solid rgba(217, 164, 65, 0.45); }

@@ -6,20 +6,19 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `2319d5e`)
+Päivitetty: 2026-11-21 (Codex, Windows; pohja `origin/main` `8fc9397`)
 
-- **Koodiversio v05.00.01** branchissa `claude/foliage-depth-song-filter` (tarkista merge-tila
-  `git merge-base --is-ancestor`). Koodi valmis, savutestattu in-app-selaimessa (lakeside, clearing);
-  ei deployattu, omistaja ei ole käsin testannut. Ajettu: `bun run test` 799/799, `bunx tsc --noEmit`,
-  `bun run lint`, `bun run build` läpi. Inventaario v05.00.00 on yhä käsin testaamatta.
-- **Lehvästön syvyys.** `M_Foliage`, `M_Grass` ja `M_Fern` ovat glTF:ssä BLEND, ja GLTFLoader
-  sammuttaa niiltä `depthWrite`n. `prepareMaterials` tekee niistä alfaleikattuja ja palauttaa nyt myös
-  `depthWrite = true`. Ilman sitä vesi, rungot ja kaukaiset puunipat maalautuivat lähioksien päälle
-  kuvakulmasta riippuen ("puut zoomaavat").
-- **Laulun ilme on jälkikäsittelyssä.** Laulun ja laulunvalinnan haalistus + ruskea reunavinjetti
-  ovat `engine/view.ts`:n grade-shaderissa (`uSong`, `setSongLook`, `updateSongLook` 0,4 s).
-  Vanha CSS-suodin `#c.singing` ja `#vignette`-elementti poistettiin, koska selain ajoi suotimen koko
-  ruudulle joka ruutu (epäilty syy lauluosion tahmaukseen heikolla läppärillä; ei vielä vahvistettu).
+- **Koodiversio v05.00.02** branchissa `codex/pause-meter-lock`. Koodi valmis; ei deployattu eikä
+  omistaja ole käsin testannut. Ajettu: `bun run test` 1119/1119, `bunx tsc --noEmit`, `bun run lint` ja
+  `bun run build` läpi. Headless-Chromen savutesti clearingissä 1920×1080: ei konsolivirheitä;
+  in-app-selain ei tavoittanut localhostia ja olemassa olevan Chromen ohjausta ei hyväksytty.
+- **Taukomenu ja mittarit.** ESC avaa mittarit aina lukittuina ilman siirtokehyksiä taukodialogin ja
+  tummennuksen alla. `Vapauta mittarit` / `Lukitse mittarit` -nappi vaihtaa `#hud.arrange`-tilan;
+  vain vapautettuja mittareita voi raahata. Paikat tallentuvat entiseen `meters.v1`-avaimeen,
+  lukitus ei muuta niitä, ja napit pysyvät mittarikerroksen päällä klikattavina.
+- **Lehvästö ja laulun ilme.** `prepareMaterials` palauttaa BLEND-lehvästölle `depthWrite = true`n.
+  Laulun haalistus ja vinjetti ovat `engine/view.ts`:n grade-shaderissa 0,4 s siirtymällä; vanha
+  koko ruudun CSS-suodin poistettiin heikomman läppärin tahmausriskin vuoksi (ei vielä vahvistettu).
 - **Paperinukke ja inventaario.** Skeema 6, avain `laulun-miekka.campaign.v6`, 12 tavarapaikkaa ja
   seitsemän varustepaikkaa. Kartta ja 3D:n pause käyttävät samaa `ui/inventoryView.ts`-näkymää.
   Rauhassa varusteita voi vaihtaa ja ruokaa syödä; taistelussa näkymä on vain luettavissa.
