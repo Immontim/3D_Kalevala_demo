@@ -29,6 +29,11 @@ export type EquipmentItemId =
   | "spear"
   | "round_shield";
 export type ItemId = FoodId | EquipmentItemId | "birch_bark_pack";
+/**
+ * Esineen tyyppi tehtäviä varten: esim. uhriksi kelpaa mikä tahansa liha. Uudet lihalajit (hirvi,
+ * vasa) saavat saman tyypin, jolloin uhri ja muut tyyppiä kysyvät ehdot toimivat niillä suoraan.
+ */
+export type ItemTag = "meat";
 
 export interface ItemDefinition {
   id: ItemId;
@@ -38,6 +43,7 @@ export interface ItemDefinition {
   equipmentSlot?: EquipmentSlot;
   /** Tavallisten tavarapaikkojen lisäksi avautuvat paikat, kun esine on ainoassa reppupaikassa. */
   storageCapacity?: number;
+  tags?: readonly ItemTag[];
 }
 
 export const ITEMS: Record<ItemId, ItemDefinition> = {
@@ -59,6 +65,7 @@ export const ITEMS: Record<ItemId, ItemDefinition> = {
     nameKey: "map.item.hareMeat",
     stackMax: 4,
     satietyGain: 30,
+    tags: ["meat"],
   },
   birch_bark_pack: {
     id: "birch_bark_pack",
@@ -320,6 +327,36 @@ export function tryAddItem(inventory: Inventory, itemId: ItemId, quantity: numbe
     remaining -= add;
   }
   return remaining === 0 ? { backpack: inventory.backpack, stacks } : null;
+}
+
+export function itemHasTag(itemId: ItemId, tag: ItemTag): boolean {
+  return ITEMS[itemId].tags?.includes(tag) === true;
+}
+
+/** Tietyn tyypin esineiden yhteismäärä inventaariossa (esim. kaikki liha). */
+export function taggedItemCount(inventory: Inventory, tag: ItemTag): number {
+  return inventory.stacks.reduce((sum, stack) => sum + (itemHasTag(stack.itemId, tag) ? stack.quantity : 0), 0);
+}
+
+/**
+ * Ottaa määrän tietyn tyypin esineitä atomisesti, esinelaji kerrallaan siinä järjestyksessä kuin lajit
+ * ovat `ITEMS`issä (sama tulos joka kerta). null tarkoittaa, ettei niitä ole tarpeeksi.
+ */
+export function tryRemoveTagged(inventory: Inventory, tag: ItemTag, quantity: number): Inventory | null {
+  if (!Number.isInteger(quantity) || quantity < 1 || taggedItemCount(inventory, tag) < quantity) return null;
+  let current = inventory;
+  let remaining = quantity;
+  for (const itemId of Object.keys(ITEMS) as ItemId[]) {
+    if (remaining === 0 || !itemHasTag(itemId, tag)) continue;
+    const have = current.stacks.reduce((sum, stack) => sum + (stack.itemId === itemId ? stack.quantity : 0), 0);
+    const take = Math.min(have, remaining);
+    if (take === 0) continue;
+    const next = tryRemoveItem(current, itemId, take);
+    if (!next) return null;
+    current = next;
+    remaining -= take;
+  }
+  return remaining === 0 ? current : null;
 }
 
 /** Ottaa määrän pois inventaariosta atomisesti. null tarkoittaa, ettei sitä ole tarpeeksi. */

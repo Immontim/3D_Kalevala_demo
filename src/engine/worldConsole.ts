@@ -1,6 +1,6 @@
 // Konsoli `__world`: maailmamoottorin tila ja selitykset kehittäjälle ja savutesteille.
 import { finnishText } from "../i18n";
-import { ARENA, yardDebug } from "../world";
+import { ARENA, lakeDebug, yardDebug } from "../world";
 import type { GameEvent } from "../world/types";
 import { focusedSceneItemId } from "./sceneItems";
 import { worldRuntime } from "./store";
@@ -30,6 +30,8 @@ export function initWorldConsole() {
     scene: ARENA,
     /** Pihan arvottu eläinsijoittelu tällä käynnillä (kanat, kukko, koira). */
     get yard() { return yardDebug.animals ? { ...yardDebug.animals, people: { ...yardDebug.people }, spots: yardDebug.spots } : null; },
+    /** Rannan arvottu tietäjän ja koiran paikka tällä käynnillä ja ehdokkaat. */
+    get lake() { return { people: { ...lakeDebug.people }, spots: lakeDebug.spots }; },
     /** Kohtauksen vielä paikallaan olevat poimittavat esineet ja se, jota katse osoittaa. */
     get items() {
       return {
