@@ -9,6 +9,7 @@ import { ARENA, groundHeight } from "../world";
 import { clampToWalkable, sceneLayout, walkableDepth } from "../sceneLayout";
 import { separateDiscBodies } from "../collision";
 import { sidestepPose } from "../sidestep";
+import { stepBogDot } from "../songLogic";
 import { Actor, setState } from "./actor";
 import { emitBlood, emitSparks } from "./effects";
 import { STYLE_NAME, flash, showMsg } from "./hud";
@@ -341,9 +342,25 @@ export function updateCombatant(a: Actor, dt: number) {
     a.moveSpeed = 0;
     if (a.stateTime >= COMBAT.dodgeTime) setState(a, "idle");
   } else if (a.state === "rooted") {
+    if (a.bogDot && bogDamage(a, dt)) return;
     a.rootTime -= dt;
     if (a.rootTime <= 0) setState(a, "idle");
   }
+  if (a.state !== "rooted") a.bogDot = null;
+}
+
+/** Suo vahingoittaa juuttunutta tikeittäin (ohi haarniskan). Palauttaa true, jos vahinko kaatoi hänet. */
+function bogDamage(a: Actor, dt: number): boolean {
+  const { ticks, damage } = stepBogDot(a.bogDot!, dt);
+  if (ticks === 0) return false;
+  a.hp -= damage;
+  a.dotPulse += ticks;
+  g.events.push(`suo:${damage.toFixed(1)}`);
+  if (g.events.length > 30) g.events.shift();
+  if (a.hp > 0) return false;
+  a.bogDot = null;
+  killActor(a);
+  return true;
 }
 
 /** Kohtauksen kuljettava alue (data: sceneLayout.ts). */

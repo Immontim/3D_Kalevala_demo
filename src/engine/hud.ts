@@ -37,6 +37,21 @@ function shownEnemy(): Actor | null {
   return shown;
 }
 
+/**
+ * Elämämittarin sykähdys suon vahinkotikin tahdissa: mittari muistaa, kenen tikkilaskuria se näytti,
+ * ja välähtää, kun saman vastustajan laskuri kasvaa.
+ */
+const pulseSeen = new Map<HTMLElement, { a: Actor; n: number }>();
+function pulseOnDot(el: HTMLElement, a: Actor | null) {
+  if (!a) { pulseSeen.delete(el); return; }
+  const seen = pulseSeen.get(el);
+  pulseSeen.set(el, { a, n: a.dotPulse });
+  if (!seen || seen.a !== a || seen.n === a.dotPulse) return;
+  el.classList.remove("dotPulse");
+  void el.offsetWidth; // animaatio alkaa alusta joka tikillä
+  el.classList.add("dotPulse");
+}
+
 /** Pieni elämäpalkki jokaisen vastustajan pään päällä. Palkit kierrätetään: yksi elementti vastustajaa kohti. */
 const foeBars: HTMLElement[] = [];
 function updateFoeBars(locked: Actor | null) {
@@ -59,6 +74,7 @@ function updateFoeBars(locked: Actor | null) {
     (el.firstChild as HTMLElement).style.width = `${(Math.max(0, e.hp) / e.stats.maxHp) * 100}%`;
     el.classList.toggle("locked", e === locked);
     el.classList.toggle("striking", e.state === "windup" || e.state === "release");
+    pulseOnDot(el, e);
   });
 }
 
@@ -88,6 +104,7 @@ export function updateHud() {
   $("ename").textContent = foe ? foe.name : "";
   $("php").style.width = `${(Math.max(0, g.player.hp) / g.player.stats.maxHp) * 100}%`;
   $("ehp").style.width = foe ? `${(Math.max(0, foe.hp) / foe.stats.maxHp) * 100}%` : "0%";
+  pulseOnDot($("ehp").parentElement!, foe);
   // Lukuarvot: elämä pyöristetään ylöspäin (1 = vielä hengissä), kestävyys alaspäin (käytettävissä oleva).
   const num = (v: number, max: number, up: boolean) => `${up ? Math.ceil(Math.max(0, v)) : Math.floor(Math.max(0, v))} / ${Math.round(max)}`;
   $("phpNum").textContent = num(g.player.hp, g.player.stats.maxHp, true);

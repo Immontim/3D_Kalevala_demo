@@ -6,15 +6,13 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `9806810`)
+Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `f06c416`)
 
-- **Koodiversio v06.08.00** branchissa `claude/song-arcs` (tarkista merge-tila `git merge-base`illa).
-  Koodi valmis, ei deployattu, omistaja ei ole käsin testannut. Claude lauloi in-app-selaimessa
-  `__game.step`illä Suolaulun (rauhassa ja aukion aallossa 1, 7/8 → vastustaja suossa 5,3 s),
-  Parannuslaulun ja Pohjolan unen sekä keskeytyksen: tauot 0,08–0,27 s parien välissä (oletus 0,5),
-  kaaret 1280×800 (fontti 30) ja 1024×640 (fontti 28), hiipuminen 1,6 s:n asetuksella 0,8 s:ssa puolet.
-  FPS-mittari näytti kaarten kanssa 91–120, mutta paneeli oli piilossa, joten luku on suuntaa antava.
-  Testit 1646/1646, tsc, lint ja build läpi; konsoli puhdas tuoreella latauksella. v06.07.00 on mainissa.
+- **Koodiversio v06.09.00** branchissa `claude/bog-dot` (tarkista merge-tila `git merge-base`illa).
+  Koodi valmis, ei deployattu, omistaja ei ole käsin testannut. Claude lauloi aukiolla `__game.step`illä
+  Suolaulun 8/8: 6 s suossa, kuusi 10 hp:n tikkiä (70 → 10) ja kuusi mittarin sykähdystä; 15/s:llä suo
+  kaatoi urhon viidennellä tikillä normaalisti (`enemyDown`, "Vastustaja kaatui"). Testit 1649/1649,
+  tsc, lint ja build läpi. v06.08.00 (tauot ja säekaaret) on mainissa; omistajan käsitesti on tekemättä.
 - **Metsästysapajat (v06.06, `map/huntGrounds.ts` puhdas).** Apaja = `SiteInstance` `kind: "hunt"` → `wilds`,
   kertakäyttöinen (`enterSite` → `removeHuntGround`). `huntCycle` (20 päivän jakso; −1 = vanha tallennus →
   `ensureHuntGrounds` 3–6 alkuapajaa); `advanceHuntGrounds` lisää jaksoittain, enintään 6 (vanhin pois myös
@@ -88,15 +86,17 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `9806810`)
   `CollisionWorld.disable`, `removeTalkable`). Pysyvyys: `cairnState.louhiBanished` lipusta.
   Lukitut paikat: `MapSiteDefinition.requiresFlag`, `siteUnlocked`. Esc-oikotie `clearing`iin
   on kehittäjälle auki.
-- **Laulun tauot ja säekaaret (v06.08).** `songLogic.songBeats` laskee riimujen ajat: `SONG.pairSize`
-  riimun ryhmän jälkeen arvottu tauko `pairPause` × riimuväli × 30–100 % (`PAUSE_MIN_SHARE`). Liian aikainen
-  painallus tauon aikana on yhä huti seuraavalle riimulle (tarkoituksella). `engine/songArcs.ts` piirtää
-  säkeet SVG-`textPath`illa sisäkkäisille ellipsikaarille (`ARC_ASPECT` 1,6; säepari = kaari, vasen/oikea
-  puolisko) sankarin pään ylle; `judge` → `revealVerse` (CSS-lento nauhalta, kulta + sykkivä hehku / tuhka),
-  `closeSong` → `fadeSongArcs` (`SONG.fade.<laulu>`, reaaliaikaa, tauko pysäyttää), `resetField` →
-  `clearSongArcs`. Fontti = nauhan säerivi, pienenee vain, jos kaaret eivät mahdu (yläreunaan 10 % tilaa
-  mittareille). `--msg-top` siirtää tulosviestin kaarten sisään; `showMsg` palauttaa sen, kun kaaret ovat
-  poissa. Nauhan `#verse`-rivi on käytössä vain opetuksessa. `__game.songArcs` savutesteille.
+- **Laulun tauot ja säekaaret (v06.08).** `songLogic.songBeats`: `SONG.pairSize` riimun ryhmän jälkeen
+  arvottu tauko `pairPause` × riimuväli × 30–100 % (`PAUSE_MIN_SHARE`); aikainen painallus tauolla on huti
+  (tarkoituksella). `engine/songArcs.ts`: säkeet SVG-`textPath`illa sisäkkäisille ellipsikaarille
+  (`ARC_ASPECT` 1,6; säepari = kaari) sankarin pään ylle; `judge` → `revealVerse` (lento nauhalta, kulta +
+  hehku / tuhka), `closeSong` → `fadeSongArcs` (`SONG.fade.<laulu>`, reaaliaikaa), `resetField` →
+  `clearSongArcs`. Fontti pienenee vain, jos kaaret eivät mahdu. `--msg-top` vie tulosviestin kaarten
+  sisään; `showMsg` palauttaa sen. `#verse` vain opetuksessa. `__game.songArcs` savutesteille.
+- **Suon vahinko (v06.09).** `songOutcome.dotPerSec` (> 0, kun onnistunut ja osumia ≥ `SONG.bogDotMinHits` 3)
+  → `endSong` asettaa `Actor.bogDot`; `melee.updateCombatant` (tila `rooted`) → `stepBogDot` tikeittäin
+  (`bogDotInterval` 1 s, vajaa loppu pienempänä tikkinä), ohi haarniskan ja `rootedDamage`n, `killActor`
+  nollassa. `Actor.dotPulse` kasvaa tikistä; `hud.pulseOnDot` välähdyttää `#ehp`:n palkin ja `.foe`-palkin.
 - **Laulun opettelu (V4, mergattu).** Laulu **Pohjolan uni** (`SONGS.sleep`, Kalevala runo 42).
   Tietäjän dialogi -> efekti `startSongLesson` (`OutAction`) -> `engine/song.ts` `startLesson`
   (ei hidastusta, säe näkyy etukäteen) -> `song.performed` -> lippu `song.sleep.learned` (raja
@@ -279,7 +279,8 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `9806810`)
 
 ## Seuraava tehtävä
 
-Omistaja testaa v06.08:n laulut taistelussa: tekeekö riimuparien tauko (säätöpaneeli Laulu → "Tauko
+Omistaja testaa v06.09:n suon vahingon (riittääkö 10/s vai tekeekö se suosta liian vahvan, kun
+tuplavahinko on päällä) ja v06.08:n laulut taistelussa: tekeekö riimuparien tauko (säätöpaneeli Laulu → "Tauko
 riimuryhmien välissä", 0 = vanha tasarytmi) rytmipelistä kiinnostavamman, ja peittävätkö säekaaret
 vihollisia hiipumisen aikana liikaa (hiipumisajat laulukohtaisesti samassa ryhmässä). Kaarten FPS
 heikolla koneella on mittaamatta. Lisäksi yhä tekemättä:

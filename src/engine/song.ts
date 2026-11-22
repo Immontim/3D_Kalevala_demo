@@ -219,7 +219,7 @@ export function updateSong() {
   if (s.endAt >= 0 && g.realTime >= s.endAt) {
     const out = songOutcome(s.results as boolean[]);
     if (s.lesson) endLesson(s.id, s.lesson, out.success, out.hits);
-    else endSong(s.id, out.success, out.rootTime, out.hits, s.healed);
+    else endSong(s.id, out.success, out.rootTime, out.hits, s.healed, out.dotPerSec);
   }
 }
 
@@ -266,7 +266,7 @@ export function endLesson(id: SongId, lesson: SongLesson, success: boolean, hits
   else showMsg(t("song.lesson.failed"), t("song.lesson.failedSub"), 2.2);
 }
 
-export function endSong(id: SongId, success: boolean, rootTime: number, hits: number, healed: number) {
+export function endSong(id: SongId, success: boolean, rootTime: number, hits: number, healed: number, dotPerSec = 0) {
   closeSong();
   const total = SONGS[id].verses.length;
   // Laulu kerrotaan moottorille. Lähin kuulija (esim. Louhi kalmistolla) kulkee mukana: sääntö
@@ -299,9 +299,14 @@ export function endSong(id: SongId, success: boolean, rootTime: number, hits: nu
     target.state = "rooted";
     target.stateTime = 0;
     target.rootTime = rootTime;
+    // Yli kaksi osumaa: suo myös vahingoittaa koko juuttumisen ajan.
+    target.bogDot = dotPerSec > 0 ? { perSec: dotPerSec, left: rootTime, acc: 0 } : null;
     sfx.swamp();
     fx.shake = 0.25;
-    showMsg(t("song.bogSuccess"), t("song.rooted", { hits, total, seconds: rootTime.toFixed(1) }), 2.4);
+    const sub = dotPerSec > 0
+      ? t("song.rootedDot", { hits, total, seconds: rootTime.toFixed(1), dps: Math.round(dotPerSec) })
+      : t("song.rooted", { hits, total, seconds: rootTime.toFixed(1) });
+    showMsg(t("song.bogSuccess"), sub, 2.4);
   } else {
     showMsg(t("song.failed"), t("song.rhythmFailed"), 1.6);
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ARC_ASPECT, HEAL_VERSES, PAUSE_MIN_SHARE, SLEEP_VERSES, SONG, SONGS, SONG_SLOTS, SONG_UNLOCK_FLAG, SONG_VERSES, arcExtent, arcLayout, arcMid, arcPath, halfLength, ringRadii, beatGap, fadeOpacity, healOnHit, inZone, slotPositions, songBeats, songLead, songOutcome, songSlots, versePlace, zoneHalf } from "./songLogic";
+import { ARC_ASPECT, HEAL_VERSES, PAUSE_MIN_SHARE, SLEEP_VERSES, SONG, SONGS, SONG_SLOTS, SONG_UNLOCK_FLAG, SONG_VERSES, arcExtent, arcLayout, arcMid, arcPath, halfLength, ringRadii, beatGap, fadeOpacity, healOnHit, inZone, slotPositions, songBeats, stepBogDot, songLead, songOutcome, songSlots, versePlace, zoneHalf } from "./songLogic";
 
 describe("laulun osuma-alueet", () => {
   it("jokainen alue on edellistä lyhyempi", () => {
@@ -168,5 +168,42 @@ describe("säekaaret", () => {
     expect(fadeOpacity(0.6, 1.2)).toBeCloseTo(0.5);
     expect(fadeOpacity(2, 1.2)).toBe(0);
     expect(fadeOpacity(0, 0)).toBe(0);
+  });
+});
+
+describe("suon vahinko", () => {
+  const hits = (n: number) => SONG_VERSES.map((_, i) => i < n);
+  it("vahinko tulee vain onnistuneeseen suohon, kun osumia on yli kaksi", () => {
+    expect(SONG.bogDotMinHits).toBe(3);
+    expect(songOutcome(hits(8)).dotPerSec).toBe(10);
+    expect(songOutcome(hits(4)).dotPerSec).toBe(10);
+    // Kolme osumaa ylittää vahingon rajan, mutta oletuksilla suo vaatii neljä.
+    expect(songOutcome(hits(3)).dotPerSec).toBe(0);
+    const old = SONG.minHits;
+    SONG.minHits = 3;
+    expect(songOutcome(hits(3))).toMatchObject({ success: true, dotPerSec: 10 });
+    SONG.minHits = 1;
+    expect(songOutcome(hits(2))).toMatchObject({ success: true, dotPerSec: 0 });
+    SONG.minHits = old;
+  });
+  it("tikit tulevat sekunnin välein ja koko vahinko on 10 × kesto", () => {
+    const dot = { perSec: 10, left: 5.25, acc: 0 };
+    const seen: number[] = [];
+    let total = 0;
+    for (let f = 0; f < 600 && dot.left > 0; f++) {
+      const r = stepBogDot(dot, 1 / 60, 1);
+      if (r.ticks) seen.push(+(f / 60 + 1 / 60).toFixed(2));
+      total += r.damage;
+    }
+    expect(seen.slice(0, 5)).toEqual([1, 2, 3, 4, 5]);
+    expect(seen).toHaveLength(6);
+    expect(total).toBeCloseTo(52.5);
+  });
+  it("iso ruutu ei hukkaa tikkejä", () => {
+    const dot = { perSec: 10, left: 3, acc: 0 };
+    expect(stepBogDot(dot, 2.5, 1)).toEqual({ ticks: 2, damage: 20 });
+    expect(stepBogDot(dot, 2, 1).damage).toBeCloseTo(10);
+    expect(dot.left).toBe(0);
+    expect(stepBogDot(dot, 1, 1)).toEqual({ ticks: 0, damage: 0 });
   });
 });
