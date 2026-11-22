@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCampaign, type CampaignState } from "../map/campaign";
+import { BASE_INVENTORY_CAPACITY, createCampaign, type CampaignState } from "../map/campaign";
 import { createCampaignStore } from "../map/campaignStore";
 import { WORLD_MINUTES_PER_MOON } from "../map/uiState";
 import { evaluate } from "./conditions";
@@ -128,7 +128,7 @@ describe("efektit", () => {
   it("antaa ja ottaa esineen, ja epäonnistuminen on atominen", () => {
     const state = createCampaign();
     const given = applyEffects(state, [{ kind: "giveItem", itemId: "birch_bark_pack", quantity: 1 }], TEST_WORLD);
-    expect(given.ok && given.state.player.inventory.stacks.map((s) => s.itemId)).toContain("birch_bark_pack");
+    expect(given.ok && given.state.player.inventory.backpack).toBe("birch_bark_pack");
 
     // Toinen efekti epäonnistuu (ei kalaa): ensimmäinen lippu ei saa jäädä voimaan.
     const failed = applyEffects(state, [{ kind: "setFlag", flag: "a" }, { kind: "takeItem", itemId: "dried_fish", quantity: 1 }], TEST_WORLD);
@@ -141,7 +141,7 @@ describe("efektit", () => {
     const base = createCampaign();
     const full: CampaignState = {
       ...base,
-      player: { ...base.player, inventory: { ...base.player.inventory, stacks: Array.from({ length: base.player.inventory.capacity }, () => ({ itemId: "birch_bark_pack" as const, quantity: 1 })) } },
+      player: { ...base.player, inventory: { ...base.player.inventory, stacks: Array.from({ length: BASE_INVENTORY_CAPACITY }, () => ({ itemId: "dried_fish" as const, quantity: 4 })) } },
     };
     const r = applyEffects(full, [{ kind: "giveItem", itemId: "dried_fish", quantity: 1 }], TEST_WORLD);
     expect(r.ok).toBe(false);

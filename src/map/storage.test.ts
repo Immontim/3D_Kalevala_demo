@@ -4,6 +4,7 @@ import {
   EARLIEST_CAMPAIGN_STORE,
   LEGACY_CAMPAIGN_STORE,
   PREVIOUS_CAMPAIGN_STORE,
+  VERSION5_CAMPAIGN_STORE,
   VERSION4_CAMPAIGN_STORE,
   VERSION3_CAMPAIGN_STORE,
   REJECTED_CAMPAIGN_STORE,
@@ -13,7 +14,7 @@ import {
   saveCampaign,
   type CampaignStorage,
 } from "./storage";
-import { CAMPAIGN_SCHEMA_VERSION } from "./campaign";
+import { CAMPAIGN_SCHEMA_VERSION, inventoryCapacity } from "./campaign";
 import { LEGACY_YARD_POSITION } from "./sites";
 
 function memoryStorage(initial?: string): CampaignStorage & { data: Map<string, string> } {
@@ -155,7 +156,7 @@ describe("kampanjan selainvarasto", () => {
     expect(storage.data.has(VERSION3_CAMPAIGN_STORE)).toBe(false);
   });
 
-  it("migroi v4-avaimen v6-avaimeen tyhjällä maailmanesinetilalla", () => {
+  it("migroi v4-avaimen nykyiseen avaimeen tyhjällä maailmanesinetilalla", () => {
     const storage = memoryStorage();
     const current = loadCampaign(storage);
     const legacy = JSON.parse(JSON.stringify(current));
@@ -174,7 +175,7 @@ describe("kampanjan selainvarasto", () => {
     expect(storage.data.has(VERSION4_CAMPAIGN_STORE)).toBe(false);
   });
 
-  it("migroi v5-avaimen v6-avaimeen ilman että paikkatietoa päätellään uudelleen", () => {
+  it("migroi v5-avaimen nykyiseen avaimeen ilman että paikkatietoa päätellään uudelleen", () => {
     const storage = memoryStorage();
     const current = loadCampaign(storage);
     const legacy = JSON.parse(JSON.stringify(current));
@@ -182,13 +183,32 @@ describe("kampanjan selainvarasto", () => {
     legacy.player = legacyPlayer(current);
     legacy.world.knownSiteIds = [];
     storage.data.delete(CAMPAIGN_STORE);
-    storage.data.set(PREVIOUS_CAMPAIGN_STORE, JSON.stringify(legacy));
+    storage.data.set(VERSION5_CAMPAIGN_STORE, JSON.stringify(legacy));
 
     const migrated = loadCampaign(storage);
     expect(migrated.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
     expect(migrated.world.knownSiteIds).toEqual([]);
-    expect(migrated.player.inventory.capacity).toBe(12);
+    expect(inventoryCapacity(migrated.player.inventory)).toBe(6);
     expect(migrated.player.inventory.stacks).toContainEqual({ itemId: "spear", quantity: 1 });
+    expect(storage.data.has(VERSION5_CAMPAIGN_STORE)).toBe(false);
+  });
+
+  it("migroi v6-avaimen tuohikontin erilliseen reppupaikkaan", () => {
+    const storage = memoryStorage();
+    const current = loadCampaign(storage);
+    const legacy = JSON.parse(JSON.stringify(current));
+    legacy.schemaVersion = 6;
+    legacy.player.inventory = {
+      capacity: 12,
+      stacks: [...current.player.inventory.stacks, { itemId: "birch_bark_pack", quantity: 1 }],
+    };
+    storage.data.delete(CAMPAIGN_STORE);
+    storage.data.set(PREVIOUS_CAMPAIGN_STORE, JSON.stringify(legacy));
+
+    const migrated = loadCampaign(storage);
+    expect(migrated.player.inventory.backpack).toBe("birch_bark_pack");
+    expect(migrated.player.inventory.stacks).not.toContainEqual({ itemId: "birch_bark_pack", quantity: 1 });
+    expect(inventoryCapacity(migrated.player.inventory)).toBe(12);
     expect(storage.data.has(PREVIOUS_CAMPAIGN_STORE)).toBe(false);
   });
 
@@ -231,6 +251,7 @@ describe("kampanjan selainvarasto", () => {
     const storage = memoryStorage("saved");
     storage.data.set(LEGACY_CAMPAIGN_STORE, "old");
     storage.data.set(PREVIOUS_CAMPAIGN_STORE, "previous");
+    storage.data.set(VERSION5_CAMPAIGN_STORE, "version5");
     storage.data.set(VERSION4_CAMPAIGN_STORE, "version4");
     storage.data.set(VERSION3_CAMPAIGN_STORE, "version3");
     storage.data.set(EARLIEST_CAMPAIGN_STORE, "oldest");
@@ -238,6 +259,7 @@ describe("kampanjan selainvarasto", () => {
     expect(clearCampaign(storage)).toBe(true);
     expect(storage.data.get(CAMPAIGN_STORE)).toBeUndefined();
     expect(storage.data.get(PREVIOUS_CAMPAIGN_STORE)).toBeUndefined();
+    expect(storage.data.get(VERSION5_CAMPAIGN_STORE)).toBeUndefined();
     expect(storage.data.get(VERSION4_CAMPAIGN_STORE)).toBeUndefined();
     expect(storage.data.get(VERSION3_CAMPAIGN_STORE)).toBeUndefined();
     expect(storage.data.get(LEGACY_CAMPAIGN_STORE)).toBeUndefined();
