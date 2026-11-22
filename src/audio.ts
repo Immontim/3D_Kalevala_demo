@@ -218,6 +218,53 @@ export class Sfx {
     n.start();
   }
 
+  /** Villisian röhkäisy: matala, karhea murahdus. strength 0..1 (varoitus on voimakkain). */
+  boarGrunt(strength: number) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, now = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = "sawtooth";
+    o.frequency.setValueAtTime(95 + 30 * strength, now);
+    o.frequency.exponentialRampToValueAtTime(55, now + 0.28);
+    const f = ctx.createBiquadFilter();
+    f.type = "lowpass";
+    f.frequency.value = 420 + 300 * strength;
+    const g = ctx.createGain();
+    this.env(g, 0.18 + 0.22 * strength, 0.02, 0.3);
+    o.connect(f).connect(g).connect(this.master);
+    o.start();
+    o.stop(now + 0.36);
+    const n = this.noise(0.3);
+    const nf = ctx.createBiquadFilter();
+    nf.type = "bandpass";
+    nf.frequency.value = 300;
+    nf.Q.value = 1.5;
+    const g2 = ctx.createGain();
+    this.env(g2, 0.12 + 0.12 * strength, 0.02, 0.26);
+    n.connect(nf).connect(g2).connect(this.master);
+    n.start();
+  }
+
+  /** Haavoittuneen villisian kiljahdus. */
+  boarSqueal() {
+    if (!this.ctx) return;
+    const ctx = this.ctx, now = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = "square";
+    o.frequency.setValueAtTime(620, now);
+    o.frequency.linearRampToValueAtTime(900, now + 0.12);
+    o.frequency.exponentialRampToValueAtTime(380, now + 0.42);
+    const f = ctx.createBiquadFilter();
+    f.type = "bandpass";
+    f.frequency.value = 900;
+    f.Q.value = 1.2;
+    const g = ctx.createGain();
+    this.env(g, 0.2, 0.01, 0.4);
+    o.connect(f).connect(g).connect(this.master);
+    o.start();
+    o.stop(now + 0.48);
+  }
+
   /** Tick, joka kertoo tahdin lähestyvän. */
   tick() {
     if (!this.ctx) return;

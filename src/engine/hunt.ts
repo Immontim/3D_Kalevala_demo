@@ -11,6 +11,7 @@ import {
 import { ARROW_LEN, buildArrow, buildBow, buildHare, type BowModel, type HareModel } from "../hunt/models";
 import { SPECIES, type Prey, type Stimulus, killPrey, meatToTake, spawnPrey, updatePrey } from "../hunt/prey";
 import { pickHareSpots } from "../hunt/spawns";
+import { boarArrowHit, boarBodies, boarPickables, boarRoot, initBoars, isBoarBody, updateBoars } from "./boars";
 import { ITEMS, tryAddItem } from "../map/campaign";
 import { t } from "../i18n";
 import { clampToWalkable, sceneLayout, walkableDepth } from "../sceneLayout";
@@ -36,7 +37,7 @@ const HARE_EDGE_MARGIN = 8;
 /** Jäniksen piirtoetäisyys (m): kauempaa 0,5 m:n eläintä ei erota sumun läpi. */
 const HARE_DRAW_RANGE = 75;
 
-interface FlyingArrow { mesh: THREE.Mesh; p: Vec3; v: Vec3; t: number }
+interface FlyingArrow { mesh: THREE.Mesh; p: Vec3; v: Vec3; t: number; draw: number; from: { x: number; z: number } }
 interface StuckArrow { id: string; mesh: THREE.Mesh; pickable: boolean; preyId?: string }
 interface Game { prey: Prey; model: HareModel; hopPhase: number }
 
@@ -97,6 +98,8 @@ export function initHunt() {
     scene.add(model.root);
     game.push({ prey: p, model, hopPhase: rng() });
   }
+  // Villisiat: 0–2 apajaa kohti (boars.ts).
+  initBoars();
   hunt.bowOut = false;
 }
 
@@ -107,9 +110,12 @@ export function rebindHeroBow() {
   g.player.fighter.setBowMode(hunt.bowOut);
 }
 
-/** Jousi kädessä ja käytettävissä: rauhassa, hengissä, ei eleen tai laulun aikana. */
+/**
+ * Jousi kädessä ja käytettävissä: rauhallisessa kohtauksessa ilman vastustajia, myös villisian
+ * hyökätessä (`g.danger`). Ihmisvihollinen pakottaa jousen pois.
+ */
 export function bowActive() {
-  return HUNTING && hunt.bowOut && heroAtPeace() && g.player.state !== "dead";
+  return HUNTING && hunt.bowOut && !!g.encounter.peaceful && g.enemies.length === 0 && g.player.state !== "dead";
 }
 
 /** Sankarin asento jousen kanssa (animate.ts), tai null. */
@@ -150,11 +156,11 @@ function traceWorld(includeDead = true): ArrowTraceWorld {
       const h = world.collision.firstProjectileHit(a.x, a.y, a.z, b.x, b.y, b.z);
       return h ? { t: h.t, id: h.collider.id } : null;
     },
-    bodies: game.filter((e) => includeDead || e.prey.state !== "dead").map((e) => {
+    bodies: [...game.filter((e) => includeDead || e.prey.state !== "dead").map((e) => {
       const def = SPECIES[e.prey.species];
       const dead = e.prey.state === "dead";
       return { id: e.prey.id, x: e.prey.x, y: groundHeight(e.prey.x, e.prey.z) + (dead ? 0.1 : def.hitHeight), z: e.prey.z, radius: dead ? 0.18 : def.hitRadius };
-    }),
+    }), ...boarBodies(includeDead)],
   };
 }
 
@@ -190,7 +196,7 @@ function shoot() {
   const mesh = buildArrow();
   placeArrow(mesh, from, v);
   scene.add(mesh);
-  flying.push({ mesh, p: from, v, t: 0 });
+  flying.push({ mesh, p: from, v, t: 0, draw: hunt.draw, from: { x: g.player.pos.x, z: g.player.pos.z } });
   sfx.bowRelease(hunt.draw);
   hunt.reload = ARCHERY.reloadTime;
   g.events.push(`pelaaja:jousi:laukaus:${hunt.draw.toFixed(2)}`);
@@ -231,9 +237,10 @@ function updateBowVisual() {
 function updateInput(dt: number) {
   if (!HUNTING) return;
   const p = g.player;
-  if (inputs.bowQueued && heroAtPeace() && p.state !== "dead") setBowOut(!hunt.bowOut, true);
-  // Taistelu alkaa: jousi selkään (miekka esiin hoituu heroAtPeace-säännöllä).
-  if (hunt.bowOut && !heroAtPeace()) setBowOut(false, false);
+  // X: rauhassa jousi ja tyhjä käsi, villisian hyökätessä jousi ja ase (ase tulee esiin heroAtPeace-säännöllä).
+  if (inputs.bowQueued && (heroAtPeace() || g.danger) && p.state !== "dead") setBowOut(!hunt.bowOut, true);
+  // Ihmisvihollinen: jousi selkään (miekka esiin hoituu heroAtPeace-säännöllä).
+  if (hunt.bowOut && (g.enemies.length > 0 || !g.encounter.peaceful)) setBowOut(false, false);
   const active = bowActive() && p.state === "idle";
   const drawHeld = active && strikeHeld.slash;
   hunt.reload = Math.max(0, hunt.reload - dt);
@@ -260,11 +267,17 @@ function updateInput(dt: number) {
   hunt.aimBlend += ((aiming ? 1 : 0) - hunt.aimBlend) * (1 - Math.exp(-12 * dt));
 }
 
-function stickArrow(f: FlyingArrow, hit: { x: number; y: number; z: number }, preyGame: Game | null) {
+function stickArrow(f: FlyingArrow, hit: { x: number; y: number; z: number }, preyGame: Game | null, boar: { id: string; root: THREE.Object3D } | null = null) {
   // Kärki uppoaa osumakohtaan: varren keskipiste jää taakse.
   const dir = v3.set(f.v.x, f.v.y, f.v.z).normalize();
   placeArrow(f.mesh, { x: hit.x + dir.x * ARCHERY.stickDepth, y: hit.y + dir.y * ARCHERY.stickDepth, z: hit.z + dir.z * ARCHERY.stickDepth }, f.v);
   const id = `arrow-${++arrowSeq}`;
+  if (boar) {
+    boar.root.updateMatrixWorld(true);
+    boar.root.attach(f.mesh);
+    stuck.push({ id, mesh: f.mesh, pickable: false, preyId: boar.id });
+    return;
+  }
   if (preyGame) {
     // Nuoli jää eläimeen: se kulkee ruhon mukana ja palaa viiniin, kun saalis poimitaan. Kiinnitys juureen
     // (ei kaatuvaan vartaloon), jottei kyljelleen kaatuminen käännä nuolta pystyyn.
@@ -289,10 +302,16 @@ function updateArrows(dt: number) {
       f.t += h;
       if (hit) {
         done = true;
-        const e = hit.kind === "body" ? game.find((x) => x.prey.id === hit.id) ?? null : null;
-        stickArrow(f, hit, e);
+        const boar = hit.kind === "body" && isBoarBody(hit.id) ? boarRoot(hit.id!) : null;
+        const e = hit.kind === "body" && !boar ? game.find((x) => x.prey.id === hit.id) ?? null : null;
+        stickArrow(f, hit, e, boar);
         sfx.arrowImpact(hit.kind === "static");
-        if (e && e.prey.state !== "dead") {
+        if (boar) {
+          // Villisika ei kaadu yhdestä nuolesta: vahinko jännityksen mukaan (boar.ts).
+          const result = boarArrowHit(hit.id!, f.draw, hit, f.from);
+          if (result === "dead") hunt.bag++;
+          g.events.push(`pelaaja:nuoli:villisika:${result}`);
+        } else if (e && e.prey.state !== "dead") {
           killPrey(e.prey);
           hunt.bag++;
           const name = t(SPECIES[e.prey.species].nameKey);
@@ -323,6 +342,7 @@ function updateArrows(dt: number) {
 function updateGame(dt: number) {
   const hero = g.player.pos;
   const stimuli: Stimulus[] = [{ kind: "sight", x: hero.x, z: hero.z }, ...sounds];
+  updateBoars(dt, sounds.flatMap((s) => (s.kind === "sound" ? [{ x: s.x, z: s.z, loudness: s.loudness }] : [])));
   sounds = [];
   const env = {
     rng,
@@ -368,9 +388,27 @@ function updateGame(dt: number) {
   }
 }
 
+/** Kuoleman jälkeinen paluu kartalle (reaaliaikaa) ja sen toteuttava kutsu (loop.toStartMenu). */
+const DEATH_RETURN_DELAY = 3.5;
+let deathReturn: { at: number; go: () => void } | null = null;
+
+/** Metsästyskohtauksessa kuolema palauttaa kartalle viiveellä. Palauttaa false muualla. */
+export function huntDeathReturn(go: () => void): boolean {
+  if (!HUNTING) return false;
+  deathReturn = { at: g.realTime + DEATH_RETURN_DELAY, go };
+  return true;
+}
+export function huntDeathPending() { return deathReturn !== null; }
+
 /** Kutsutaan joka ruudulla sankarin päivityksen jälkeen. */
 export function updateHunt(dt: number) {
   if (!HUNTING) return;
+  if (deathReturn && g.realTime >= deathReturn.at) {
+    const go = deathReturn.go;
+    deathReturn = null;
+    go();
+    return;
+  }
   updateInput(dt);
   // Tähtäyksen kädet (Fighter.bowArms): jousikäsi linjalla, vetokäsi jänteellä.
   g.player.fighter.setBowAim(bowActive() ? hunt.aimBlend : 0, -aim.pitch, hunt.draw);
@@ -457,6 +495,17 @@ export function huntPickables(): Pickable[] {
       },
     });
   }
+  // Villisian ruho: liha ja ruhoon jääneet nuolet.
+  out.push(...boarPickables((preyId) => {
+    let back = 0;
+    for (let i = stuck.length - 1; i >= 0; i--) {
+      if (stuck[i].preyId !== preyId) continue;
+      if (returnArrow(hunt.quiver)) back++;
+      stuck[i].mesh.removeFromParent();
+      stuck.splice(i, 1);
+    }
+    return back;
+  }, () => {}));
   return out;
 }
 

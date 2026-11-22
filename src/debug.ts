@@ -20,6 +20,7 @@ import { Modifier, withModifier } from "./stats";
 import { changedValues } from "./tuning";
 import { meterOff } from "./ui/pauseMenu";
 import { hunt, huntDebug } from "./engine/hunt";
+import { addBoar, boarDebug, bloodDrops, hurtBoarDebug } from "./engine/boars";
 import { ARENA, groundHeight } from "./world";
 
 export function initDebug() {
@@ -50,6 +51,10 @@ export function initDebug() {
     },
     /** Metsästys: jousi, viini, saalis, nuolet ja eläinten tilat. */
     get hunt() { return huntDebug(); },
+    /** Villisiat (tila, elämä, paikka, leike), verijäljen tippojen määrä ja sian lisäys savutestiin. */
+    get boars() { return { boars: boarDebug(), blood: bloodDrops(), danger: g.danger }; },
+    spawnBoar(x: number, z: number, yaw = 0) { return addBoar(x, z, yaw).id; },
+    hurtBoar(id: string, amount = 1) { return hurtBoarDebug(id, amount); },
     /** Savutesti: jousi esiin (bow), tähtäys (aim) ja jännitys (draw) ilman hiirtä. Arvo false vapauttaa. */
     huntInput(o: { bow?: boolean; aim?: boolean; draw?: boolean }) {
       if (o.bow !== undefined && o.bow !== hunt.bowOut) inputs.bowQueued = true;

@@ -29,12 +29,14 @@ import { updateSceneItemFocus } from "./sceneItems";
 import { closeDialogue, dialogueOpen } from "./dialogue";
 import { updateExit } from "./exit";
 import { postLeftBehind } from "./leave";
-import { hunt, rebindHeroBow, updateHunt, updateHuntVisuals } from "./hunt";
+import { hunt, huntDeathPending, huntDeathReturn, rebindHeroBow, updateHunt, updateHuntVisuals } from "./hunt";
 
 export function onPlayerDeath() {
   g.gameOver = true;
   // Kaatuminen kirjataan loppuruudun tilastoon (moottorin sääntö `player.death-counted`).
   worldRuntime().post({ type: "player.died", sceneId: ARENA });
+  // Metsästysapajalla kuolema palauttaa kartalle; inventaarioon jo otettu saalis säilyy (omistaja 2026-11-22).
+  if (huntDeathReturn(toStartMenu)) { showMsg(t("hunt.deathTitle"), t("hunt.deathSub"), 9999); return; }
   showMsg(t("death.title"), isTouch ? t("death.touch") : t("death.keyboard"), 9999);
 }
 /** Tyhjentää kentän ja luo sankarin uudelleen aloituspaikalleen. */
@@ -58,6 +60,8 @@ function resetField() {
 
 /** Uusi yritys samalla paikalla ja samoilla varusteilla. */
 export function restart() {
+  // Metsästysapajalla kaatunut palaa kartalle, ei aloita kohtausta alusta.
+  if (huntDeathPending()) return;
   resetField();
   g.encounter.start();
   lockPointer();

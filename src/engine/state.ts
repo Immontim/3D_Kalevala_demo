@@ -27,6 +27,8 @@ export const g = {
   timeScale: 1,
   running: false,
   gameOver: false,
+  /** Metsästyksessä vaarallinen eläin (villisika) hyökkää: sankari ei ole rauhassa, vaikka vastustajia ei ole. */
+  danger: false,
   corpses: [] as { actor: Actor; removeAt: number }[],
   /** Viimeisimmät iskujen tulokset tekstinä (savutestit). */
   events: [] as string[],

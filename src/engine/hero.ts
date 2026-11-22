@@ -83,13 +83,16 @@ export function refreshHeroLook() {
 
 /** Rauha: kohtaus on rauhallinen eikä kentällä ole vastustajia. Silloin miekka on huotrassa ja
  *  kilpi selässä, eikä sankari lyö tai torju. Ensimmäinen vastustaja saa hänet vetämään aseen. */
-export function heroAtPeace() { return !!g.encounter.peaceful && g.enemies.length === 0; }
+/** Rauha: rauhallinen kohtaus, ei vastustajia eikä hyökkäävää eläintä (metsästyksen villisika, `g.danger`). */
+export function heroAtPeace() { return !!g.encounter.peaceful && g.enemies.length === 0 && !g.danger; }
 
 export function updatePlayer(dt: number) {
   const p = g.player;
   if (p.state === "dead") return;
   const calm = heroAtPeace();
-  p.fighter.setSheathed(calm);
+  // Jousi esillä (myös villisikaa vastaan): miekka pysyy tupessa, oikea käsi on jänteellä.
+  const bowUp = bowActive();
+  p.fighter.setSheathed(calm || bowUp);
   // Lukittuna katse seuraa vastustajaa; muuten sitä ohjaa hiiri. Sankari kääntyy katseen suuntaan.
   const target = lockTarget();
   if (target) aim.yaw = lerpAngle(aim.yaw, bearing(p.pos, target.pos), 1 - Math.exp(-CONTROLS.lockTurn * dt));
@@ -142,13 +145,14 @@ export function updatePlayer(dt: number) {
     }
     // Rauhassa iskunappi puhuu ja torjuntanappi käyttää; kumpikin on lyhyt ele paikallaan seisten.
     // Jousi esillä: vasen painike jännittää ja oikea tähtää (hunt.ts); oikea poimii vain kohdistetun esineen.
-    if (calm && p.state === "idle" && bowActive()) {
-      if (inputs.useQueued && focusedSceneItemId()) { lockFocusedSceneItem(); startGesture(p, "use"); return; }
+    if (bowUp) {
+      // Jousi ohjaa hiiren painikkeita myös vaarassa (hunt.ts); väistö toimii yllä.
+      if (calm && p.state === "idle" && inputs.useQueued && focusedSceneItemId()) { lockFocusedSceneItem(); startGesture(p, "use"); return; }
     } else if (calm && p.state === "idle") {
       if (inputs.strikeQueued) { startGesture(p, "talk"); return; }
       if (inputs.useQueued) { lockFocusedSceneItem(); startGesture(p, "use"); return; }
     }
-    if (inputs.strikeQueued && !calm) {
+    if (inputs.strikeQueued && !calm && !bowUp) {
       if (p.state === "idle") { startAttack(p, inputs.strikeQueued, "light", true); return; }
       // Torjunnan aikana: kilven kanssa kilpityöntö, pelkällä aseella torjunta-asennon vaihto.
       if (p.shield) { startAttack(p, "bash"); return; }
@@ -157,8 +161,8 @@ export function updatePlayer(dt: number) {
     }
     // Uupunut ei pysty torjumaan: suoja laskee itsestään.
     const tired = exhausted(p.stamina);
-    if (inputs.blockHeld && !tired && !calm && p.state === "idle") { setState(p, "block"); p.blockStart = g.gameTime; }
-    if ((!inputs.blockHeld || tired || calm) && p.state === "block") setState(p, "idle");
+    if (inputs.blockHeld && !tired && !calm && !bowUp && p.state === "idle") { setState(p, "block"); p.blockStart = g.gameTime; }
+    if ((!inputs.blockHeld || tired || calm || bowUp) && p.state === "block") setState(p, "idle");
   }
   const walk = p.stats.moveSpeed * (hunt.aiming ? ARCHERY.aimMoveScale : 1);
   // Puhuessa voi kävellä hitaasti; tartuntaan pysähdytään.
