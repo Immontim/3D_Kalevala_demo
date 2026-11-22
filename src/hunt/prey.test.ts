@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SPECIES, type PreyEnv, killPrey, perceives, spawnPrey, updatePrey } from "./prey";
+import { SPECIES, type PreyEnv, killPrey, meatToTake, perceives, spawnPrey, updatePrey } from "./prey";
 
 const free: PreyEnv = { rng: () => 0.5, move: (x, z, dx, dz) => ({ x: x + dx, z: z + dz }) };
 const hare = SPECIES.hare;
@@ -81,6 +81,25 @@ describe("jäniksen tilat", () => {
     updatePrey(p, 0.05, [{ kind: "sight", x: 0, z: -10 }], wall);
     run(p, 2, [], wall);
     expect(Math.abs(p.x)).toBeGreaterThan(2);
+  });
+
+  it("kaadetusta jäniksestä saa 1–3 lihapalaa", () => {
+    const seen = new Set<number>();
+    for (const r of [0, 0.2, 0.34, 0.5, 0.67, 0.8, 0.999]) {
+      const p = spawnPrey("h", "hare", 0, 0);
+      killPrey(p, () => r);
+      seen.add(p.meat);
+    }
+    expect([...seen].sort()).toEqual([1, 2, 3]);
+  });
+
+  it("täyteen inventaarioon otetaan vain mahtuva määrä", () => {
+    const p = spawnPrey("h", "hare", 0, 0);
+    killPrey(p, () => 0.99);
+    expect(p.meat).toBe(3);
+    expect(meatToTake(p, (n) => n <= 2)).toBe(2);
+    expect(meatToTake(p, () => false)).toBe(0);
+    expect(meatToTake(p, () => true)).toBe(3);
   });
 
   it("kaadettu jänis ei enää liiku eikä säikähdä", () => {
