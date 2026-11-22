@@ -21,7 +21,10 @@ export function initStartMenu(options: { returnToMap?: boolean; scene?: SceneId 
       tag.removeAttribute("data-i18n");
     }
     const startButton = $("startBtn");
-    startButton.textContent = friendly ? t(options.scene === "lakeside" || options.scene === "wilds" ? "map.enterWilds" : options.scene === "lakeruin" || options.scene === "cairnfield" ? "map.enterLakeside" : "map.enterYard") : t("map.enterBattle");
+    // Napin teksti paikan mukaan: ranta rannalle, kalmisto kalmistolle, Erämaa metsään, muut pihalle.
+    const enter = options.scene === "lakeside" || options.scene === "lakeruin" ? "map.enterLakeside"
+      : options.scene === "cairnfield" ? "map.enterCairnfield" : options.scene === "wilds" ? "map.enterWilds" : "map.enterYard";
+    startButton.textContent = friendly ? t(enter) : t("map.enterBattle");
     startButton.removeAttribute("data-i18n");
     $("menuBtn").textContent = t("map.return");
     $("menuBtn").removeAttribute("data-i18n");

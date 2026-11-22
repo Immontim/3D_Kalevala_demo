@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planYardAnimals, YARD_LIFE, type YardLifeContext } from "./yardLife";
+import { pickSpot, planYardAnimals, YARD_LIFE, type Spot, type YardLifeContext } from "./yardLife";
 
 /** Siemennetty satunnaisluku toistettaviin arvontoihin. */
 function seeded(seed: number) {
@@ -17,6 +17,7 @@ function seeded(seed: number) {
 const CTX: YardLifeContext = {
   coop: { x: -9.55, z: 1.68, yaw: (-80 * Math.PI) / 180 + Math.PI },
   housewife: { x: -2.44, z: -6.27 },
+  table: { x: -4.4, z: -6.6 },
   dogSpots: [{ x: 1.9, z: 11.5 }, { x: -1.9, z: 11.5 }, { x: 3, z: -2.2 }],
   blocked: (x, z, pad) => Math.hypot(x - 3.6, z + 4.6) < 2 + pad || Math.hypot(x + 4.4, z + 6.6) < 2 + pad || Math.hypot(x + 9.55, z - 1.68) < 1.2 + pad,
   avoid: [{ x: -2.44, z: -6.27, r: 0.5 }, { x: 1, z: -6.4, r: 1.25 }],
@@ -65,5 +66,35 @@ describe("pihan eläinten arvonta", () => {
     expect(nearCoop / hens).toBeGreaterThan(0.7);
     expect(dogNear / 300).toBeGreaterThan(0.45);
     expect(dogNear / 300).toBeLessThan(0.8);       // välillä muualla (portinpieli ym.)
+  });
+});
+
+describe("koira pöydän luona ja väen paikat", () => {
+  it("kun emäntä on muualla, koira on usein hänen tai pöydän luona", () => {
+    const ctx: YardLifeContext = { ...CTX, housewife: { x: 4.5, z: -3.3 }, avoid: [{ x: 4.5, z: -3.3, r: 0.5 }] };
+    let wife = 0, table = 0;
+    for (let seed = 1; seed <= 400; seed++) {
+      const dog = planYardAnimals(ctx, seeded(seed)).dog;
+      if (Math.hypot(dog.x - ctx.housewife.x, dog.z - ctx.housewife.z) < 2.8) wife++;
+      else if (Math.hypot(dog.x - ctx.table!.x, dog.z - ctx.table!.z) < 3.4) table++;
+    }
+    expect(wife / 400).toBeGreaterThan(0.4);
+    expect(table / 400).toBeGreaterThan(0.1);
+    expect((wife + table) / 400).toBeLessThan(0.9);       // välillä muualla
+  });
+
+  it("paikka arvotaan painojen mukaan ja varattu paikka ohitetaan", () => {
+    const spots: Spot[] = [
+      { key: "a", weight: 0.7, x: 0, z: 0, yaw: 0 },
+      { key: "b", weight: 0.2, x: 5, z: 0, yaw: 0 },
+      { key: "c", weight: 0.1, x: 10, z: 0, yaw: 0 },
+    ];
+    const counts: Record<string, number> = { a: 0, b: 0, c: 0 };
+    const rng = seeded(7);
+    for (let i = 0; i < 1000; i++) counts[pickSpot(spots, rng).key]++;
+    expect(counts.a).toBeGreaterThan(600);
+    expect(counts.c).toBeGreaterThan(40);
+    for (let i = 0; i < 50; i++) expect(pickSpot(spots, rng, (s) => s.x !== 0).key).not.toBe("a");
+    expect(pickSpot(spots, rng, () => false).key).toMatch(/[abc]/);   // ei vapaata: silti jokin
   });
 });
