@@ -84,6 +84,13 @@ Kaikkia malleja on muokattu (skripti `assets-src/blender/animals.py`).
 
 Kaikki on lisäksi skaalattu luonnolliseen kokoon ja käännetty nokka suuntaan -Y.
 
+## `animals/villisika.glb`
+
+Itse tehty Blenderissä (skripti `assets-src/blender/boar.py`): geometria, verteksivärit, luuranko, painot
+ja kaikki kuusi animaatiota. Valmista CC0-villisikaa ei löytynyt (haetut mallit olivat maksullisia
+royalty free -lisenssillä). Omistajan antama kuvapankin siluetti oli vain mittasuhteiden ja tunnelman
+viite; sitä ei ole jäljennetty eikä käytetty tekstuurina. Ei ulkopuolisia lähteitä, ei CC-BY-velvoitetta.
+
 ## `homestead.glb`
 
 | Osa | Lähde (Poly Haven -tunniste) | Käyttö |

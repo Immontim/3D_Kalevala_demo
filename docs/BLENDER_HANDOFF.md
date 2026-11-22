@@ -6,7 +6,8 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-22 (Claude, Windows; pohja main 218cebd; `vuode` branchissa `claude/yard-bed`)
+Päivitetty: 2026-11-22 (Claude, Windows; pohja main 616bf48; villisika branchissa `claude/boar-model-94a069`,
+tarkista merge-tila `git merge-base --is-ancestor`)
 
 - **Metsän LOD- ja reuna-assetit** (`assets/forest_lod.glb`, 1,6 Mt; `assets-src/blender/forest_lod.py`;
   mainissa). Peli lataa tiedoston kaikissa 3D-kohtauksissa v06.00.00:sta alkaen (AGENT_HANDOFF). Skripti lukee
@@ -21,11 +22,8 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja main 218cebd; `vuode` branchissa
   - `metsaseina`: 80 × 20 m:n horisonttisuikale samassa atlaksessa (rivi 4), laatoittuu vaakasuunnassa.
   - `juurakko`: kaatuneen puun juurilevy (2 230 kolmiota, `M_Soil` = maaston dirt-tekstuuri,
     juuret `M_Log`) ja +Y:hen laskeva runkotynkä kelon (`log`) tyveksi.
-  - **Pelissä katsottu (v06.00.00):** muodot ja siluetit vastaavat täysiä puita, mutta valaisemattomana
-    leivottu atlas + ylöspäin kallistetut korttinormaalit tekevät kaukopuista pelin valossa selvästi
-    vaaleampia ja harmaampia. Korjattu toistaiseksi pelin puolella (`world.ts` `LOD_TINT` lehvästölle
-    0,28/0,38/0,32 ja `M_BarkLOD` × 0,62); pikselimittaus vertailukuvista, ei vielä täydellinen vastaavuus.
-    Juurakko (2 230 kolmiota) on raskas, joten erämaa piirtää sen vain alle 60 m:n päähän.
+  - **Pelissä (v06.00.00):** valaisematon atlas tekee kaukopuista vaaleampia; peli korjaa sen (`world.ts`
+    `LOD_TINT`, `M_BarkLOD` × 0,62). Erämaa piirtää raskaan juurakon vain alle 60 m:n päähän.
 - **Järvenrannan kohtaus** (`assets/lakeside.glb`, noin 0,9 Mt / 9 300
   kolmiota; `assets-src/blender/lakeside.py`, ajetaan taustalla ja lukee
   ensin `homestead.py`:n ja `household.py`:n; Blender on
@@ -163,14 +161,23 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja main 218cebd; `vuode` branchissa
   `kukko` ja `kana_b`). Juurisolmu on eläimen nimi, origo jalkojen välissä, nokka -Y, koko metreinä. Omissa tiedostoissa
   (luiden nimet menevät päällekkäin), materiaali `M_AN_*`. `key_static_channels` kirjoittaa leikkeisiin luiden
   avaimettomat kanavat (muuten viikset ja varpaat siirtyvät viennissä). Uusi eläin = rivi `ANIMALS`-taulukkoon.
-- **Tarkistuksen taso:** mallit on katsottu Blenderin kuvista (lepoasento), kyläläiset, eläimet, esineet ja
-  rakennelmat lisäksi pelissä kuvakaappauksista, ei liikkeessä. Eläinten GLB:t on tuotu takaisin Blenderiin ja
-  jokainen leike kuvattu.
+- **Villisika** (`assets/animals/villisika.glb`, 0,53 Mt; `boar.py`, taustalla 1–2 min; itse mallinnettu, koska
+  CC0-villisikaa ei löytynyt; `assets-src/boar.blend` ei Gitissä): karju, 3 430 kolmiota, yksi materiaali,
+  verteksivärit (COLOR_0). Kärsä–peppu 1,52 m (hännän kanssa 1,58), säkä 0,865 m, harja 0,99 m, leveys 0,43 m.
+  Origo maassa jalkojen välissä, kärsä −Y (pelissä +z). Juurisolmu `villisika` (armature, 28 luuta) ja lapsena
+  `villisika_mesh`. Leikkeet 30 fps paikallaan: `idle` 2,0 s, `walk` 1,0 s (1,2 m/s), `run` 0,5 s (rynnäkkö,
+  6,5 m/s), `attack` 0,8 s (osumaikkuna 0,30–0,45 s), `hit` 0,4 s ja `death` 1,5 s (kyljelleen, pidä viimeinen
+  ruutu). `KALEVALA_PREVIEW=<kansio>` tekee kuvat ja `report.json`in uudelleen tuodusta GLB:stä. Arvioija
+  hyväksyi iteraation 5; ei katsottu pelissä. Hylätty iter. 4: reiden yläkansi pisti läpi (nyt jalka alkaa
+  rungon sisältä) ja hammas oli kärsän kärjessä (nyt suupielessä 13 cm kiekon takana). Profiilissa hammas jää
+  pään ääriviivan sisään; riittävän pitkä hammas (15–18 cm) olisi sarjakuvamainen.
+- **Tarkistuksen taso:** Blenderin kuvat; kyläläiset, eläimet, esineet ja rakennelmat myös pelin
+  kuvakaappauksista, ei liikkeessä. Eläinten GLB:t on tuotu takaisin Blenderiin ja jokainen leike kuvattu.
 - **Blender-putket** (`assets-src/blender/`): metsä `build_all.py`,
   taistelijat `char_all.py` → `run_chars()`, kyläläiset `char_folk.py` →
   `run_folk()`, suo `bog.py` → `build_bog()`, pihapiiri `homestead.py` ja
-  esineet `household.py`, rauhallisen pihan rakennelmat `yard.py` ja
-  eläimet `animals.py`.
+  esineet `household.py`, rauhallisen pihan rakennelmat `yard.py`,
+  eläimet `animals.py` ja villisika `boar.py`.
   - Hahmot rakennetaan **avoimessa `characters.blend`-tiedostossa** Blender
     MCP:n kautta (kokoelmat GAME, SRC, WORK, FOLK, FOLK_F). Uusi
     kyläläinen: oma `build_…`-funktio ja rivi `run_folk`iin.
@@ -187,17 +194,12 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja main 218cebd; `vuode` branchissa
     kerrallaan, kyläläisille `FOLK_DIR`) ja vie
     `export_characters(out)` tai `KALEVALA_ASSETS_OUT`; `char_all.py`:n
     `_B` osoittaa pääkansioon.
-  - Vienti lisää `characters.glb`:hen tyhjän juurisolmun `RIG_F` (ja
-    `villagers_f.glb`:hen `RIG__tmp`). Ne ovat viejän sivutuote toisesta
-    luurangosta ja harmittomia.
+  - Tyhjät juurisolmut `RIG_F` (`characters.glb`) ja `RIG__tmp` (`villagers_f.glb`) ovat harmittomia.
   - Blender MCP:n oma taustatyökalu ei toimi, koska `BLENDER_PATH` puuttuu.
     MCP-kutsut eivät säilytä Python-tilaa: jokainen kutsu lukee skriptin
     uudelleen.
-  - Lähteet hakevat `tools/fetch-*.ps1`; PowerShell-skriptien ajo on ollut
-    kotikoneella estetty, joten tiedostoja on haettu samoista osoitteista
-    käsin kansioon `assets-src/_downloads/` (ei Gitissä). `.blend`-tiedostot
-    eivät ole Gitissä, eikä lähdemallien tuontia SRC-kokoelmaan ole
-    skriptattu.
+  - Lähteet hakevat `tools/fetch-*.ps1` (kotikoneella estetty, haettu käsin kansioon
+    `assets-src/_downloads/`, ei Gitissä). `.blend`-tiedostot eivät ole Gitissä.
 
 ## Tunnetut rajoitteet ja riskit
 
@@ -211,16 +213,16 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja main 218cebd; `vuode` branchissa
 - Eläinten tyyli ei ole yhtenäinen: kukko ja kanat ovat käsinmaalattuja,
   koira sileä ja ihmishahmoja lelumaisempi. Possu on porsaan mittasuhteissa.
   Koiran 191 luuta on yhdelle koiralle hyväksyttävä, ei laumalle.
+- Villisian jalat ovat yhä hieman hoikat, kuolema on jäykkä käsin avaimitettu kaatuminen ja vatsan
+  karvatupsut ovat lähellä sahalaitaisia. GLB on 0,5 Mt, koska jokainen luu on leivottu joka ruutuun.
 - Talousesineiden tulikivet ja tuhka ovat tasaisen harmaita ilman tekstuuria.
 - Miehen huotra on litteä laatikko ja seuraa vain lantiota, joten se menee
   kävellessä reiden ja helman läpi. Selässä kilven kädensija painuu hieman
   panssariin ja sankarin pitkät hiukset menevät kilven läpi. Kantohihna
   kulkee selässä kilven alla, ei kiinnity kilpeen.
 - Blender-skriptien polut on kovakoodattu (`C:\Data\3D Kalevala`), paitsi `forest_lod.py`.
-- Kaukopuiden kortit ovat valaisemattomia albedokuvia ilman itsevarjostusta: Cycles-kuvissa ne ovat
-  hieman vaaleampia ja litteämpiä kuin täydet puut. Jos ero näkyy pelissä LOD-rajalla, tummenna kuvia
-  skriptissä (`bake_material`) tai lisää kortteihin sävyliukuma. Kuvat on otettu kolmesta suunnasta,
-  joten suoraan kortin suuntaisesti katsottuna kaksi muuta korttia näyttävät puun hieman leveämpänä.
+- Kaukopuiden kortit ovat valaisemattomia albedokuvia ilman itsevarjostusta; jos LOD-raja näkyy, tummenna
+  `bake_material`issa. Kortin suuntaisesti katsottuna puu näyttää hieman leveämmältä.
 - `forest_lod.glb` sisältää omat kopiot `M_Log`- ja dirt-tekstuureista (noin 0,8 Mt), koska tiedostot
   eivät jaa materiaaleja.
 
