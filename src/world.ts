@@ -1777,8 +1777,14 @@ export const yardDebug: {
   spots: Record<string, { key: string; x: number; z: number }[]>;
 } = { animals: null, people: {}, spots: {} };
 
-/** Rantakohtauksen väki: tietäjä seisoo keittotulen vieressä sauvaansa nojaten, koira lepäilee
- *  tulen ja mökin välissä. */
+/** Savutesteille: tämän käynnin arvottu tietäjän ja koiran paikka rannalla (`__world.lake`). */
+export const lakeDebug: { people: Record<string, string>; spots: Record<string, { key: string; x: number; z: number }[]> } = { people: {}, spots: {} };
+
+/**
+ * Rantakohtauksen väki. Tietäjä seisoo käynnistä riippuen padan ääressä, mökin ovensuussa tai
+ * laiturilla sauvaansa nojaten (omistaja 2026-11-22); koira on useimmiten hänen lähellään, muuten
+ * tulen, oven, laiturin tyven tai kuivaustelineen luona.
+ */
 function populateLakeLife(scene: THREE.Scene, collision: CollisionWorld) {
   const facing = (x: number, z: number, tx: number, tz: number) => Math.atan2(tx - x, tz - z);
   const solid = (id: string, x: number, z: number, radius: number) => {
@@ -1802,17 +1808,36 @@ function populateLakeLife(scene: THREE.Scene, collision: CollisionWorld) {
     return Promise.all(jobs).then(() => undefined);
   }
 
-  const sx = FIRE.x + 1.45, sz = FIRE.z + 0.45;
+  const spot = (key: string, weight: number, [x, z]: [number, number], tx: number, tz: number): Spot => ({ key, weight, x, z, yaw: facing(x, z, tx, tz) });
+  const listed = <S extends Spot>(who: string, spots: S[]) => { lakeDebug.spots[who] = spots.map(({ key, x, z }) => ({ key, x, z })); return spots; };
+  const [doorX, doorZ] = fromLocal(CABIN, -0.4, 2.9);
+  const jettyZ = JETTY_AT.z + 1.3;
+  const sage = pickSpot(listed("sage", [
+    spot("pot", 0.45, [FIRE.x + 1.45, FIRE.z + 0.45], FIRE.x, FIRE.z),
+    spot("door", 0.3, [doorX, doorZ], FIRE.x, FIRE.z),
+    // Laiturilla katse järvelle; sankari puhuu hänelle laiturin tyveltä.
+    spot("jetty", 0.25, [JETTY_AT.x, jettyZ], JETTY_AT.x, jettyZ + 5),
+  ]));
+  lakeDebug.people.sage = sage.key;
   jobs.push(spawnVillager(scene, {
-    url: villagersUrl, character: "tietaja", x: sx, y: groundHeight(sx, sz), z: sz, yaw: facing(sx, sz, FIRE.x, FIRE.z),
+    url: villagersUrl, character: "tietaja", x: sage.x, y: groundHeight(sage.x, sage.z), z: sage.z, yaw: sage.yaw,
     armR: { upper: [0.2, -1, 0.3], fore: [0.05, -0.1, 1] },
     prop: { name: "sauva", hand: "R", kind: "staff", grip: GRIP_MALE_R },
   }));
-  solid("tietaja", sx, sz, 0.4);
+  solid("tietaja", sage.x, sage.z, 0.4);
 
-  const dx = FIRE.x - 1.15, dz = FIRE.z - 1.2;
-  jobs.push(spawnAnimal(scene, { url: dogUrl, x: dx, y: groundHeight(dx, dz), z: dz, yaw: facing(dx, dz, FIRE.x, FIRE.z), behavior: "dog" }));
-  solid("koira", dx, dz, 0.3);
+  // Koiran paikat; `near` = tietäjän paikka, jonka lähellä tämä on (silloin todennäköisempi).
+  const dogSpot = (key: string, near: string | null, at: [number, number]) =>
+    ({ ...spot(key, 0.15 + (near === sage.key ? 0.4 : 0), at, sage.x, sage.z), near });
+  const dog = pickSpot(listed("dog", [
+    dogSpot("fire", "pot", [FIRE.x - 1.15, FIRE.z - 1.2]),
+    dogSpot("door", "door", fromLocal(CABIN, 0.6, 3.4)),
+    dogSpot("jettyBase", "jetty", [JETTY_AT.x + 1.5, JETTY_AT.z - 1.4]),
+    dogSpot("rack", null, [RACK_LAKE.x + 1.3, RACK_LAKE.z + 0.9]),
+  ]));
+  lakeDebug.people.dog = dog.key;
+  jobs.push(spawnAnimal(scene, { url: dogUrl, x: dog.x, y: groundHeight(dog.x, dog.z), z: dog.z, yaw: dog.yaw, behavior: "dog" }));
+  solid("koira", dog.x, dog.z, 0.3);
 
   return Promise.all(jobs).then(() => undefined);
 }
@@ -1829,7 +1854,8 @@ export function birdSongLevel(x: number, z: number): number {
  * Kuppikivelle voi puhua kummallakin kalmistolla (Ukon muistaminen, `CUPSTONE_DIALOGUE`).
  */
 function populateCairnLife(scene: THREE.Scene, collision: CollisionWorld) {
-  addTalkable({ id: "kuppikivi", x: CUPSTONE.x, z: CUPSTONE.z, name: t("folk.kuppikivi") });
+  // Louhen kalmiston kivi on `kuppikivi`; toisen kalmiston `uhrikivi` ottaa myös tietäjän pyytämät uhrit.
+  addTalkable({ id: cairnState.louhiHere ? "kuppikivi" : "uhrikivi", x: CUPSTONE.x, z: CUPSTONE.z, name: t("folk.kuppikivi") });
   if (cairnState.louhiBanished || !cairnState.louhiHere) return Promise.resolve();   // karkotettu tai toinen kalmisto
   const { x, z } = LOUHI_AT;
   const yaw = Math.atan2(CUPSTONE.x - x, CUPSTONE.z - z);

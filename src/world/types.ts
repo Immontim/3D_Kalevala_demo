@@ -1,7 +1,7 @@
 // Maailmamoottorin tyypit. Pelkkää dataa: ei skriptikieltä eikä eval-kutsuja.
 // Sääntöjen kirjoittavat agentit; omistaja hyväksyy ne moottorin tulostaman suomenkielisen yhteenvedon kautta.
 import type { TextKey } from "../i18n";
-import type { ItemId, TakeMode } from "../map/campaign";
+import type { ItemId, ItemTag, TakeMode } from "../map/campaign";
 import type { LongEffectId } from "../map/longEffects";
 import type { CounterDef, FlagDef } from "./registry";
 
@@ -25,6 +25,8 @@ export type Condition =
   | { kind: "itemTaken"; instanceId: string }
   /** Pelaajan inventaariossa on vähintään `quantity` kappaletta esinettä. */
   | { kind: "hasItem"; itemId: ItemId; quantity: number }
+  /** Pelaajalla on vähintään `quantity` kappaletta tämän tyypin esineitä yhteensä (esim. mitä tahansa lihaa). */
+  | { kind: "hasTagged"; tag: ItemTag; quantity: number }
   /**
    * Kuunkierron arpa: pitää todennäköisyydellä `chance`, ja tulos pysyy samana koko kuunkierron
    * (siemen, kuunkierto ja `salt`). Esim. "kalaa on tällä kuulla noussut hyvin".
@@ -42,6 +44,8 @@ export type Effect =
   | { kind: "addCounter"; counter: string; amount: number }
   | { kind: "giveItem"; itemId: ItemId; quantity: number }
   | { kind: "takeItem"; itemId: ItemId; quantity: number }
+  /** Ottaa pelaajalta `quantity` kappaletta tämän tyypin esineitä (esim. kaksi lihaa uhriksi), lajista riippumatta. */
+  | { kind: "takeTagged"; tag: ItemTag; quantity: number }
   /** Muuttaa ottamisen luvan. `instanceId` voi viitata pihan rooliin (`@archerYard.` / `@otherYard.`). */
   | { kind: "setSceneItemTakeMode"; instanceId: string; takeMode: TakeMode }
   /** Viesti pelaajalle. Ei muuta tilaa; moottori palauttaa sen kutsujalle näytettäväksi. */

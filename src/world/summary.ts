@@ -10,6 +10,7 @@ import type { Condition, Dialogue, Effect, EventPattern, Rule, WorldData } from 
 export type TextLookup = (key: TextKey) => string;
 
 const TAKE_MODE_TEXT = { allowed: "luvalliseksi", theft: "varkaudeksi" } as const;
+const TAG_TEXT = { meat: "lihaa" } as const;
 
 function itemName(itemId: keyof typeof ITEMS, text: TextLookup): string {
   return text(ITEMS[itemId].nameKey).toLowerCase();
@@ -33,6 +34,7 @@ export function describeCondition(cond: Condition, data: WorldData): string {
     case "itemTaken": return `${itemLabel(cond.instanceId)} on otettu`;
     case "sameMoon": return `${data.counters[cond.counter]?.label ?? cond.counter} on tämä kuunkierto`;
     case "hasItem": return `pelaajalla on mukana vähintään ${cond.quantity} × ${cond.itemId}`;
+    case "hasTagged": return `pelaajalla on mukana vähintään ${cond.quantity} × ${TAG_TEXT[cond.tag]} (mitä tahansa lajia)`;
     case "moonChance": return `tämän kuunkierron arpa "${cond.salt}" osuu (${Math.round(cond.chance * 100)} %)`;
     case "unknownHuntGround": return "kartalla on metsästysapaja, jota pelaaja ei vielä tunne";
   }
@@ -50,6 +52,7 @@ export function describeEffect(effect: Effect, data: WorldData, text: TextLookup
     }
     case "giveItem": return `pelaaja saa: ${itemName(effect.itemId, text)} ×${effect.quantity}`;
     case "takeItem": return `pelaajalta otetaan: ${itemName(effect.itemId, text)} ×${effect.quantity}`;
+    case "takeTagged": return `pelaajalta otetaan ${effect.quantity} × ${TAG_TEXT[effect.tag]} (mitä tahansa lajia)`;
     case "setSceneItemTakeMode": return `${itemLabel(effect.instanceId)} muuttuu ${TAKE_MODE_TEXT[effect.takeMode]} otettavaksi`;
     case "message": return `näytetään viesti "${text(effect.text)}"${effect.sub ? ` / "${text(effect.sub)}"` : ""}`;
     case "revealSite": return `karttapaikka "${effect.siteId}" paljastuu kartalle`;

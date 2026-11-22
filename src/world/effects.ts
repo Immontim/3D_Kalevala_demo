@@ -1,7 +1,7 @@
 // Efektien soveltaminen. Efektilista on atominen: jos yksikin epäonnistuu (esim. tavarat eivät
 // mahdu mukaan), mikään sen vaikutus ei tule voimaan. Efektit eivät kosketa maailma-aikaa
 // (`worldMinutes`): 3D-kohtaus ei kuluta aikaa.
-import { setSceneItemTakeMode, tryAddItem, tryRemoveItem, type CampaignState } from "../map/campaign";
+import { setSceneItemTakeMode, tryAddItem, tryRemoveItem, tryRemoveTagged, type CampaignState } from "../map/campaign";
 import { nearestUnknownHuntGround } from "../map/huntGrounds";
 import { tryAddLongEffect } from "../map/longEffects";
 import { revealSiteOnMap } from "../map/reveal";
@@ -44,6 +44,12 @@ export function applyEffects(state: CampaignState, effects: readonly Effect[], d
       case "takeItem": {
         const inventory = tryRemoveItem(current.player.inventory, effect.itemId, effect.quantity);
         if (!inventory) return fail(state, "missing-item", `${effect.itemId} ×${effect.quantity} ei löydy inventaariosta`);
+        current = { ...current, player: { ...current.player, inventory } };
+        break;
+      }
+      case "takeTagged": {
+        const inventory = tryRemoveTagged(current.player.inventory, effect.tag, effect.quantity);
+        if (!inventory) return fail(state, "missing-item", `${effect.tag} ×${effect.quantity} ei löydy inventaariosta`);
         current = { ...current, player: { ...current.player, inventory } };
         break;
       }

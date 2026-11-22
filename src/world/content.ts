@@ -163,6 +163,13 @@ export const RULES: Rule[] = [
     ],
   },
   {
+    id: "sage.offering-awaited",
+    intent: "Kun pelaaja lähtee rannalta sen jälkeen, kun tietäjä on vaatinut uhrin, tietäjä kysyy seuraavalla käynnillä, onko uhrit toimitettu.",
+    on: { type: "npc.leftBehind", npcId: "tietaja", sceneId: "lakeside" },
+    when: { kind: "flag", flag: "sage.offeringAsked" },
+    then: [{ kind: "setFlag", flag: "sage.offeringAwaited" }],
+  },
+  {
     id: "campaign.victory",
     intent: "Kun leirin viimeinen aalto kaatuu, kampanja on voitettu: päivät ja tutkittu kartta kirjataan loppuruutua varten.",
     on: { type: "battle.won", sceneId: "clearing" },
@@ -239,12 +246,34 @@ export const RULES: Rule[] = [
   },
 ];
 
-/** Laulun opettelun valinta (V4): näkyy, kunnes Pohjolan uni on opittu. */
-const ASK_SONG: DialogueChoice = {
-  id: "ask-song",
-  text: "dialogue.sage.askSong",
-  when: { kind: "flag", flag: "song.sleep.learned", value: false },
-  next: "songIntro",
+/** Uhrikalmiston kuppikivelle vietävä lihamäärä (omistaja 2026-11-22). */
+export const OFFERING_MEAT = 2;
+const NOT_LEARNED: Condition = { kind: "flag", flag: "song.sleep.learned", value: false };
+const OFFERING_MADE: Condition = { kind: "flag", flag: "offering.made" };
+/**
+ * Laulun pyyntö (V4 + uhri 2026-11-22). Ennen uhria tietäjä vaatii uhrin Ukolle, Tapiolle ja Manalle
+ * menneille ja kertoo toisesta kalmistosta (paljastuu kartalle). Kun uhri on tehty, hän opettaa laulun.
+ */
+const ASK_SONG: DialogueChoice[] = [
+  {
+    id: "ask-song",
+    text: "dialogue.sage.askSong",
+    when: { kind: "all", of: [NOT_LEARNED, { kind: "flag", flag: "sage.offeringAsked", value: false }, { kind: "not", of: OFFERING_MADE }] },
+    effects: [
+      { kind: "setFlag", flag: "sage.offeringAsked" },
+      { kind: "revealSite", siteId: "cairn-b" },
+      { kind: "message", text: "world.sage.offeringCairn", sub: "world.sage.offeringCairnSub" },
+    ],
+    next: "offeringDemand",
+  },
+  { id: "ask-song-taught", text: "dialogue.sage.askSong", when: { kind: "all", of: [NOT_LEARNED, OFFERING_MADE] }, next: "songIntro" },
+];
+const LESSON_CHOICES: DialogueChoice[] = [
+  { id: "ready", text: "dialogue.sage.ready", effects: [{ kind: "startSongLesson", songId: "sleep" }] },
+  { id: "leave", text: "dialogue.sage.leave" },
+];
+const PACK_FREE: Condition = {
+  kind: "all", of: [{ kind: "flag", flag: "sage.permission", value: false }, { kind: "not", of: { kind: "itemTaken", instanceId: SAGE_PACK } }],
 };
 const ASK_PACK: DialogueChoice = {
   id: "ask-pack",
@@ -260,10 +289,14 @@ export const SAGE_DIALOGUE: Dialogue = {
   id: "sage.lakeside",
   sceneId: "lakeside",
   npcId: "tietaja",
-  intent: "Tietäjä antaa tuohikontin luvallisesti pyydettäessä ja opettaa Pohjolan unen; luvaton ottaja saa kuulla varkaudesta ja voi pyytää anteeksi.",
+  intent: "Tietäjä antaa ovensuun tuohikontin luvallisesti pyydettäessä. Laulua pyytävältä hän vaatii ensin uhrin Ukolle, Tapiolle ja Manalle menneille ja kertoo toisesta kalmistosta; seuraavalla käynnillä hän kysyy, onko uhrit toimitettu, ja uhrin jälkeen opettaa Pohjolan unen. Luvaton ottaja saa kuulla varkaudesta ja voi pyytää anteeksi.",
   entries: [
     { when: { kind: "flag", flag: "sage.robbed" }, node: "robbed" },
     { when: { kind: "flag", flag: "song.sleep.learned" }, node: "taught" },
+    {
+      when: { kind: "all", of: [{ kind: "flag", flag: "sage.offeringAwaited" }, { kind: "flag", flag: "sage.offeringConfirmed", value: false }] },
+      node: "askOffering",
+    },
     { when: { kind: "flag", flag: "sage.forgiven" }, node: "forgiven" },
     {
       when: { kind: "all", of: [{ kind: "flag", flag: "sage.permission" }, { kind: "not", of: { kind: "itemTaken", instanceId: SAGE_PACK } }] },
@@ -275,24 +308,33 @@ export const SAGE_DIALOGUE: Dialogue = {
   nodes: {
     greet: {
       text: lines("dialogue.sage.greet"),
-      choices: [ASK_PACK, ASK_SONG, { id: "leave", text: "dialogue.sage.leave" }],
+      choices: [ASK_PACK, ...ASK_SONG, { id: "leave", text: "dialogue.sage.leave" }],
     },
-    granted: { text: lines("dialogue.sage.granted"), choices: [ASK_SONG, { id: "thanks", text: "dialogue.sage.thanks" }] },
-    afterTaken: { text: lines("dialogue.sage.afterTaken"), choices: [ASK_SONG, { id: "leave", text: "dialogue.sage.leave" }] },
-    songIntro: {
-      text: lines("dialogue.sage.songIntro"),
+    granted: { text: lines("dialogue.sage.granted"), choices: [...ASK_SONG, { id: "thanks", text: "dialogue.sage.thanks" }] },
+    afterTaken: { text: lines("dialogue.sage.afterTaken"), choices: [...ASK_SONG, { id: "leave", text: "dialogue.sage.leave" }] },
+    songIntro: { text: lines("dialogue.sage.songIntro"), choices: LESSON_CHOICES },
+    offeringDemand: { text: lines("dialogue.sage.offeringDemand"), choices: [{ id: "leave", text: "dialogue.sage.willDo" }] },
+    askOffering: {
+      text: lines("dialogue.sage.askOffering"),
       choices: [
-        { id: "ready", text: "dialogue.sage.ready", effects: [{ kind: "startSongLesson", songId: "sleep" }] },
+        {
+          id: "offering-done",
+          text: "dialogue.sage.offeringDone",
+          when: OFFERING_MADE,
+          effects: [{ kind: "setFlag", flag: "sage.offeringConfirmed" }],
+          next: "offeringThanks",
+        },
+        { id: "offering-not-yet", text: "dialogue.sage.offeringNotYet", when: { kind: "not", of: OFFERING_MADE }, next: "offeringPending" },
+        { ...ASK_PACK, when: PACK_FREE },
         { id: "leave", text: "dialogue.sage.leave" },
       ],
     },
+    offeringThanks: { text: lines("dialogue.sage.offeringThanks"), choices: LESSON_CHOICES },
+    offeringPending: { text: lines("dialogue.sage.offeringPending"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
     taught: {
       text: lines("dialogue.sage.taught"),
       choices: [
-        {
-          ...ASK_PACK,
-          when: { kind: "all", of: [{ kind: "flag", flag: "sage.permission", value: false }, { kind: "not", of: { kind: "itemTaken", instanceId: SAGE_PACK } }] },
-        },
+        { ...ASK_PACK, when: PACK_FREE },
         { id: "leave", text: "dialogue.sage.leave" },
       ],
     },
@@ -311,7 +353,7 @@ export const SAGE_DIALOGUE: Dialogue = {
         { id: "leave", text: "dialogue.sage.leave" },
       ],
     },
-    forgiven: { text: lines("dialogue.sage.forgiven"), choices: [ASK_SONG, { id: "thanks", text: "dialogue.sage.thanks" }] },
+    forgiven: { text: lines("dialogue.sage.forgiven"), choices: [...ASK_SONG, { id: "thanks", text: "dialogue.sage.thanks" }] },
   },
 };
 
@@ -476,50 +518,71 @@ export const YOUNG_WARRIOR_DIALOGUE: Dialogue = {
 };
 
 /**
- * Kuppikivi kummallakin kalmistolla (sama kohtaus `cairnfield`). Ukon muistaminen antaa Ukon siunauksen
- * (+20 kestävyyden yläraja 15 päiväksi) kerran kuunkierrossa yhteensä molemmilla kivillä (omistaja 2026-11-22).
- * Saman kuun aikana kivi vain vaikenee, ja tarjolla on tyhjä muistelu.
+ * Kuppikivi kummallakin kalmistolla (sama kohtaus `cairnfield`): Louhen kalmistolla `kuppikivi`, toisella
+ * kalmistolla `uhrikivi`. Ukon muistaminen antaa Ukon siunauksen (+20 kestävyyden yläraja 15 päiväksi)
+ * kerran kuunkierrossa yhteensä molemmilla kivillä (omistaja 2026-11-22); saman kuun aikana kivi vain
+ * vaikenee, ja tarjolla on tyhjä muistelu. Uhrikivellä voi lisäksi uhrata kaksi lihaa (mitä tahansa
+ * lihaa), mikä avaa tietäjän laulunopetuksen eikä anna buffia.
  */
-export const CUPSTONE_DIALOGUE: Dialogue = {
-  id: "kuppikivi.cairnfield",
-  sceneId: "cairnfield",
-  npcId: "kuppikivi",
-  intent: "Kuppikivellä pelaaja voi muistaa Ukkoa, Tapiota ja Otavan tähtiä; siitä saa Ukon siunauksen (kestävyyden yläraja +20, 15 päivää) kerran kuunkierrossa, yhteensä kummallakin kalmistolla. Saman kuun aikana kivi on vaiti eikä muistelu tee mitään.",
-  entries: [
-    { when: { kind: "sameMoon", counter: "ukko.rememberedMoon" }, node: "silent" },
-    { node: "stone" },
-  ],
-  nodes: {
-    stone: {
-      text: lines("dialogue.cupstone.stone"),
-      choices: [
-        {
-          id: "remember-ukko",
-          text: "dialogue.cupstone.remember",
-          effects: [
-            { kind: "addLongEffect", effectId: "ukko_blessing" },
-            { kind: "markMoon", counter: "ukko.rememberedMoon" },
-            { kind: "message", text: "world.ukko.blessed", sub: "world.ukko.blessedSub" },
-          ],
-          next: "blessed",
-        },
-        { id: "leave", text: "dialogue.cupstone.leave" },
-      ],
+function cupstoneDialogue(npcId: "kuppikivi" | "uhrikivi"): Dialogue {
+  const offering = npcId === "uhrikivi";
+  const offer: DialogueChoice[] = offering ? [{
+    id: "offer",
+    text: "dialogue.cupstone.offer",
+    when: { kind: "all", of: [{ kind: "hasTagged", tag: "meat", quantity: OFFERING_MEAT }, { kind: "not", of: OFFERING_MADE }] },
+    effects: [
+      { kind: "takeTagged", tag: "meat", quantity: OFFERING_MEAT },
+      { kind: "setFlag", flag: "offering.made" },
+      { kind: "message", text: "world.offering.made", sub: "world.offering.madeSub" },
+    ],
+    next: "offered",
+  }] : [];
+  const leave: DialogueChoice = { id: "leave", text: "dialogue.cupstone.leave" };
+  return {
+    id: `${npcId}.cairnfield`,
+    sceneId: "cairnfield",
+    npcId,
+    intent: offering
+      ? "Toisen kalmiston kuppikivelle pelaaja voi uhrata kaksi lihaa Ukolle ja Manalle menneille (valinta näkyy vain, kun lihaa on mukana kaksi); uhri avaa tietäjän laulunopetuksen. Kivellä voi myös muistaa Ukkoa kuten Louhen kalmistolla: siunaus kerran kuunkierrossa kummalla tahansa kivellä."
+      : "Kuppikivellä pelaaja voi muistaa Ukkoa, Tapiota ja Otavan tähtiä; siitä saa Ukon siunauksen (kestävyyden yläraja +20, 15 päivää) kerran kuunkierrossa, yhteensä kummallakin kalmistolla. Saman kuun aikana kivi on vaiti eikä muistelu tee mitään.",
+    entries: [
+      { when: { kind: "sameMoon", counter: "ukko.rememberedMoon" }, node: "silent" },
+      { node: "stone" },
+    ],
+    nodes: {
+      stone: {
+        text: lines("dialogue.cupstone.stone"),
+        choices: [
+          ...offer,
+          {
+            id: "remember-ukko",
+            text: "dialogue.cupstone.remember",
+            effects: [
+              { kind: "addLongEffect", effectId: "ukko_blessing" },
+              { kind: "markMoon", counter: "ukko.rememberedMoon" },
+              { kind: "message", text: "world.ukko.blessed", sub: "world.ukko.blessedSub" },
+            ],
+            next: "blessed",
+          },
+          leave,
+        ],
+      },
+      blessed: { text: lines("dialogue.cupstone.blessed"), choices: [leave] },
+      silent: {
+        text: lines("dialogue.cupstone.silent"),
+        choices: [...offer, { id: "recall", text: "dialogue.cupstone.recall" }, leave],
+      },
+      ...(offering ? { offered: { text: lines("dialogue.cupstone.offered"), choices: [leave] } } : {}),
     },
-    blessed: { text: lines("dialogue.cupstone.blessed"), choices: [{ id: "leave", text: "dialogue.cupstone.leave" }] },
-    silent: {
-      text: lines("dialogue.cupstone.silent"),
-      choices: [
-        { id: "recall", text: "dialogue.cupstone.recall" },
-        { id: "leave", text: "dialogue.cupstone.leave" },
-      ],
-    },
-  },
-};
+  };
+}
+
+export const CUPSTONE_DIALOGUE = cupstoneDialogue("kuppikivi");
+export const OFFERING_STONE_DIALOGUE = cupstoneDialogue("uhrikivi");
 
 export const GAME_WORLD: WorldData = {
   flags: FLAGS,
   counters: COUNTERS,
   rules: RULES,
-  dialogues: [SAGE_DIALOGUE, ARCHER_DIALOGUE, HOUSEWIFE_DIALOGUE, HOUSEWIFE_B_DIALOGUE, YOUNG_WARRIOR_DIALOGUE, CUPSTONE_DIALOGUE],
+  dialogues: [SAGE_DIALOGUE, ARCHER_DIALOGUE, HOUSEWIFE_DIALOGUE, HOUSEWIFE_B_DIALOGUE, YOUNG_WARRIOR_DIALOGUE, CUPSTONE_DIALOGUE, OFFERING_STONE_DIALOGUE],
 };

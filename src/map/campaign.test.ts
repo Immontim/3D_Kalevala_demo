@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  itemHasTag,
+  taggedItemCount,
+  tryRemoveTagged,
   CAMPAIGN_SCHEMA_VERSION,
   BASE_INVENTORY_CAPACITY,
   MAX_INVENTORY_CAPACITY,
@@ -541,5 +544,18 @@ describe("taivaanrautamiekka varusteena (V6)", () => {
     const state = tryEquipItem(start, "sky_iron_sword").state;
     expect(state.player.equipment.mainHand).toBe("sky_iron_sword");
     expect(parseCampaign(serializeCampaign(state))?.player.equipment.mainHand).toBe("sky_iron_sword");
+  });
+});
+
+describe("esineiden tyyppi: liha (2026-11-22)", () => {
+  it("jänisliha on lihaa; tyypin mukaan otto on atominen ja vie vain lihaa", () => {
+    expect(itemHasTag("hare_meat", "meat")).toBe(true);
+    expect(itemHasTag("dried_fish", "meat")).toBe(false);
+    const inventory = tryAddItem(createCampaign().player.inventory, "hare_meat", 3)!;
+    expect(taggedItemCount(inventory, "meat")).toBe(3);
+    const after = tryRemoveTagged(inventory, "meat", 2)!;
+    expect(taggedItemCount(after, "meat")).toBe(1);
+    expect(after.stacks.find((stack) => stack.itemId === "barley_flatbread")?.quantity).toBe(3);
+    expect(tryRemoveTagged(after, "meat", 2)).toBeNull();
   });
 });

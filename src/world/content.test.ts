@@ -151,11 +151,12 @@ describe("tietäjä ja tuohikontti", () => {
     expect(text).toContain("Kun esine otetaan");
   });
 
-  it("laulun opettelu: valinta näkyy kunnes laulu on opittu ja pyytää harjoituksen UI:lta", () => {
+  it("laulun opettelu: uhrin jälkeen valinta näkyy kunnes laulu on opittu ja pyytää harjoituksen UI:lta", () => {
     const { store, runtime } = setup();
+    store.update((s) => ({ ...s, engine: { ...s.engine, flags: { ...s.engine.flags, "offering.made": true } } }));
     const start = runtime.startDialogue("lakeside", "tietaja")!;
-    expect(start.view.choices.map((c) => c.id)).toEqual(["ask-pack", "ask-song", "leave"]);
-    const intro = runtime.choose(start, "ask-song");
+    expect(start.view.choices.map((c) => c.id)).toEqual(["ask-pack", "ask-song-taught", "leave"]);
+    const intro = runtime.choose(start, "ask-song-taught");
     expect(intro.saved && intro.next?.view.nodeId).toBe("songIntro");
     if (!intro.saved || !intro.next) return;
     const ready = runtime.choose(intro.next, "ready");
@@ -696,5 +697,95 @@ describe("kuppikivi: Ukon muistaminen kerran kuussa molemmilla kalmistoilla (202
   it("yhteenveto kertoo siunauksen suomeksi", () => {
     const { runtime } = setup();
     expect(runtime.describe(finnishText)).toContain("Ukon siunaus");
+  });
+});
+
+describe("tietäjän uhri ennen laulua ja uhrikalmisto (2026-11-22)", () => {
+  const sage = (runtime: ReturnType<typeof setup>["runtime"]) => runtime.startDialogue("lakeside", "tietaja")!;
+  const stone = (runtime: ReturnType<typeof setup>["runtime"], id = "uhrikivi") => runtime.startDialogue("cairnfield", id)!;
+  const giveMeat = (store: ReturnType<typeof setup>["store"], n: number) =>
+    store.update((s) => ({ ...s, player: { ...s.player, inventory: tryAddItem(s.player.inventory, "hare_meat", n)! } }));
+  const leaveShore = (runtime: ReturnType<typeof setup>["runtime"]) =>
+    runtime.post({ type: "npc.leftBehind", npcId: "tietaja", sceneId: "lakeside" });
+
+  it("laulun pyyntö vaatii ensin uhrin ja paljastaa toisen kalmiston, ei Louhen kalmistoa", () => {
+    const { store, runtime } = setup();
+    const out = runtime.choose(sage(runtime), "ask-song");
+    if (!out.saved) throw new Error("valinta epäonnistui");
+    expect(out.next?.view.nodeId).toBe("offeringDemand");
+    expect(out.actions).toEqual([]);                                  // ei opetusta vielä
+    expect(out.messages[0].text).toBe("world.sage.offeringCairn");
+    expect(store.get().world.knownSiteIds).toContain("cairn-b");
+    expect(store.get().world.knownSiteIds).not.toContain("cairnfield");
+    // Samalla käynnillä laulua ei tarjota uudelleen eikä kysellä uhreista.
+    const again = sage(runtime);
+    expect(again.view.nodeId).toBe("greet");
+    expect(again.view.choices.map((c) => c.id)).toEqual(["ask-pack", "leave"]);
+  });
+
+  it("seuraavalla käynnillä tietäjä kysyy uhreista; ilman uhria vastaus on, ettei apajaa ole löytynyt", () => {
+    const { runtime } = setup();
+    runtime.choose(sage(runtime), "ask-song");
+    leaveShore(runtime);
+    const ask = sage(runtime);
+    expect(ask.view.nodeId).toBe("askOffering");
+    expect(ask.view.choices.map((c) => c.id)).toEqual(["offering-not-yet", "ask-pack", "leave"]);
+    const out = runtime.choose(ask, "offering-not-yet");
+    expect(out.saved && out.next?.view.nodeId).toBe("offeringPending");
+  });
+
+  it("uhrivalinta näkyy vain uhrikivellä ja vain kahdella lihalla; uhri vie lihat eikä anna siunausta", () => {
+    const { store, runtime } = setup();
+    expect(stone(runtime).view.choices.map((c) => c.id)).toEqual(["remember-ukko", "leave"]);
+    giveMeat(store, 1);
+    expect(stone(runtime).view.choices.map((c) => c.id)).not.toContain("offer");
+    giveMeat(store, 2);
+    expect(stone(runtime, "kuppikivi").view.choices.map((c) => c.id)).not.toContain("offer");   // Louhen kalmisto
+    const talk = stone(runtime);
+    expect(talk.view.choices.map((c) => c.id)).toEqual(["offer", "remember-ukko", "leave"]);
+    const out = runtime.choose(talk, "offer");
+    if (!out.saved) throw new Error("valinta epäonnistui");
+    expect(out.next?.view.nodeId).toBe("offered");
+    expect(itemCount(store.get(), "hare_meat")).toBe(1);
+    expect(store.get().engine.flags["offering.made"]).toBe(true);
+    expect(store.get().player.effects).toEqual([]);
+    expect(store.get().engine.counters["ukko.rememberedMoon"]).toBeUndefined();   // siunauksen voi yhä ottaa
+    expect(stone(runtime).view.choices.map((c) => c.id)).toEqual(["remember-ukko", "leave"]);   // uhri vain kerran
+  });
+
+  it("uhrin voi antaa myös saman kuun siunauksen jälkeen", () => {
+    const { store, runtime } = setup();
+    runtime.choose(stone(runtime, "kuppikivi"), "remember-ukko");
+    giveMeat(store, 2);
+    const silent = stone(runtime);
+    expect(silent.view.nodeId).toBe("silent");
+    expect(silent.view.choices.map((c) => c.id)).toEqual(["offer", "recall", "leave"]);
+  });
+
+  it("uhrin jälkeen tietäjä kuulee, että uhrit on toimitettu, ja opettaa laulun", () => {
+    const { store, runtime } = setup();
+    runtime.choose(sage(runtime), "ask-song");
+    leaveShore(runtime);
+    giveMeat(store, 2);
+    runtime.choose(stone(runtime), "offer");
+    const ask = sage(runtime);
+    expect(ask.view.choices.map((c) => c.id)).toEqual(["offering-done", "ask-pack", "leave"]);
+    const done = runtime.choose(ask, "offering-done");
+    if (!done.saved || !done.next) throw new Error("valinta epäonnistui");
+    expect(done.next.view.nodeId).toBe("offeringThanks");
+    const ready = runtime.choose(done.next, "ready");
+    expect(ready.saved && ready.actions).toEqual([{ kind: "songLesson", songId: "sleep" }]);
+    // Epäonnistuneen harjoituksen jälkeen tietäjä ei kysele uhreista uudelleen vaan opettaa pyydettäessä.
+    leaveShore(runtime);
+    const after = sage(runtime);
+    expect(after.view.nodeId).toBe("greet");
+    expect(after.view.choices.map((c) => c.id)).toContain("ask-song-taught");
+  });
+
+  it("uhrin voi antaa jo ennen tietäjän pyyntöä; silloin tietäjä opettaa heti", () => {
+    const { store, runtime } = setup();
+    giveMeat(store, 2);
+    runtime.choose(stone(runtime), "offer");
+    expect(sage(runtime).view.choices.map((c) => c.id)).toEqual(["ask-pack", "ask-song-taught", "leave"]);
   });
 });

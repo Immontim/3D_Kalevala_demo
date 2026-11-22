@@ -6,34 +6,37 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `076bb08`)
+Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `2260807`)
 
-- **Koodiversio v08.01.00** branchissa `claude/effects-ukko-buff` (pala 2/3 tietäjä- ja uhritehtävästä;
-  tarkista merge-tila `git merge-base`illa). Koodi valmis, ei deployattu, omistaja ei ole testannut. Claude
-  savutesti in-app-selaimessa: `cairn-b`:n kuppikivi avaa dialogin, muistaminen antaa kestävyyden ylärajaksi
-  120 heti, toinen puhe samalla kuulla (myös Louhen kalmistolla) näyttää vain tyhjän muistelun; siunaus
-  näkyy taukovalikon ja kartan inventaariossa (15 päivää) ja säilyy kohtauksesta toiseen; Louhelle voi yhä
-  puhua; `renderBench` 6,4 ms (1024 × 768); konsolissa vain vanha, jo korjattu virheloki. Tarkistukset:
-  `bun run test` 2124/2124, `bunx tsc --noEmit`, `bun run lint`, `bun run build`. v08.00 ja aiemmat mainissa.
+- **Koodiversio v08.02.00** branchissa `claude/sage-offering` (pala 3/3 tietäjä- ja uhritehtävästä; tarkista
+  merge-tila `git merge-base`illa). Koodi valmis, ei deployattu, omistaja ei ole testannut. Claude savutesti
+  in-app-selaimessa koko ketju: laulupyyntö → uhrivaatimus ja `cairn-b` kartalle → kartalle ja takaisin →
+  "onko uhrit toimitettu" → uhrikivellä "Ota uhrit…" (2 jänistä lähti, ei siunausta) → "Toki toimitin" →
+  opetus alkoi. Tietäjä nähty padalla, ovensuussa ja laiturilla, koira tulella, ovella, laiturin tyvellä ja
+  kuivaustelineellä; ehdokaspaikat vapaita törmäyksistä. `renderBench` ranta 6,8 ms (1024 × 768); konsolissa
+  vain vanha, jo korjattu virheloki. Tarkistukset: `bun run test` 2131/2131, `bunx tsc --noEmit`,
+  `bun run lint`, `bun run build`. v08.01 ja aiemmat mainissa.
+- **Uhri ennen laulua (v08.02, `content.ts`).** `ASK_SONG` on kaksi valintaa: `ask-song` (ei uhria, ei
+  pyydetty) → `sage.offeringAsked`, `revealSite cairn-b`, solmu `offeringDemand`; `ask-song-taught`
+  (`offering.made`) → `songIntro`. Sääntö `sage.offering-awaited` (`npc.leftBehind` tietäjä) → lippu
+  `sage.offeringAwaited`, jolloin seuraavalla käynnillä solmu `askOffering` ("Toki toimitin…" →
+  `sage.offeringConfirmed`, `offeringThanks` + opetus; "Ei ole apajaa…" → `offeringPending`). Uhrin voi
+  antaa myös ennen pyyntöä. Esineillä `tags` (`ItemTag` `"meat"`, nyt `hare_meat`); ehto `hasTagged`, efekti
+  `takeTagged` (`tryRemoveTagged`). Tuohikontti on ovensuussa ("Onko tuohikontti ovensuussa joutilas?").
 - **Pitkäkestoiset efektit (v08.01, `map/longEffects.ts`).** `CampaignPlayer.effects` = `{ id, until }`
   (maailma-aika); luetaan sallivasti (`parseLongEffects`), puuttuva = tyhjä, joten skeemaversio pysyi 7:nä.
   Kolme paikkaa (`LONG_EFFECT_SLOTS`), sama efekti uudelleen alkaa alusta, neljäs eri efekti epäonnistuu
   (`effects-full`). Moottorin efekti `addLongEffect`. 3D: `transition.applyLongEffects` (muunnin
   `long-effect:<id>:<stat>`, summautuu nälän rangaistukseen) `spawnHero`ssa ja `campaignStore`-muutoksissa
-  (`refreshLongEffects`). UI: `inventoryView` piirtää paikat paperinuken alle, kuvake
-  `assets/map/effect-ukko-blessing.png` (generoitu skriptillä). Ainoa efekti nyt `ukko_blessing`.
-- **Kuppikivi (v08.01, `CUPSTONE_DIALOGUE`).** Puhuteltava `kuppikivi` kummallakin kalmistolla
-  (`populateCairnLife`). "Ukon muistan…" → `ukko_blessing` + `markMoon` `ukko.rememberedMoon`; saman kuun
-  aikana solmu `silent` ja tyhjä "Muistat muinaisia ja Ukon väkeä". Pohjolan unella `peaceTargets: ["louhi"]`,
-  jotta kivi ei vie karkotuksen kuulijaa.
-- **Tietäjän mökki ja kalmistot ovat instansseja (v08.00).** `SiteInstanceKind` `lakeside` ja `cairn`;
-  tunnisteet `lakeside` (`SAGE_SITE_ID`), `cairnfield` (Louhi, `LOUHI_CAIRN_ID`) ja `cairn-b`
-  (`OFFERING_CAIRN_ID`, ei Louhta) `map/sites.ts`:ssä. Kartassa ei ole enää kiinteitä paikkoja
-  (`MAP_SITE_DEFINITIONS` poistettu). Uusi matka: `placeShoreSites` (`placement.ts`, `SHORE_PLACEMENT`:
-  rantaruutu = vieressä avovettä, ei viistoon; mökki niitty/metsä, kalmisto niitty/metsä/umpimetsä/kallio;
-  kalmisto ≥ 5 mökistä ja toisesta kalmistosta) ennen pihoja, jotka väistävät ne (`placementWith`).
-  Vanha tallennus: `completeSiteInstances` (mökki ja Louhen kalmisto `LEGACY_SHORE_POSITIONS`iin, `cairn-b`
-  arvotaan). `cairnState.louhiHere` `scene3d.ts`:ssä; `cairn-b`:n karttamerkki `cairn-site-empty.png`.
+  (`refreshLongEffects`). UI: `inventoryView` paperinuken alla, kuvake `effect-ukko-blessing.png` (generoitu).
+- **Kuppikivi (v08.01–02, `cupstoneDialogue`).** Louhen kalmistolla puhuteltava `kuppikivi`, `cairn-b`:llä
+  `uhrikivi` (`populateCairnLife`, `cairnState.louhiHere`); vain uhrikivellä "Ota uhrit…" (2 lihaa, kerran,
+  myös `silent`-solmussa). "Ukon muistan…" → `ukko_blessing` + `markMoon` `ukko.rememberedMoon`; saman kuun
+  aikana `silent` ja tyhjä muistelu. Pohjolan unella `peaceTargets: ["louhi"]` (kivi ei vie kuulijaa).
+- **Mökki ja kalmistot ovat instansseja (v08.00, `map/sites.ts`).** `lakeside` (`SAGE_SITE_ID`), `cairnfield`
+  (Louhi) ja `cairn-b` (`OFFERING_CAIRN_ID`); ei kiinteitä karttapaikkoja. `placeShoreSites` (`SHORE_PLACEMENT`:
+  rantaruutu = avovesi vieressä, kalmisto ≥ 5 mökistä ja toisesta) ennen pihoja (`placementWith`). Vanha
+  tallennus: `completeSiteInstances` + `LEGACY_SHORE_POSITIONS`. `cairn-b`:n merkki `cairn-site-empty.png`.
 - **Piha (v07.02–v07.04, `content.ts`, `world.ts`, `yardLife.ts`).** Neito `vuode`lla; `archer.healed` (`minHits`
   6), `archer.died-song`, `archer.died-left` (`npc.leftBehind`, `engine/leave.ts`). `housewifeDialogue(npc)`
   (`emanta` neidon talossa, `emanta_b` toisessa): huhu kerran kummalta tahansa (`rumor.heard`), sitten apaja
@@ -91,21 +94,16 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `076bb08`)
   >= 8 ruutua aloituksesta, <= 600 min, lukossa lipulla `louhi.banished`). Jousineito on `archer`-pihassa
   (v07.02 yllä); dialogista `sky_iron_sword` (vahinko 1,3; oma GLB-malli). Tietäjä vain rannalla, nuori urho
   `archer`-vapaassa pihassa.
-- **Louhen karkotus (V5, mergattu).** Pohjolan uni <= 6 m (`SONG_AUDIENCE_RANGE`) Louhesta
-  kalmistolla: `endSong` lähettää `song.performed` (cast, `nearNpcId`); sääntö `louhi.banished`
-  asettaa lipun, `revealSite` ja `removeNpc` (`world.removeNpc`: `vanishVillager`,
-  `CollisionWorld.disable`, `removeTalkable`). Pysyvyys: `cairnState.louhiBanished` lipusta.
-  Lukitut paikat: `MapSiteDefinition.requiresFlag`, `siteUnlocked`. Esc-oikotie `clearing`iin
-  on kehittäjälle auki.
+- **Louhen karkotus (V5).** Pohjolan uni ≤ 6 m (`SONG_AUDIENCE_RANGE`) Louhesta: `song.performed` (cast,
+  `nearNpcId`) → sääntö `louhi.banished` (lippu, `revealSite camp`, `removeNpc`). Lukitut paikat:
+  `requiresFlag`/`siteUnlocked`; Esc-oikotie `clearing`iin on kehittäjälle auki.
 - **Laulun tauot ja säekaaret (v06.08).** `songLogic.songBeats`: ryhmän (`SONG.pairSize`) jälkeen arvottu
   tauko; painallus tauolla on huti (tarkoituksella). `engine/songArcs.ts`: säkeet SVG-kaarille sankarin ylle
   (`revealVerse`, `fadeSongArcs`, `clearSongArcs`); `#verse` vain opetuksessa. `__game.songArcs`.
 - **Suon vahinko (v06.09).** `songOutcome.dotPerSec` → `Actor.bogDot`; `melee.updateCombatant` (`rooted`) →
   `stepBogDot` tikeittäin ohi haarniskan; `hud.pulseOnDot` välähdyttää palkit.
-- **Laulun opettelu (V4, mergattu).** Laulu **Pohjolan uni** (`SONGS.sleep`, Kalevala runo 42).
-  Tietäjän dialogi -> efekti `startSongLesson` (`OutAction`) -> `engine/song.ts` `startLesson`
-  (ei hidastusta, säe näkyy etukäteen) -> `song.performed` -> lippu `song.sleep.learned` (raja
-  `SONG.minHits` 4/8, epäonnistuminen ei rankaise). `songLogic.songSlots(flags)`: laulu paikkaan F3.
+- **Laulun opettelu (V4).** Pohjolan uni (`SONGS.sleep`): dialogin `startSongLesson` → `startLesson` →
+  `song.performed` → `song.sleep.learned` (4/8, ei rangaistusta); `songSlots(flags)` paikkaan F3.
 - **Satunnaiset pihapiirit.** `map/siteInstances.ts` tallentaa siemenen ja paikat (`yard`/`yard-b`).
   `yardMeadows.ts` kasvattaa taloruudusta 3–9 sivuttain kiinni olevaa niittyruutua viiden ruudun
   levyisellä alueella. Metsät ja nykyinen niitty käyvät, ranta ja muut paikat rajaavat kasvua.
@@ -151,8 +149,9 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `076bb08`)
 - **Järven rannat.** `lakeside` on rauhallinen mökki-, keittotuli-, laituri-, vene- ja
   tietäjäkohtaus; `lakeruin` käyttää samaa maastoa mutta palaneita rakennuksia, kuollutta tietäjää ja
   sammunutta tulta. Järvi jatkuu horisonttiin, vastaranta on sumuinen maisema ja syvä vesi estää kulun;
-  laiturilla voi kävellä. Tietäjä, koira, mökki, vene ja tuli törmäävät. Tarkat mallit ja mitat ovat
-  `BLENDER_HANDOFF.md`:ssä, sijoittelu ja maastosäännöt `world.ts`:ssä.
+  laiturilla voi kävellä. Tietäjä, koira, mökki, vene ja tuli törmäävät. Tietäjän paikka arvotaan käynnittäin
+  (`populateLakeLife`: pata 0,45, ovensuu 0,3, laituri 0,25), koira on useimmiten hänen lähellään
+  (`__world.lake`). Tietäjän repliikit eivät saa olettaa tulta. Mallit: `BLENDER_HANDOFF.md`.
 - **Dev-palvelin ja savutesti:** `preview_start` lukee session aloituskansion `.claude/launch.json`in
   (työpuussa tarkista `fetch('/src/…')`illa). 3D-kohtaus vaatii aloitusvalikon "Aloita" (`#startBtn`).
   Piilotettu paneeli pysäyttää rAF:n: aja ruudut `__game.renderBench(n)`illä. Moduulin konsolituonti
@@ -275,10 +274,9 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `076bb08`)
 
 ## Seuraava tehtävä
 
-Tietäjä- ja uhritehtävän pala 3/3: tietäjä vaatii uhrin ennen laulunopetusta ja paljastaa `cairn-b`:n;
-kuppikiven solmuun `stone` valinta "Ota uhrit Ukolle ja Manaan menneille" vain kahdella lihalla (esineille
-lihatyyppi, ei vain jänis), uhri ei anna buffia; tietäjän kyselyrepliikit ja pelaajan kaksi vastausta;
-tuohikontin repliikki "ovensuussa"; tietäjän (laituri, ovensuu, pata) ja koiran arvotut paikat.
+Omistajan pelitesti tietäjä- ja uhriketjusta (v08.00–v08.02) uudella matkalla: mökin ja kalmistojen
+arvonta, uhrivaatimus, jäniksen metsästys, uhri, Ukon siunaus ja laulunopetus. Korjaa löydökset ennen uusia
+ominaisuuksia.
 
 ## Ei vielä aloiteta
 
