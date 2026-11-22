@@ -11,7 +11,7 @@ import { mountInventoryView, type InventoryView } from "./inventoryView";
 import { campaignStore } from "../engine/store";
 import { combatLoadout, isSkyIron } from "../map/campaign";
 import { PLAYER_LOOK, refreshHeroLook } from "../engine/hero";
-import { ARENA_PEACEFUL } from "../world";
+import { ARENA_PEACEFUL, sceneLoadout } from "../world";
 
 // Säätövälilehdellä tehdyt muutokset ovat tallessa selaimen muistissa ja otetaan käyttöön
 // ennen kuin yhtään hahmoa luodaan.
@@ -210,7 +210,7 @@ export function initPauseMenu() {
     onChange(state) {
       const loadout = combatLoadout(state.player.equipment);
       if (!loadout) return;
-      PLAYER_LOOK.loadout = loadout;
+      PLAYER_LOOK.loadout = sceneLoadout(loadout);
       PLAYER_LOOK.skyIron = isSkyIron(state.player.equipment);
       PLAYER_LOOK.female = state.player.gender === "female";
       PLAYER_LOOK.helmet = state.player.equipment.head === "iron_helmet";

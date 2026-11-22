@@ -10,7 +10,8 @@ export interface SpeciesDef {
   id: SpeciesId;
   nameKey: TextKey;
   /** Kaadetusta eläimestä poimittava saalis. */
-  meat: { itemId: FoodId; quantity: number };
+  /** Saaliin liha: kaadosta arvotaan määrä väliltä [min, max]. */
+  meat: { itemId: FoodId; quantity: readonly [number, number] };
   /** Liikkeen törmäyssäde (m). */
   radius: number;
   /** Nuolen osumapallo: säde ja keskipisteen korkeus maasta (m). Hieman mallia suurempi. */
@@ -43,7 +44,8 @@ export const SPECIES: Record<SpeciesId, SpeciesDef> = {
   hare: {
     id: "hare",
     nameKey: "hunt.species.hare",
-    meat: { itemId: "hare_meat", quantity: 1 },
+    // Omistajan päätös 2026-11-22: jäniksestä 1–3 lihanpalaa.
+    meat: { itemId: "hare_meat", quantity: [1, 3] },
     radius: 0.2,
     hitRadius: 0.24,
     hitHeight: 0.2,
@@ -84,6 +86,8 @@ export interface Prey {
   zigTimer: number;
   /** Nykyinen vauhti (m/s), loikkimisen animaatiota varten. */
   speed: number;
+  /** Kaadetussa eläimessä jäljellä olevat lihapalat (arvotaan kaadossa). */
+  meat: number;
 }
 
 /** Havainto: näkyvä hahmo tai ääni. Äänen loudness = kantama metreinä. */
@@ -104,7 +108,7 @@ const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 export function spawnPrey(id: string, species: SpeciesId, x: number, z: number, yaw = 0): Prey {
   return {
     id, species, x, z, yaw, state: "graze", stateTime: 0, timer: 1 + (id.length % 3),
-    home: { x, z }, target: null, threat: null, zig: 0, zigTimer: 0, speed: 0,
+    home: { x, z }, target: null, threat: null, zig: 0, zigTimer: 0, speed: 0, meat: 0,
   };
 }
 
@@ -126,10 +130,19 @@ function setState(p: Prey, state: PreyState, timer = 0) {
 }
 
 /** Tappaa eläimen (nuolen osuma). Kuollut ei enää liiku eikä havaitse. */
-export function killPrey(p: Prey) {
+/** Kaataa eläimen ja arpoo sen lihamäärän lajin rajoista. */
+export function killPrey(p: Prey, rng: () => number = Math.random) {
   setState(p, "dead");
   p.speed = 0;
   p.target = null;
+  const [lo, hi] = SPECIES[p.species].meat.quantity;
+  p.meat = lo + Math.min(hi - lo, Math.floor(rng() * (hi - lo + 1)));
+}
+
+/** Kuinka monta lihapalaa ruhosta otetaan, kun inventaarioon mahtuu `fits(n)`: suurin mahtuva. */
+export function meatToTake(p: Prey, fits: (n: number) => boolean): number {
+  for (let n = p.meat; n > 0; n--) if (fits(n)) return n;
+  return 0;
 }
 
 /** Kohta, jota kohti eläin pakenee: uhasta poispäin siksakin kulmalla. */

@@ -11,7 +11,7 @@ import { frame, initLoop } from "./engine/loop";
 import { initPauseMenu, loadSavedTuning } from "./ui/pauseMenu";
 import { skirmish } from "./engine/skirmish";
 import { cairnfieldVisit, lakeruinVisit, lakesideVisit, visit, wildsVisit } from "./engine/encounter";
-import { ARENA, ARENA_PEACEFUL, cairnState, setSiteInstance, yardState } from "./world";
+import { ARENA, ARENA_PEACEFUL, cairnState, sceneLoadout, setSiteInstance, yardState } from "./world";
 import { g } from "./engine/state";
 import { initStartMenu } from "./ui/startMenu";
 import { initDebug } from "./debug";
@@ -41,7 +41,7 @@ export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   configureMapToSceneTransition(mapTransition);
   const loadout = combatLoadout(campaign.player.equipment);
   if (!loadout) throw new Error("Kampanjan varusteyhdistelmää ei voi tuoda 3D-kohtaukseen.");
-  PLAYER_LOOK.loadout = loadout;
+  PLAYER_LOOK.loadout = sceneLoadout(loadout);
   PLAYER_LOOK.skyIron = isSkyIron(campaign.player.equipment);
   PLAYER_LOOK.female = campaign.player.gender === "female";
   PLAYER_LOOK.helmet = campaign.player.equipment.head === "iron_helmet";

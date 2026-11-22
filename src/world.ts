@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { Loadout } from "./combat";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import forestUrl from "../assets/forest.glb?url";
 import forestLodUrl from "../assets/forest_lod.glb?url";
@@ -185,6 +186,14 @@ const LAKE = LAKESIDE || CAIRN;
 const RUIN = ARENA === "lakeruin";
 /** Erämaa: laaja (200 x 200 m) metsä, jonka keskellä suoniitty ja reunalla paloaukea; ei rakennuksia eikä tulta. */
 const WILDS = ARENA === "wilds";
+/**
+ * Kohtauksen varustus kampanjan varusteista: metsästysapajalla (erämaa) kilpi jää leiriin, joten
+ * miekka ja kilpi -yhdistelmä on siellä pelkkä miekka (omistajan päätös 2026-11-22). Kampanjan
+ * varusteet eivät muutu.
+ */
+export function sceneLoadout(loadout: Loadout): Loadout {
+  return WILDS && loadout === "sword_shield" ? "sword" : loadout;
+}
 /** Kohtauksen kuljettava alue ja polunsuut (sceneLayout.ts). */
 const LAYOUT = sceneLayout(ARENA);
 
