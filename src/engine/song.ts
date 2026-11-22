@@ -14,7 +14,7 @@ import { beginSongArcs, fadeSongArcs, revealVerse } from "./songArcs";
 import { fx, g, inputs, sfx } from "./state";
 import { campaignStore, worldRuntime } from "./store";
 import { heroAtPeace } from "./hero";
-import { nearestTalkable } from "../interact";
+import { TALKABLES, nearestTalkable } from "../interact";
 import { camera, setSongLook, world } from "./view";
 
 // ---------- Laulu ----------
@@ -80,7 +80,7 @@ export function songAvailable(id: SongId | null): id is SongId {
     // Rauhassa laulaa voi vain rauhan laulun (Pohjolan uni) tai laulun, jonka kohde on kuuluvilla (parannus jousineidolle).
     const def = SONGS[id];
     if (def.peaceful) return true;
-    const listener = nearestTalkable(g.player.pos, SONG_AUDIENCE_RANGE);
+    const listener = songListener(id);
     return !!def.peaceTargets && !!listener && def.peaceTargets.includes(listener.id);
   }
   return !SONGS[id].needsEnemy || focusEnemy() !== null;
@@ -93,6 +93,19 @@ export function canSingAtPeace(): boolean {
 
 /** Kuinka kaukaa hahmo kuulee laulun (m). Louhen karkotus vaatii, että laulaja on tämän matkan sisällä. */
 export const SONG_AUDIENCE_RANGE = 6;
+
+/**
+ * Laulun kuulija: laulun oma rauhan kohde (parannuksella jousineito), jos se on kuuluvilla, muuten lähin
+ * puhuteltava. Näin pihan koira tai kana vuoteen vieressä ei vie parannuslaulua neidolta.
+ */
+function songListener(id: SongId) {
+  const targets = SONGS[id].peaceTargets;
+  if (targets) {
+    const target = nearestTalkable(g.player.pos, SONG_AUDIENCE_RANGE, TALKABLES.filter((t) => targets.includes(t.id)));
+    if (target) return target;
+  }
+  return nearestTalkable(g.player.pos, SONG_AUDIENCE_RANGE);
+}
 export function openChoice() {
   choosing = true;
   clearInputs();
@@ -271,7 +284,7 @@ export function endSong(id: SongId, success: boolean, rootTime: number, hits: nu
   const total = SONGS[id].verses.length;
   // Laulu kerrotaan moottorille. Lähin kuulija (esim. Louhi kalmistolla) kulkee mukana: sääntö
   // `louhi.banished` vaatii hänen olevan kuuluvilla.
-  const listener = nearestTalkable(g.player.pos, SONG_AUDIENCE_RANGE);
+  const listener = songListener(id);
   const posted = worldRuntime().post({
     type: "song.performed", songId: id, context: "cast", success, hits, sceneId: ARENA,
     ...(listener ? { nearNpcId: listener.id } : {}),
@@ -284,9 +297,9 @@ export function endSong(id: SongId, success: boolean, rootTime: number, hits: nu
   // Suo lauletaan lukitun tai lähimmän vastustajan alle.
   const target = id === "heal" ? null : focusEnemy();
   if (id === "heal") {
-    // Sääntöjen seuraus (loukkaantunut jousineito paranee) menee laulun oman viestin edelle.
+    // Sääntöjen seuraus (jousineito paranee, laulu ei tepsinyt tai hän kuolee) menee laulun oman viestin edelle.
     const consequence = posted.saved ? posted.result.messages[0] : undefined;
-    if (success && consequence) showMsg(t(consequence.text), consequence.sub ? t(consequence.sub) : "", 3.6);
+    if (consequence) showMsg(t(consequence.text), consequence.sub ? t(consequence.sub) : "", 3.6);
     else if (hits > 0) showMsg(t("song.healSuccess"), t("song.healed", { hits, total, healed: Math.round(healed) }), 2.4);
     else showMsg(t("song.failed"), t("song.rhythmFailed"), 1.6);
   } else if (id === "sleep") {

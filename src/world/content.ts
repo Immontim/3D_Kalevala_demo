@@ -1,9 +1,28 @@
 // Pelin varsinainen maailmadata: säännöt ja dialogit. Tyypitettyä dataa, ei skriptiä.
-// Tällä hetkellä sisältö on yksi NPC (tietäjä rannalla) ja yksi esine (tuohikontti).
+// NPC:iden repliikeillä on vähintään kolme samaa tarkoittavaa muunnelmaa (`lines`), joista näytetään yksi.
+import type { TextKey } from "../i18n";
 import { COUNTERS, FLAGS } from "./registry";
-import type { Dialogue, DialogueChoice, Rule, WorldData } from "./types";
+import type { Condition, Dialogue, DialogueChoice, Rule, WorldData } from "./types";
 
 const SAGE_PACK = "lakeside.sage-pack";
+/** Jousineidon haava vaatii vähintään näin monta osumaa parannuslaulun kahdeksasta säkeestä (omistaja 2026-11-22). */
+export const HEAL_ARCHER_HITS = 6;
+/** Parannusyrityksiä on näin monta; viimeisen epäonnistuessa jousineito kuolee. */
+export const HEAL_ARCHER_TRIES = 3;
+const ARCHER_WOUNDED: Condition = {
+  kind: "all",
+  of: [{ kind: "flag", flag: "archer.healed", value: false }, { kind: "flag", flag: "archer.dead", value: false }],
+};
+
+/** Repliikki ja sen kaksi samaa tarkoittavaa muunnelmaa: avaimet `<avain>`, `<avain>.2` ja `<avain>.3`. */
+type Varied = { [K in TextKey]: `${K}.2` extends TextKey ? (`${K}.3` extends TextKey ? K : never) : never }[TextKey];
+const lines = (key: Varied): readonly TextKey[] => [key, `${key}.2` as TextKey, `${key}.3` as TextKey];
+
+/** "Ei ole tältä kuulta uutta kuultu": emännän vastaus, kun kerrottavaa ei ole. Omistaja toivoi runsaasti vaihtelua. */
+const NO_NEWS: readonly TextKey[] = [
+  "dialogue.emanta.noNews", "dialogue.emanta.noNews.2", "dialogue.emanta.noNews.3",
+  "dialogue.emanta.noNews.4", "dialogue.emanta.noNews.5", "dialogue.emanta.noNews.6",
+];
 
 export const RULES: Rule[] = [
   {
@@ -43,14 +62,53 @@ export const RULES: Rule[] = [
   },
   {
     id: "archer.healed",
-    intent: "Kun pelaaja laulaa onnistuneesti parannuslaulun loukkaantuneen jousineidon kuuluvilla pihassa, jousineito paranee ja nousee seisomaan; epäonnistunut yritys ei rankaise.",
-    on: { type: "song.performed", songId: "heal", context: "cast", success: true, sceneId: "yard", nearNpcId: "jousineito" },
-    when: { kind: "flag", flag: "archer.healed", value: false },
+    intent: "Kun pelaaja laulaa parannuslaulun loukkaantuneen jousineidon kuuluvilla pihassa ja vähintään kuusi säettä kahdeksasta osuu, jousineito paranee ja nousee seisomaan.",
+    on: { type: "song.performed", songId: "heal", context: "cast", success: true, minHits: HEAL_ARCHER_HITS, sceneId: "yard", nearNpcId: "jousineito" },
+    when: ARCHER_WOUNDED,
     then: [
       { kind: "setFlag", flag: "archer.healed" },
       { kind: "setNpcState", npcId: "jousineito", state: "healed" },
       { kind: "message", text: "world.archer.healed", sub: "world.archer.healedSub" },
     ],
+  },
+  {
+    id: "archer.died-song",
+    intent: "Kolmas liian heikko parannuslaulu ei pidätä jousineidon henkeä: hän kuolee vuoteelleen, eikä miekkaa voi enää saada.",
+    on: { type: "song.performed", songId: "heal", context: "cast", maxHits: HEAL_ARCHER_HITS - 1, sceneId: "yard", nearNpcId: "jousineito" },
+    when: { kind: "all", of: [ARCHER_WOUNDED, { kind: "counter", counter: "archer.healFails", op: ">=", value: HEAL_ARCHER_TRIES - 1 }] },
+    then: [
+      { kind: "addCounter", counter: "archer.healFails", amount: 1 },
+      { kind: "setFlag", flag: "archer.dead" },
+      { kind: "setNpcState", npcId: "jousineito", state: "dead" },
+      { kind: "message", text: "world.archer.died", sub: "world.archer.diedSub" },
+    ],
+  },
+  {
+    id: "archer.heal-failed-second",
+    intent: "Toinen liian heikko parannuslaulu: jousineito heikkenee, ja pelaaja kuulee, että yritys on enää yksi.",
+    on: { type: "song.performed", songId: "heal", context: "cast", maxHits: HEAL_ARCHER_HITS - 1, sceneId: "yard", nearNpcId: "jousineito" },
+    when: { kind: "all", of: [ARCHER_WOUNDED, { kind: "counter", counter: "archer.healFails", op: "=", value: 1 }] },
+    then: [
+      { kind: "addCounter", counter: "archer.healFails", amount: 1 },
+      { kind: "message", text: "world.archer.songFailed", sub: "world.archer.lastTry" },
+    ],
+  },
+  {
+    id: "archer.heal-failed-first",
+    intent: "Ensimmäinen liian heikko parannuslaulu (alle kuusi osumaa kahdeksasta) ei paranna jousineitoa; pelaaja kuulee, mitä haava vaatii.",
+    on: { type: "song.performed", songId: "heal", context: "cast", maxHits: HEAL_ARCHER_HITS - 1, sceneId: "yard", nearNpcId: "jousineito" },
+    when: { kind: "all", of: [ARCHER_WOUNDED, { kind: "counter", counter: "archer.healFails", op: "=", value: 0 }] },
+    then: [
+      { kind: "addCounter", counter: "archer.healFails", amount: 1 },
+      { kind: "message", text: "world.archer.songFailed", sub: "world.archer.needsHits" },
+    ],
+  },
+  {
+    id: "archer.died-left",
+    intent: "Jos pelaaja lähtee pihasta parantamatta jousineitoa, hän kuolee poissa ollessa: seuraavalla käynnillä vuode on tyhjä ja emäntä kertoo, mitä tapahtui.",
+    on: { type: "npc.leftBehind", npcId: "jousineito", sceneId: "yard" },
+    when: ARCHER_WOUNDED,
+    then: [{ kind: "setFlag", flag: "archer.dead" }],
   },
   {
     id: "louhi.banished",
@@ -101,20 +159,20 @@ export const SAGE_DIALOGUE: Dialogue = {
   ],
   nodes: {
     greet: {
-      text: "dialogue.sage.greet",
+      text: lines("dialogue.sage.greet"),
       choices: [ASK_PACK, ASK_SONG, { id: "leave", text: "dialogue.sage.leave" }],
     },
-    granted: { text: "dialogue.sage.granted", choices: [ASK_SONG, { id: "thanks", text: "dialogue.sage.thanks" }] },
-    afterTaken: { text: "dialogue.sage.afterTaken", choices: [ASK_SONG, { id: "leave", text: "dialogue.sage.leave" }] },
+    granted: { text: lines("dialogue.sage.granted"), choices: [ASK_SONG, { id: "thanks", text: "dialogue.sage.thanks" }] },
+    afterTaken: { text: lines("dialogue.sage.afterTaken"), choices: [ASK_SONG, { id: "leave", text: "dialogue.sage.leave" }] },
     songIntro: {
-      text: "dialogue.sage.songIntro",
+      text: lines("dialogue.sage.songIntro"),
       choices: [
         { id: "ready", text: "dialogue.sage.ready", effects: [{ kind: "startSongLesson", songId: "sleep" }] },
         { id: "leave", text: "dialogue.sage.leave" },
       ],
     },
     taught: {
-      text: "dialogue.sage.taught",
+      text: lines("dialogue.sage.taught"),
       choices: [
         {
           ...ASK_PACK,
@@ -124,7 +182,7 @@ export const SAGE_DIALOGUE: Dialogue = {
       ],
     },
     robbed: {
-      text: "dialogue.sage.robbed",
+      text: lines("dialogue.sage.robbed"),
       choices: [
         {
           id: "apologize",
@@ -138,32 +196,43 @@ export const SAGE_DIALOGUE: Dialogue = {
         { id: "leave", text: "dialogue.sage.leave" },
       ],
     },
-    forgiven: { text: "dialogue.sage.forgiven", choices: [ASK_SONG, { id: "thanks", text: "dialogue.sage.thanks" }] },
+    forgiven: { text: lines("dialogue.sage.forgiven"), choices: [ASK_SONG, { id: "thanks", text: "dialogue.sage.thanks" }] },
   },
 };
 
-/** Jousineito (V6): makaa loukkaantuneena, kunnes pelaaja parantaa hänet laululla; sitten hän antaa taivaanrautamiekan. */
+/**
+ * Jousineito makaa loukkaantuneena vuoteella nuotion ääressä, kunnes pelaaja parantaa hänet laululla
+ * (6/8 osumaa, kolme yritystä); sitten hän antaa taivaanrautamiekan. Kuolleelle ei voi puhua.
+ */
 export const ARCHER_DIALOGUE: Dialogue = {
   id: "archer.yard",
   sceneId: "yard",
   npcId: "jousineito",
-  intent: "Loukkaantunut jousineito pyytää parannuslaulua; parannettuna hän antaa taivaanrautamiekan, jonka voi saada vain näin.",
+  intent: "Loukkaantunut jousineito pyytää parannuslaulua ja kertoo, jos edellinen laulu ei tepsinyt; parannettuna hän antaa taivaanrautamiekan, jonka voi saada vain näin.",
   entries: [
     { when: { kind: "flag", flag: "archer.gaveSword" }, node: "after" },
     { when: { kind: "flag", flag: "archer.healed" }, node: "reward" },
+    { when: { kind: "counter", counter: "archer.healFails", op: ">=", value: 1 }, node: "fading" },
     { node: "wounded" },
   ],
   nodes: {
     wounded: {
-      text: "dialogue.archer.wounded",
+      text: lines("dialogue.archer.wounded"),
       choices: [
         { id: "ask-story", text: "dialogue.archer.askStory", next: "story" },
         { id: "leave", text: "dialogue.sage.leave" },
       ],
     },
-    story: { text: "dialogue.archer.story", choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
+    fading: {
+      text: lines("dialogue.archer.fading"),
+      choices: [
+        { id: "ask-story", text: "dialogue.archer.askStory", next: "story" },
+        { id: "leave", text: "dialogue.sage.leave" },
+      ],
+    },
+    story: { text: lines("dialogue.archer.story"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
     reward: {
-      text: "dialogue.archer.reward",
+      text: lines("dialogue.archer.reward"),
       choices: [
         {
           id: "take",
@@ -177,24 +246,31 @@ export const ARCHER_DIALOGUE: Dialogue = {
         { id: "leave", text: "dialogue.sage.leave" },
       ],
     },
-    after: { text: "dialogue.archer.after", choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
+    after: { text: lines("dialogue.archer.after"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
   },
 };
 
-/** Emäntä kertoo huhun vainolaisista ja merkitsee tietäjän rannan kartalle (ROADMAP: huhu). Molemmissa pihoissa. */
+/** Kysymys uutisista: sama sanamuoto molemmille emännille. */
+const ASK_NEWS_TEXT: TextKey = "dialogue.emanta.askNews";
+
+/**
+ * Jousineidon talon emäntä (`emanta`): kertoo kerran huhun vainolaisista ja merkitsee tietäjän rannan
+ * kartalle. Jos jousineito kuoli, hän kertoo siitä. Muuten uutta ei ole kuulunut.
+ */
 export const HOUSEWIFE_DIALOGUE: Dialogue = {
   id: "emanta.yard",
   sceneId: "yard",
   npcId: "emanta",
-  intent: "Emäntä kertoo huhun Pohjan akan vainolaisista ja neuvoo tietäjän luo: tietäjän ranta merkitään kartalle.",
-  entries: [{ when: { kind: "flag", flag: "rumor.heard" }, node: "again" }, { node: "greet" }],
+  intent: "Jousineidon talon emäntä kertoo huhun Pohjan akan vainolaisista ja neuvoo tietäjän luo (ranta kartalle); jos jousineito kuoli, emäntä kertoo, ettei ollut laulajaa eikä rohtojen sitojaa. Kun kaikki on kerrottu, uutta ei ole kuultu.",
+  entries: [{ node: "greet" }],
   nodes: {
     greet: {
-      text: "dialogue.emanta.greet",
+      text: lines("dialogue.emanta.greet"),
       choices: [
         {
           id: "ask-news",
-          text: "dialogue.emanta.askNews",
+          text: ASK_NEWS_TEXT,
+          when: { kind: "flag", flag: "rumor.heard", value: false },
           effects: [
             { kind: "setFlag", flag: "rumor.heard" },
             { kind: "revealSite", siteId: "lakeside" },
@@ -202,11 +278,54 @@ export const HOUSEWIFE_DIALOGUE: Dialogue = {
           ],
           next: "rumor",
         },
+        { id: "ask-news-again", text: ASK_NEWS_TEXT, when: { kind: "flag", flag: "rumor.heard" }, next: "noNews" },
+        { id: "ask-maiden", text: "dialogue.emanta.askMaiden", when: { kind: "flag", flag: "archer.dead" }, next: "maidenDied" },
         { id: "leave", text: "dialogue.sage.leave" },
       ],
     },
-    rumor: { text: "dialogue.emanta.rumor", choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
-    again: { text: "dialogue.emanta.again", choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
+    rumor: { text: lines("dialogue.emanta.rumor"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
+    maidenDied: { text: lines("dialogue.emanta.maidenDied"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
+    noNews: { text: NO_NEWS, choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
+  },
+};
+
+/** Apajavinkki on tarjolla, kun tuntematon apaja on olemassa eikä emäntä ole vielä neuvonut tällä kuulla. */
+const HUNT_TIP_AVAILABLE: Condition = {
+  kind: "all",
+  of: [{ kind: "unknownHuntGround" }, { kind: "not", of: { kind: "sameMoon", counter: "emanta.huntTipMoon" } }],
+};
+
+/**
+ * Toisen talon emäntä (`emanta_b`): ei tiedä vainolaisista, mutta neuvoo kerran kuunkierrossa yhden
+ * metsästysapajan, jota pelaaja ei vielä tunne. Jos sellaista ei ole tai hän on jo neuvonut, uutta ei ole.
+ */
+export const HOUSEWIFE_B_DIALOGUE: Dialogue = {
+  id: "emanta_b.yard",
+  sceneId: "yard",
+  npcId: "emanta_b",
+  intent: "Toisen talon emäntä neuvoo kerran kuunkierrossa yhden metsästysapajan, jota pelaaja ei vielä tunne (apaja kartalle); muuten tältä kuulta ei ole uutta kuultu.",
+  entries: [{ node: "greet" }],
+  nodes: {
+    greet: {
+      text: lines("dialogue.emanta.greet"),
+      choices: [
+        {
+          id: "ask-news",
+          text: ASK_NEWS_TEXT,
+          when: HUNT_TIP_AVAILABLE,
+          effects: [
+            { kind: "revealHuntGround" },
+            { kind: "markMoon", counter: "emanta.huntTipMoon" },
+            { kind: "message", text: "world.emanta.huntTip", sub: "world.emanta.huntTipSub" },
+          ],
+          next: "huntTip",
+        },
+        { id: "ask-news-none", text: ASK_NEWS_TEXT, when: { kind: "not", of: HUNT_TIP_AVAILABLE }, next: "noNews" },
+        { id: "leave", text: "dialogue.sage.leave" },
+      ],
+    },
+    huntTip: { text: lines("dialogue.emanta.huntTip"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
+    noNews: { text: NO_NEWS, choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
   },
 };
 
@@ -217,12 +336,12 @@ export const YOUNG_WARRIOR_DIALOGUE: Dialogue = {
   npcId: "urho",
   intent: "Nuori urho kertoo, että kalmistolla seisoo Pohjan akan lähettiläs ja joku saa ajettua hänet pois: vihje pelaajalle.",
   entries: [{ node: "greet" }],
-  nodes: { greet: { text: "dialogue.urho.greet", choices: [{ id: "leave", text: "dialogue.sage.leave" }] } },
+  nodes: { greet: { text: lines("dialogue.urho.greet"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] } },
 };
 
 export const GAME_WORLD: WorldData = {
   flags: FLAGS,
   counters: COUNTERS,
   rules: RULES,
-  dialogues: [SAGE_DIALOGUE, ARCHER_DIALOGUE, HOUSEWIFE_DIALOGUE, YOUNG_WARRIOR_DIALOGUE],
+  dialogues: [SAGE_DIALOGUE, ARCHER_DIALOGUE, HOUSEWIFE_DIALOGUE, HOUSEWIFE_B_DIALOGUE, YOUNG_WARRIOR_DIALOGUE],
 };

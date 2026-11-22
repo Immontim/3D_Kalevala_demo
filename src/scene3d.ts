@@ -55,6 +55,7 @@ export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   }
   cairnState.louhiBanished = campaign.engine.flags["louhi.banished"] === true;
   yardState.archerHealed = campaign.engine.flags["archer.healed"] === true;
+  yardState.archerDead = campaign.engine.flags["archer.dead"] === true;
   initView();
   initCampaignStore(campaign);
   configureSceneItems();

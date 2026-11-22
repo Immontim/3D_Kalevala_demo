@@ -296,9 +296,11 @@ class Animal implements Living {
   private dogStep = 0;
 
   constructor(private def: AnimalDef, gltf: GLTF) {
-    const model = def.node ? gltf.scene.getObjectByName(def.node) : gltf.scene;
-    if (!model) { console.warn("Eläin puuttuu:", def.node); return; }
-    model.removeFromParent();
+    const source = def.node ? gltf.scene.getObjectByName(def.node) : gltf.scene;
+    if (!source) { console.warn("Eläin puuttuu:", def.node); return; }
+    // Ladattu GLB on jaettu (välimuisti): jokainen eläin saa oman kopionsa, jotta samasta
+    // tiedostosta voi olla pihalla useita (esim. 2–4 animoitua kanaa).
+    const model = SkeletonUtils.clone(source);
     prepareMeshes(model);
     this.root.add(model);
     this.root.position.set(def.x, def.y, def.z);

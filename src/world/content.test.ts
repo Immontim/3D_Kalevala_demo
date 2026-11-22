@@ -11,7 +11,10 @@ import { effectRefs } from "./effects";
 import { createWorldRuntime } from "./runtime";
 import { SCENE_ITEM_LABELS } from "./registry";
 import { takeSceneItemWithEvents } from "./take";
-import type { Condition, Effect } from "./types";
+import type { Condition, Effect, GameEvent } from "./types";
+import { nodeVariants } from "./dialogue";
+import { WORLD_MINUTES_PER_MOON } from "../map/uiState";
+
 
 const PACK: SceneItemDefinition = {
   instanceId: "lakeside.sage-pack", siteId: "lakeside", itemId: "birch_bark_pack", quantity: 1, takeMode: "theft", ownerId: "tietaja",
@@ -270,7 +273,7 @@ describe("jousineito, emäntä ja nuori urho (V6)", () => {
     expect(store.get().player.inventory.stacks.some((s) => s.itemId === "sky_iron_sword")).toBe(false);   // miekka vasta dialogissa
   });
 
-  it("epäonnistunut, kaukainen tai väärän kohtauksen parannus ei paranna eikä rankaise; toistuva ei tee mitään", () => {
+  it("epäonnistunut (6 osumaa mutta ei onnistunut), kaukainen tai väärän kohtauksen parannus ei tee mitään; toistuva ei tee mitään", () => {
     for (const event of [heal({ success: false }), heal({ nearNpcId: undefined }), heal({ nearNpcId: "emanta" }), heal({ sceneId: "lakeside" }), heal({ context: "lesson" })]) {
       const { store, runtime } = setup();
       const before = store.get();
@@ -312,15 +315,29 @@ describe("jousineito, emäntä ja nuori urho (V6)", () => {
     expect(runtime.startDialogue("yard", "jousineito")!.view.nodeId).toBe("reward");
   });
 
-  it("emäntä kertoo huhun, asettaa lipun ja merkitsee tietäjän rannan kartalle (kaikissa pihoissa)", () => {
+  it("jousineidon talon emäntä kertoo huhun kerran; sen jälkeen tältä kuulta ei ole uutta", () => {
     const { store, runtime } = setup();
     const talk = runtime.startDialogue("yard", "emanta")!;
     expect(talk.view.nodeId).toBe("greet");
+    expect(talk.view.choices.map((c) => c.id)).toEqual(["ask-news", "leave"]);
     const asked = runtime.choose(talk, "ask-news");
     expect(asked.saved && asked.next?.view.nodeId).toBe("rumor");
     expect(store.get().engine.flags["rumor.heard"]).toBe(true);
     expect(store.get().world.knownSiteIds).toContain("lakeside");
-    expect(runtime.startDialogue("yard", "emanta")!.view.nodeId).toBe("again");
+    const again = runtime.startDialogue("yard", "emanta")!;
+    expect(again.view.choices.map((c) => c.id)).toEqual(["ask-news-again", "leave"]);
+    expect(again.view.choices[0].text).toBe(talk.view.choices[0].text);          // sama kysymys
+    const none = runtime.choose(again, "ask-news-again");
+    expect(none.saved && none.next?.view.nodeId).toBe("noNews");
+  });
+
+  it("toisen talon emäntä ei tunne huhua: kumpikin emäntä puhuu omasta asiastaan", () => {
+    const { store, runtime } = setup();
+    const b = runtime.startDialogue("yard", "emanta_b")!;
+    expect(b.view.choices.some((c) => c.id === "ask-news-again")).toBe(false);
+    runtime.choose(b, b.view.choices[0].id);
+    expect(store.get().engine.flags["rumor.heard"]).toBeUndefined();               // ei väitä kertoneensa kaikkea
+    expect(runtime.startDialogue("yard", "emanta")!.view.choices[0].id).toBe("ask-news");
   });
 
   it("nuorella urholla on dialogi pihassa, mutta tietäjällä ei enää ole (yksi tietäjä, rannalla)", () => {
@@ -333,5 +350,137 @@ describe("jousineito, emäntä ja nuori urho (V6)", () => {
     const { store, runtime } = setup();
     runtime.post({ type: "song.performed", songId: "sleep", context: "lesson", success: true, hits: 7, sceneId: "lakeside" });
     expect(store.get().world.knownSiteIds).toContain("cairnfield");
+  });
+});
+
+describe("jousineidon parannus: 6/8 osumaa ja kolme yritystä (2026-11-22)", () => {
+  const heal = (hits: number, over: Record<string, unknown> = {}) => ({
+    type: "song.performed", songId: "heal", context: "cast", success: hits >= 4, hits,
+    sceneId: "yard", nearNpcId: "jousineito", ...over,
+  }) as GameEvent;
+  const fired = (out: { result: { fired: { ruleId: string }[] } }) => out.result.fired.map((f) => f.ruleId);
+
+  it("viisi osumaa ei riitä: yritys kirjataan, pelaaja kuulee vaatimuksen ja neito sanoo laulun ei tepsineen", () => {
+    const { store, runtime } = setup();
+    const out = runtime.post(heal(5));
+    expect(fired(out)).toEqual(["archer.heal-failed-first"]);
+    expect(out.result.messages[0]).toEqual({ text: "world.archer.songFailed", sub: "world.archer.needsHits" });
+    expect(store.get().engine.counters["archer.healFails"]).toBe(1);
+    expect(store.get().engine.flags["archer.healed"]).toBeUndefined();
+    expect(runtime.startDialogue("yard", "jousineito")!.view.nodeId).toBe("fading");
+  });
+
+  it("kuusi osumaa parantaa myös kahden epäonnistumisen jälkeen", () => {
+    const { store, runtime } = setup();
+    runtime.post(heal(2));
+    const second = runtime.post(heal(0, { success: false }));
+    expect(fired(second)).toEqual(["archer.heal-failed-second"]);
+    expect(second.result.messages[0].sub).toBe("world.archer.lastTry");
+    expect(fired(runtime.post(heal(6)))).toEqual(["archer.healed"]);
+    expect(store.get().engine.flags["archer.dead"]).toBeUndefined();
+  });
+
+  it("kolmas epäonnistuminen tappaa neidon vuoteelle; sen jälkeen laulu ei tee mitään", () => {
+    const { store, runtime } = setup();
+    runtime.post(heal(5));
+    runtime.post(heal(4));
+    const third = runtime.post(heal(3));
+    expect(fired(third)).toEqual(["archer.died-song"]);
+    expect(third.result.actions).toEqual([{ kind: "npcState", npcId: "jousineito", state: "dead" }]);
+    expect(store.get().engine.flags["archer.dead"]).toBe(true);
+    expect(store.get().engine.counters["archer.healFails"]).toBe(3);
+    expect(fired(runtime.post(heal(8)))).toEqual([]);
+    expect(fired(runtime.post(heal(1)))).toEqual([]);
+  });
+
+  it("pihasta lähtö parantamatta tappaa neidon; parannetulle lähtö ei tee mitään", () => {
+    const leave = { type: "npc.leftBehind", npcId: "jousineito", sceneId: "yard" } as const;
+    const { store, runtime } = setup();
+    expect(fired(runtime.post({ type: "npc.leftBehind", npcId: "emanta", sceneId: "yard" }))).toEqual([]);
+    expect(fired(runtime.post(leave))).toEqual(["archer.died-left"]);
+    expect(store.get().engine.flags["archer.dead"]).toBe(true);
+
+    const healed = setup();
+    healed.runtime.post(heal(7));
+    expect(fired(healed.runtime.post(leave))).toEqual([]);
+    expect(healed.store.get().engine.flags["archer.dead"]).toBeUndefined();
+  });
+
+  it("emäntä kertoo kuolleesta neidosta: ei ollut laulajaa eikä rohtojen sitojaa", () => {
+    const { runtime } = setup();
+    expect(runtime.startDialogue("yard", "emanta")!.view.choices.some((c) => c.id === "ask-maiden")).toBe(false);
+    runtime.post({ type: "npc.leftBehind", npcId: "jousineito", sceneId: "yard" });
+    const talk = runtime.startDialogue("yard", "emanta")!;
+    expect(talk.view.choices.map((c) => c.id)).toEqual(["ask-news", "ask-maiden", "leave"]);
+    const told = runtime.choose(talk, "ask-maiden");
+    expect(told.saved && told.next?.view.nodeId).toBe("maidenDied");
+  });
+});
+
+describe("toisen talon emäntä neuvoo metsästysapajan kerran kuussa", () => {
+  function withHunts(ids: string[]) {
+    const ctx = setup();
+    ctx.store.update((s) => ({
+      ...s,
+      world: {
+        ...s.world,
+        siteInstances: [
+          ...s.world.siteInstances,
+          ...ids.map((id, i) => ({ id, kind: "hunt" as const, x: 2 + i * 14, y: 2 + i * 14, archer: false })),
+        ],
+      },
+    }));
+    return ctx;
+  }
+  const ask = (runtime: ReturnType<typeof setup>["runtime"]) => {
+    const talk = runtime.startDialogue("yard", "emanta_b")!;
+    const choice = talk.view.choices.find((c) => c.id.startsWith("ask-news"))!;
+    const out = runtime.choose(talk, choice.id);
+    if (!out.saved) throw new Error("valinta epäonnistui");
+    return out;
+  };
+
+  it("paljastaa sankaria lähimmän tuntemattoman apajan ja muistaa kuun", () => {
+    const { store, runtime } = withHunts(["hunt-a", "hunt-b"]);
+    const hero = { x: store.get().world.x, y: store.get().world.y };
+    const near = [{ id: "hunt-a", x: 2, y: 2 }, { id: "hunt-b", x: 16, y: 16 }]
+      .sort((a, b) => Math.max(Math.abs(a.x - hero.x), Math.abs(a.y - hero.y)) - Math.max(Math.abs(b.x - hero.x), Math.abs(b.y - hero.y)))[0].id;
+    const out = ask(runtime);
+    expect(out.next?.view.nodeId).toBe("huntTip");
+    expect(out.messages[0].text).toBe("world.emanta.huntTip");
+    expect(store.get().world.knownSiteIds).toContain(near);
+    expect(store.get().engine.counters["emanta.huntTipMoon"]).toBe(1);
+    // Samalla kuulla ei uutta, vaikka toinen apaja on vielä tuntematon.
+    expect(ask(runtime).next?.view.nodeId).toBe("noNews");
+    // Seuraavalla kuulla seuraava apaja.
+    store.update((s) => ({ ...s, world: { ...s.world, worldMinutes: s.world.worldMinutes + WORLD_MINUTES_PER_MOON } }));
+    expect(ask(runtime).next?.view.nodeId).toBe("huntTip");
+    expect(store.get().world.knownSiteIds).toEqual(expect.arrayContaining(["hunt-a", "hunt-b"]));
+    // Kaikki tiedossa: ei uutta, vaikka kuu vaihtuu.
+    store.update((s) => ({ ...s, world: { ...s.world, worldMinutes: s.world.worldMinutes + WORLD_MINUTES_PER_MOON } }));
+    expect(ask(runtime).next?.view.nodeId).toBe("noNews");
+  });
+
+  it("ilman apajia vastaus on aina, ettei tältä kuulta ole uutta", () => {
+    const { store, runtime } = setup();
+    store.update((s) => ({ ...s, world: { ...s.world, siteInstances: s.world.siteInstances.filter((i) => i.kind !== "hunt") } }));
+    expect(ask(runtime).next?.view.nodeId).toBe("noNews");
+  });
+});
+
+describe("repliikkien muunnelmat", () => {
+  it("jokaisella NPC:n repliikillä on vähintään kolme erilaista muunnelmaa (englanninkieliset avaimet tarkistaa tyyppi)", () => {
+    for (const d of GAME_WORLD.dialogues) {
+      for (const [id, node] of Object.entries(d.nodes)) {
+        const variants = nodeVariants(node);
+        expect(variants.length, `${d.id}/${id}`).toBeGreaterThanOrEqual(3);
+        expect(new Set(variants.map((k) => finnishText(k))).size, `${d.id}/${id} FI`).toBe(variants.length);
+      }
+    }
+  });
+
+  it("ei uutta -vastauksella on runsaasti vaihtelua (omistajan toive)", () => {
+    const node = GAME_WORLD.dialogues.find((d) => d.npcId === "emanta_b")!.nodes.noNews;
+    expect(nodeVariants(node).length).toBeGreaterThanOrEqual(6);
   });
 });

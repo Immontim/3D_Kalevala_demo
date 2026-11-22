@@ -7,6 +7,7 @@ import { createEmptySceneReturn, saveSceneReturn } from "../map/transition";
 import { exitCrossed, nearestExit, sceneLayout, type SceneExit } from "../sceneLayout";
 import { ARENA } from "../world";
 import { showMsg } from "./hud";
+import { postLeftBehind } from "./leave";
 import { g } from "./state";
 
 export const EXIT_FADE_SECONDS = 1.0;
@@ -65,6 +66,7 @@ export function updateExit(realDt: number, fallback: () => void) {
   finished = true;
   const route = parseAppRoute(location.href);
   if (route.mode === "scene" && route.returnToMap) {
+    postLeftBehind();
     saveSceneReturn(createEmptySceneReturn(route.scene, hit.mapDir));
     location.href = mapUrl(location.href).href;
   } else {

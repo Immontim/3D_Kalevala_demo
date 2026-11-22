@@ -18,7 +18,11 @@ export type Condition =
   /** Kuun vaihe (0–7, kartan kalenterin mukaan) on jokin annetuista. */
   | { kind: "moonPhase"; phases: number[] }
   /** Staattinen maailmanesine on jo otettu. */
-  | { kind: "itemTaken"; instanceId: string };
+  | { kind: "itemTaken"; instanceId: string }
+  /** Laskuriin on kirjattu tämä kuunkierto (`markMoon`): esim. emäntä on jo neuvonut tällä kuulla. */
+  | { kind: "sameMoon"; counter: string }
+  /** Kartalla on metsästysapaja, jota pelaaja ei vielä tunne. */
+  | { kind: "unknownHuntGround" };
 
 // ---------- Efektit ----------
 
@@ -39,7 +43,11 @@ export type Effect =
   /** Pyytää 3D:tä vaihtamaan hahmon tilan heti (esim. jousineito "healed": nousee seisomaan). Pysyvyys tulee lipusta. */
   | { kind: "setNpcState"; npcId: string; state: string }
   /** Kirjaa kampanjan voitetuksi ja tallentaa loppuruudun tilastot (päivät, tutkittu kartta) lipuiksi ja laskureiksi. */
-  | { kind: "recordVictory" };
+  | { kind: "recordVictory" }
+  /** Kirjaa laskuriin nykyisen kuunkierron (numero + 1), jota `sameMoon` vertaa. */
+  | { kind: "markMoon"; counter: string }
+  /** Paljastaa kartalle sankaria lähimmän apajan, jota pelaaja ei tunne. Epäonnistuu, jos sellaista ei ole. */
+  | { kind: "revealHuntGround" };
 
 export interface OutMessage { text: TextKey; sub?: TextKey }
 
@@ -55,6 +63,8 @@ export type GameEvent =
   | { type: "item.taken"; instanceId: string; itemId: ItemId; siteId: string; sceneId: string; takeMode: TakeMode; ownerId?: string }
   | { type: "npc.talked"; npcId: string; sceneId: string }
   | { type: "scene.entered"; sceneId: string }
+  /** Sankari poistui kohtauksesta polunsuusta tai valikosta, ja hahmo jäi sinne (puhuteltava väki). */
+  | { type: "npc.leftBehind"; npcId: string; sceneId: string }
   /** Leirin viimeinen aalto kaatui. */
   | { type: "battle.won"; sceneId: string; wave: number }
   /** Sankari kaatui taistelussa (ennen uutta yritystä). */
@@ -66,7 +76,9 @@ export type GameEvent =
     nearNpcId?: string;
   };
 
-type PatternFor<E extends GameEvent> = { type: E["type"] } & Partial<Omit<E, "type">>;
+/** Laulun osumaraja kuviossa: täsmää, kun osumia on vähintään `minHits` / enintään `maxHits`. */
+interface HitRange { minHits?: number; maxHits?: number }
+type PatternFor<E extends GameEvent> = { type: E["type"] } & Partial<Omit<E, "type">> & (E extends { hits: number } ? HitRange : unknown);
 /** Tapahtumatyyppi ja valinnaisia kenttiä, joiden pitää täsmätä tapahtumaan. */
 export type EventPattern = { [E in GameEvent as E["type"]]: PatternFor<E> }[GameEvent["type"]];
 
@@ -97,7 +109,8 @@ export interface DialogueChoice {
 }
 
 export interface DialogueNode {
-  text: TextKey;
+  /** Repliikki tai sen samaa tarkoittavat muunnelmat, joista näytetään yksi kerrallaan. */
+  text: TextKey | readonly TextKey[];
   choices: DialogueChoice[];
 }
 
