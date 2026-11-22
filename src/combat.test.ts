@@ -7,6 +7,8 @@ import {
   graceAfter,
   graceCovers,
   mayStartAttack,
+  attackStartDelay,
+  hitStaggers,
   lungeProgress,
   strikeLands,
   BASH,
@@ -329,25 +331,50 @@ describe("usea vastustaja", () => {
     expect(graceAfter("hit")).toBe(0);
     expect(graceAfter("guardbreak")).toBe(0);
   });
-  it("suoja-aika pysäyttää muiden iskut edestä, ei saman lyöjän eikä takaa tulevia", () => {
-    const arc = Math.PI / 4;
+  it("suoja-aika pysäyttää muiden iskut torjutusta suunnasta, ei saman lyöjän eikä sivulta tai takaa tulevia", () => {
+    const arc = Math.PI / 3;
     const deg = Math.PI / 180;
-    expect(graceCovers(10, 10.5, false, 0, arc)).toBe(true);
-    expect(graceCovers(10, 10.5, false, -(COMBAT.graceArc - 1) * deg, arc)).toBe(true);
-    expect(graceCovers(10, 10.5, false, (COMBAT.graceArc + 1) * deg, arc)).toBe(false);
-    expect(graceCovers(10, 10.5, false, Math.PI, arc)).toBe(false);
-    expect(graceCovers(10, 10.5, true, 0, arc)).toBe(false);
-    expect(graceCovers(10.6, 10.5, false, 0, arc)).toBe(false);
-    // Suojasektori on aina vähintään torjunnan oma sektori.
-    expect(graceCovers(10, 10.5, false, 100 * deg, 110 * deg)).toBe(true);
+    expect(graceCovers(10, 10.5, false, 0, arc, 0)).toBe(true);
+    expect(graceCovers(10, 10.5, false, 0, arc, -(COMBAT.graceArc - 1) * deg)).toBe(true);
+    // Toisesta suunnasta tuleva osuu, vaikka olisi katseen edessä.
+    expect(graceCovers(10, 10.5, false, 0, arc, (COMBAT.graceArc + 1) * deg)).toBe(false);
+    // Torjunnan oman sektorin ulkopuolelta tuleva osuu, vaikka suunta täsmäisi.
+    expect(graceCovers(10, 10.5, false, arc + deg, arc, 0)).toBe(false);
+    expect(graceCovers(10, 10.5, false, Math.PI, arc, 0)).toBe(false);
+    expect(graceCovers(10, 10.5, true, 0, arc, 0)).toBe(false);
+    expect(graceCovers(10.6, 10.5, false, 0, arc, 0)).toBe(false);
   });
-  it("vain yksi lyö kerrallaan, ja toinen odottaa välin", () => {
-    expect(mayStartAttack(true, 10, 0, false)).toBe(false);
-    expect(mayStartAttack(false, 10, 10.4, false)).toBe(false);
-    expect(mayStartAttack(false, 10.4, 10.4, false)).toBe(true);
-    // Oma edellinen isku ei viivytä: yksin taisteleva lyö kuten ennen.
-    expect(mayStartAttack(false, 10, 10.4, true)).toBe(true);
-    expect(mayStartAttack(true, 10, 0, true)).toBe(false);
+  it("hyökkäyskatto: paikan saa kuka tahansa, kun lyöjiä on alle katon", () => {
+    expect(ENEMY_AI.maxAttackers).toBe(2);
+    expect(mayStartAttack(0)).toBe(true);
+    expect(mayStartAttack(1)).toBe(true);
+    expect(mayStartAttack(2)).toBe(false);
+    expect(mayStartAttack(1, 1)).toBe(false);
+    expect(mayStartAttack(2, 3)).toBe(true);
+    // Katto ei voi estää kaikkia: yksi saa aina lyödä.
+    expect(mayStartAttack(0, 0)).toBe(true);
+  });
+  it("iskun aloitusviive arvotaan rajojen sisältä", () => {
+    expect(attackStartDelay(0)).toBeCloseTo(ENEMY_AI.attackDelayMin);
+    expect(attackStartDelay(1)).toBeCloseTo(ENEMY_AI.attackDelayMax);
+    expect(attackStartDelay(0.5)).toBeGreaterThan(attackStartDelay(0.1));
+    expect(ENEMY_AI.attackDelayMax).toBeGreaterThan(ENEMY_AI.attackDelayMin);
+  });
+  it("horjuva ei horjahda uudelleen: jatko-osuma tekee vain vahingon", () => {
+    expect(hitStaggers("slash", "hit", "idle", 10, -1)).toBe(true);
+    expect(hitStaggers("slash", "hit", "windup", 10, -1)).toBe(true);
+    expect(hitStaggers("slash", "hit", "recovery", 10, -1)).toBe(false);
+    expect(hitStaggers("slash", "hit", "stagger", 10, -1)).toBe(false);
+    expect(hitStaggers("bash", "hit", "stagger", 10, -1)).toBe(false);
+    expect(hitStaggers("bash", "hit", "recovery", 10, -1)).toBe(true);
+    expect(hitStaggers("bash", "guardbreak", "block", 10, -1)).toBe(true);
+    expect(hitStaggers("bash", "hit", "rooted", 10, -1)).toBe(false);
+    expect(hitStaggers("slash", "blocked", "block", 10, -1)).toBe(false);
+  });
+  it("horjahduksen jälkeen hetki, jolloin osumat eivät horjuta", () => {
+    expect(hitStaggers("slash", "hit", "idle", 10, 10.3)).toBe(false);
+    expect(hitStaggers("bash", "guardbreak", "block", 10, 10.3)).toBe(false);
+    expect(hitStaggers("slash", "hit", "idle", 10.3, 10.3)).toBe(true);
   });
 });
 

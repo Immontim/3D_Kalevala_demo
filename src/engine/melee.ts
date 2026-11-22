@@ -1,6 +1,6 @@
 // Lähitaistelu: iskun kulku, osuman seuraukset ja törmäykset.
 import * as THREE from "three";
-import { ActionState, BASH, COMBAT, StrikeStyle, StrikeWeight, angleBetween, bashPushStep, damageAfterArmour, graceAfter, graceCovers, helmetAbsorbsOverhead, inStrikeZone, attackPhase, enemyAttackTiming, lungeProgress, makeAttack, resolveHit, shieldWear, staminaAfterBlock, staminaTick, strikeCost, strikeDamage, strikeLands, strikeTier, styleFor, weakened } from "../combat";
+import { ActionState, BASH, COMBAT, StrikeStyle, StrikeWeight, angleBetween, bashPushStep, damageAfterArmour, graceAfter, graceCovers, helmetAbsorbsOverhead, hitStaggers, inStrikeZone, attackPhase, enemyAttackTiming, lungeProgress, makeAttack, resolveHit, shieldWear, staminaAfterBlock, staminaTick, strikeCost, strikeDamage, strikeLands, strikeTier, styleFor, weakened } from "../combat";
 import { FALLEN, GESTURE_TIME, Gesture } from "../fighter";
 import { t } from "../i18n";
 import { effectiveStats } from "../stats";
@@ -123,12 +123,15 @@ export function resolveStrike(att: Actor, def: Actor) {
     shield: def.shield, stance: def.stance, blockArc: def.weapon.blockArc,
   };
   let res = resolveHit(geometry, defender, g.gameTime, atk);
-  // Suoja-aika: juuri torjuttu isku pysäyttää hetken myös muiden lyöjien iskut edestä.
+  // Suoja-aika: juuri torjuttu isku pysäyttää hetken myös muiden lyöjien iskut samasta suunnasta.
   const arc = def.shield ? def.shield.blockArc : def.weapon.blockArc;
+  const fromDef = Math.atan2(-toDef.x, -toDef.z);
   const graced = atk.kind !== "bash" && res === "hit" && defState !== "stagger" && defState !== "rooted"
-    && graceCovers(g.gameTime, def.graceUntil, def.graceFrom === att, angleToAttacker, arc);
+    && graceCovers(g.gameTime, def.graceUntil, def.graceFrom === att, angleToAttacker, arc, angleBetween(def.graceDir, fromDef));
   if (graced) res = "blocked";
-  else if (graceAfter(res) > 0) { def.graceUntil = g.gameTime + graceAfter(res); def.graceFrom = att; }
+  else if (graceAfter(res) > 0) { def.graceUntil = g.gameTime + graceAfter(res); def.graceFrom = att; def.graceDir = fromDef; }
+  // Jo horjuva ei horjahda uudelleen eikä työnny: jatko-osuma tekee vain vahingon.
+  const staggers = hitStaggers(atk.kind, res, defState, g.gameTime, def.staggerFreeUntil);
   const contact = att.pos.clone().lerp(def.pos, 0.55).setY(groundHeight(def.pos.x, def.pos.z) + 1.3);
   const isPlayer = att === g.player;
   const heavy = atk.weight === "heavy";
@@ -158,7 +161,7 @@ export function resolveStrike(att: Actor, def: Actor) {
   }
   if (res === "blocked" || res === "parried") def.stamina = staminaAfterBlock(def.stamina);
   const died = def.hp <= 0;
-  const pushed = atk.kind === "bash" && (res === "hit" || res === "guardbreak") && defState !== "rooted";
+  const pushed = atk.kind === "bash" && staggers;
   if (pushed && !died) {
     const away = def.pos.clone().sub(att.pos).setY(0);
     if (away.lengthSq() < 0.0001) away.set(Math.sin(att.yaw), 0, Math.cos(att.yaw));
@@ -185,8 +188,7 @@ export function resolveStrike(att: Actor, def: Actor) {
     }
     if (!helmetSaved && !isPlayer && defState === "block" && !died) showMsg(t("combat.wrongBlock"), t("combat.strikePassed", { strike: STYLE_NAME[atk.kind] }), 0.9);
     // Lyhyt horjahdus keskeyttää noston; kilpityöntö pysäyttää myös jo alkaneen iskun.
-    const interrupts = atk.kind === "bash" ? defState !== "rooted" : defState === "idle" || defState === "block" || defState === "windup";
-    if (!died && interrupts) {
+    if (!died && staggers) {
       setState(def, "stagger");
       def.stateTime = COMBAT.staggerTime - COMBAT.hitStagger;
     }
@@ -196,7 +198,7 @@ export function resolveStrike(att: Actor, def: Actor) {
     emitSparks(contact, 36, 5);
     fx.hitstop = 0.08;
     fx.shake = 0.18;
-    if (!died) {
+    if (!died && staggers) {
       setState(def, "stagger");
       def.stateTime = COMBAT.staggerTime - COMBAT.guardbreakStagger;
     }
@@ -330,7 +332,11 @@ export function updateCombatant(a: Actor, dt: number) {
     }
     if (a.stateTime >= T.total) setState(a, "idle");
   } else if (a.state === "stagger") {
-    if (a.stateTime >= COMBAT.staggerTime) setState(a, "idle");
+    if (a.stateTime >= COMBAT.staggerTime) {
+      setState(a, "idle");
+      // Usea lyöjä ei saa pitää sankaria horjahdusketjussa: hetken rauha ennen seuraavaa horjahdusta.
+      if (a === g.player) a.staggerFreeUntil = g.gameTime + COMBAT.staggerImmunity;
+    }
   } else if (a.state === "dodge") {
     // Vartalo kulkee askeleen käyrää pitkin samassa tahdissa kuin jalat (fighter.ts), jottei maassa oleva jalka liu'u.
     const T = COMBAT.dodgeTime;

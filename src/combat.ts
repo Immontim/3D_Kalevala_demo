@@ -42,6 +42,8 @@ export const COMBAT = {
   hitStagger: 0.405,
   /** Murretun torjunnan jälkeinen horjahdus, sekunteja. */
   guardbreakStagger: 0.9,
+  /** Sankarin horjahduksen jälkeen näin moneen sekuntiin osumat tekevät vain vahingon eivätkä horjuta uudelleen. */
+  staggerImmunity: 0.4,
   /** Suojan murtanut pääsee jatkamaan näin paljon nopeammin (lyhentää palautumista). */
   guardbreakAdvantage: 0.25,
   /** Torjuttu lyöjä palautuu näin paljon hitaammin. */
@@ -76,13 +78,16 @@ export const COMBAT = {
   songMax: 100,
   /**
    * Suoja-aika yhtä vastaan monta -taistelussa: onnistunut torjunta pysäyttää näin monta
-   * sekuntia myös muiden vastustajien iskut, jotka tulevat suojasektorin sisältä.
+   * sekuntia myös muiden vastustajien iskut, jotka tulevat samasta suunnasta kuin torjuttu isku.
    */
   graceBlock: 0.6,
   /** Suoja-aika täydellisen torjunnan jälkeen, sekunteja. */
   graceParry: 1.0,
-  /** Suoja-ajan sektorin puolikas asteina; aina vähintään torjunnan oma sektori. */
-  graceArc: 75,
+  /**
+   * Suoja-ajan sektorin puolikas asteina, mitattuna torjutun iskun suunnasta. Lisäksi iskun on tultava
+   * torjunnan omalta sektorilta katseen edestä: sivulta ja takaa tuleva osuu.
+   */
+  graceArc: 40,
 };
 
 /** Puettujen suojavarusteiden kertoimet ja kypärän irtoamisen todennäköisyydet. */
@@ -205,10 +210,20 @@ export const ENEMY_AI = {
   decideMin: 0.5,
   decideRandom: 1.0,
   attackChance: 0.65,
-  /** Usea vastustaja: vain yksi lyö kerrallaan, ja toinen saa aloittaa aikaisintaan näin monta sekuntia edellisen iskun jälkeen. */
-  attackGap: 0.5,
-  /** Vuoroaan odottava pysyy näin paljon lyöntietäisyyttä kauempana (m). */
+  /**
+   * Ryhmän hyökkäyskatto: näin moni saa olla yhtä aikaa nostamassa tai lyömässä. Raja on tilannepohjainen:
+   * paikan saa kuka tahansa, joka on asemissa, kun lyöjiä on vähemmän.
+   */
+  maxAttackers: 2,
+  /** Iskun aloitusviive (s) päätöksestä: jokainen arpoo omansa, jotta ryhmä ei lyö samassa ruudussa. */
+  attackDelayMin: 0.04,
+  attackDelayMax: 0.22,
+  /** Toisen juuri aloittaman noston jälkeen oma isku alkaa aikaisintaan näin monen sekunnin päästä (siirtyy, ei peruunnu). */
+  startSpacing: 0.15,
+  /** Katon takia odottamaan jäänyt pysyy näin paljon lyöntietäisyyttä kauempana (m)… */
   waitBack: 0.9,
+  /** …ja näin monta sekuntia katon vapauduttua, ettei se heilu edestakaisin. */
+  waitHold: 0.6,
   /** Vastustajat pitävät toisiinsa vähintään tämän välin (m), jolloin ryhmä levittäytyy sankarin ympärille. */
   spread: 2.4,
   /** Ryhmässä vastustaja ei kierrä sankarin selän taakse tätä kulmaa (astetta sankarin katseesta) pidemmälle. */
@@ -531,12 +546,13 @@ export function graceAfter(res: HitResult): number {
 }
 
 /**
- * Pysäyttääkö suoja-aika iskun, joka muuten osuisi. Suoja koskee vain muita kuin sitä
- * lyöjää, jonka isku torjuttiin, ja vain suojasektorin sisältä tulevia iskuja.
+ * Pysäyttääkö suoja-aika iskun, joka muuten osuisi. Suoja koskee vain muita kuin sitä lyöjää,
+ * jonka isku torjuttiin, ja vain iskuja, jotka tulevat torjunnan sektorilta katseen edestä
+ * (angleToAttacker) ja enintään graceArc asteen päästä torjutun iskun suunnasta (fromGraceDir).
  */
-export function graceCovers(now: number, graceUntil: number, sameAttacker: boolean, angleToAttacker: number, blockArc: number): boolean {
+export function graceCovers(now: number, graceUntil: number, sameAttacker: boolean, angleToAttacker: number, blockArc: number, fromGraceDir: number): boolean {
   if (sameAttacker || now > graceUntil) return false;
-  return Math.abs(angleToAttacker) <= Math.max(blockArc, (COMBAT.graceArc * Math.PI) / 180);
+  return Math.abs(angleToAttacker) <= blockArc && Math.abs(fromGraceDir) <= (COMBAT.graceArc * Math.PI) / 180;
 }
 
 /** Kuinka paljon kilpi kuluu tästä iskusta. Täydellinen torjunta ei kuluta kilpeä. */
@@ -600,12 +616,28 @@ export function angleBetween(a: number, b: number): number {
 }
 
 /**
- * Hyökkäysvuoro usealle vastustajalle: iskun saa aloittaa, kun kukaan muu ei ole lyömässä ja
- * toisen vastustajan edellisestä iskusta on kulunut ENEMY_AI.attackGap. Oma edellinen isku ei
- * viivytä (lastWasOwn), joten yksin taisteleva vastustaja käyttäytyy kuten ennen.
+ * Ryhmän hyökkäyskatto: iskun saa aloittaa, jos muita on nostamassa tai lyömässä vähemmän kuin
+ * ENEMY_AI.maxAttackers. Vuoroja tai järjestysnumeroita ei ole: ratkaisee vain se, kuka lyö juuri nyt.
  */
-export function mayStartAttack(othersStriking: boolean, now: number, freeAt: number, lastWasOwn: boolean): boolean {
-  return !othersStriking && (lastWasOwn || now >= freeAt);
+export function mayStartAttack(othersStriking: number, maxAttackers: number = ENEMY_AI.maxAttackers): boolean {
+  return othersStriking < Math.max(1, Math.round(maxAttackers));
+}
+
+/** Iskun aloitusviive päätöksestä (s); rand 0..1. */
+export function attackStartDelay(rand: number): number {
+  return ENEMY_AI.attackDelayMin + (ENEMY_AI.attackDelayMax - ENEMY_AI.attackDelayMin) * rand;
+}
+
+/**
+ * Horjuttaako osuma puolustajaa. Jo horjuva ei horjahda uudelleen eikä horjahdus pitene: jatko-osuma
+ * tekee vain vahingon. Suohon juuttunut ei horjahda. Horjahduksen jälkeen on hetki (staggerFreeUntil),
+ * jolloin osumat eivät horjuta, jotta usea lyöjä ei pidä sankaria horjahdusketjussa.
+ * Tavallinen isku keskeyttää vain levon, torjunnan ja noston; kilpityöntö ja murrettu torjunta myös muun.
+ */
+export function hitStaggers(kind: StrikeStyle | "bash", res: HitResult, defState: ActionState, now: number, staggerFreeUntil: number): boolean {
+  if (defState === "stagger" || defState === "rooted" || defState === "dead" || now < staggerFreeUntil) return false;
+  if (res === "guardbreak" || kind === "bash") return res === "hit" || res === "guardbreak";
+  return res === "hit" && (defState === "idle" || defState === "block" || defState === "windup");
 }
 
 /**
