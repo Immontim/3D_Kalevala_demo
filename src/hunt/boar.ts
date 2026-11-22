@@ -148,6 +148,8 @@ function startThreat(b: Boar) {
 function startFlee(b: Boar, env: BoarEnv, farther = false) {
   setState(b, "flee");
   b.travelled = 0;
+  // Edellisen paon kierto ei saa jäädä voimaan: muuten sika pitäisi vanhan suuntansa (voi osoittaa sankariin).
+  b.detour = 0;
   b.fleeGoal = boarWounded(b) || farther ? between(env.rng, BOAR.woundedFleeDistance) : BOAR.fleeDistance;
 }
 
@@ -335,6 +337,7 @@ export function updateBoar(b: Boar, dt: number, hero: BoarHero | null, sounds: r
         b.detour = 1.4;
       }
       if (b.travelled >= b.fleeGoal) {
+        b.detour = 0;
         b.home = { x: b.x, z: b.z };
         b.angry = false;
         if (boarWounded(b)) setState(b, "bed", between(env.rng, BOAR.bedTime));
@@ -388,10 +391,15 @@ export function arrowDamage(draw: number): number {
 }
 
 /** Lähitaistelun vahinko sialle: keihäs on sianmetsästyksen ase, raskas isku tekee enemmän. */
-export function meleeBoarDamage(weapon: "sword" | "spear" | "sky_iron_sword", heavy: boolean): number {
+export function meleeBoarDamage(weapon: "sword" | "spear" | "sky_iron_sword", heavy: boolean, bash = false): number {
+  // Kilpityöntö (jos kilpi joskus on mukana) vain tönäisee: puolet aseen kevyestä iskusta.
+  if (bash) return 0.5;
   const base = weapon === "spear" ? 1.25 : weapon === "sky_iron_sword" ? 1.2 : 1;
   return base * (heavy ? 1.5 : 1);
 }
+
+/** Haavoittunut sika näin lähellä (m) pitää sankarin taisteluvalmiina, jotta sen voi lopettaa aseella. */
+export const WOUNDED_ENGAGE_RANGE = 9;
 
 /** Apajan sikamäärä: 40 % ei yhtään, 40 % yksi, 20 % kaksi. */
 export function boarCount(r: number): number {

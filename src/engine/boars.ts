@@ -9,8 +9,8 @@ import { angleBetween, damageAfterArmour, hitStaggers, inStrikeZone } from "../c
 import { loadGltf } from "../folk";
 import type { ArrowBody, Vec3 } from "../hunt/archery";
 import {
-  BOAR, type Boar, type BoarEvent, type BoarSound, arrowDamage, boarCount, boarDangerous, boarHitSpheres,
-  boarMeatToTake, damageBoar, meleeBoarDamage, spawnBoar, updateBoar,
+  BOAR, type Boar, type BoarEvent, type BoarSound, WOUNDED_ENGAGE_RANGE, arrowDamage, boarCount, boarDangerous,
+  boarHitSpheres, boarMeatToTake, boarWounded, damageBoar, meleeBoarDamage, spawnBoar, updateBoar,
 } from "../hunt/boar";
 import { t } from "../i18n";
 import { ITEMS, tryAddItem } from "../map/campaign";
@@ -58,6 +58,7 @@ interface BoarView {
 const views: BoarView[] = [];
 const layout = sceneLayout(ARENA);
 let threatHintShown = false;
+let bowWasOut = false;
 let blood: THREE.InstancedMesh | null = null;
 let bloodNext = 0;
 let bloodCount = 0;
@@ -94,6 +95,8 @@ export function addBoar(x: number, z: number, yaw = 0): Boar {
   const boar = spawnBoar(`boar-${views.length + 1}`, x, z, yaw);
   const root = new THREE.Group();
   root.name = "hunt_boar";
+  // Kallistus (rotation.x) sian omassa kehyksessä: ensin suunta, sitten nyökkäys.
+  root.rotation.order = "YXZ";
   scene.add(root);
   const view: BoarView = { boar, root, model: null, mixer: null, actions: new Map(), clip: "", oneShot: 0, yawVis: yaw };
   views.push(view);
@@ -200,12 +203,14 @@ function heroStrikesBoar(att: Actor): boolean {
       const distance = Math.max(0, Math.hypot(dx, dz) - s.r * 0.7);
       const angleToDefender = angleBetween(att.yaw, Math.atan2(s.x - att.pos.x, s.z - att.pos.z));
       if (!inStrikeZone({ distance, angleToDefender }, att.attack)) continue;
+      // Puu tai kivi välissä: isku osuu esteeseen, ei sikaan.
+      if (world.collision.firstMeleeHit(att.pos.x, att.pos.z, s.x, s.z)) continue;
       if (!best || distance < best.d) best = { v, d: distance, point: new THREE.Vector3(s.x, s.y, s.z) };
     }
   }
   if (!best) return false;
   const heavy = att.attack.weight === "heavy";
-  const dmg = meleeBoarDamage(att.weapon.id, heavy);
+  const dmg = meleeBoarDamage(att.weapon.id, heavy, att.attack.kind === "bash");
   const result = damageBoar(best.v.boar, dmg, { x: att.pos.x, z: att.pos.z });
   emitBlood(best.point, heavy ? 28 : 18, 2.6);
   dropBlood(best.v.boar.x, best.v.boar.z, 1.5);
@@ -260,7 +265,8 @@ function afterHurt(v: BoarView, result: "dead" | "hurt" | "none") {
 }
 
 /** Päivitys joka ruudulla. Palauttaa, onko jokin sika vaarallinen (asettaa `g.danger`). */
-export function updateBoars(dt: number, sounds: readonly BoarSound[]) {
+export function updateBoars(dt: number, sounds: readonly BoarSound[], bowOut: boolean) {
+  bowWasOut = bowOut;
   const p = g.player;
   const hero = { x: p.pos.x, z: p.pos.z, alive: p.state !== "dead", hittable: p.state !== "dodge" && p.state !== "dead" };
   const env = {
@@ -276,6 +282,8 @@ export function updateBoars(dt: number, sounds: readonly BoarSound[]) {
     const events = updateBoar(b, dt, hero, sounds, env);
     for (const e of events) handleEvent(v, e);
     if (boarDangerous(b)) danger = true;
+    // Haavoittunut sika lähellä: sankari pysyy taisteluvalmiina, jotta sen voi lopettaa aseella.
+    else if (boarWounded(b) && Math.hypot(b.x - p.pos.x, b.z - p.pos.z) < WOUNDED_ENGAGE_RANGE) danger = true;
     animate(v, dt);
   }
   g.danger = danger && p.state !== "dead";
@@ -290,8 +298,9 @@ function handleEvent(v: BoarView, e: BoarEvent) {
       sfx.boarGrunt(1);
       if (!threatHintShown) {
         threatHintShown = true;
+        // Jousi esillä: X vaihtaa aseeseen. Ilman jousta ase on jo kädessä: neuvotaan väistämään ja iskemään.
         const key = bindings.bow.find((c) => c) ?? "";
-        showMsg(t("hunt.boarThreat"), t("hunt.boarThreatSub", { key: key ? codeLabel(key) : "—" }), 3);
+        showMsg(t("hunt.boarThreat"), bowWasOut ? t("hunt.boarThreatSub", { key: key ? codeLabel(key) : "—" }) : t("hunt.boarThreatArmed"), 3);
       }
       g.events.push(`villisika:varoittaa:${b.id}`);
       break;

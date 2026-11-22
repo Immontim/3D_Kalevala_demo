@@ -342,7 +342,7 @@ function updateArrows(dt: number) {
 function updateGame(dt: number) {
   const hero = g.player.pos;
   const stimuli: Stimulus[] = [{ kind: "sight", x: hero.x, z: hero.z }, ...sounds];
-  updateBoars(dt, sounds.flatMap((s) => (s.kind === "sound" ? [{ x: s.x, z: s.z, loudness: s.loudness }] : [])));
+  updateBoars(dt, sounds.flatMap((s) => (s.kind === "sound" ? [{ x: s.x, z: s.z, loudness: s.loudness }] : [])), hunt.bowOut);
   sounds = [];
   const env = {
     rng,
@@ -399,6 +399,8 @@ export function huntDeathReturn(go: () => void): boolean {
   return true;
 }
 export function huntDeathPending() { return deathReturn !== null; }
+/** Kenttä aloitetaan alusta (alkuvalikko): odottava paluu ei saa laueta uudessa yrityksessä. */
+export function clearHuntDeath() { deathReturn = null; }
 
 /** Kutsutaan joka ruudulla sankarin päivityksen jälkeen. */
 export function updateHunt(dt: number) {

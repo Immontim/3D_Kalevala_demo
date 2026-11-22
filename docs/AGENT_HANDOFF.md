@@ -18,7 +18,7 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `7740904`)
   `BOAR` (aggressio 0,35, varoitus 0,7 s, rynnäkkö 9 m/s, käännös 1,1 rad/s, vahinko 22, elämä 3; pako terve
   34 m, haavoittunut 70–100 m → `bed`; paon todennäköisyys kasvaa vahingosta). `updateBoar` palauttaa
   tapahtumat (`contact`, `blood`…). Nuolet: `boarBodies` (`boar-N#i`) `traceWorld`iin, `arrowDamage(draw)`;
-  lyönnit `melee.setCreatureStrike` → `meleeBoarDamage`. `g.danger` (`boarDangerous`) kumoaa `heroAtPeace`n;
+  lyönnit `melee.setCreatureStrike` → `meleeBoarDamage`. `g.danger` (`boarDangerous` tai haavoittunut alle 9 m) kumoaa `heroAtPeace`n;
   `bowActive` sallii jousen vaarassa (miekka tupessa), X vaihtaa jousen ja aseen. Verijälki `InstancedMesh`
   400 tippaa. Kuolema erämaassa: `huntDeathReturn(toStartMenu)`. Ruho `boar_meat` 4–6. Lukitus ei tunne sikaa.
 - **Taustalinnut (v08.03, `fauna/birds.ts` puhdas + `engine/birds.ts`).** `Flock` (`perch`/`fly`/`ground`),

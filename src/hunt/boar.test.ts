@@ -123,6 +123,7 @@ describe("haavoittuminen ja pako", () => {
     expect(arrowDamage(0.3)).toBeLessThan(arrowDamage(1));
     expect(meleeBoarDamage("spear", false)).toBeGreaterThan(meleeBoarDamage("sword", false));
     expect(meleeBoarDamage("sword", true)).toBeGreaterThan(meleeBoarDamage("sword", false));
+    expect(meleeBoarDamage("sword", false, true)).toBeLessThan(meleeBoarDamage("sword", false));
   });
 
   it("osuma suututtaa: terve sika useimmiten ryntää", () => {
@@ -176,6 +177,21 @@ describe("haavoittuminen ja pako", () => {
     expect(b.state).toBe("flee");
     run(b, 8, hero(0, -10), wall);
     expect(Math.abs(b.x)).toBeGreaterThan(20);
+  });
+
+  it("uusi pako ei peri edellisen paon kiertosuuntaa", () => {
+    // Este pysäyttää liikkeen kokonaan (kuten kivi), jolloin sika kääntyy kiertämään.
+    const rock: BoarEnv = { rng: () => 0.3, move: (x, z, dx, dz) => (z + dz > 5 ? { x, z } : { x: x + dx, z: z + dz }) };
+    const b = spawnBoar("b", 0, 0);
+    damageBoar(b, 1, { x: 0, z: -10 });
+    run(b, BOAR.flinchTime + 0.05, hero(0, -10), { ...rock, rng: () => 0.1 });
+    let turned = false;
+    for (let i = 0; i < 100 && !turned; i++) { updateBoar(b, 0.02, hero(0, -10), [], rock); turned = b.detour > 0; }
+    expect(turned).toBe(true);
+    damageBoar(b, 0.5, { x: 0, z: -10 });
+    run(b, BOAR.flinchTime + 0.05, hero(0, -10), free(0.1));
+    expect(b.state).toBe("flee");
+    expect(b.detour).toBe(0);
   });
 
   it("kaadettu sika ei liiku eikä reagoi", () => {

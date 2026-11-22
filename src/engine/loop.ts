@@ -29,7 +29,7 @@ import { updateSceneItemFocus } from "./sceneItems";
 import { closeDialogue, dialogueOpen } from "./dialogue";
 import { updateExit } from "./exit";
 import { postLeftBehind } from "./leave";
-import { hunt, huntDeathPending, huntDeathReturn, rebindHeroBow, updateHunt, updateHuntVisuals } from "./hunt";
+import { clearHuntDeath, hunt, huntDeathPending, huntDeathReturn, rebindHeroBow, updateHunt, updateHuntVisuals } from "./hunt";
 
 export function onPlayerDeath() {
   g.gameOver = true;
@@ -41,6 +41,7 @@ export function onPlayerDeath() {
 }
 /** Tyhjentää kentän ja luo sankarin uudelleen aloituspaikalleen. */
 function resetField() {
+  clearHuntDeath();
   clearEnemies();
   for (const a of [g.player, ...g.corpses.map((c) => c.actor)]) removeActor(a);
   g.corpses.length = 0;
