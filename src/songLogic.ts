@@ -36,6 +36,12 @@ export const SONG = {
   minHits: 4,
   /** Suohon laulamisen kesto jokaista osumaa kohti (pelin sekunteja). */
   rootTimePerHit: 0.75,
+  /** Suo vahingoittaa koko juuttumisen ajan, kun osumia on vähintään näin monta (3 = "yli kaksi"). */
+  bogDotMinHits: 3,
+  /** Suon vahinko sekunnissa (ohittaa haarniskan; voi kaataa). */
+  bogDotPerSec: 10,
+  /** Suon vahinko tulee tikkeinä näin usein (pelin sekunteja); mittari sykähtää joka tikillä. */
+  bogDotInterval: 1,
   /** Parannuslaulu: elämää jokaisesta osumasta, heti osuman hetkellä. */
   healPerHit: 5,
   /** Säekaarten hiipumisaika laulun päätyttyä, laulukohtaisesti (sekunteja, reaaliaikaa). */
@@ -88,13 +94,39 @@ export interface SongOutcome {
   hits: number;
   /** Kuinka kauan vihollinen on suossa (pelin sekunteja). */
   rootTime: number;
+  /** Suon vahinko sekunnissa juuttumisen ajan (0 = ei vahinkoa). */
+  dotPerSec: number;
 }
 
 /** Kesto kasvaa osumien määrän mukaan; liian vähillä osumilla loitsu ei laukea lainkaan. */
 export function songOutcome(results: boolean[]): SongOutcome {
   const hits = results.filter(Boolean).length;
   const success = hits >= SONG.minHits;
-  return { success, hits, rootTime: success ? hits * SONG.rootTimePerHit : 0 };
+  const dot = success && hits >= SONG.bogDotMinHits ? SONG.bogDotPerSec : 0;
+  return { success, hits, rootTime: success ? hits * SONG.rootTimePerHit : 0, dotPerSec: dot };
+}
+
+/** Suon vahinko yhdellä vastustajalla: jäljellä oleva aika ja aika edellisestä tikistä (pelin sekunteja). */
+export interface BogDot {
+  perSec: number;
+  left: number;
+  acc: number;
+}
+
+/**
+ * Etenee suon vahinkoa ajan dt verran. Vahinko tulee tikkeinä (`interval` välein, perSec × interval);
+ * kun aika loppuu, viimeisen vajaan jakson osuus tulee vielä yhtenä pienempänä tikkinä, joten koko
+ * vahinko on aina perSec × kesto. Palauttaa tikkien määrän ja yhteisvahingon; muuttaa dot-oliota.
+ */
+export function stepBogDot(dot: BogDot, dt: number, interval = SONG.bogDotInterval): { ticks: number; damage: number } {
+  const step = Math.min(Math.max(0, dt), dot.left);
+  const every = Math.max(0.05, interval);
+  dot.left -= step;
+  dot.acc += step;
+  let ticks = 0, damage = 0;
+  while (dot.acc >= every - 1e-9) { dot.acc -= every; ticks++; damage += dot.perSec * every; }
+  if (dot.left <= 1e-9 && dot.acc > 1e-6) { ticks++; damage += dot.perSec * dot.acc; dot.acc = 0; }
+  return { ticks, damage };
 }
 
 /** Kalevalan 3. runo (1849, vapaa käyttää). Yksi säe per riimu: säkeiden määrä on riimujen määrä. */

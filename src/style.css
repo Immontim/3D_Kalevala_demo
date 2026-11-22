@@ -197,6 +197,12 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; col
 #foeBars .foe i { display: block; height: 100%; background: #b33a2e; }
 #foeBars .foe.locked { border-color: var(--bronze); }
 #foeBars .foe.striking { box-shadow: 0 0 6px 1px #e8b04a; }
+/* Suon vahinkotikki: elämämittari välähtää kuin osumasta (hud.ts pulseOnDot). */
+.bar.dotPulse, #foeBars .foe.dotPulse { animation: dotPulse 0.45s ease-out; }
+@keyframes dotPulse {
+  0% { filter: brightness(2.1); box-shadow: 0 0 12px 2px rgba(255, 90, 60, 0.95); }
+  100% { filter: none; box-shadow: none; }
+}
 #rearWarn { position: fixed; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
 #rearWarn span { position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; line-height: 44px; text-align: center; font-size: 34px; color: #e2533f; text-shadow: 0 0 8px #000, 0 0 3px #000; animation: rearPulse 0.35s ease-in-out infinite alternate; }
 #rearWarn.hidden { display: none; }

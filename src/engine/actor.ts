@@ -5,6 +5,7 @@ import { ActionState, AttackDef, AttackTiming, Loadout, SHIELDS, ShieldDef, Stri
 import { CharacterId, Fighter, FighterLook, SwordTrail } from "../fighter";
 import { Modifier, Stats, baseStats, effectiveStats } from "../stats";
 import { COLLISION } from "../collision";
+import type { BogDot } from "../songLogic";
 import { scene } from "./view";
 
 export interface Actor {
@@ -42,6 +43,10 @@ export interface Actor {
   stats: Stats;
   blockStart: number;
   rootTime: number;
+  /** Suon vahinko juuttumisen ajan (null = suo ei vahingoita). */
+  bogDot: BogDot | null;
+  /** Kasvaa jokaisesta suon vahinkotikistä: elämämittari sykähtää (hud.ts). */
+  dotPulse: number;
   dodgeDir: THREE.Vector3;
   dodgeCd: number;
   /** Kilpityönnön aiheuttaman taaksehorjahduksen suunta ja jäljellä oleva matka. */
@@ -78,7 +83,7 @@ export function makeActor(look: FighterLook, pos: THREE.Vector3, level: number, 
     armour: { ringMail: !!look.ringMail, greaves: !!look.greaves }, stance: "slash", charging: false,
     fighter, trail, pos: pos.clone(), radius: COLLISION.actorRadius, yaw: 0, state: "idle", stateTime: 0, timing: { windup: 0.3, release: 0.1, recovery: 0.3 },
     attack: makeAttack(weapon, styleFor(weapon, "slash"), "light"), character: look.character, loadout: look.loadout, struck: false, hp: stats.maxHp,
-    blockStart: -99, rootTime: 0, dodgeDir: new THREE.Vector3(), dodgeCd: 0,
+    blockStart: -99, rootTime: 0, bogDot: null, dotPulse: 0, dodgeDir: new THREE.Vector3(), dodgeCd: 0,
     bashPushDir: new THREE.Vector3(), bashPushLeft: 0, moveSpeed: 0, extraRecovery: 0,
     lunged: 0, stepFrom: pos.clone(), graceUntil: -1, graceFrom: null, name: "", level, ai: null,
   };
