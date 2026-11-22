@@ -53,7 +53,7 @@ describe("CampaignStore", () => {
     const state = store.get();
     expect(state.world.sceneItems.takenInstanceIds).toEqual(["lakeside.sage-pack"]);
     expect(state.world.sceneItems.thefts).toHaveLength(1);
-    expect(state.player.inventory.stacks.some((st) => st.itemId === "birch_bark_pack")).toBe(true);
+    expect(state.player.inventory.backpack).toBe("birch_bark_pack");
     expect(state.engine.flags["sage.robbed"]).toBe(true);
     expect(state.world.sceneItems.takeModeOverrides).toEqual([{ instanceId: "yard.table-flatbread", takeMode: "allowed" }]);
   });

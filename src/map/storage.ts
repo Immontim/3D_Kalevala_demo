@@ -5,8 +5,9 @@ import { completeSiteInstances, newSiteInstances } from "./siteInstances";
 import { legacyKnownSiteIds } from "./sites";
 import { VERSION } from "../version";
 
-export const CAMPAIGN_STORE = "laulun-miekka.campaign.v6";
-export const PREVIOUS_CAMPAIGN_STORE = "laulun-miekka.campaign.v5";
+export const CAMPAIGN_STORE = "laulun-miekka.campaign.v7";
+export const PREVIOUS_CAMPAIGN_STORE = "laulun-miekka.campaign.v6";
+export const VERSION5_CAMPAIGN_STORE = "laulun-miekka.campaign.v5";
 export const VERSION4_CAMPAIGN_STORE = "laulun-miekka.campaign.v4";
 export const VERSION3_CAMPAIGN_STORE = "laulun-miekka.campaign.v3";
 export const LEGACY_CAMPAIGN_STORE = "laulun-miekka.campaign.v2";
@@ -85,7 +86,7 @@ function backupRejected(target: CampaignStorage, store: string, raw: string): bo
 export function loadCampaignReport(storage?: CampaignStorage): CampaignLoad {
   try {
     const target = storage ?? localStorage;
-    const stores = [CAMPAIGN_STORE, PREVIOUS_CAMPAIGN_STORE, VERSION4_CAMPAIGN_STORE, VERSION3_CAMPAIGN_STORE, LEGACY_CAMPAIGN_STORE, EARLIEST_CAMPAIGN_STORE];
+    const stores = [CAMPAIGN_STORE, PREVIOUS_CAMPAIGN_STORE, VERSION5_CAMPAIGN_STORE, VERSION4_CAMPAIGN_STORE, VERSION3_CAMPAIGN_STORE, LEGACY_CAMPAIGN_STORE, EARLIEST_CAMPAIGN_STORE];
     let rejected = false;
     for (const store of stores) {
       const raw = target.getItem(store);
@@ -145,6 +146,7 @@ export function clearCampaign(storage?: CampaignStorage): boolean {
     const target = storage ?? localStorage;
     target.removeItem(CAMPAIGN_STORE);
     target.removeItem(PREVIOUS_CAMPAIGN_STORE);
+    target.removeItem(VERSION5_CAMPAIGN_STORE);
     target.removeItem(VERSION4_CAMPAIGN_STORE);
     target.removeItem(VERSION3_CAMPAIGN_STORE);
     target.removeItem(LEGACY_CAMPAIGN_STORE);

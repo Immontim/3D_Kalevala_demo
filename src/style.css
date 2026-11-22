@@ -335,11 +335,21 @@ body.mode-scene > #mapRoot { display: none !important; }
 .inventory-item-icon.item-iron_greaves { background-position: -96px -96px; }
 .inventory-item-icon.item-leather_shoes { background-position: -144px -96px; }
 .inventory-view > h3 { margin-top: 10px; }
-.inventory-grid { display: grid; grid-template-columns: repeat(4, 58px); justify-content: center; gap: 7px; }
-.inventory-grid-slot { position: relative; width: 58px; height: 58px; margin: 0 !important; padding: 3px !important; background: #cdbb94 !important;
+.inventory-storage { display: grid; grid-template-columns: auto auto; justify-content: center; align-items: start; gap: 8px; }
+.inventory-base-grid, .inventory-extra-grid { display: grid; gap: 5px; }
+.inventory-base-grid { grid-template-columns: repeat(2, 46px); }
+.inventory-backpack-area { display: grid; justify-items: center; align-content: start; gap: 4px; }
+.inventory-backpack-heading { color: #6d4b35; font-size: 11px; line-height: 1; }
+.inventory-backpack-slot, .inventory-grid-slot { position: relative; width: 46px; height: 46px; margin: 0 !important; padding: 2px !important; background: #cdbb94 !important;
   border: 2px solid var(--inventory-border) !important; border-radius: 1px !important; }
+.inventory-backpack-slot { display: grid; place-items: center; }
+.inventory-backpack-slot:disabled { opacity: 1; cursor: default; }
+.inventory-backpack-slot .inventory-item-icon, .inventory-grid-slot .inventory-item-icon { transform: scale(0.82); transform-origin: center; margin: -4px; }
+.inventory-extra-grid { grid-template-columns: repeat(var(--extra-columns, 2), 46px); }
+.inventory-extra-grid:empty { display: none; }
 .inventory-grid-slot b { position: absolute; right: 3px; bottom: 1px; min-width: 18px; color: #fff1cd; background: #8f2f18; border-radius: 9px; font-size: 12px; }
 .inventory-grid-slot:disabled { cursor: default; opacity: 0.45; }
+.inventory-overflow-slot { border-style: dashed !important; border-color: #9c351c !important; }
 .inventory-note { min-height: 2.5em; margin: 8px 0 0; color: #6d4b35; text-align: center; font-size: 11px; line-height: 1.25; }
 .map-danger { width: 100%; margin: 5px 0 20px; }
 .map-settings-error { min-height: 1.3em; margin: 6px 0; color: #8f2f18; font-weight: bold; text-align: center; }
@@ -389,8 +399,6 @@ body.from-map #start .panel { max-width: 500px; }
   .inventory-portrait { width: 96px; height: 180px; }
   .inventory-equipment-slot { height: 39px; grid-template-columns: minmax(0, 1fr) 30px; }
   .inventory-equipment-slot .inventory-item-icon { transform: scale(0.62); margin: -9px; }
-  .inventory-grid { grid-template-columns: repeat(4, 52px); gap: 5px; }
-  .inventory-grid-slot { width: 52px; height: 52px; }
 }
 @media (max-width: 1100px) {
   .map-layout { grid-template-columns: 1fr; }
@@ -401,8 +409,6 @@ body.from-map #start .panel { max-width: 500px; }
   .map-ornament { display: none; }
 }
 @media (max-width: 560px) {
-  .inventory-grid { grid-template-columns: repeat(4, 52px); }
-  .inventory-grid-slot { width: 52px; height: 52px; }
   .map-setting-grid { grid-template-columns: 1fr; }
 }
 

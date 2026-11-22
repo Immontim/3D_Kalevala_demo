@@ -4,8 +4,13 @@ import type { Loadout } from "../combat";
 import type { TextKey } from "../i18n";
 import { createEngineState, parseEngineState, type EngineState } from "../world/state";
 
-export const CAMPAIGN_SCHEMA_VERSION = 6 as const;
-export const INVENTORY_CAPACITY = 12;
+export const CAMPAIGN_SCHEMA_VERSION = 7 as const;
+export const BASE_INVENTORY_CAPACITY = 6;
+export const MAX_BACKPACK_CAPACITY = 12;
+export const MAX_INVENTORY_CAPACITY = BASE_INVENTORY_CAPACITY + MAX_BACKPACK_CAPACITY;
+/** Vanha nimi pidetään toistaiseksi enimmäiskapasiteetin aliasena kutsujien migraatiota varten. */
+export const INVENTORY_CAPACITY = MAX_INVENTORY_CAPACITY;
+const VERSION6_INVENTORY_CAPACITY = 12;
 const LEGACY_INVENTORY_CAPACITY = 8;
 export const SATIETY_MAX = 100;
 
@@ -30,6 +35,8 @@ export interface ItemDefinition {
   stackMax: number;
   satietyGain?: number;
   equipmentSlot?: EquipmentSlot;
+  /** Tavallisten tavarapaikkojen lisäksi avautuvat paikat, kun esine on ainoassa reppupaikassa. */
+  storageCapacity?: number;
 }
 
 export const ITEMS: Record<ItemId, ItemDefinition> = {
@@ -56,6 +63,7 @@ export const ITEMS: Record<ItemId, ItemDefinition> = {
     id: "birch_bark_pack",
     nameKey: "map.item.birchBarkPack",
     stackMax: 1,
+    storageCapacity: 6,
   },
   iron_helmet: { id: "iron_helmet", nameKey: "map.item.ironHelmet", stackMax: 1, equipmentSlot: "head" },
   ring_mail: { id: "ring_mail", nameKey: "map.item.ringMail", stackMax: 1, equipmentSlot: "torso" },
@@ -74,8 +82,17 @@ export interface ItemStack {
 }
 
 export interface Inventory {
-  capacity: typeof INVENTORY_CAPACITY;
+  /** Säilytysesine on erillään tavarapinoista. Vain yksi reppupaikka on käytössä. */
+  backpack: StorageItemId | null;
   stacks: ItemStack[];
+}
+
+/** Reppupaikan kelpoisuus ratkaistaan datan `storageCapacity`-kentästä, ei kovakoodatusta esinelistasta. */
+export type StorageItemId = ItemId;
+
+export function inventoryCapacity(inventory: Pick<Inventory, "backpack">): number {
+  const extra = inventory.backpack ? ITEMS[inventory.backpack].storageCapacity ?? 0 : 0;
+  return Math.min(MAX_INVENTORY_CAPACITY, BASE_INVENTORY_CAPACITY + extra);
 }
 
 export interface Equipment {
@@ -249,7 +266,7 @@ export function createCampaign(start: CampaignStart = {}): CampaignState {
       gender: "male",
       satiety: SATIETY_MAX,
       inventory: {
-        capacity: INVENTORY_CAPACITY,
+        backpack: null,
         stacks: [
           { itemId: "barley_flatbread", quantity: 3 },
           { itemId: "spear", quantity: 1 },
@@ -276,6 +293,10 @@ export function createCampaign(start: CampaignStart = {}): CampaignState {
 export function tryAddItem(inventory: Inventory, itemId: ItemId, quantity: number): Inventory | null {
   const def = ITEMS[itemId];
   if (!def || !Number.isInteger(quantity) || quantity < 1) return null;
+  if (def.storageCapacity !== undefined) {
+    if (quantity !== 1 || inventory.backpack !== null) return null;
+    return { backpack: itemId, stacks: inventory.stacks.map((stack) => ({ ...stack })) };
+  }
   const stacks = inventory.stacks.map((stack) => ({ ...stack }));
   let remaining = quantity;
   for (const stack of stacks) {
@@ -283,19 +304,23 @@ export function tryAddItem(inventory: Inventory, itemId: ItemId, quantity: numbe
     const add = Math.min(remaining, def.stackMax - stack.quantity);
     stack.quantity += add;
     remaining -= add;
-    if (remaining === 0) return { capacity: INVENTORY_CAPACITY, stacks };
+    if (remaining === 0) return { backpack: inventory.backpack, stacks };
   }
-  while (remaining > 0 && stacks.length < inventory.capacity) {
+  while (remaining > 0 && stacks.length < inventoryCapacity(inventory)) {
     const add = Math.min(remaining, def.stackMax);
     stacks.push({ itemId, quantity: add });
     remaining -= add;
   }
-  return remaining === 0 ? { capacity: INVENTORY_CAPACITY, stacks } : null;
+  return remaining === 0 ? { backpack: inventory.backpack, stacks } : null;
 }
 
 /** Ottaa määrän pois inventaariosta atomisesti. null tarkoittaa, ettei sitä ole tarpeeksi. */
 export function tryRemoveItem(inventory: Inventory, itemId: ItemId, quantity: number): Inventory | null {
   if (!Number.isInteger(quantity) || quantity < 1) return null;
+  if (ITEMS[itemId].storageCapacity !== undefined) {
+    if (quantity !== 1 || inventory.backpack !== itemId || inventory.stacks.length > BASE_INVENTORY_CAPACITY) return null;
+    return { backpack: null, stacks: inventory.stacks.map((stack) => ({ ...stack })) };
+  }
   const have = inventory.stacks.reduce((sum, stack) => sum + (stack.itemId === itemId ? stack.quantity : 0), 0);
   if (have < quantity) return null;
   let remaining = quantity;
@@ -308,7 +333,7 @@ export function tryRemoveItem(inventory: Inventory, itemId: ItemId, quantity: nu
     remaining -= take;
     if (stack.quantity - take > 0) stacks.unshift({ ...stack, quantity: stack.quantity - take });
   }
-  return { capacity: INVENTORY_CAPACITY, stacks };
+  return { backpack: inventory.backpack, stacks };
 }
 
 export function sceneItemTakeMode(state: CampaignState, item: Pick<SceneItemDefinition, "instanceId" | "takeMode">): TakeMode {
@@ -514,6 +539,17 @@ export function parseCampaign(value: unknown): CampaignState | null {
     && validPlayer(data.player)) {
     return cloneCampaign(data as unknown as ParsedCampaign);
   }
+  if (data.schemaVersion === 6
+    && validKnownSiteIds(data.world.knownSiteIds)
+    && validSceneItemState(data.world.sceneItems)
+    && validVersion6Player(data.player)) {
+    return cloneCampaign({
+      schemaVersion: CAMPAIGN_SCHEMA_VERSION,
+      world: data.world as unknown as CampaignWorld,
+      player: migrateVersion6Player(data.player),
+      engine: data.engine,
+    });
+  }
   if (data.schemaVersion === 5
     && validKnownSiteIds(data.world.knownSiteIds)
     && validSceneItemState(data.world.sceneItems)
@@ -660,6 +696,22 @@ interface LegacyInventory {
   stacks: ItemStack[];
 }
 
+interface Version6Inventory {
+  capacity: typeof VERSION6_INVENTORY_CAPACITY;
+  stacks: ItemStack[];
+}
+
+interface Version6CampaignPlayer extends Omit<CampaignPlayer, "inventory"> {
+  inventory: Version6Inventory;
+}
+
+function validVersion6Player(value: unknown): value is Version6CampaignPlayer {
+  if (!isRecord(value) || !isPlayerGender(value.gender)
+    || typeof value.satiety !== "number" || !Number.isFinite(value.satiety)
+    || value.satiety < 0 || value.satiety > SATIETY_MAX) return false;
+  return validVersion6Inventory(value.inventory) && validEquipment(value.equipment);
+}
+
 interface LegacyEquipment {
   mainHand: Extract<EquipmentItemId, "sword" | "sky_iron_sword" | "spear"> | null;
   offHand: Extract<EquipmentItemId, "round_shield"> | null;
@@ -704,8 +756,19 @@ function validVersion1Player(value: unknown): value is Version1CampaignPlayer {
 }
 
 function validInventory(value: unknown): value is Inventory {
-  if (!isRecord(value) || value.capacity !== INVENTORY_CAPACITY || !Array.isArray(value.stacks)
-    || value.stacks.length > INVENTORY_CAPACITY) return false;
+  if (!isRecord(value) || !(value.backpack === null || isStorageItemId(value.backpack))
+    || !Array.isArray(value.stacks) || value.stacks.length > MAX_INVENTORY_CAPACITY) return false;
+  for (const stack of value.stacks) {
+    if (!isRecord(stack) || !isItemId(stack.itemId) || !Number.isInteger(stack.quantity)) return false;
+    const quantity = stack.quantity as number;
+    if (quantity < 1 || quantity > ITEMS[stack.itemId].stackMax) return false;
+  }
+  return true;
+}
+
+function validVersion6Inventory(value: unknown): value is Version6Inventory {
+  if (!isRecord(value) || value.capacity !== VERSION6_INVENTORY_CAPACITY || !Array.isArray(value.stacks)
+    || value.stacks.length > VERSION6_INVENTORY_CAPACITY) return false;
   for (const stack of value.stacks) {
     if (!isRecord(stack) || !isItemId(stack.itemId) || !Number.isInteger(stack.quantity)) return false;
     const quantity = stack.quantity as number;
@@ -754,19 +817,59 @@ function validLegacyEquipment(value: unknown): value is LegacyEquipment {
  * aiemmat vaihtoehdot lisätään tavaroihin. Taivaanrautamiekka oli poikkeuksena sekä
  * inventaariossa että kädessä, joten kädessä ollessa siitä poistetaan täsmälleen yksi pino.
  */
-function migrateLegacyPlayer(player: LegacyCampaignPlayer): CampaignPlayer {
-  let inventory: Inventory = {
-    capacity: INVENTORY_CAPACITY,
-    stacks: player.inventory.stacks.map((stack) => ({ ...stack })),
+function migrateStoredInventory(stacks: readonly ItemStack[]): Inventory {
+  let backpack: StorageItemId | null = null;
+  const migrated: ItemStack[] = [];
+  for (const stack of stacks) {
+    if (backpack === null && ITEMS[stack.itemId].storageCapacity !== undefined) {
+      backpack = stack.itemId;
+      if (stack.quantity > 1) migrated.push({ ...stack, quantity: stack.quantity - 1 });
+    } else {
+      migrated.push({ ...stack });
+    }
+  }
+  return { backpack, stacks: migrated };
+}
+
+/** Migraatio säilyttää vanhat tavarat myös aktiivikapasiteetin ylittävässä overflow-tilassa. */
+function addMigratedItem(inventory: Inventory, itemId: ItemId, quantity: number): Inventory | null {
+  const def = ITEMS[itemId];
+  const stacks = inventory.stacks.map((stack) => ({ ...stack }));
+  let remaining = quantity;
+  for (const stack of stacks) {
+    if (stack.itemId !== itemId || stack.quantity >= def.stackMax) continue;
+    const add = Math.min(remaining, def.stackMax - stack.quantity);
+    stack.quantity += add;
+    remaining -= add;
+    if (remaining === 0) return { backpack: inventory.backpack, stacks };
+  }
+  while (remaining > 0 && stacks.length < MAX_INVENTORY_CAPACITY) {
+    const add = Math.min(remaining, def.stackMax);
+    stacks.push({ itemId, quantity: add });
+    remaining -= add;
+  }
+  return remaining === 0 ? { backpack: inventory.backpack, stacks } : null;
+}
+
+function migrateVersion6Player(player: Version6CampaignPlayer): CampaignPlayer {
+  return {
+    gender: player.gender,
+    satiety: player.satiety,
+    inventory: migrateStoredInventory(player.inventory.stacks),
+    equipment: { ...player.equipment },
   };
+}
+
+function migrateLegacyPlayer(player: LegacyCampaignPlayer): CampaignPlayer {
+  let inventory = migrateStoredInventory(player.inventory.stacks);
   if (player.equipment.mainHand === "sky_iron_sword") {
     inventory = tryRemoveItem(inventory, "sky_iron_sword", 1) ?? inventory;
   }
   const virtualItems: EquipmentItemId[] = ["sword", "spear", "round_shield"];
   for (const itemId of virtualItems) {
     if (player.equipment.mainHand === itemId || player.equipment.offHand === itemId) continue;
-    const next = tryAddItem(inventory, itemId, 1);
-    if (!next) throw new Error("V5-varusteiden migraatio ei mahtunut 12 tavarapaikkaan");
+    const next = addMigratedItem(inventory, itemId, 1);
+    if (!next) throw new Error("V5-varusteiden migraatio ei mahtunut 18 tavarapaikkaan");
     inventory = next;
   }
   return {
@@ -834,7 +937,7 @@ function cloneCampaign(state: ParsedCampaign): CampaignState {
     player: {
       gender: state.player.gender,
       satiety: state.player.satiety,
-      inventory: { capacity: INVENTORY_CAPACITY, stacks: state.player.inventory.stacks.map((stack) => ({ ...stack })) },
+      inventory: { backpack: state.player.inventory.backpack, stacks: state.player.inventory.stacks.map((stack) => ({ ...stack })) },
       equipment: { ...state.player.equipment },
     },
     // Moottoriosio luetaan aina sallivasti: tuntematon lippu pudotetaan, tallennus säilyy.
@@ -848,6 +951,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isItemId(value: unknown): value is ItemId {
   return typeof value === "string" && Object.prototype.hasOwnProperty.call(ITEMS, value);
+}
+
+function isStorageItemId(value: unknown): value is StorageItemId {
+  return isItemId(value) && ITEMS[value].storageCapacity !== undefined;
 }
 
 function isPlayerGender(value: unknown): value is PlayerGender {

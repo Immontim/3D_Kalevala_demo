@@ -6,13 +6,13 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `f06c416`)
+Päivitetty: 2026-11-22 (Codex, Windows; pohja `origin/main` `6eff560`)
 
-- **Koodiversio v06.09.00** branchissa `claude/bog-dot` (tarkista merge-tila `git merge-base`illa).
-  Koodi valmis, ei deployattu, omistaja ei ole käsin testannut. Claude lauloi aukiolla `__game.step`illä
-  Suolaulun 8/8: 6 s suossa, kuusi 10 hp:n tikkiä (70 → 10) ja kuusi mittarin sykähdystä; 15/s:llä suo
-  kaatoi urhon viidennellä tikillä normaalisti (`enemyDown`, "Vastustaja kaatui"). Testit 1649/1649,
-  tsc, lint ja build läpi. v06.08.00 (tauot ja säekaaret) on mainissa; omistajan käsitesti on tekemättä.
+- **Koodiversio v07.00.00** branchissa `codex/dynamic-backpack-inventory` (tarkista merge-tila
+  `git merge-base`illa). Koodi valmis, ei deployattu eikä omistaja ole testannut. Codex testasi kartan
+  kuuden perusruudun sekä tuohikontin 6 lisäruudun ja 18 ruudun enimmäisasettelun `@Browser`issa
+  340 px:n paneelissa; järvenranta piirsi noin 57–60 FPS, eikä konsolivirheitä ollut. Testit 1656/1656,
+  tsc, lint ja build läpi. Suolaulun v06.09 ja laulukaarten v06.08 omistajan taistelutesti on yhä tekemättä.
 - **Metsästysapajat (v06.06, `map/huntGrounds.ts` puhdas).** Apaja = `SiteInstance` `kind: "hunt"` → `wilds`,
   kertakäyttöinen (`enterSite` → `removeHuntGround`). `huntCycle` (20 päivän jakso; −1 = vanha tallennus →
   `ensureHuntGrounds` 3–6 alkuapajaa); `advanceHuntGrounds` lisää jaksoittain, enintään 6 (vanhin pois myös
@@ -55,8 +55,13 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `f06c416`)
   kuljettava alue (monikulmio ±97 m), kolme polunsuuta. Maasto `wildsHeight` (suoniitty `bogMix`,
   paloaukea `burnMix`). ~4 900 puuta; kivet, kelot ja juurakot alle 60 m:n päähän, aluskasvillisuus
   `ScatterField`illa 34 m:n säteellä. Piirtokuorma alussa ~0,96 milj. kolmiota.
-- **Paperinukke ja inventaario.** Skeema 6, avain `laulun-miekka.campaign.v6`, 12 tavarapaikkaa ja
-  seitsemän varustepaikkaa. Kartta ja 3D:n pause käyttävät samaa `ui/inventoryView.ts`-näkymää.
+- **Paperinukke ja inventaario.** Skeema 7, avain `laulun-miekka.campaign.v7`, kuusi peruspaikkaa,
+  yksi reppupaikka ja repusta 0–12 lisäpaikkaa (enintään 18 tavararuutua) sekä seitsemän
+  varustepaikkaa. `ItemDefinition.storageCapacity` määrää repun koon; tuohikontti avaa kuusi.
+  Säilytysesine menee tyhjään reppupaikkaan myös perusruutujen ollessa täynnä; toinen ei mahdu.
+  V6:n kontti siirtyy pinosta reppuun. Vanhan tallennuksen yli kuusi muuta pinoa säilyvät ylivuotona,
+  mutta uusia pinoja ei lisätä ennen kuin tavarat mahtuvat.
+  Kartta ja 3D:n pause käyttävät samaa `ui/inventoryView.ts`-näkymää.
   Rauhassa varusteita voi vaihtaa ja ruokaa syödä; taistelussa näkymä on vain luettavissa.
   `B` avaa 3D-inventaarion ja pysäyttää kohtauksen. Ase- ja kilpivaihdot ovat atomisia;
   keihäs palauttaa kilven inventaarioon, eikä pääkättä voi jättää tyhjäksi.
@@ -64,7 +69,6 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `f06c416`)
   shoes-solmuja ja Taivaanrautamiekka omaa `sword_sky_iron`-malliaan. Rengaspaita kertoo vahingon
   0,85:llä, säärisuojat 0,95:llä. Vain ylälyönti voi irrottaa kypärän; silloin koko isku torjutaan.
   Sama sääntö on pelaajalla ja vihollisilla. Tarkat arvot ovat `combat.ts`in `ARMOUR`-vakiossa.
-- **MVP:n koko pelikaari on koodissa.**
 - **Leirin aallot ja voitto (V7).** `src/waves.ts` (puhdas): `CAMPAIGN_WAVES` 5 kiinteää aaltoa
   omistajan listan mukaan (urho/miekka; pohja/miekka+kilpi; urho/keihäs + pohja/miekka; pohja/keihäs +
   pohja/miekka+kilpi; urho/keihäs + pohja/miekka+kilpi + pohja/miekka), `FINAL_WAVE`, `TOTAL_ENEMIES` (9).
@@ -125,9 +129,7 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `f06c416`)
   Käytä-ele lukitsee painallushetken kohteen ja ratkaisee oton eleen keskellä. Tallennus ennen 3D-juuren
   poistoa; epäonnistunut tallennus jättää esineen paikalleen. Instanssit: `lakeside.sage-pack` (myös
   `lakeruin`) sekä pihassa `<pihan tunniste>.table-flatbread` (3) ja `.table-dried-fish` (3).
-- **Esinedomain ja pysyvyys.** Kampanjaskeema 6 ja avain
-  `laulun-miekka.campaign.v6`; v5 migroidaan menettämättä etenemistä tai varusteita.
-  `CampaignWorld.sceneItems` tallentaa otetut instanssit, `allowed|theft`-
+- **Esinedomain ja pysyvyys.** `CampaignWorld.sceneItems` tallentaa otetut instanssit, `allowed|theft`-
   lupapoikkeamat, varkaustietueet sekä varauksen myöhemmille pudotetuille
   esineille (paikka, kierto, määrä ja seuraava tunniste). `setSceneItemTakeMode`
   on nyt kytketty tietäjän dialogiin (yllä). Pudotus-UI:ta tai pudotettujen mallien
@@ -183,13 +185,12 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `f06c416`)
   0,4 päivää. Kylläisyys vähenee 3,6 pistettä päivässä (niittyliike 0,6); 100 → 0 kestää noin 28
   päivää ilman ruokaa. Arvo ei tapa tai estä liikkumista. Kuun kuva näyttää kahdeksan vaihetta;
   tavallinen liike ei näytä kustannusta. Viisi numerotonta kasvokuvaa 20 pisteen portain.
-- **Kampanjatallennus** (`campaign.ts`, `storage.ts`) käyttää skeemaa 6 ja
-  avainta `laulun-miekka.campaign.v6`. Terrain-muisti ja `knownSiteIds` säilyvät erikseen.
-  Vanhat hunger-, sukupuoli-, maailmanesine- ja virtuaalivarustetiedot migroidaan häviöttömästi;
+- **Kampanjatallennus** (`campaign.ts`, `storage.ts`) käyttää skeemaa 7 ja avainta
+  `laulun-miekka.campaign.v7`. V1–v6 migroidaan;
   kelvollinen vanha tila palautetaan myös, jos migraation kirjoitus estyy. **Uusi aikakenttä tarkistetaan
   `validWorldTime`illa**, ei kokonaislukuna (kartan aika on murtolukuja).
 - **Matkan asetukset.** Esc-dialogissa ovat FI/GB-kieli, sukupuoli, vahvistettava uudelleenaloitus
-  ja 3D-oikotiet kohtaustyyppeineen. Mies on uuden ja migroidun kampanjan oletus.
+  ja 3D-oikotiet kohtaustyyppeineen.
 - **Paikat.** `sites.ts` omistaa liikkumisen, elinkaaren, sijainnin ja `sceneId`-kytkennän; nykyiset
   ovat `fixed+persistent`, ja kaksi pihainstanssia käyttää samaa 3D-sceneä.
 - **2D↔3D-sillat.** `transition.ts` vähentää nälkäisessä taistelussa HP- ja staminakattoa 20,
@@ -279,15 +280,8 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `f06c416`)
 
 ## Seuraava tehtävä
 
-Omistaja testaa v06.09:n suon vahingon (riittääkö 10/s vai tekeekö se suosta liian vahvan, kun
-tuplavahinko on päällä) ja v06.08:n laulut taistelussa: tekeekö riimuparien tauko (säätöpaneeli Laulu → "Tauko
-riimuryhmien välissä", 0 = vanha tasarytmi) rytmipelistä kiinnostavamman, ja peittävätkö säekaaret
-vihollisia hiipumisen aikana liikaa (hiipumisajat laulukohtaisesti samassa ryhmässä). Kaarten FPS
-heikolla koneella on mittaamatta. Lisäksi yhä tekemättä:
-Omistaja testaa taistelussa v06.07:n väistöaskeleen (Shift + A/D/S) ja kävelyn: tuntuuko 0,6 m:n askel
-riittävältä väistöltä (suoja-aika 0,35 s ennallaan) ja onko kävely nyt kevyt. Säätö `COMBAT.dodgeDistance`,
-`SIDESTEP` ja `GAIT`. Samalla v06.05:n torjunta ja etenevä nosto aalloissa 3–5. Kartan apajatesti
-(`HUNT_RULES`, `HARE_SPAWN`, `SPECIES.hare`) on yhä tekemättä.
+Lisää paperinuken alle referenssikuvan mukaiset kolme pitkäkestoisen efektin paikkaa omana
+rajattuna työnään. Tässä branchissa ei ole efektien tilamallia, kuvakkeita eikä toimintaa.
 
 ## Ei vielä aloiteta
 

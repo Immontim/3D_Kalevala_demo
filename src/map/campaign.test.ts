@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   CAMPAIGN_SCHEMA_VERSION,
-  INVENTORY_CAPACITY,
+  BASE_INVENTORY_CAPACITY,
+  MAX_INVENTORY_CAPACITY,
   SATIETY_MAX,
   ITEMS,
   combatLoadout,
   consumeFood,
   createCampaign,
+  inventoryCapacity,
   parseCampaign,
   sceneItemTakeMode,
   serializeCampaign,
@@ -38,7 +40,7 @@ function legacyPlayer(state: ReturnType<typeof createCampaign>) {
 }
 
 describe("kampanjatila", () => {
-  it("luo 20 × 20 maailman, 12 tavarapaikkaa ja puetut aloitusvarusteet", () => {
+  it("luo 20 × 20 maailman, kuusi peruspaikkaa ja puetut aloitusvarusteet", () => {
     const state = createCampaign();
     expect(state.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
     expect(state.world).toMatchObject({ width: 20, height: 20, worldMinutes: 0 });
@@ -47,7 +49,8 @@ describe("kampanjatila", () => {
     expect(state.world.sceneItems).toEqual({
       takenInstanceIds: [], takeModeOverrides: [], thefts: [], droppedItems: [], nextDroppedItemId: 1,
     });
-    expect(state.player.inventory.capacity).toBe(12);
+    expect(state.player.inventory.backpack).toBeNull();
+    expect(inventoryCapacity(state.player.inventory)).toBe(6);
     expect(state.player.inventory.stacks).toEqual([
       { itemId: "barley_flatbread", quantity: 3 },
       { itemId: "spear", quantity: 1 },
@@ -101,9 +104,34 @@ describe("kampanjatila", () => {
 
   it("lisää vain koko määrän eikä muuta täyttä inventaariota", () => {
     const inventory = createCampaign().player.inventory;
-    inventory.stacks = Array.from({ length: INVENTORY_CAPACITY }, () => ({ itemId: "birch_bark_pack" as const, quantity: 1 }));
+    inventory.stacks = Array.from({ length: BASE_INVENTORY_CAPACITY }, () => ({ itemId: "dried_fish" as const, quantity: 4 }));
     expect(tryAddItem(inventory, "dried_fish", 1)).toBeNull();
-    expect(inventory.stacks).toHaveLength(INVENTORY_CAPACITY);
+    expect(inventory.stacks).toHaveLength(BASE_INVENTORY_CAPACITY);
+  });
+
+  it("asettaa tuohikontin erilliseen reppupaikkaan ja avaa kuusi lisäpaikkaa", () => {
+    const inventory = createCampaign().player.inventory;
+    inventory.stacks = Array.from({ length: BASE_INVENTORY_CAPACITY }, () => ({ itemId: "dried_fish" as const, quantity: 1 }));
+    const packed = tryAddItem(inventory, "birch_bark_pack", 1)!;
+    expect(packed.backpack).toBe("birch_bark_pack");
+    expect(packed.stacks).toEqual(inventory.stacks);
+    expect(inventoryCapacity(packed)).toBe(12);
+    expect(tryAddItem(packed, "birch_bark_pack", 1)).toBeNull();
+    expect(ITEMS.birch_bark_pack.storageCapacity).toBe(6);
+    expect(MAX_INVENTORY_CAPACITY).toBe(18);
+  });
+
+  it("johtaa tulevien reppujen 4–12 lisäpaikkaa esinedatasta ja rajaa kokonaismäärän 18:aan", () => {
+    const inventory = { backpack: "birch_bark_pack" as const };
+    const original = ITEMS.birch_bark_pack.storageCapacity;
+    try {
+      for (const [extra, total] of [[4, 10], [8, 14], [12, 18], [20, 18]] as const) {
+        ITEMS.birch_bark_pack.storageCapacity = extra;
+        expect(inventoryCapacity(inventory)).toBe(total);
+      }
+    } finally {
+      ITEMS.birch_bark_pack.storageCapacity = original;
+    }
   });
 
   it("johtaa vain tuetut pää- ja sivukäden yhdistelmät 3D-varustukseksi", () => {
@@ -161,7 +189,8 @@ describe("maailmanesineet", () => {
     if (result.status !== "taken") return;
     expect(result.takeMode).toBe("allowed");
     expect(result.theft).toBeNull();
-    expect(result.state.player.inventory.stacks).toContainEqual({ itemId: "birch_bark_pack", quantity: 1 });
+    expect(result.state.player.inventory.backpack).toBe("birch_bark_pack");
+    expect(result.state.player.inventory.stacks).not.toContainEqual({ itemId: "birch_bark_pack", quantity: 1 });
     expect(result.state.world.sceneItems.takenInstanceIds).toContain(pack.instanceId);
     expect(state.player.inventory.stacks).not.toContainEqual({ itemId: "birch_bark_pack", quantity: 1 });
   });
@@ -214,7 +243,7 @@ describe("maailmanesineet", () => {
 
   it("jättää esineen ja kampanjan koskematta, jos koko määrä ei mahdu", () => {
     const state = createCampaign();
-    state.player.inventory.stacks = Array.from({ length: INVENTORY_CAPACITY }, () => ({ itemId: "birch_bark_pack" as const, quantity: 1 }));
+    state.player.inventory.stacks = Array.from({ length: BASE_INVENTORY_CAPACITY }, () => ({ itemId: "dried_fish" as const, quantity: 4 }));
     const food: SceneItemDefinition = {
       instanceId: "yard.table-fish", siteId: "yard", itemId: "dried_fish", quantity: 3,
       takeMode: "theft", ownerId: "yard-household",
@@ -278,6 +307,43 @@ describe("kampanjatallennus", () => {
     });
   });
 
+  it("migroi v6-tuohikontin tavarapinosta erilliseen reppupaikkaan", () => {
+    const legacy = JSON.parse(serializeCampaign(createCampaign()));
+    legacy.schemaVersion = 6;
+    legacy.player.inventory = {
+      capacity: 12,
+      stacks: [
+        { itemId: "barley_flatbread", quantity: 3 },
+        { itemId: "birch_bark_pack", quantity: 1 },
+        { itemId: "spear", quantity: 1 },
+      ],
+    };
+    const migrated = parseCampaign(legacy)!;
+    expect(migrated.player.inventory.backpack).toBe("birch_bark_pack");
+    expect(migrated.player.inventory.stacks).toEqual([
+      { itemId: "barley_flatbread", quantity: 3 },
+      { itemId: "spear", quantity: 1 },
+    ]);
+    expect(inventoryCapacity(migrated.player.inventory)).toBe(12);
+  });
+
+  it("säilyttää v6-tallennuksen ylikapasiteetin overflowina mutta ei luo uutta pinoa", () => {
+    const legacy = JSON.parse(serializeCampaign(createCampaign()));
+    legacy.schemaVersion = 6;
+    legacy.player.inventory = {
+      capacity: 12,
+      stacks: Array.from({ length: 12 }, () => ({ itemId: "dried_fish", quantity: 1 })),
+    };
+    const migrated = parseCampaign(legacy)!;
+    expect(migrated.player.inventory.backpack).toBeNull();
+    expect(migrated.player.inventory.stacks).toHaveLength(12);
+    expect(inventoryCapacity(migrated.player.inventory)).toBe(6);
+    expect(tryAddItem(migrated.player.inventory, "hare_meat", 1)).toBeNull();
+    const filledExisting = tryAddItem(migrated.player.inventory, "dried_fish", 1);
+    expect(filledExisting?.stacks).toHaveLength(12);
+    expect(filledExisting?.stacks[0]).toEqual({ itemId: "dried_fish", quantity: 2 });
+  });
+
   it("migroi v5-varusteet häviöttömästi ja poistaa kädessä olevan taivaanrautamiekan kaksoiskappaleen", () => {
     const current = createCampaign();
     const legacy = JSON.parse(serializeCampaign(current));
@@ -290,7 +356,7 @@ describe("kampanjatallennus", () => {
       head: "iron_helmet", torso: "ring_mail", legs: "iron_greaves",
       mainHand: "sky_iron_sword", offHand: "round_shield",
     });
-    expect(migrated.player.inventory.capacity).toBe(12);
+    expect(inventoryCapacity(migrated.player.inventory)).toBe(6);
     expect(migrated.player.inventory.stacks.filter((stack) => stack.itemId === "sky_iron_sword")).toEqual([]);
     expect(migrated.player.inventory.stacks).toContainEqual({ itemId: "sword", quantity: 1 });
     expect(migrated.player.inventory.stacks).toContainEqual({ itemId: "spear", quantity: 1 });
@@ -436,13 +502,21 @@ describe("moottoriosio (engine)", () => {
 describe("tryRemoveItem", () => {
   it("ottaa määrän useasta pinosta ja poistaa tyhjät pinot", async () => {
     const { tryRemoveItem } = await import("./campaign");
-    const inv = { capacity: INVENTORY_CAPACITY as typeof INVENTORY_CAPACITY, stacks: [{ itemId: "dried_fish" as const, quantity: 4 }, { itemId: "barley_flatbread" as const, quantity: 3 }, { itemId: "dried_fish" as const, quantity: 2 }] };
+    const inv = { backpack: null, stacks: [{ itemId: "dried_fish" as const, quantity: 4 }, { itemId: "barley_flatbread" as const, quantity: 3 }, { itemId: "dried_fish" as const, quantity: 2 }] };
     expect(tryRemoveItem(inv, "dried_fish", 3)?.stacks).toEqual([
       { itemId: "dried_fish", quantity: 3 }, { itemId: "barley_flatbread", quantity: 3 },
     ]);
     expect(tryRemoveItem(inv, "dried_fish", 6)?.stacks).toEqual([{ itemId: "barley_flatbread", quantity: 3 }]);
     expect(tryRemoveItem(inv, "dried_fish", 7)).toBeNull();
     expect(tryRemoveItem(inv, "dried_fish", 0)).toBeNull();
+  });
+
+  it("poistaa repun vain, kun tavarat mahtuvat takaisin kuuteen peruspaikkaan", async () => {
+    const { tryRemoveItem } = await import("./campaign");
+    const packed = tryAddItem(createCampaign().player.inventory, "birch_bark_pack", 1)!;
+    expect(tryRemoveItem(packed, "birch_bark_pack", 1)?.backpack).toBeNull();
+    packed.stacks = Array.from({ length: BASE_INVENTORY_CAPACITY + 1 }, () => ({ itemId: "dried_fish", quantity: 1 }));
+    expect(tryRemoveItem(packed, "birch_bark_pack", 1)).toBeNull();
   });
 });
 

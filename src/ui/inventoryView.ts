@@ -3,8 +3,10 @@ import malePaperDollUrl from "../../assets/map/paper-doll-hero-male.png?url";
 import inventoryAtlasUrl from "../../assets/map/inventory-atlas.png?url";
 import { t } from "../i18n";
 import {
+  BASE_INVENTORY_CAPACITY,
   ITEMS,
   consumeFood,
+  inventoryCapacity,
   tryEquipItem,
   tryUnequipItem,
   type CampaignState,
@@ -12,6 +14,7 @@ import {
   type EquipmentSlot,
   type FoodId,
   type ItemId,
+  type StorageItemId,
 } from "../map/campaign";
 
 const EQUIPMENT_SLOTS: readonly EquipmentSlot[] = [
@@ -31,17 +34,28 @@ const SLOT_LABELS: Record<EquipmentSlot, Parameters<typeof t>[0]> = {
 export interface InventoryViewModel {
   gender: CampaignState["player"]["gender"];
   equipment: ReadonlyArray<{ slot: EquipmentSlot; itemId: EquipmentItemId | null }>;
-  stacks: ReadonlyArray<{ itemId: ItemId; quantity: number } | null>;
+  backpack: StorageItemId | null;
+  baseStacks: ReadonlyArray<{ itemId: ItemId; quantity: number } | null>;
+  extraStacks: ReadonlyArray<{ itemId: ItemId; quantity: number } | null>;
+  extraCapacity: number;
 }
 
 export function inventoryViewModel(state: CampaignState): InventoryViewModel {
+  const inventory = state.player.inventory;
+  const extraCapacity = inventoryCapacity(inventory) - BASE_INVENTORY_CAPACITY;
+  // V6-migraation ylivuoto näytetään häviöttömästi, vaikka aktiivista repputilaa ei olisi.
+  const extraLength = Math.max(extraCapacity, inventory.stacks.length - BASE_INVENTORY_CAPACITY);
+  const stackAt = (index: number) => {
+    const stack = inventory.stacks[index];
+    return stack ? { ...stack } : null;
+  };
   return {
     gender: state.player.gender,
     equipment: EQUIPMENT_SLOTS.map((slot) => ({ slot, itemId: state.player.equipment[slot] })),
-    stacks: Array.from({ length: state.player.inventory.capacity }, (_, index) => {
-      const stack = state.player.inventory.stacks[index];
-      return stack ? { ...stack } : null;
-    }),
+    backpack: inventory.backpack,
+    baseStacks: Array.from({ length: BASE_INVENTORY_CAPACITY }, (_, index) => stackAt(index)),
+    extraStacks: Array.from({ length: extraLength }, (_, index) => stackAt(BASE_INVENTORY_CAPACITY + index)),
+    extraCapacity,
   };
 }
 
@@ -149,10 +163,10 @@ export function mountInventoryView(root: HTMLElement, options: InventoryViewOpti
 
     const itemsTitle = element("h3");
     itemsTitle.textContent = t("map.items");
-    const items = element("div", "inventory-grid");
-    for (const stack of model.stacks) {
+    const makeItemSlot = (stack: InventoryViewModel["baseStacks"][number], overflow = false) => {
       const slot = element("button", "inventory-grid-slot");
       slot.type = "button";
+      if (overflow) slot.classList.add("inventory-overflow-slot");
       if (!stack) {
         slot.disabled = true;
         slot.setAttribute("aria-label", t("map.emptyItemSlot"));
@@ -172,12 +186,44 @@ export function mountInventoryView(root: HTMLElement, options: InventoryViewOpti
         } else slot.disabled = true;
       }
       if (!options.editable) slot.disabled = true;
-      items.append(slot);
+      return slot;
+    };
+
+    const storage = element("div", "inventory-storage");
+    const baseItems = element("div", "inventory-base-grid");
+    baseItems.setAttribute("aria-label", t("map.items"));
+    for (const stack of model.baseStacks) baseItems.append(makeItemSlot(stack));
+
+    const backpackArea = element("div", "inventory-backpack-area");
+    const backpackHeading = element("div", "inventory-backpack-heading");
+    backpackHeading.textContent = t("map.backpackSlot");
+    const backpackSlot = element("button", "inventory-backpack-slot");
+    backpackSlot.type = "button";
+    backpackSlot.disabled = true;
+    if (model.backpack) {
+      const itemName = t(ITEMS[model.backpack].nameKey);
+      backpackSlot.append(itemIcon(model.backpack));
+      backpackSlot.title = itemName;
+      backpackSlot.setAttribute("aria-label", `${t("map.backpackSlot")}: ${itemName}`);
+    } else {
+      const empty = element("span", "inventory-empty-mark");
+      empty.textContent = "◇";
+      backpackSlot.append(empty);
+      backpackSlot.setAttribute("aria-label", t("map.emptyBackpackSlot"));
     }
+    const extraItems = element("div", "inventory-extra-grid");
+    extraItems.setAttribute("aria-label", t("map.backpackExtraSlots"));
+    extraItems.style.setProperty("--extra-columns", String(model.extraCapacity <= 6 ? 2 : 4));
+    model.extraStacks.forEach((stack, index) => {
+      extraItems.append(makeItemSlot(stack, index >= model.extraCapacity));
+    });
+    backpackArea.append(backpackHeading, backpackSlot, extraItems);
+    storage.append(baseItems, backpackArea);
+
     const note = element("p", "inventory-note");
     note.setAttribute("role", "status");
     note.textContent = options.editable ? t("inventory.hint") : t("inventory.readOnly");
-    root.append(title, content, itemsTitle, items, note);
+    root.append(title, content, itemsTitle, storage, note);
   }
 
   render();

@@ -1,7 +1,7 @@
 // Pelin oikean maailmadatan tarkistukset ja ensimmäinen dialogipolku: tietäjä ja tuohikontti.
 import { describe, expect, it } from "vitest";
 import { finnishText } from "../i18n";
-import { createCampaign, parseCampaign, serializeCampaign, type SceneItemDefinition } from "../map/campaign";
+import { BASE_INVENTORY_CAPACITY, createCampaign, parseCampaign, serializeCampaign, type SceneItemDefinition } from "../map/campaign";
 import { createCampaignStore } from "../map/campaignStore";
 import { PROTOTYPE_MAP_ID } from "../map/prototype";
 import { newSiteInstances } from "../map/siteInstances";
@@ -104,7 +104,7 @@ describe("tietäjä ja tuohikontti", () => {
     const state = store.get();
     expect(state.world.sceneItems.thefts).toHaveLength(0);
     expect(state.engine.flags["sage.robbed"]).toBeUndefined();
-    expect(state.player.inventory.stacks.some((s) => s.itemId === "birch_bark_pack")).toBe(true);
+    expect(state.player.inventory.backpack).toBe("birch_bark_pack");
     // Oton jälkeen tietäjä on tyytyväinen.
     expect(runtime.startDialogue("lakeside", "tietaja")!.view.nodeId).toBe("afterTaken");
   });
@@ -302,7 +302,7 @@ describe("jousineito, emäntä ja nuori urho (V6)", () => {
     const { store, runtime } = setup();
     store.update((s) => ({
       ...s,
-      player: { ...s.player, inventory: { ...s.player.inventory, stacks: Array.from({ length: s.player.inventory.capacity }, () => ({ itemId: "birch_bark_pack" as const, quantity: 1 })) } },
+      player: { ...s.player, inventory: { ...s.player.inventory, stacks: Array.from({ length: BASE_INVENTORY_CAPACITY }, () => ({ itemId: "dried_fish" as const, quantity: 1 })) } },
     }));
     runtime.post(heal());
     const reward = runtime.startDialogue("yard", "jousineito")!;
