@@ -185,6 +185,21 @@ Oletustapa on käynnistää paikallinen dev-serveri ja avata peli
 in-app browser). Tarkista renderöinti, ohjaus, konsolivirheet ja FPS.
 Ulkoista selainta käytetään vain, jos testi sitä erikseen vaatii; kirjaa syy.
 
+**Seuraava täsmennys koskee vain Codexia Windowsissa, ei Claudea eikä
+Clauden toimivaa `preview_start`-kulkua:**
+
+- Codex tekee localhost-savutestin aina omalla `@Browser`-in-app-selaimellaan,
+  ei `@Chrome`lla. Chromea käytetään vain omistajan nimenomaisesta pyynnöstä
+  tai kun testi oikeasti vaatii kirjautunutta Chrome-profiilia.
+- Käynnistä Vite eksplisiittisesti osoitteeseen `127.0.0.1` ja avaa selaimessa
+  sama osoite. Jos Vite ilmoittaa olevansa valmis mutta `@Browser` antaa
+  `ERR_CONNECTION_TIMED_OUT`-virheen, epäile ensin Codexin Windows-sandboxin
+  loopback-eristystä.
+- Käynnistä tällöin dev-palvelin Codex-sandboxin ulkopuolisena, rajattuna
+  paikallisena toimintona (`bun run dev`) ja yritä uudelleen `@Browser`illa.
+  Aikakatkaisu ei ole peruste pyytää Chrome-oikeutta. Jos palvelinta ei saada
+  käyntiin sandboxin ulkopuolella, kirjaa savutesti ajamattomaksi ja syy.
+
 ## Olemassa olevien tiedostojen formatointi
 
 Älä aja Prettieriä tai muuta koko tiedoston formatoijaa olemassa oleviin
