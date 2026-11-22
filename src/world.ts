@@ -30,6 +30,7 @@ import { pickSpot, planYardAnimals, type Circle, type Point, type Spot, type Yar
 import { birdLevelAtDistance } from "./ambience";
 import { SCENE_IDS, type SceneId } from "./app/route";
 import { Forest, ScatterField, placeForestWall, type ScatterItem, type TreeSpot } from "./forest";
+import { createBirds, type BirdsView } from "./engine/birds";
 import { addFoliageFade } from "./engine/foliageFade";
 import { entrySpawn, sceneLayout, walkableDepth, type Vec2 } from "./sceneLayout";
 
@@ -1475,7 +1476,7 @@ function populate(
     : null;
   return {
     stats: { trees: treeSpots.length, tris: Math.round(tris + dynamicTris), sceneItems: sceneItems.size, walls },
-    forest, scatter, props,
+    forest, scatter, props, treeSpots,
   };
 }
 
@@ -1982,6 +1983,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     sun.position.copy(snapped).add(sunOffset);
   };
   let forest: Forest | null = null, scatter: ScatterField | null = null, props: Forest | null = null;
+  let birds: BirdsView | null = null;
 
   const groundTex = buildGround(scene, maxAniso);
   const water = LAKE ? buildWater(scene, envMap) : null;
@@ -2055,6 +2057,11 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     forest = built.forest;
     scatter = built.scatter;
     props = built.props;
+    // Erämaan taustalinnut istuvat oikeiden puiden oksilla ja tepastelevat vapaalla maalla (engine/birds.ts).
+    if (WILDS) birds = createBirds(scene, built.treeSpots, (n) => protos.get(n), {
+      ground: groundHeight,
+      groundFree: (x, z) => walkableDepth(LAYOUT, x, z) > 1.5 && collision.depenetrateDisc(x, z, 0.3).hit === null,
+    }, SPAWN);
     // Liitetään tilastot samaan `__world`-olioon, jossa on maailmamoottorin konsoli (engine/worldConsole.ts).
     const host = window as unknown as { __world?: object };
     Object.assign(host.__world ??= {}, { ...built.stats, collision: collision.stats() });
@@ -2063,6 +2070,8 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
       configurable: true,
       get: () => ({ ...forest?.stats(), props: props?.stats(), cover: scatter?.stats() }),
     });
+    Object.defineProperty(host.__world, "birds", { configurable: true, get: () => birds?.stats() });
+    Object.assign(host.__world, { birdsShow: (on: boolean) => birds?.show(on) });
     // Savutesteihin: metsän lähisäteen säätö (vertailukuvat täysi/kaukopuu).
     Object.assign(host.__world, { forestNear: (r: number, band?: number) => forest?.setNear(r, band) });
     if (ARENA === "yard") return populateYardLife(scene, collision);
@@ -2105,6 +2114,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
         forest?.update(focus);
         props?.update(focus);
         scatter?.update(focus);
+        birds?.update(dt, camera, focus);
       }
     },
   };
