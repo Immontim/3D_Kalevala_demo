@@ -8,11 +8,13 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `7d2f55c`)
 
-- **Koodiversio v06.06.01** branchissa `claude/peaceful-crosshair` (tarkista merge-tila `git merge-base`illa).
-  Koodi valmis, ei deployattu, omistaja ei ole käsin testannut. Korjaus: `#crosshair.hidden` ja
-  `#huntHud.hidden` puuttuivat CSS:stä (yleistä `.hidden`-sääntöä ei ole), joten tähtäin näkyi kaikissa
-  kohtauksissa. In-app-selaimessa: pihalla tähtäin ja laskuri piilossa, erämaassa tähtäin näkyy vain
-  tähdätessä. v06.06:n apajat on mergattu (#81); omistajan karttatesti on yhä tekemättä.
+- **Koodiversio v06.07.00** branchissa `claude/sidestep-and-gait` (tarkista merge-tila `git merge-base`illa).
+  Koodi valmis, ei deployattu, omistaja ei ole käsin testannut. Claude mittasi aukiolla `__game.step`illä
+  luiden paikoista: väistö 0,6 m joka suuntaan, maassa olevan jalan liuku ≤ 1,5 cm/ruutu, lantion lasku
+  sivulle 7–10 cm; pelkkä Shift ja Shift+W eivät väistä. Kävely: nilkkojen väli rauhassa 0,19 m,
+  taistelussa 0,23 m (ennen 0,34); polvi heilahduksessa 82° 3,4 m/s:ssa (ennen 72°). Arvioiva ali-agentti
+  kävi kuvat läpi kahdesti (gauntlet; ks. alla). Piirto 3,8 ms/ruutu, ei muutosta. Testit, tsc, lint läpi.
+  v06.06.01 (tähtäimen piilotus) on mainissa; omistajan karttatesti apajoista on yhä tekemättä.
 - **Metsästysapajat (v06.06, `map/huntGrounds.ts` puhdas).** Apaja on `SiteInstance` `kind: "hunt"`
   (`sites.ts` → `wilds`, `lifetime: "temporary"`). `CampaignWorld.huntCycle` = viimeisin käsitelty 20 päivän
   jakso; −1 (vanha tallennus) → `ensureHuntGrounds` arpoo 3–6 alkuapajaa kerran (`newCampaign` ja
@@ -23,6 +25,16 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `7d2f55c`)
   Apaja ei ole valmiiksi tunnettu, joten `mapSiteDisplay` näyttää sen vasta 3 × 3 -näössä. `enterSite`
   kuluttaa sen (`removeHuntGround`) ennen siirtymää. Kuvake `assets/map/hunt-site.png`. Satunnaistettu
   tietäjän paikka huomioidaan, kun se on instanssi tai `MAP_SITE_DEFINITIONS`issa.
+- **Väistöaskel ja kävely (v06.07, `src/sidestep.ts` puhdas, `fighter.ts`, `engine/{hero,melee,animate}.ts`).**
+  `dodgeDirection(A, D, S)` (eteenpäin-osa pois; null = ei väistöä eikä jäähdytystä). `sidestepPose(u)`:
+  johtava jalka 0–0,5, perässä tuleva 0,5–1 (ei koskaan molemmat ilmassa: muuten alempi jalka laahaa),
+  vartalo = jalkojen keskiarvo; sama käyrä liikuttaa hahmoa (`COMBAT.dodgeDistance` 0,6 m) ja jalkoja
+  (`Fighter.setSidestep`). Sivulle johtaa liikkeen puoleinen jalka (vaihtoaskel), taakse etummainen jalka
+  (kaksi askelta; taempi ensin venytti haara-asennon 1,3 m:iin). `sideW` vaimentaa kävelyaskelluksen, ja
+  lantio laskee täyden matkan (`dropK`). Koko hahmon kallistus poistettiin. Haara-asentoa ei voi kaventaa
+  kesken askeleen ilman liukua: leveyttä säätää vain askeleen pituus. Kävely: `GAIT.walkNarrow/
+  walkNarrowGuard/standNarrow` (luurangon lepoasennossa nilkat 0,34 m, lonkat 0,19 m) ja `liftSkew`. Kävelyyn
+  lisätty polvikyykky ja taka-askeleen kyykky poistettiin arvioijan palautteesta (istuva ilme).
 - **Vihollisen torjuntareaktio ja etenevä nosto (v06.05, `engine/ai.ts`, säännöt `combat.ts`).** Uhattu
   (`threatenedBy` + `ENEMY_AI.threatMargin` 25°, alle 3,2 m) vastustaja arpoo torjunnan kerran iskua kohti
   viiveellä `blockReactionDelay` (0,03–0,16 s, vain jos `BLOCK_RAISE` ehtii ennen `timeToImpact`ia).
@@ -41,23 +53,16 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `7d2f55c`)
   koodissa (`hunt/models.ts`).
 - **Tallennuksen hylkäys (v06.03.01).** Kelvoton tallennus kopioidaan avaimelle `laulun-miekka.campaign.rejected`
   ja kartta näyttää `map.saveRejected`; lataus on tarkoituksella tiukka, jotta vika näkyy.
-- **Saapuminen polunsuulta (v06.02).** `sceneLayout.entrySpawn(layout, inset)` = ensimmäisen polunsuun portista
-  `ENTRY_INSET` 3,5 m sisään, katse sisään. `world.ts` `SPAWN`: kalmisto ja erämaa käsin (jo polulla), pihat
-  inset 6,4 (kameran `camMaxR` 12,2 aidan sisällä, muuten kamera painuu maahan), ranta katsoo `LAKE_FIRE`a.
-  Rannan polunsuu siirrettiin 205° → 150° (mökin itäpuolelle); polku ja puuton kaista seuraavat dataa.
-- **Aaltojen tulo (v06.02).** `sceneLayout.approachSpawns`: ryhmä vierekkäin (1,8 m) arenan keskeltä katsoen
-  pelaajan vastakkaisella puolella ± satunnainen 0,5 rad, kehällä `SceneLayout.approach` (vain aukio, 14,5 m;
-  puut alkavat 13,2 m) tai alueen reunalla (r − 1). `addEnemy` kääntää vihollisen heti pelaajaa kohti.
-  Alueen ulkopuolella syntynyt saa `ai.arriveUntil`in (12 s): `melee.keepApartAndInside` ei rajaa häntä,
-  kunnes hän on alueen sisällä. `ENEMY_AI.strafeRange` 5: kauempaa ei kierrellä. Aukiolla 1. aallon urho on
-  sankarin luona noin 7 s:ssa.
+- **Saapuminen polunsuulta (v06.02).** `sceneLayout.entrySpawn(layout, inset)`: ensimmäisen polunsuun portista
+  `ENTRY_INSET` 3,5 m sisään (pihat 6,4, jotta kamera mahtuu aidan sisään); kalmisto ja erämaa käsin.
+- **Aaltojen tulo (v06.02).** `sceneLayout.approachSpawns`: ryhmä vierekkäin pelaajan vastakkaiselta puolelta
+  (aukiolla 14,5 m:n kehältä puiden välistä). Alueen ulkopuolella syntynyt saa `ai.arriveUntil`in (12 s),
+  jonka ajan `melee.keepApartAndInside` ei rajaa häntä. `ENEMY_AI.strafeRange` 5: kauempaa ei kierrellä.
 - **Kohtausmalli (`src/sceneLayout.ts`, puhdas).** Jokaisella kohtauksella on `SceneLayout`: kuljettava
   monikulmio `bounds`, taistelun `arena` (keskus + säde, vihollisten tulopaikat) ja polunsuut `exits`
   (portti, ulos-suunta, leveys, `mapDir`). Kuljettava alue = monikulmio TAI polunsuun käytävä (5 m sisään,
-  4 m ulos portista). `clampToWalkable` korvasi `ARENA_RADIUS`-ympyrän `melee.ts`:ssä ja `skirmish.ts`:ssä
-  (`ARENA_RADIUS` on yhä `world.ts`:ssä vanhan sijoittelun säteenä). Vanhat kohtaukset ovat 11 m:n
-  ympyröitä, joissa on yksi polunsuu (aukio etelä, pihat portista, rannat ja kalmisto maan puolelle).
-  Konventio: 3D:n −z = pohjoinen, +x = itä.
+  4 m ulos portista), rajaus `clampToWalkable` (`ARENA_RADIUS` on enää vanhan sijoittelun säde). Vanhat
+  kohtaukset ovat 11 m:n ympyröitä, joissa on yksi polunsuu. Konventio: 3D:n −z = pohjoinen, +x = itä.
 - **Polunsuusta poistuminen (`src/engine/exit.ts`).** Portin ylitys aloittaa 1 s:n mustan häivytyksen
   (`#exitFade`), jonka aikana peli jatkuu (vihollinen voi lyödä; kuolema tai käytävästä palaaminen
   peruu). Lopuksi `?return=map`-reitillä `createEmptySceneReturn(scene, mapDir)` ja kartalle; muuten
@@ -74,12 +79,9 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `7d2f55c`)
   häipyy kuvioiden alle 2,2 m:n päässä kamerasta ja harvenee 80 % kameran ja sankarin rinnan välisellä
   kapselilla (säde 0,9 m). Varjot pysyvät umpinaisina.
 - **Erämaa `wilds` (friendly, Esc-oikotie, aloitusvalikko, `?scene=wilds`; ei karttapaikkaa).** 200 × 200 m:n
-  kuljettava alue (34-kärkinen monikulmio ±97 m), polunsuut pohjoinen (14, −97), itä (97, 18) ja etelä
-  (−36, 97). Maasto 380 m (`wildsHeight`: moreenikumpareet, suoniitty `bogMix` keskellä tasoitettuna,
-  paloaukea `burnMix` (52, −40) hiiltyneellä maalla). ~4 900 puuta (myös 70 m rajan yli), reunalla tiheä
-  nuori kuusikko, lohkareet ja juurakot; polut puuttomia 3,6 m. Kivet, kelot ja juurakot piirretään alle
-  60 m:n päähän (`Forest` ilman kaukomallia). Aluskasvillisuus `ScatterField`illa 12 m:n ruutuina 34 m:n
-  säteellä, reunalla häivytys. Piirtokuorma alussa ~0,96 milj. kolmiota (ranta nyt 0,92, ennen 1,26).
+  kuljettava alue (monikulmio ±97 m), kolme polunsuuta. Maasto `wildsHeight` (suoniitty `bogMix`,
+  paloaukea `burnMix`). ~4 900 puuta; kivet, kelot ja juurakot alle 60 m:n päähän, aluskasvillisuus
+  `ScatterField`illa 34 m:n säteellä. Piirtokuorma alussa ~0,96 milj. kolmiota.
 - **Paperinukke ja inventaario.** Skeema 6, avain `laulun-miekka.campaign.v6`, 12 tavarapaikkaa ja
   seitsemän varustepaikkaa. Kartta ja 3D:n pause käyttävät samaa `ui/inventoryView.ts`-näkymää.
   Rauhassa varusteita voi vaihtaa ja ruokaa syödä; taistelussa näkymä on vain luettavissa.
@@ -94,12 +96,9 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `7d2f55c`)
   omistajan listan mukaan (urho/miekka; pohja/miekka+kilpi; urho/keihäs + pohja/miekka; pohja/keihäs +
   pohja/miekka+kilpi; urho/keihäs + pohja/miekka+kilpi + pohja/miekka), `FINAL_WAVE`, `TOTAL_ENEMIES` (9).
   **Vastustajat ovat perusarvoissa** (taso 0, ei `groupHpScale`a; urho 70 HP, pohja 80 HP); vain
-  tekoälyn taito nousee (`aiLevelForWave` = aalto-1, `EnemyDef.aiLevel`). `engine/skirmish.ts`:
-  viimeisen aallon kaatuminen -> viesti -> `engine/victory.ts` `finishVictory`: `battle.won`
-  -> sääntö `campaign.victory` (efekti `recordVictory`: lippu `campaign.won`, laskurit `win.days` =
-  `totalDays(worldMinutes)` ja `win.explored` %) -> `mapUrl`. Kaatuminen: `onPlayerDeath` ->
-  `player.died` -> `player.deaths`-laskuri. Debug: `__game.killEnemies()`, `skipTo(1..5)`.
-  Alkuperäiset `groupSize`/`WAVES.hpPerWave` jäivät `combat.ts`:ään käyttämättöminä (testit).
+  tekoälyn taito nousee (`aiLevelForWave` = aalto-1). Viimeinen aalto -> `finishVictory` -> `battle.won`
+  -> sääntö `campaign.victory` (`recordVictory`: lippu `campaign.won`, `win.days`, `win.explored`).
+  Kaatuminen -> `player.died` -> `player.deaths`. Debug: `__game.killEnemies()`, `skipTo(1..5)`.
 - **Loppuruutu** (`map/ending.ts` puhdas, `map/app.ts` `#mapEnding`): näkyy kartalla voiton jälkeen kerran
   (päivät, tutkittu %, laulut, kukistetut, kaatumiset, luvattomat otot, sivupolut); "Jatka vaellusta"
   asettaa `campaign.endSeen`, asetuksista voi katsoa uudelleen. Päivät ja kartta jäädytetään voittoon.
@@ -116,9 +115,8 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `7d2f55c`)
   on kehittäjälle auki.
 - **Laulun opettelu (V4, mergattu).** Laulu **Pohjolan uni** (`SONGS.sleep`, Kalevala runo 42).
   Tietäjän dialogi -> efekti `startSongLesson` (`OutAction`) -> `engine/song.ts` `startLesson`
-  (`SongState.lesson`: ei hidastusta, säe näkyy etukäteen) -> `endLesson` lähettää `song.performed`
-  (lesson); sääntö `sage.song-learned` antaa lipun `song.sleep.learned`. Epäonnistuminen ei rankaise
-  (raja `SONG.minHits` 4/8). `songLogic.songSlots(flags)` sijoittaa laulun paikkaan F3.
+  (ei hidastusta, säe näkyy etukäteen) -> `song.performed` -> lippu `song.sleep.learned` (raja
+  `SONG.minHits` 4/8, epäonnistuminen ei rankaise). `songLogic.songSlots(flags)`: laulu paikkaan F3.
 - **Satunnaiset pihapiirit.** `map/siteInstances.ts` tallentaa siemenen ja paikat (`yard`/`yard-b`).
   `yardMeadows.ts` kasvattaa taloruudusta 3–9 sivuttain kiinni olevaa niittyruutua viiden ruudun
   levyisellä alueella. Metsät ja nykyinen niitty käyvät, ranta ja muut paikat rajaavat kasvua.
@@ -294,9 +292,10 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja `origin/main` `7d2f55c`)
 
 ## Seuraava tehtävä
 
-Omistaja pelaa uuden matkan kartalla: löytyvätkö apajat sopivasti, onko 3–6 alussa ja yksi 20 päivässä
-oikea tahti, ja tuntuvatko 7–9 jänistä ja hitaampi pako (6,8 m/s) hyvältä. Säätö `HUNT_RULES`,
-`HARE_SPAWN` ja `SPECIES.hare`. v06.05:n torjunta- ja etenemistesti aalloissa 3–5 on yhä tekemättä.
+Omistaja testaa taistelussa v06.07:n väistöaskeleen (Shift + A/D/S) ja kävelyn: tuntuuko 0,6 m:n askel
+riittävältä väistöltä (suoja-aika 0,35 s ennallaan) ja onko kävely nyt kevyt. Säätö `COMBAT.dodgeDistance`,
+`SIDESTEP` ja `GAIT`. Samalla v06.05:n torjunta ja etenevä nosto aalloissa 3–5. Kartan apajatesti
+(`HUNT_RULES`, `HARE_SPAWN`, `SPECIES.hare`) on yhä tekemättä.
 
 ## Ei vielä aloiteta
 

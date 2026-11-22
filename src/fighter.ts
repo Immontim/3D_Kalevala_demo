@@ -5,6 +5,7 @@ import charactersUrl from "../assets/characters.glb?url";
 import villagersFUrl from "../assets/villagers_f.glb?url";
 import { FINGER_OPEN, loadGltf } from "./folk";
 import type { Loadout } from "./combat";
+import { SIDESTEP, sidestepPose } from "./sidestep";
 
 // Blenderissä mallinnettu luurankohahmo, jota ohjataan koodilla: asennot (Pose) ovat
 // nivelkulmia, joita kohti hahmo pehmeästi liukuu. Valmiita animaatioleikkeitä ei ole.
@@ -343,8 +344,12 @@ export const GAIT = {
   sideStep: 0.75,
   /** Osuus syklistä, jonka jalka on maassa: kävellessä yli puolet, juostessa (runSpeed) alle. */
   duty: 0.58, dutyRun: 0.4, walkSpeed: 1.6, runSpeed: 3.4,
-  /** Jalan nosto heilahduksessa (m): perusosa ja nopeuden mukaan kasvava osa. */
-  liftBase: 0.05, liftPerSpeed: 0.022,
+  /** Jalan nosto heilahduksessa (m): perusosa ja nopeuden mukaan kasvava osa. liftSkew < 1 siirtää
+   *  nousun huipun heilahduksen alkuun (kantapää nousee takana, polvi koukistuu). */
+  liftBase: 0.07, liftPerSpeed: 0.03, liftSkew: 0.75,
+  /** Jalkojen kapennus keskilinjaa kohti (m jalkaa kohti): kävellessä rauhassa ja taisteluasennossa sekä
+   *  rauhan seisonnassa. Ilman tätä nilkat ovat 0,34 m:n päässä toisistaan (luurangon lepoasento). */
+  walkNarrow: 0.08, walkNarrowGuard: 0.06, standNarrow: 0.035,
   /** Nopeus, jolla askellus alkaa ja jolla se on täydessä laajuudessa (m/s). */
   startSpeed: 0.2, fullSpeed: 0.9,
   /** Kävellessä: lantion kierto, kallistus ja sivusiirtymä (rad, rad, m) sekä hartioiden vastaliike. */
@@ -425,6 +430,10 @@ export class Fighter {
   private strideVel = 0;
   /** 0..1: kädet ovat vapaat (rauhan lepoasento), jolloin ne heiluvat kävellessä. */
   private relax = 0;
+  /** Väistöaskel: vaihe 0..1 ja askel hahmon omassa koordinaatistossa (m), null kun ei väistetä. */
+  private sidestep: { u: number; x: number; z: number; leadLeft: boolean } | null = null;
+  /** 0..1: kuinka paljon väistöaskel ohittaa kävelyn askelluksen (pehmeä siirtymä). */
+  private sideW = 0;
   /** Sormiluut (finger1..3 kummallekin kädelle): lepoasento on nyrkki, avaus 0..1 kiertää luita auki. */
   private fingers: Partial<Record<"L" | "R", { bones: THREE.Bone[]; rest: THREE.Quaternion[] }>> = {};
   private handOpen = { L: 0, R: 0 };
@@ -933,6 +942,22 @@ export class Fighter {
   }
 
   /** Mittari: jalkaterien paikka maailmassa (x, y, z) ja askelsyklin vaihe. Savutestiin. */
+  /**
+   * Väistöaskel: u = vaihe 0..1 (null = ei väistöä), dir = askeleen suunta maailmassa, distance = pituus.
+   * Sivuaskeleessa johtava jalka on liikkeen puoleinen (vaihtoaskel, jalat eivät mene ristiin).
+   * Taka-askeleessa etummainen jalka astuu ensin toisen taakse ja toinen palaa taakse: kaksi askelta
+   * taaksepäin pitävät haara-asennon kapeana (taempi ensin venytti sen 1,3 metriin).
+   */
+  setSidestep(u: number | null, dir: THREE.Vector3, distance: number) {
+    if (u === null) { this.sidestep = null; return; }
+    const yaw = this.root.rotation.y, c = Math.cos(yaw), sn = Math.sin(yaw);
+    const x = (dir.x * c - dir.z * sn) * distance, z = (dir.x * sn + dir.z * c) * distance;
+    // Johtava jalka valitaan askeleen alussa ja pidetään loppuun asti.
+    const leadLeft = this.sidestep?.leadLeft
+      ?? (Math.abs(x) >= 0.5 * Math.abs(z) ? Math.sign(x) === this.leftX : this.pose.stride > 0);
+    this.sidestep = { u, x, z, leadLeft };
+  }
+
   feetDebug() {
     if (!this.rig) return null;
     this.root.updateMatrixWorld(true);
@@ -995,7 +1020,10 @@ export class Fighter {
     const G = GAIT, TAU = Math.PI * 2;
     const life = 1 - fw;
     const speed = this.vel.length();
-    const w = THREE.MathUtils.smoothstep(speed, G.startSpeed, G.fullSpeed) * life;
+    // Väistöaskel ohittaa kävelyn askelluksen: jalat astuvat askeleen käyrää pitkin (sidestepPose).
+    const ss = this.sidestep, sp = ss ? sidestepPose(ss.u) : null;
+    const w = THREE.MathUtils.smoothstep(speed, G.startSpeed, G.fullSpeed) * life * (1 - this.sideW);
+    const sideBell = ss ? Math.sin(Math.PI * ss.u) * life : 0;
     const calm = (1 - 0.7 * w) * life;
     const t = this.idleT;
     const idle = Math.sin(t * 1.15) * 0.75 + Math.sin(t * 2.63 + 1.3) * 0.25;
@@ -1004,7 +1032,8 @@ export class Fighter {
     const onLeft = Math.cos(TAU * (this.walkPhase - duty / 2)); // +1 = paino vasemmalla jalalla
     const leftLead = Math.cos(TAU * this.walkPhase); // +1 = vasen jalka edessä
     const pelvisX = idle * G.idleShift * calm + this.leftX * onLeft * G.hipShift * w;
-    const hipRoll = idle * G.idleRoll * calm + this.leftX * onLeft * G.hipRoll * w;
+    const hipRoll = idle * G.idleRoll * calm + this.leftX * onLeft * G.hipRoll * w
+      + (ss ? Math.sign(ss.x) * this.leftX * SIDESTEP.roll * sideBell : 0);
     const hipYaw = Math.sin(t * 0.83 + 2) * G.idleYaw * calm - this.leftX * leftLead * G.hipYaw * w * dir.y;
     const lean = G.lean * w * dir.y * Math.min(1, speed / 3.4);
     const S = new THREE.Quaternion().setFromEuler(eul.set(p.spinePitch + breath + lean, p.spineYaw - hipYaw * G.counter, fp.spineRoll * fw - hipRoll * G.counter));
@@ -1068,6 +1097,11 @@ export class Fighter {
     const reach = (l1 + l2) * 0.995;
     const stepLen = this.stepLen;
     const lift = (G.liftBase + G.liftPerSpeed * speed) * w;
+    // Luurangon lepoasennossa jalat haraavat ulos. Kävellessä jalat astuvat lähemmäs keskilinjaa, rauhan
+    // seisonnassa ne ovat hieman koolla ja taisteluasennossa leveämmin. Sivuttain kävellessä kapennus väistyy,
+    // jotta jalat eivät mene ristiin.
+    const narrow = (w * THREE.MathUtils.lerp(G.walkNarrowGuard, G.walkNarrow, this.relax) * (1 - 0.7 * Math.abs(dir.x))
+      + (1 - w) * this.relax * G.standNarrow) * life;
     const foot = (side: "L" | "R", thighRot: number, kneeRot: number) => {
       const a = -thighRot;
       const out = { x: 0, y: -(l1 * Math.cos(a) + l2 * Math.cos(a - kneeRot)), z: l1 * Math.sin(a) + l2 * Math.sin(a - kneeRot), up: 0 };
@@ -1079,26 +1113,41 @@ export class Fighter {
         const u = (ph - duty) / (1 - duty), m = Math.max(-1, -(1 - duty) / duty);
         const u2 = u * u, u3 = u2 * u;
         along = (2 * u3 - 3 * u2 + 1) * -0.5 + (u3 - 2 * u2 + u) * m + (-2 * u3 + 3 * u2) * 0.5 + (u3 - u2) * m;
-        out.up = Math.sin(Math.PI * u);
+        // Nousu huipentuu heilahduksen alkupuolella: kantapää nousee takana ja polvi koukistuu.
+        out.up = Math.sin(Math.PI * Math.pow(u, G.liftSkew));
       }
       // Sivuaskeleessa kumpikin jalka askeltaa enimmäkseen oman puolensa ulkopuolella, jotta jalat eivät mene ristiin.
       const sideSign = side === "L" ? this.leftX : -this.leftX;
-      out.x += (dir.x * along + sideSign * 0.25 * Math.abs(dir.x)) * stepLen * w - pelvisX;
+      out.x += (dir.x * along + sideSign * 0.25 * Math.abs(dir.x)) * stepLen * w - pelvisX - sideSign * narrow;
       out.z += dir.y * along * stepLen * w;
       out.y += out.up * lift;
+      if (ss && sp) {
+        // Väistöaskel: jalka on vartaloon nähden siinä, mihin se on omaa käyräänsä pitkin ehtinyt.
+        const lead = (side === "L") === ss.leadLeft;
+        const k = (lead ? sp.lead : sp.trail) - sp.body;
+        // Haara-asentoa ei voi kaventaa siirtämällä jalkoja: maassa oleva jalka liukuisi. Leveyttä säätää askeleen pituus.
+        out.x += ss.x * k * life;
+        out.z += ss.z * k * life;
+        out.y += (lead ? sp.leadUp : sp.trailUp) * THREE.MathUtils.lerp(SIDESTEP.liftBack, SIDESTEP.lift, lateral) * life;
+      }
       return out;
     };
-    // Haara-asento sulautuu osin pois kävellessä, jotta askel ei jää toispuoleiseksi.
+    // Haara-asento sulautuu osin pois kävellessä, jotta askel ei jää toispuoleiseksi. Sivuaskeleessa polvet
+    // koukistuvat hieman lisää; taka-askel ja kävelyn tukijalka pysyvät suorempina (ei "istuvaa" ilmettä).
     const st = p.stride * (1 - w * 0.6);
     const sf = Math.max(0, st), sb = Math.max(0, -st);
-    const fL = foot("L", -p.crouch * 1.2 - st, p.crouch * 2 + sf * 0.35 + sb * 0.6);
-    const fR = foot("R", -p.crouch * 1.2 + st, p.crouch * 2 + sb * 0.35 + sf * 0.6);
+    const lateral = ss ? Math.abs(ss.x) / Math.max(1e-6, Math.hypot(ss.x, ss.z)) : 0;
+    const crouch = p.crouch + SIDESTEP.crouch * sideBell * lateral;
+    const fL = foot("L", -crouch * 1.2 - st, crouch * 2 + sf * 0.35 + sb * 0.6);
+    const fR = foot("R", -crouch * 1.2 + st, crouch * 2 + sb * 0.35 + sf * 0.6);
     // Tukiaskel: kun haara-asento aukeaa nopeasti (isku), etujalka nousee ja astuu eikä laahaa maata.
     fL.y += THREE.MathUtils.clamp(this.strideVel * 0.03, 0, 0.13) * life;
     // Jos jalka ei yllä paikkaansa, lantio laskeutuu: tästä syntyy askelluksen pieni pystyliike.
     let drop = 0;
     // Ilmassa oleva jalka ei vedä lantiota alas.
-    for (const f of [fL, fR]) drop = Math.max(drop, 0.55 * (1 - f.up * w) * (-f.y - Math.sqrt(Math.max(0.01, reach * reach - f.x * f.x - f.z * f.z))));
+    // Väistöaskeleen leveässä haara-asennossa lantio laskee täyden matkan, jotta maassa oleva jalka ylettyy eikä liu'u.
+    const dropK = THREE.MathUtils.lerp(0.55, 1, this.sideW);
+    for (const f of [fL, fR]) drop = Math.max(drop, dropK * (1 - f.up * w) * (-f.y - Math.sqrt(Math.max(0.01, reach * reach - f.x * f.x - f.z * f.z))));
     const leg = (side: "L" | "R", tgt: { x: number; y: number; z: number; up: number }) => {
       const x = tgt.x, y = tgt.y + drop, z = tgt.z;
       const r = Math.min(reach, Math.max(Math.abs(l1 - l2) + 0.01, Math.hypot(x, y, z)));
@@ -1156,6 +1205,7 @@ export class Fighter {
     const strideWas = this.pose.stride;
     // Rauhan lepoasennossa kädet ovat vapaat ja heiluvat; eleet ja taisteluasennot hallitsevat käsiä itse.
     this.relax += ((target === POSES.rest || target === POSES.restSpear ? 1 : 0) - this.relax) * k;
+    this.sideW += ((this.sidestep ? 1 : 0) - this.sideW) * (1 - Math.exp(-25 * dt));
     // Kämmenet: rauhassa ja eleissä sormet ovat rennosti auki, taistelussa ase- ja kilpikäsi puristaa nyrkkiin.
     const freeHands = target === POSES.rest || target === POSES.restSpear || gesture;
     const openAmt = gesture ? 0.9 : 0.7;

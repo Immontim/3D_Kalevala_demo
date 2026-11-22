@@ -51,8 +51,12 @@ export const COMBAT = {
   bashPushSpeed: 2.6,
   dodgeTime: 0.35,
   dodgeCooldown: 0.6,
-  /** Väistön nopeus, m/s. */
-  dodgeSpeed: 7,
+  /**
+   * Väistöaskeleen pituus (m). Askel kulkee sidestepPose-käyrää pitkin, ei tasaisella nopeudella.
+   * Sivuaskeleen leveimmässä kohdassa jalat ovat taisteluasennon leveyden (0,34 m) + tämän verran erillään;
+   * pidempi askel painaa lantion syvään "sumokyykkyyn". Väistön suoja-aika (dodgeTime) ei riipu matkasta.
+   */
+  dodgeDistance: 0.6,
   /**
    * Osuus iskuvaiheesta (release), jonka kohdalla isku osuu. Sitä ennen lyöjä ottaa
    * tukiaskeleen eteen (lunge); isku ratkeaa vasta, kun askel on otettu.
