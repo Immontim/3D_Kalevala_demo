@@ -1,6 +1,6 @@
 // Ehtojen arviointi. Jokainen tulos kertoo suomeksi, miksi ehto piti tai ei pitänyt,
 // jotta `__world.explain` voi näyttää epäonnistumisen syyn.
-import type { CampaignState, ItemId } from "../map/campaign";
+import { taggedItemCount, type CampaignState, type ItemId } from "../map/campaign";
 import { nearestUnknownHuntGround } from "../map/huntGrounds";
 import { mapCalendarTime } from "../map/uiState";
 import { counterValue, flagValue } from "./state";
@@ -113,6 +113,14 @@ export function evaluate(cond: Condition, state: CampaignState, data: WorldData)
         reason: `pelaajalla on ${have} × ${cond.itemId}; vaadittiin vähintään ${cond.quantity}${pass ? "" : " (ei täyty)"}`,
       };
     }
+    case "hasTagged": {
+      const have = taggedItemCount(state.player.inventory, cond.tag);
+      const pass = have >= cond.quantity;
+      return {
+        pass,
+        reason: `pelaajalla on ${have} × tyyppiä ${cond.tag}; vaadittiin vähintään ${cond.quantity}${pass ? "" : " (ei täyty)"}`,
+      };
+    }
     case "moonChance": {
       const roll = moonRoll(state, cond.salt);
       const pass = roll < cond.chance;
@@ -176,6 +184,7 @@ export function conditionRefs(cond: Condition, out: { flags: string[]; counters:
     case "itemTaken": out.instances.push(cond.instanceId); break;
     case "moonPhase":
     case "hasItem":
+    case "hasTagged":
     case "moonChance":
     case "unknownHuntGround": break;
   }
