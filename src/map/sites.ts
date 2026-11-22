@@ -3,8 +3,13 @@ import type { SiteInstance } from "./campaign";
 import { MAP_RULES, mapCell, type MapPosition, type WorldMapDefinition } from "./domain";
 import type { MapCellVisibility } from "./uiState";
 
-export const FIXED_SITE_IDS = ["lakeside", "cairnfield"] as const;
-export type FixedSiteId = (typeof FIXED_SITE_IDS)[number];
+/** Tietäjän rantamökin instanssi. Tunniste on sama kuin entisellä kiinteällä paikalla (säännöt viittaavat siihen). */
+export const SAGE_SITE_ID = "lakeside";
+/** Kalmisto, jolla Louhi seisoo (entinen kiinteä `cairnfield`). */
+export const LOUHI_CAIRN_ID = "cairnfield";
+/** Toinen kalmisto: kuppikivi ilman Louhta. */
+export const OFFERING_CAIRN_ID = "cairn-b";
+export const SHORE_SITE_IDS = [SAGE_SITE_ID, LOUHI_CAIRN_ID, OFFERING_CAIRN_ID] as const;
 export type MapSiteMovement = "fixed" | "mobile";
 export type MapSiteLifetime = "persistent" | "temporary";
 export type MapSiteDisplay = "hidden" | "normal" | "dimmed";
@@ -31,26 +36,14 @@ export function siteUnlocked(definition: Pick<MapSiteDefinition, "requiresFlag">
 /** Vanhan tallennuksen kiinteä piha (instanssi "yard") ennen satunnaisia pihapiirejä. */
 export const LEGACY_YARD_POSITION: MapPosition = { x: 10, y: 11 };
 
-/** Kartalle käsin kiinnitetyt paikat. Pihapiirit ovat kampanjan `siteInstances`-instansseja. */
-export const MAP_SITE_DEFINITIONS: Record<FixedSiteId, MapSiteDefinition> = {
-  lakeside: {
-    id: "lakeside",
-    mapId: "kalevala-prototype",
-    position: { x: 9, y: 6 },
-    sceneId: "lakeside",
-    movement: "fixed",
-    lifetime: "persistent",
-  },
-  /** Kaakon vaaran kalliokumpu veden rannalla: rauhallinen kalmisto kuppikivineen. */
-  cairnfield: {
-    id: "cairnfield",
-    mapId: "kalevala-prototype",
-    position: { x: 16, y: 16 },
-    sceneId: "cairnfield",
-    movement: "fixed",
-    lifetime: "persistent",
-  },
-};
+/**
+ * Tietäjän mökin ja Louhen kalmiston paikat ennen v08:aa, jolloin ne olivat kartan kiinteitä paikkoja.
+ * Vanha tallennus saa ne näille paikoille instansseina; uusi matka arpoo ne rannoille.
+ */
+export const LEGACY_SHORE_POSITIONS = {
+  lakeside: { x: 9, y: 6 },
+  cairnfield: { x: 16, y: 16 },
+} as const satisfies Record<string, MapPosition>;
 
 /** Vainolaisten leirin lukitus: piilossa, kunnes Louhi on karkotettu (V5). */
 export const CAMP_REQUIRES_FLAG = "louhi.banished";
@@ -65,7 +58,8 @@ export function instanceSiteDefinition(instance: SiteInstance): MapSiteDefinitio
     id: instance.id,
     mapId: "kalevala-prototype",
     position: { x: instance.x, y: instance.y },
-    sceneId: instance.kind === "camp" ? "clearing" : instance.kind === "hunt" ? "wilds" : "yard",
+    sceneId: instance.kind === "camp" ? "clearing" : instance.kind === "hunt" ? "wilds"
+      : instance.kind === "lakeside" ? "lakeside" : instance.kind === "cairn" ? "cairnfield" : "yard",
     movement: "fixed",
     lifetime: instance.kind === "hunt" ? "temporary" : "persistent",
     ...(instance.kind === "camp" ? { requiresFlag: CAMP_REQUIRES_FLAG } : {}),
@@ -77,7 +71,6 @@ export function mapSiteDefinition(
   instances: readonly SiteInstance[] = [],
 ): MapSiteDefinition | undefined {
   if (!siteId) return undefined;
-  if ((FIXED_SITE_IDS as readonly string[]).includes(siteId)) return MAP_SITE_DEFINITIONS[siteId as FixedSiteId];
   const instance = instances.find((entry) => entry.id === siteId);
   return instance ? instanceSiteDefinition(instance) : undefined;
 }

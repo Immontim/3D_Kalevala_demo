@@ -159,11 +159,15 @@ export interface SceneItemState {
 
 /** Kartalle konkretisoitu paikkainstanssi. Tallennetaan tulos eikä vain siementä (generaattori muuttuu). */
 /** "hunt" = kertakäyttöinen metsästysapaja (erämaakohtaus), joka katoaa kartalta, kun sinne mennään. */
-export type SiteInstanceKind = "yard" | "camp" | "hunt";
-export const SITE_INSTANCE_KINDS: readonly SiteInstanceKind[] = ["yard", "camp", "hunt"];
+/** "lakeside" = tietäjän rantamökki, "cairn" = kalmisto (Louhi vain `cairnfield`-instanssissa). */
+export type SiteInstanceKind = "yard" | "camp" | "hunt" | "lakeside" | "cairn";
+export const SITE_INSTANCE_KINDS: readonly SiteInstanceKind[] = ["yard", "camp", "hunt", "lakeside", "cairn"];
 
 export interface SiteInstance {
-  /** Pysyvä tunniste, myös 3D-esineiden etuliite: "yard" (vanhan tallennuksen piha), "yard-b" ja vainolaisten leiri "camp". */
+  /**
+   * Pysyvä tunniste, myös 3D-esineiden etuliite: pihat "yard" ja "yard-b", vainolaisten leiri "camp",
+   * tietäjän mökki "lakeside" sekä kalmistot "cairnfield" (Louhi) ja "cairn-b" (uhrikivi ilman Louhta).
+   */
   id: string;
   kind: SiteInstanceKind;
   x: number;

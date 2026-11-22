@@ -3,18 +3,21 @@ import { createCampaign, parseCampaign, parseSiteInstances, serializeCampaign, t
 import { mapCellTravel, mapCell } from "./domain";
 import {
   CAMP_PLACEMENT,
+  SHORE_PLACEMENT,
   YARD_PLACEMENT,
   chebyshev,
+  isShoreCell,
   placeYardInstances,
   rngStream,
   placeCampInstance,
   travelMinutes,
   validateCampPlacement,
+  validateShorePlacement,
   validateYardPlacement,
 } from "./placement";
-import { PROTOTYPE_START } from "./prototype";
-import { PROTOTYPE_PLACEMENT, completeSiteInstances, newSiteInstances, newYardInstances } from "./siteInstances";
-import { LEGACY_YARD_POSITION } from "./sites";
+import { PROTOTYPE_MAP, PROTOTYPE_START } from "./prototype";
+import { PROTOTYPE_PLACEMENT, completeSiteInstances, newSiteInstances, newYardInstances, placementWith } from "./siteInstances";
+import { LEGACY_SHORE_POSITIONS, LEGACY_YARD_POSITION } from "./sites";
 import { newCampaign } from "./storage";
 
 describe("satunnaisvirrat", () => {
@@ -72,7 +75,8 @@ describe("pihapiirien sijoittelu (V3)", () => {
     expect(bad({ x: 1, y: 1 }).join()).toContain("keskialueella");
     expect(bad({ x: 13, y: 9 }).join()).toMatch(/maasto|ruudussa/);          // joen ruutu (13,9) ei kelpaa
     expect(bad({ x: 10, y: 14 }).join()).toContain("liian lähellä aloitusta");
-    expect(bad({ x: 9, y: 7 }).join()).toContain("kiinteää paikkaa");         // rannan mökin vieressä
+    const nearSage = validateYardPlacement([{ ...ok, x: 9, y: 7 }], placementWith([{ id: "lakeside", kind: "lakeside", x: 9, y: 6, archer: false }]));
+    expect(nearSage.join()).toContain("kiinteää paikkaa");                     // rannan mökin vieressä
     expect(bad({}, { id: "yard-b", kind: "yard", x: 9, y: 9, archer: false }).join()).toContain("liian lähellä toisiaan");
     expect(bad({}, { id: "yard", kind: "yard", x: 4, y: 4, archer: false }).join()).toContain("kahdesti");
     expect(bad({ x: 99 }).join()).toContain("kartan ulkopuolella");
@@ -105,7 +109,7 @@ describe("paikkainstanssit kampanjassa", () => {
     // Metsästysapajat (kind "hunt") testataan huntGrounds.test.ts:ssä.
     const fixed = state.world.siteInstances.filter((i) => i.kind !== "hunt");
     expect(fixed).toEqual(newSiteInstances(777));
-    expect(fixed.map((i) => i.kind)).toEqual(["yard", "yard", "camp"]);
+    expect(fixed.map((i) => i.id)).toEqual(["lakeside", "cairnfield", "cairn-b", "yard", "yard-b", "camp"]);
     expect(parseCampaign(serializeCampaign(state))?.world.siteInstances).toEqual(state.world.siteInstances);
     expect(parseCampaign(serializeCampaign(state))?.world.worldSeed).toBe(777);
   });
@@ -132,12 +136,19 @@ describe("paikkainstanssit kampanjassa", () => {
   it("vanha tallennus ilman instansseja saa kiinteän pihansa 'yard' ja arvotun 'yard-b'", () => {
     const old = createCampaign();                              // ei instansseja, siemen 0
     const done = completeSiteInstances(old, 4242);
-    const [a, b] = done.world.siteInstances;
-    expect(done.world.siteInstances.filter((i) => i.kind !== "hunt").map((i) => i.id)).toEqual(["yard", "yard-b", "camp"]);
+    const a = done.world.siteInstances.find((i) => i.id === "yard")!;
+    const b = done.world.siteInstances.find((i) => i.id === "yard-b")!;
+    expect(done.world.siteInstances.filter((i) => i.kind !== "hunt").map((i) => i.id))
+      .toEqual(["yard", "lakeside", "cairnfield", "yard-b", "camp", "cairn-b"]);
+    // Ennen v08:aa kiinteät paikat säilyvät entisillä ruuduillaan.
+    expect(done.world.siteInstances.find((i) => i.id === "lakeside")).toMatchObject({ kind: "lakeside", ...LEGACY_SHORE_POSITIONS.lakeside });
+    expect(done.world.siteInstances.find((i) => i.id === "cairnfield")).toMatchObject({ kind: "cairn", ...LEGACY_SHORE_POSITIONS.cairnfield });
+    const cairnB = done.world.siteInstances.find((i) => i.id === "cairn-b")!;
+    expect(validateShorePlacement(cairnB, PROTOTYPE_PLACEMENT, done.world.siteInstances)).toEqual([]);
     expect(a).toEqual({ id: "yard", kind: "yard", x: LEGACY_YARD_POSITION.x, y: LEGACY_YARD_POSITION.y, archer: true });
     expect(b).toMatchObject({ id: "yard-b", archer: false });
     expect(done.world.worldSeed).toBe(4242);
-    expect(validateYardPlacement([b], PROTOTYPE_PLACEMENT).filter((p) => !p.includes("kahdesti"))).toEqual([]);
+    expect(validateYardPlacement([b], placementWith(done.world.siteInstances.filter((i) => i.kind === "lakeside" || i.kind === "cairn"))).filter((p) => !p.includes("kahdesti"))).toEqual([]);
     expect(chebyshev(a, b)).toBeGreaterThanOrEqual(YARD_PLACEMENT.minMutualDistance);
     // Täydennys on idempotentti: valmis maailma ei arvota uudelleen.
     expect(completeSiteInstances(done, 999)).toBe(done);
@@ -147,7 +158,8 @@ describe("paikkainstanssit kampanjassa", () => {
     const partial = createCampaign({ worldSeed: 31, siteInstances: [{ id: "yard-b", kind: "yard", x: 8, y: 9, archer: true }] });
     const done = completeSiteInstances(partial, 1);
     expect(done.world.worldSeed).toBe(31);
-    expect(done.world.siteInstances.filter((i) => i.kind !== "hunt").map((i) => i.id).sort()).toEqual(["camp", "yard", "yard-b"]);
+    expect(done.world.siteInstances.filter((i) => i.kind !== "hunt").map((i) => i.id).sort())
+      .toEqual(["cairn-b", "cairnfield", "camp", "lakeside", "yard", "yard-b"]);
     expect(done.world.siteInstances.find((i) => i.id === "yard-b")).toEqual({ id: "yard-b", kind: "yard", x: 8, y: 9, archer: true });
     expect(done.world.siteInstances.filter((i) => i.archer)).toHaveLength(1);
     expect(PROTOTYPE_START).toBeDefined();
@@ -160,9 +172,10 @@ describe("vainolaisten leirin sijoittelu", () => {
     for (let seed = 1; seed <= 1000; seed++) {
       const all = newSiteInstances(seed);
       const camp = all.find((i) => i.kind === "camp")!;
-      expect(all).toHaveLength(3);
-      expect(validateCampPlacement(camp, PROTOTYPE_PLACEMENT, all), `siemen ${seed}`).toEqual([]);
-      expect(validateYardPlacement(all.filter((i) => i.kind === "yard"), PROTOTYPE_PLACEMENT), `siemen ${seed}`).toEqual([]);
+      const shore = all.filter((i) => i.kind === "lakeside" || i.kind === "cairn");
+      expect(all).toHaveLength(6);
+      expect(validateCampPlacement(camp, placementWith(shore), all), `siemen ${seed}`).toEqual([]);
+      expect(validateYardPlacement(all.filter((i) => i.kind === "yard"), placementWith(shore)), `siemen ${seed}`).toEqual([]);
       expect(chebyshev(camp, PROTOTYPE_START)).toBeGreaterThanOrEqual(CAMP_PLACEMENT.minStartDistance);
       expect(minutes[camp.y * 20 + camp.x]).toBeLessThanOrEqual(CAMP_PLACEMENT.maxStartMinutes);
     }
@@ -189,5 +202,33 @@ describe("vainolaisten leirin sijoittelu", () => {
     expect(bad({}, [{ id: "yard", kind: "yard", x: camp.x, y: camp.y, archer: false }])).toContain("liian lähellä paikkaa yard");
     expect(bad({ x: 99 })).toContain("kartan ulkopuolella");
     expect(CAMP_PLACEMENT.edgeBand).toBeGreaterThan(0);
+  });
+});
+
+describe("tietäjän mökki ja kalmistot rannoille (v08)", () => {
+  it("500 siementä: mökki ja kaksi kalmistoa rantaruuduilla, kalmistot erillään mökistä ja toisistaan", () => {
+    const sagePlaces = new Set<string>();
+    for (let seed = 1; seed <= 500; seed++) {
+      const all = newSiteInstances(seed);
+      const sage = all.find((i) => i.id === "lakeside")!;
+      const cairns = all.filter((i) => i.kind === "cairn");
+      expect(sage.kind).toBe("lakeside");
+      expect(cairns.map((c) => c.id)).toEqual(["cairnfield", "cairn-b"]);
+      for (const site of [sage, ...cairns]) {
+        expect(isShoreCell(PROTOTYPE_MAP, site.x, site.y), `siemen ${seed} ${site.id}`).toBe(true);
+        expect(validateShorePlacement(site, PROTOTYPE_PLACEMENT, all), `siemen ${seed}`).toEqual([]);
+        expect(chebyshev(site, sage === site ? cairns[0] : sage)).toBeGreaterThanOrEqual(SHORE_PLACEMENT.minSageCairnDistance);
+      }
+      expect(chebyshev(cairns[0], cairns[1])).toBeGreaterThanOrEqual(SHORE_PLACEMENT.minCairnDistance);
+      expect(SHORE_PLACEMENT.sageTerrains).toContain(mapCell(PROTOTYPE_MAP, sage.x, sage.y)!.terrainId);
+      sagePlaces.add(`${sage.x},${sage.y}`);
+    }
+    expect(sagePlaces.size).toBeGreaterThan(15);                          // oikeasti eri paikkoja
+  });
+
+  it("rantaruutu vaatii viereen avoveden; joki ja viisto vesi eivät riitä", () => {
+    expect(isShoreCell(PROTOTYPE_MAP, LEGACY_SHORE_POSITIONS.lakeside.x, LEGACY_SHORE_POSITIONS.lakeside.y)).toBe(true);
+    expect(isShoreCell(PROTOTYPE_MAP, PROTOTYPE_START.x, PROTOTYPE_START.y)).toBe(false);
+    expect(isShoreCell(PROTOTYPE_MAP, 0, 0)).toBe(false);                 // vesi itse ei ole ranta
   });
 });

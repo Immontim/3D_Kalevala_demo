@@ -152,8 +152,11 @@ export function setNpcStateInScene(scene: THREE.Scene, collision: CollisionWorld
   return true;
 }
 
-/** Kalmiston pysyvä tila: Louhi on karkotettu (`louhi.banished`), eikä häntä luoda. `scene3d.ts` asettaa ennen rakennusta. */
-export const cairnState = { louhiBanished: false };
+/**
+ * Kalmiston tila `scene3d.ts`:ltä ennen rakennusta: onko tämä Louhen kalmisto (`cairnfield`; uhrikalmistolla
+ * `cairn-b` häntä ei ole) ja onko Louhi karkotettu (`louhi.banished`), jolloin häntä ei luoda.
+ */
+export const cairnState = { louhiHere: true, louhiBanished: false };
 
 /**
  * Poistaa hahmon kesken kohtauksen (moottorin `removeNpc`-toimi): kyläläinen vaipuu näkyvistä,
@@ -1822,7 +1825,7 @@ export function birdSongLevel(x: number, z: number): number {
 
 /** Kalmiston väki: Louhi seisoo karsikkomännyn vieressä ja katsoo kuppikiveä kohti, rauhassa ja liikkumatta. */
 function populateCairnLife(scene: THREE.Scene, collision: CollisionWorld) {
-  if (cairnState.louhiBanished) return Promise.resolve();      // karkotettu: tallennus muistaa
+  if (cairnState.louhiBanished || !cairnState.louhiHere) return Promise.resolve();   // karkotettu tai toinen kalmisto
   const { x, z } = LOUHI_AT;
   const yaw = Math.atan2(CUPSTONE.x - x, CUPSTONE.z - z);
   collision.add({ id: "folk:louhi", kind: "circle", x, z, radius: 0.4, blocksMovement: true, blocksMelee: false });
