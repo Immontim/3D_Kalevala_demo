@@ -40,6 +40,15 @@ describe("tapahtumakuvio", () => {
     expect(matchesPattern({ type: "npc.talked", npcId: "tietaja" }, TALK)).toBe(false);
     expect(matchesPattern({ type: "scene.entered" }, TALK)).toBe(false);
   });
+
+  it("laulun osumaraja: minHits ja maxHits ovat rajat mukaan lukien", () => {
+    const song = (hits: number) => ({ type: "song.performed", songId: "heal", context: "cast", success: true, hits, sceneId: "yard" }) as const;
+    expect(matchesPattern({ type: "song.performed", minHits: 6 }, song(6))).toBe(true);
+    expect(matchesPattern({ type: "song.performed", minHits: 6 }, song(5))).toBe(false);
+    expect(matchesPattern({ type: "song.performed", maxHits: 5 }, song(5))).toBe(true);
+    expect(matchesPattern({ type: "song.performed", maxHits: 5 }, song(6))).toBe(false);
+    expect(matchesPattern({ type: "song.performed", minHits: 2, maxHits: 4, songId: "heal" }, song(3))).toBe(true);
+  });
 });
 
 describe("tarinakäänne: emäntä kertoo huhun", () => {

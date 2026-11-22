@@ -6,11 +6,29 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `751afa1`)
+Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `218cebd`)
 
-- **Koodiversio v07.01.00** branchissa `claude/enemy-attack-cap` (tarkista merge-tila `git merge-base`illa).
-  Koodi valmis, ei deployattu, omistaja ei ole testannut. v07.00 (reppu) on mainissa; sen kartta-asettelun
-  ja suolaulun v06.09 / laulukaarten v06.08 omistajan testit ovat yhä tekemättä.
+- **Koodiversio v07.02.00** branchissa `claude/yard-maiden-dialogue` (pinottu `claude/yard-bed`-assettibranchin
+  päälle, joka tuo `vuode`-mallin; tarkista molempien merge-tila `git merge-base`illa). Koodi valmis, ei
+  deployattu, omistaja ei ole testannut. Claude savutesti `?scene=yard` in-app-selaimessa: neito vuoteella,
+  3 epäonnistunutta laulua → kuolema, tyhjä vuode uudella käynnillä, emännän kuolemavastaus, parannettu
+  neito seisoo, `site=yard-b`:n emäntä paljasti apajan; ei konsolivirheitä; `renderBench` 5,8 ms (1024 × 768).
+  Polunsuusta lähtö (`npc.leftBehind`) on testattu vain yksikkötestein. Tarkistukset: `bun run test`
+  2104/2104, `bunx tsc --noEmit`, `bun run lint`, `bun run build`. v07.01 (hyökkäyskatto), v07.00 (reppu),
+  v06.09 ja v06.08 ovat mainissa; niiden omistajatestit ovat yhä tekemättä.
+- **Piha: jousineito, emännät ja eläimet (v07.02).** Neito makaa `vuode`lla nuotion länsipuolella (`world.ts`
+  `BED`, `BED_TOP`; puhepiste vuoteen keskellä); parannettu seisoo vuoteen etelälaidalla, kuollut
+  (`yardState.archerDead`) puuttuu. Säännöt `content.ts`: `archer.healed` vaatii `minHits` 6
+  (`HEAL_ARCHER_HITS`), epäonnistumiset `archer.heal-failed-first/-second` → `archer.died-song` (3.
+  yritys, `setNpcState` "dead" = puhuteltavuus pois) ja `archer.died-left` (`npc.leftBehind`, jonka
+  `engine/leave.ts` lähettää kaikille puhuteltaville ennen paluuta kartalle polunsuusta tai valikosta).
+  Tapahtumakuviossa `minHits`/`maxHits` (`engine.ts`). Laulun kuulija suosii laulun `peaceTargets`ia
+  (`song.ts` `songListener`). Emännät: jousineidon talossa `emanta` (huhu kerran, sitten `noNews`, kuolleesta
+  neidosta `maidenDied`), toisessa `emanta_b` (`revealHuntGround` + `markMoon` kerran kuunkierrossa;
+  ehdot `unknownHuntGround`, `sameMoon`; `huntGrounds.nearestUnknownHuntGround`). Eläimet arpoo puhdas
+  `yardLife.ts` (2–4 kanaa + kukko, koira 60 % emännän luona); `folk.ts` kloonaa eläinmallin, ja
+  `__world.yard` näyttää arvonnan. Dialogisolmun `text` voi olla muunnelmalista; `engine/dialogue.ts`
+  arpoo yhden (ei samaa peräkkäin). Uudet avaimet `<avain>.2/.3` (`lines()` `content.ts`:ssä).
 - **Ryhmän hyökkäyskatto ja vihun reaktiot (v07.01 + v06.05, `engine/ai.ts`, säännöt `combat.ts`).** Ei vuoroja:
   isku alkaa, jos muita windup/release-tilassa < `maxAttackers` 2; oma viive `attackStartDelay` 0,04–0,22 s,
   `startSpacing` 0,15 s; katon takia odottava `waitBack` + `waitHold`. `hitStaggers`: horjuva ei horjahda
@@ -32,72 +50,48 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `751afa1`)
   ja kartta näyttää `map.saveRejected`; lataus on tarkoituksella tiukka, jotta vika näkyy.
 - **Saapuminen ja aallot (v06.02).** `sceneLayout.entrySpawn` (`ENTRY_INSET` 3,5 m, pihat 6,4) ja
   `approachSpawns` (vastakkaiselta puolelta; `ai.arriveUntil` 12 s ohittaa alueen rajauksen).
-- **Kohtausmalli (`src/sceneLayout.ts`, puhdas).** Jokaisella kohtauksella on `SceneLayout`: kuljettava
-  monikulmio `bounds`, taistelun `arena` (keskus + säde, vihollisten tulopaikat) ja polunsuut `exits`
-  (portti, ulos-suunta, leveys, `mapDir`). Kuljettava alue = monikulmio TAI polunsuun käytävä (5 m sisään,
-  4 m ulos portista), rajaus `clampToWalkable` (`ARENA_RADIUS` on enää vanhan sijoittelun säde). Vanhat
-  kohtaukset ovat 11 m:n ympyröitä, joissa on yksi polunsuu. Konventio: 3D:n −z = pohjoinen, +x = itä.
-- **Polunsuusta poistuminen (`src/engine/exit.ts`).** Portin ylitys aloittaa 1 s:n mustan häivytyksen
-  (`#exitFade`), jonka aikana peli jatkuu (vihollinen voi lyödä; kuolema tai käytävästä palaaminen
-  peruu). Lopuksi `?return=map`-reitillä `createEmptySceneReturn(scene, mapDir)` ja kartalle; muuten
-  aloitusvalikkoon. Kartta (`initMap`) ottaa `exitDir`in ja astuu yhden ruudun siihen suuntaan `move()`lla
-  (estetty askel ei tee mitään). Vihje "Polku vie pois" alle 6 m:n päässä portista. `__game.exitState()`.
-- **Metsä (`src/forest.ts`).** Kaikki puut piirtää `Forest`: alle `nearR`:n täysi malli varjoineen,
-  kauempana `forest_lod.glb`:n kaukopuu; vaihto 5–6 m:n kaistalla vastakkaisilla Bayer-pikselikuvioilla
-  (`aFade`-attribuutti, kloonatut materiaalit). Lista kootaan, kun pelaaja liikkuu 0,8 m. Aukioilla
-  `nearR` 48, erämaassa 38 ja `farR` 135 (sumu). Kaukopuiden sävy `LOD_TINT` (BLENDER_HANDOFF).
-  Horisonttisuikaleet (`metsaseina`): aukioilla kehä 84 m, erämaassa neliö ±178 m. Varjokamera ja taivas
-  seuraavat pelaajaa. Konsoli: `__world.forest`, `__world.forestNear(r)`, `__game.drawLoad()`.
-- **Kamera metsässä.** `CollisionWorld.firstCameraHit` + `blocksCamera` (puut, kota, karsikko, juurakko,
-  rakennukset): kamera vetäytyy rungon eteen heti ja palaa hitaasti. `engine/foliageFade.ts`: lehvästö
-  häipyy kuvioiden alle 2,2 m:n päässä kamerasta ja harvenee 80 % kameran ja sankarin rinnan välisellä
-  kapselilla (säde 0,9 m). Varjot pysyvät umpinaisina.
+- **Kohtausmalli (`src/sceneLayout.ts`, puhdas).** `SceneLayout`: kuljettava monikulmio `bounds`, `arena`
+  ja polunsuut `exits` (`mapDir`); kuljettava = monikulmio tai polunsuun käytävä, rajaus `clampToWalkable`.
+  Vanhat kohtaukset ovat 11 m:n ympyröitä. Konventio: 3D:n −z = pohjoinen, +x = itä.
+- **Polunsuusta poistuminen (`src/engine/exit.ts`).** 1 s:n häivytys (`#exitFade`), jonka aikana peli jatkuu;
+  kuolema tai paluu peruu. `?return=map`: `postLeftBehind` → `createEmptySceneReturn(scene, mapDir)` → kartta
+  astuu ruudun `exitDir`iin. Vihje "Polku vie pois" alle 6 m:stä. `__game.exitState()`.
+- **Metsä (`src/forest.ts`).** `Forest`: alle `nearR`:n täysi puu, kauempana `forest_lod.glb`, vaihto Bayer-
+  kuvioilla 5–6 m:n kaistalla; `nearR` 48 (erämaa 38), `farR` 135. Horisonttisuikaleet `metsaseina`.
+  Konsoli: `__world.forest`, `__world.forestNear(r)`, `__game.drawLoad()`.
+- **Kamera metsässä.** `CollisionWorld.firstCameraHit` + `blocksCamera`: kamera vetäytyy rungon eteen.
+  `engine/foliageFade.ts` häivyttää lähilehvästön ja harventaa kameran ja sankarin välistä (varjot umpinaisia).
 - **Erämaa `wilds` (friendly, Esc-oikotie, aloitusvalikko, `?scene=wilds`; ei karttapaikkaa).** 200 × 200 m:n
   kuljettava alue (monikulmio ±97 m), kolme polunsuuta. Maasto `wildsHeight` (suoniitty `bogMix`,
   paloaukea `burnMix`). ~4 900 puuta; kivet, kelot ja juurakot alle 60 m:n päähän, aluskasvillisuus
   `ScatterField`illa 34 m:n säteellä. Piirtokuorma alussa ~0,96 milj. kolmiota.
-- **Paperinukke ja inventaario.** Skeema 7, avain `laulun-miekka.campaign.v7`, kuusi peruspaikkaa,
-  yksi reppupaikka ja repusta 0–12 lisäpaikkaa (enintään 18 tavararuutua) sekä seitsemän
-  varustepaikkaa. `ItemDefinition.storageCapacity` määrää repun koon; tuohikontti avaa kuusi.
-  Säilytysesine menee tyhjään reppupaikkaan myös perusruutujen ollessa täynnä; toinen ei mahdu.
-  V6:n kontti siirtyy pinosta reppuun. Vanhan tallennuksen yli kuusi muuta pinoa säilyvät ylivuotona,
-  mutta uusia pinoja ei lisätä ennen kuin tavarat mahtuvat.
-  Kartta ja 3D:n pause käyttävät samaa `ui/inventoryView.ts`-näkymää.
-  Rauhassa varusteita voi vaihtaa ja ruokaa syödä; taistelussa näkymä on vain luettavissa.
-  `B` avaa 3D-inventaarion ja pysäyttää kohtauksen. Ase- ja kilpivaihdot ovat atomisia;
-  keihäs palauttaa kilven inventaarioon, eikä pääkättä voi jättää tyhjäksi.
+- **Paperinukke ja inventaario.** Skeema 7 (`laulun-miekka.campaign.v7`): kuusi peruspaikkaa, reppupaikka ja
+  repusta 0–12 lisäpaikkaa (`ItemDefinition.storageCapacity`; tuohikontti 6), seitsemän varustepaikkaa.
+  Vanhan tallennuksen ylivuoto säilyy. Kartta ja 3D:n pause (`B`) käyttävät `ui/inventoryView.ts`:ää;
+  taistelussa vain luku. Ase- ja kilpivaihdot ovat atomisia; pääkättä ei voi jättää tyhjäksi.
 - **3D-varusteet ja suoja.** Mies- ja naissankari käyttävät Clauden modulaarisia base/mail/greaves/
   shoes-solmuja ja Taivaanrautamiekka omaa `sword_sky_iron`-malliaan. Rengaspaita kertoo vahingon
   0,85:llä, säärisuojat 0,95:llä. Vain ylälyönti voi irrottaa kypärän; silloin koko isku torjutaan.
   Sama sääntö on pelaajalla ja vihollisilla. Tarkat arvot ovat `combat.ts`in `ARMOUR`-vakiossa.
-- **Leirin aallot ja voitto (V7).** `src/waves.ts` (puhdas): `CAMPAIGN_WAVES` 5 kiinteää aaltoa
-  omistajan listan mukaan (urho/miekka; pohja/miekka+kilpi; urho/keihäs + pohja/miekka; pohja/keihäs +
-  pohja/miekka+kilpi; urho/keihäs + pohja/miekka+kilpi + pohja/miekka), `FINAL_WAVE`, `TOTAL_ENEMIES` (9).
-  **Vastustajat ovat perusarvoissa** (taso 0, ei `groupHpScale`a; urho 70 HP, pohja 80 HP); vain
-  tekoälyn taito nousee (`aiLevelForWave` = aalto-1). Viimeinen aalto -> `finishVictory` -> `battle.won`
-  -> sääntö `campaign.victory` (`recordVictory`: lippu `campaign.won`, `win.days`, `win.explored`).
-  Kaatuminen -> `player.died` -> `player.deaths`. Debug: `__game.killEnemies()`, `skipTo(1..5)`.
+- **Leirin aallot ja voitto (V7).** `src/waves.ts`: `CAMPAIGN_WAVES` 5 kiinteää aaltoa (9 vihollista),
+  **vastustajat perusarvoissa**, vain tekoäly paranee (`aiLevelForWave`). Viimeinen aalto → `battle.won` →
+  `campaign.victory` (`recordVictory`). Kaatuminen → `player.deaths`. Debug: `killEnemies()`, `skipTo(1..5)`.
 - **Loppuruutu** (`map/ending.ts` puhdas, `map/app.ts` `#mapEnding`): näkyy kartalla voiton jälkeen kerran
   (päivät, tutkittu %, laulut, kukistetut, kaatumiset, luvattomat otot, sivupolut); "Jatka vaellusta"
   asettaa `campaign.endSeen`, asetuksista voi katsoa uudelleen. Päivät ja kartta jäädytetään voittoon.
 - **V6 ja leirin arvonta (mergattu).** Leiri on instanssi `camp` (`placement.ts` `CAMP_PLACEMENT`: reunakaista,
-  >= 8 ruutua aloituksesta, <= 600 min, lukossa lipulla `louhi.banished`). Jousineito makaa `archer`-pihassa;
-  parannuslaulu rauhassa (`SongDef.peaceTargets`) -> `archer.healed` + `setNpcState` -> seisoo; dialogista
-  `sky_iron_sword` (vahinko 1,3; oma GLB-malli). Tietäjä vain rannalla, nuori urho
-  `archer`-vapaassa pihassa, emäntä kertoo huhun (`rumor.heard` + tietäjän ranta kartalle).
+  >= 8 ruutua aloituksesta, <= 600 min, lukossa lipulla `louhi.banished`). Jousineito on `archer`-pihassa
+  (v07.02 yllä); dialogista `sky_iron_sword` (vahinko 1,3; oma GLB-malli). Tietäjä vain rannalla, nuori urho
+  `archer`-vapaassa pihassa.
 - **Louhen karkotus (V5, mergattu).** Pohjolan uni <= 6 m (`SONG_AUDIENCE_RANGE`) Louhesta
   kalmistolla: `endSong` lähettää `song.performed` (cast, `nearNpcId`); sääntö `louhi.banished`
   asettaa lipun, `revealSite` ja `removeNpc` (`world.removeNpc`: `vanishVillager`,
   `CollisionWorld.disable`, `removeTalkable`). Pysyvyys: `cairnState.louhiBanished` lipusta.
   Lukitut paikat: `MapSiteDefinition.requiresFlag`, `siteUnlocked`. Esc-oikotie `clearing`iin
   on kehittäjälle auki.
-- **Laulun tauot ja säekaaret (v06.08).** `songLogic.songBeats`: `SONG.pairSize` riimun ryhmän jälkeen
-  arvottu tauko `pairPause` × riimuväli × 30–100 % (`PAUSE_MIN_SHARE`); aikainen painallus tauolla on huti
-  (tarkoituksella). `engine/songArcs.ts`: säkeet SVG-`textPath`illa sisäkkäisille ellipsikaarille
-  (`ARC_ASPECT` 1,6; säepari = kaari) sankarin pään ylle; `judge` → `revealVerse` (lento nauhalta, kulta +
-  hehku / tuhka), `closeSong` → `fadeSongArcs` (`SONG.fade.<laulu>`, reaaliaikaa), `resetField` →
-  `clearSongArcs`. Fontti pienenee vain, jos kaaret eivät mahdu. `--msg-top` vie tulosviestin kaarten
-  sisään; `showMsg` palauttaa sen. `#verse` vain opetuksessa. `__game.songArcs` savutesteille.
+- **Laulun tauot ja säekaaret (v06.08).** `songLogic.songBeats`: ryhmän (`SONG.pairSize`) jälkeen arvottu
+  tauko; painallus tauolla on huti (tarkoituksella). `engine/songArcs.ts`: säkeet SVG-kaarille sankarin ylle
+  (`revealVerse`, `fadeSongArcs`, `clearSongArcs`); `#verse` vain opetuksessa. `__game.songArcs`.
 - **Suon vahinko (v06.09).** `songOutcome.dotPerSec` (> 0, kun onnistunut ja osumia ≥ `SONG.bogDotMinHits` 3)
   → `endSong` asettaa `Actor.bogDot`; `melee.updateCombatant` (tila `rooted`) → `stepBogDot` tikeittäin
   (`bogDotInterval` 1 s, vajaa loppu pienempänä tikkinä), ohi haarniskan ja `rootedDamage`n, `killActor`
@@ -238,6 +232,11 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `751afa1`)
 - Sukupuolivalinta vaihtaa 2D-kartan spriten, paperinuken ja kylläisyyskasvot
   sekä 3D-sankarin (jousineidon vartalo). Jousineito-NPC pihalla (vain `archer`-talossa) on
   jousen kanssa, joten naissankarin rinnalla on kaksi samannäköistä hahmoa.
+- Jousineito v07.02: välilehden sulkeminen tai 3D-sivun uudelleenlataus ei ole "lähtö", joten neito säilyy
+  silloin hengissä (vain polunsuu ja valikon paluu kartalle lähettävät `npc.leftBehind`). Kuollut neito jää
+  samalla käynnillä vuoteelle silmät auki (ei kuolinasentoa). Emännän "kuoli"-vastaus ei erottele, lauloiko
+  pelaaja itse. Kukko ja istuva kana katolla: korkeus `COOP_ROOST` on yard.py:n mitoista, kaltevaa kattoa
+  ei seurata.
   Naissankarin kilpi on selässä jousineidon viinen päällä.
 - Paluusillan kuljetus toimii, mutta 3D ei vielä myönnä palkintoja eikä kartta
   lisää `rewards`-kentän esineitä inventaarioon.
@@ -339,8 +338,12 @@ rajattuna työnään. Tässä branchissa ei ole efektien tilamallia, kuvakkeita 
   sidottavissa Esc-valikossa (2026-11-21).
 - Metsästysapajat: kertakäyttöisiä (kuluvat sisään mentäessä), uudella matkalla 3–6, 20 päivän välein
   yksi lisää ja enintään 6 (täynnä vanhin väistyy). Eivät koskaan valmiiksi näkyvissä: paljastuvat vasta
-  viereisestä ruudusta, myös tutkitulla alueella; eivät toisen 3D-paikan viereen. Jäniksiä 7–9, joista
-  1–3 suolla ja 1–3 paloaukealla (2026-11-21).
+  viereisestä ruudusta, myös tutkitulla alueella, tai kun toisen talon emäntä neuvoo yhden (kerran
+  kuunkierrossa, 2026-11-22); eivät toisen 3D-paikan viereen. Jäniksiä 7–9, joista 1–3 suolla ja 1–3
+  paloaukealla (2026-11-21).
+- Jousineito (2026-11-22): parannus vaatii 6/8 osumaa, kolme yritystä; kuolee myös, jos ensimmäiseltä
+  käynniltä lähdetään parantamatta. Vain jousineidon talon emäntä tietää huhun. NPC-repliikeillä on
+  vähintään kolme samaa tarkoittavaa muunnelmaa; uudet repliikit kirjoitetaan samoin.
 - Riista: alkuun pako 12 m:stä, mutta näkö ja kuulo pidetään erillisinä; jänis ei ole ainoa riista.
   Saalis poimitaan kaadetusta eläimestä lihana, joka on toistaiseksi syötävää (2026-11-21).
 - Vertailukone on vanha peliläppäri (i5, 8 Gt, GTX 16 -sarja), mutta se on vain referenssi: omistaja

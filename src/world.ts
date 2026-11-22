@@ -26,6 +26,7 @@ import { COLLISION, CollisionWorld } from "./collision";
 import { spawnAnimal, spawnVillager, updateFolk, vanishVillager } from "./folk";
 import { t, type TextKey } from "./i18n";
 import { addTalkable, removeTalkable } from "./interact";
+import { planYardAnimals, type Circle, type YardAnimals } from "./yardLife";
 import { birdLevelAtDistance } from "./ambience";
 import { SCENE_IDS, type SceneId } from "./app/route";
 import { Forest, ScatterField, placeForestWall, type ScatterItem, type TreeSpot } from "./forest";
@@ -89,39 +90,59 @@ export function setSiteInstance(next: { id: string; archer: boolean }) {
   siteInstance.archer = next.archer;
 }
 
-/** Pihan pysyvä tila: jousineito on parannettu (`archer.healed`), joten hän seisoo eikä makaa. `scene3d.ts` asettaa. */
-export const yardState = { archerHealed: false };
+/**
+ * Pihan pysyvä tila `scene3d.ts`:ltä: jousineito on parannettu (`archer.healed`, seisoo vuoteen vieressä)
+ * tai kuollut (`archer.dead`, häntä ei enää ole pihassa; vuode on tyhjä).
+ */
+export const yardState = { archerHealed: false, archerDead: false };
 
-/** Jousineidon paikka pihassa (maassa makaava ja seisova ovat samassa kohdassa). */
-const ARCHER_AT = { x: 2.3, z: 8.9 };
-/** Loukkaantuneen jousineidon vartalon lisäesteet (ympyrät juuresta pitkin vartaloa), poistetaan paranemisessa. */
-const ARCHER_BODY_IDS = ["folk:jousineito-ruumis1", "folk:jousineito-ruumis2"] as const;
+/** Makaavan jousineidon jalkojen kohta vuoteella (vartalo ulottuu juuresta pielukseen päin, +X). */
+const archerLyingAt = () => { const [x, z] = fromLocal(BED, -0.8, 0); return { x, z, yaw: BED.yaw - Math.PI / 2 }; };
+/** Parannettu jousineito seisoo vuoteen etelälaidalla pihan keskustaan päin. */
+const archerStandingAt = () => {
+  const [x, z] = fromLocal(BED, -0.1, 1.0);
+  return { x, z, yaw: Math.atan2(-0.5 - x, 3 - z) };
+};
+/** Puhepiste: makaavalla vuoteen keskellä (vartalon kohdalla), seisovalla hänen paikallaan. */
+const archerTalkAt = (standing: boolean) => standing ? archerStandingAt() : { x: BED.x, z: BED.z };
 
 /**
- * Jousineito pihassa: loukkaantuneena selällään maassa (V6, ilman jousta) tai parannettuna seisomassa
- * jousi kädessä. Sama tunniste "jousineito" molemmille, jotta `vanishVillager` löytää hänet.
+ * Jousineito pihassa: loukkaantuneena selällään vuoteella nuotion ääressä (ilman jousta) tai parannettuna
+ * seisomassa jousi kädessä. Sama tunniste "jousineito" molemmille, jotta `vanishVillager` löytää hänet.
  */
 function spawnArcher(scene: THREE.Scene, standing: boolean): Promise<void> {
-  const { x: jx, z: jz } = ARCHER_AT;
-  const yaw = Math.atan2(-1 - jx, 0 - jz);
   if (!standing) {
-    return spawnVillager(scene, { id: "jousineito", url: villagersFUrl, character: "jousineito", x: jx, y: groundHeight(jx, jz), z: jz, yaw, scale: 0.95, lying: true });
+    const { x, z, yaw } = archerLyingAt();
+    return spawnVillager(scene, {
+      id: "jousineito", url: villagersFUrl, character: "jousineito", x, y: groundHeight(BED.x, BED.z) + BED_TOP, z, yaw, scale: 0.95, lying: true,
+    });
   }
+  const { x, z, yaw } = archerStandingAt();
   return spawnVillager(scene, {
-    id: "jousineito", url: villagersFUrl, character: "jousineito", x: jx, y: groundHeight(jx, jz), z: jz, yaw, scale: 0.95,
+    id: "jousineito", url: villagersFUrl, character: "jousineito", x, y: groundHeight(x, z), z, yaw, scale: 0.95,
     armL: { upper: [0.16, -1, 0.06], fore: [0.12, -0.25, 1] },
     prop: { name: "jousi", hand: "L", kind: "bow", grip: GRIP_FEMALE_L },
   });
 }
 
+/** Jousineidon puhuteltavuus ja este. Makaavalla este on vuode itse, seisovalla oma ympyrä. */
+function placeArcherPresence(collision: CollisionWorld, standing: boolean) {
+  removeTalkable("jousineito");
+  const at = archerTalkAt(standing);
+  addTalkable({ id: "jousineito", x: at.x, z: at.z, name: t("folk.jousineito") });
+  if (standing) collision.add({ id: "folk:jousineito", kind: "circle", x: at.x, z: at.z, radius: 0.38, blocksMovement: true, blocksMelee: false });
+}
+
 /**
- * Hahmon tilan vaihto kesken kohtauksen (moottorin `setNpcState`-toimi). Nyt vain jousineito: parannettu
- * hahmo nousee seisomaan (maassa makaava malli vaihdetaan heti seisovaan) ja vartaloesteet poistuvat.
+ * Hahmon tilan vaihto kesken kohtauksen (moottorin `setNpcState`-toimi). Nyt vain jousineito:
+ * "healed" = nousee seisomaan vuoteen viereen; "dead" = jää vuoteelle eikä hänelle voi enää puhua.
  */
 export function setNpcStateInScene(scene: THREE.Scene, collision: CollisionWorld, npcId: string, state: string): boolean {
-  if (npcId !== "jousineito" || state !== "healed" || !vanishVillager("jousineito", true)) return false;
+  if (npcId !== "jousineito") return false;
+  if (state === "dead") return removeTalkable("jousineito");
+  if (state !== "healed" || !vanishVillager("jousineito", true)) return false;
   void spawnArcher(scene, true);
-  for (const id of ARCHER_BODY_IDS) collision.disable(id);
+  placeArcherPresence(collision, true);
   return true;
 }
 
@@ -202,6 +223,10 @@ const RACK = onRing(126, 15.4, 2.0, 0.8, 0.8);
 const STY = onRing(74, 13.7, 1.85, 2.15, 2.2);
 const COOP = onRing(-80, 9.7, 0.8, 0.65, 0.65);
 const TABLE = { x: -4.4, z: -6.6, yaw: 0.22 };
+/** Jousineidon vuode nuotion länsipuolella (household.glb `vuode`): pääty +X (pielus) on tuleen päin. */
+const BED = { x: 1.0, z: -6.4, yaw: 0.1, hx: 1.06, front: 0.47, back: 0.47 };
+/** Vuoteen makuupinta maasta (household.py `BED_TOP` 0,50 m, hahmo painuu taljaan hieman). */
+const BED_TOP = 0.47;
 const FENCE_R = 12.9;
 const GATE_HALF = 0.11;       // portin puolileveys radiaaneina (etelässä, +z)
 /** Kuoppatalon kulkukuilu, joka leikataan maastoon: puolileveys sekä alku ja loppu etusuuntaan
@@ -289,7 +314,7 @@ const SITES: Record<ArenaId, Site> = {
     fire: { x: 3.6, z: -4.6 }, flat0: 20, flat1: 34, rough: 0.03,
     treeMin: 25, shrub0: 17, shrub1: 24, dirtR: 15, camMaxR: 12.2,
     footprints: [HOUSE, STY, STOREHOUSE, SHED, RACK],
-    circles: [{ x: 3.6, z: -4.6, r: 2.0 }, { x: COOP.x, z: COOP.z, r: 1.6 }, { x: TABLE.x, z: TABLE.z, r: 2.0 }],
+    circles: [{ x: 3.6, z: -4.6, r: 2.0 }, { x: COOP.x, z: COOP.z, r: 1.6 }, { x: TABLE.x, z: TABLE.z, r: 2.0 }, { x: BED.x, z: BED.z, r: 1.25 }],
   },
   lakeside: {
     fire: LAKE_FIRE, fireScale: 0.62, flat0: 20, flat1: 34, rough: 0.03,
@@ -363,6 +388,7 @@ export const PROP_COLLIDERS: Record<string, PropColliderTemplate> = {
   // saa törmäykset ilman kohtauskohtaista käsityötä.
   pukkipoyta: { kind: "box", halfX: 1.18, halfZ: 0.42, blocksMelee: true, height: 0.8 },
   penkki: { kind: "box", halfX: 0.98, halfZ: 0.3, blocksMelee: true, height: 0.5 },
+  vuode: { kind: "box", halfX: 1.04, halfZ: 0.46, blocksMelee: false, height: 0.6 },
   kanakoppi: { kind: "box", halfX: 0.8, halfZ: 0.65, blocksMelee: true, height: 1.6 },
   pata: { kind: "circle", radius: 0.5, blocksMelee: false, height: 0.6 },
   tuohikontti: { kind: "circle", radius: 0.2, blocksMelee: false, height: 0.6 },
@@ -1402,6 +1428,7 @@ function populate(
       const [lx, lz] = fromLocal(STOREHOUSE, 1.75, 3.2);
       put("lyhde@near", lx, lz, 1.05, 4.1, 0.01, 0.12);
       put("kanakoppi@near", COOP.x, COOP.z, 1, COOP.yaw, 0.02);
+      put("vuode@near", BED.x, BED.z, 1, BED.yaw, 0.01);
     }
     const [bx, bz] = fromLocal(SHED, 2.2, 2.6);
     put("polkky@near", bx, bz, 1, 0.8, 0.02);
@@ -1600,25 +1627,41 @@ function wildsCover(tx: number, tz: number, size: number): ScatterItem[] {
 const GRIP_MALE_R = { p: [-0.383, 0.795, 0.112] as [number, number, number], d: [0.31, -0.06, 0.95] as [number, number, number] };
 const GRIP_FEMALE_L = { p: [0.385, 0.769, 0.058] as [number, number, number], d: [-0.283, -0.537, 0.795] as [number, number, number] };
 
-/** Rauhallisen pihan väki: emäntä pöydän luona, tietäjä tulella, jousineito portilla, koira ja siipikarja pihalla, possu lätissä. */
+/** Pihan väen nimi tunnisteesta: "kana_2", "kana_b" ja "emanta_b" ovat kanoja ja emäntiä. */
+const folkName = (id: string) => t(`folk.${id.replace(/_[a-z0-9]+$/, "")}` as TextKey);
+
+/** Kanakopin orsi (kyljessä 0,6 m) ja olkikaton keskikohta (yard.py `build_coop`): sivulle, eteen, korkeus. */
+const COOP_ROOST = { perch: { lx: 1.15, lz: 0, y: 0.6 }, roof: { lx: -0.1, lz: 0, y: 1.44 } } as const;
+
+/**
+ * Rauhallisen pihan väki: emäntä pöydän luona, jousineito vuoteella nuotion ääressä (tai urho tulella),
+ * possu lätissä. Kanat (2–4 + kukko) ja koira arvotaan joka käynnillä (`yardLife.ts`).
+ */
 function populateYardLife(scene: THREE.Scene, collision: CollisionWorld) {
   const tb = { ...TABLE, hx: 0, front: 0, back: 0 };
   const facing = (x: number, z: number, tx: number, tz: number) => Math.atan2(tx - x, tz - z);
   const solid = (id: string, x: number, z: number, radius: number) => {
     collision.add({ id: `folk:${id}`, kind: "circle", x, z, radius, blocksMovement: true, blocksMelee: false });
-    // Pihan ja rannan väelle voi puhua (src/interact.ts); kana_b on toinen kana.
-    addTalkable({ id, x, z, name: t(`folk.${id === "kana_b" ? "kana" : id}` as TextKey) });
+    // Pihan ja rannan väelle voi puhua (src/interact.ts).
+    addTalkable({ id, x, z, name: folkName(id) });
   };
   const jobs: Promise<void>[] = [];
+  const avoid: Circle[] = [];
 
   // Naiset on mallinnettu miehen pituisiksi; pelissä heidät skaalataan hieman pienemmiksi.
+  // Emäntiä on kaksi eri tunnisteella, jotta heillä on omat dialoginsa: jousineidon talon emäntä
+  // kertoo huhun (`emanta`), toisen talon emäntä neuvoo metsästysapajia (`emanta_b`).
+  const housewifeId = siteInstance.archer ? "emanta" : "emanta_b";
   const [ex, ez] = fromLocal(tb, 1.85, 0.75);
   const [potX, potZ] = fromLocal(tb, 2.5, -0.5);
   jobs.push(spawnVillager(scene, {
     url: villagersFUrl, character: "emanta", x: ex, y: groundHeight(ex, ez), z: ez, yaw: facing(ex, ez, potX + 0.6, potZ + 3), scale: 0.95,
     armL: { upper: [0.1, -1, 0.1], fore: [-0.25, -0.75, 0.6] }, armR: { upper: [0.1, -1, 0.1], fore: [-0.25, -0.75, 0.6] },
   }));
-  solid("emanta", ex, ez, 0.35);
+  solid(housewifeId, ex, ez, 0.35);
+  avoid.push({ x: ex, z: ez, r: 0.5 }, { x: potX, z: potZ, r: 0.6 });
+  const [jarX, jarZ] = fromLocal(tb, 2.0, 0.55);
+  avoid.push({ x: jarX, z: jarZ, r: 0.3 }, { x: FIRE.x + 1.9, z: FIRE.z + 1.3, r: 0.7 });
 
   // Tietäjä asuu vain rannalla (MVP:ssä yksi tietäjä). Pihassa, jossa ei ole jousineitoa, tulen
   // vieressä seisoo nuori urho (aseeton, rauhassa).
@@ -1629,37 +1672,50 @@ function populateYardLife(scene: THREE.Scene, collision: CollisionWorld) {
       armL: { upper: [0.14, -1, 0.04], fore: [0.1, -0.8, 0.45] }, armR: { upper: [0.14, -1, 0.04], fore: [0.1, -0.8, 0.45] },
     }));
     solid("urho", ux, uz, 0.4);
+    avoid.push({ x: ux, z: uz, r: 0.6 });
   }
 
   // Jousineito on vain siinä pihassa, jonka instanssi niin määrää (satunnaisesti valittu talo):
-  // loukkaantuneena maassa, kunnes pelaaja on parantanut hänet laululla (V6).
-  if (siteInstance.archer) {
+  // loukkaantuneena vuoteella, kunnes pelaaja parantaa hänet laululla. Kuollutta ei enää ole.
+  if (siteInstance.archer && !yardState.archerDead) {
     const healed = yardState.archerHealed;
     jobs.push(spawnArcher(scene, healed));
-    solid("jousineito", ARCHER_AT.x, ARCHER_AT.z, 0.38);
-    if (!healed) {
-      const yaw = Math.atan2(-1 - ARCHER_AT.x, 0 - ARCHER_AT.z);
-      const body = { x: -Math.sin(yaw), z: -Math.cos(yaw) };
-      ARCHER_BODY_IDS.forEach((id, i) => {
-        const k = 0.65 * (i + 1);
-        collision.add({ id, kind: "circle", x: ARCHER_AT.x + body.x * k, z: ARCHER_AT.z + body.z * k, radius: 0.34, blocksMovement: true, blocksMelee: false });
-      });
-    }
+    placeArcherPresence(collision, healed);
+    const stand = archerStandingAt();
+    avoid.push({ x: stand.x, z: stand.z, r: 0.6 });
   }
 
-  const dx = -1.7, dz = -3.9;
-  jobs.push(spawnAnimal(scene, { url: dogUrl, x: dx, y: groundHeight(dx, dz), z: dz, yaw: facing(dx, dz, 1, 3), behavior: "dog" }));
-  solid("koira", dx, dz, 0.3);
+  // Kanat ja koira arvotaan joka käynnillä.
+  const plan = planYardAnimals({
+    coop: COOP,
+    housewife: { x: ex, z: ez },
+    dogSpots: [
+      { x: 1.9, z: FENCE_R - 1.4 }, { x: -1.9, z: FENCE_R - 1.4 },          // portinpielet sisäpuolella
+      { x: FIRE.x - 0.6, z: FIRE.z + 2.4 },                                 // nuotion etelälaidalla
+      { x: 1.2, z: -10.8 }, { x: -1.5, z: -10.9 },                          // talon ovensuu
+      (() => { const [x, z] = fromLocal(COOP, -1.4, 3.6); return { x, z }; })(), // kanoja vahtimassa
+      (() => { const [x, z] = fromLocal(STOREHOUSE, 0.6, 4.1); return { x, z }; })(), // aitan edusta
+    ],
+    blocked,
+    avoid,
+    fenceRadius: FENCE_R,
+  });
+  const dog = plan.dog;
+  jobs.push(spawnAnimal(scene, { url: dogUrl, x: dog.x, y: groundHeight(dog.x, dog.z), z: dog.z, yaw: dog.yaw, behavior: "dog" }));
+  solid("koira", dog.x, dog.z, 0.3);
 
-  // Kukko orrella kopin kyljessä, kanat maassa kulkulaudan edessä.
-  const [rx, rz] = fromLocal(COOP, 1.15, 0);
-  jobs.push(spawnAnimal(scene, { url: fowlUrl, node: "kukko", x: rx, y: groundHeight(rx, rz) + 0.6, z: rz, yaw: COOP.yaw + 0.5 }));
-  const [hx, hz] = fromLocal(COOP, -0.55, 1.9);
-  jobs.push(spawnAnimal(scene, { url: fowlUrl, node: "kana_b", x: hx, y: groundHeight(hx, hz), z: hz, yaw: COOP.yaw + 2.2 }));
-  solid("kana_b", hx, hz, 0.15);
-  const [kx, kz] = fromLocal(COOP, 0.75, 2.5);
-  jobs.push(spawnAnimal(scene, { url: henUrl, x: kx, y: groundHeight(kx, kz), z: kz, yaw: COOP.yaw - 0.7, behavior: "idle", clip: "olo" }));
-  solid("kana", kx, kz, 0.18);
+  const roost = (spot: keyof typeof COOP_ROOST, node: "kukko" | "kana_b", dlz: number, yaw: number) => {
+    const r = COOP_ROOST[spot];
+    const [x, z] = fromLocal(COOP, r.lx, r.lz + dlz);
+    jobs.push(spawnAnimal(scene, { url: fowlUrl, node, x, y: groundHeight(COOP.x, COOP.z) - 0.02 + r.y, z, yaw: COOP.yaw + yaw }));
+  };
+  roost(plan.rooster, "kukko", 0, 0.5);
+  if (plan.roostingHen) roost(plan.roostingHen, "kana_b", 0, plan.roostingHen === "perch" ? -0.4 : 2.6);
+  plan.hens.forEach((hen, i) => {
+    jobs.push(spawnAnimal(scene, { url: henUrl, x: hen.x, y: groundHeight(hen.x, hen.z), z: hen.z, yaw: hen.yaw, behavior: "idle", clip: "olo" }));
+    solid(i === 0 ? "kana" : `kana_${i + 1}`, hen.x, hen.z, 0.18);
+  });
+  yardDebug.animals = plan;
 
   // Possu kiertää aitauksen avointa puolta; kaukalo jää ympyrän ulkopuolelle.
   const [px, pz] = fromLocal(STY, -0.4, 0.5);
@@ -1668,14 +1724,17 @@ function populateYardLife(scene: THREE.Scene, collision: CollisionWorld) {
   return Promise.all(jobs).then(() => undefined);
 }
 
+/** Savutesteille: tämän käynnin arvottu eläinten sijoittelu (`__world.yard`). */
+export const yardDebug: { animals: YardAnimals | null } = { animals: null };
+
 /** Rantakohtauksen väki: tietäjä seisoo keittotulen vieressä sauvaansa nojaten, koira lepäilee
  *  tulen ja mökin välissä. */
 function populateLakeLife(scene: THREE.Scene, collision: CollisionWorld) {
   const facing = (x: number, z: number, tx: number, tz: number) => Math.atan2(tx - x, tz - z);
   const solid = (id: string, x: number, z: number, radius: number) => {
     collision.add({ id: `folk:${id}`, kind: "circle", x, z, radius, blocksMovement: true, blocksMelee: false });
-    // Pihan ja rannan väelle voi puhua (src/interact.ts); kana_b on toinen kana.
-    addTalkable({ id, x, z, name: t(`folk.${id === "kana_b" ? "kana" : id}` as TextKey) });
+    // Pihan ja rannan väelle voi puhua (src/interact.ts).
+    addTalkable({ id, x, z, name: folkName(id) });
   };
   const jobs: Promise<void>[] = [];
 

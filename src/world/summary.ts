@@ -3,6 +3,7 @@
 import type { TextKey } from "../i18n";
 import { ITEMS } from "../map/campaign";
 import { itemLabel, moonPhaseNames } from "./conditions";
+import { nodeVariants } from "./dialogue";
 import type { Condition, Dialogue, Effect, EventPattern, Rule, WorldData } from "./types";
 
 export type TextLookup = (key: TextKey) => string;
@@ -29,6 +30,8 @@ export function describeCondition(cond: Condition, data: WorldData): string {
     }
     case "moonPhase": return `kuu on vaiheessa: ${moonPhaseNames(cond.phases)}`;
     case "itemTaken": return `${itemLabel(cond.instanceId)} on otettu`;
+    case "sameMoon": return `${data.counters[cond.counter]?.label ?? cond.counter} on tämä kuunkierto`;
+    case "unknownHuntGround": return "kartalla on metsästysapaja, jota pelaaja ei vielä tunne";
   }
 }
 
@@ -51,6 +54,8 @@ export function describeEffect(effect: Effect, data: WorldData, text: TextLookup
     case "setNpcState": return `hahmon "${effect.npcId}" tila vaihtuu: ${effect.state}`;
     case "removeNpc": return `hahmo "${effect.npcId}" poistuu kohtauksesta`;
     case "startSongLesson": return `aloitetaan laulun "${effect.songId}" opettelu (rytmiharjoitus)`;
+    case "markMoon": return `kirjataan laskuriin "${data.counters[effect.counter]?.label ?? effect.counter}" nykyinen kuunkierto`;
+    case "revealHuntGround": return "sankaria lähin tuntematon metsästysapaja paljastuu kartalle";
   }
 }
 
@@ -74,6 +79,11 @@ export function describePattern(on: EventPattern): string {
       detail("sceneId", "kohtaus");
       return `Kun kohtaukseen siirrytään${extra.length ? ` (${extra.join(", ")})` : ""}`;
     }
+    case "npc.leftBehind": {
+      detail("npcId", "hahmo");
+      detail("sceneId", "kohtaus");
+      return `Kun sankari lähtee ja hahmo jää kohtaukseen${extra.length ? ` (${extra.join(", ")})` : ""}`;
+    }
     case "battle.won": {
       detail("sceneId", "kohtaus");
       return `Kun leirin viimeinen aalto kaatuu${extra.length ? ` (${extra.join(", ")})` : ""}`;
@@ -87,6 +97,8 @@ export function describePattern(on: EventPattern): string {
       detail("nearNpcId", "lähellä hahmo");
       detail("context", "yhteys");
       detail("success", "onnistui");
+      detail("minHits", "osumia vähintään");
+      detail("maxHits", "osumia enintään");
       detail("sceneId", "kohtaus");
       return `Kun laulu lauletaan${extra.length ? ` (${extra.join(", ")})` : ""}`;
     }
@@ -106,7 +118,8 @@ export function summarizeDialogue(dialogue: Dialogue, data: WorldData, text: Tex
     lines.push(`  Aloitus solmuun ${e.node}: ${e.when ? `jos ${describeCondition(e.when, data)}` : "muuten"}`);
   });
   for (const [id, node] of Object.entries(dialogue.nodes)) {
-    lines.push(`  Solmu ${id}: "${text(node.text)}"`);
+    const variants = nodeVariants(node);
+    lines.push(`  Solmu ${id}: "${text(variants[0])}"${variants.length > 1 ? ` (+ ${variants.length - 1} samaa tarkoittavaa muunnelmaa)` : ""}`);
     for (const c of node.choices) {
       const cond = c.when ? ` (näkyy, jos ${describeCondition(c.when, data)})` : "";
       const fx = (c.effects ?? []).map((e) => describeEffect(e, data, text)).join("; ");

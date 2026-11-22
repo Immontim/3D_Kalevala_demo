@@ -18,6 +18,20 @@ import { worldRuntime } from "./store";
 export let dialogueOpen = false;
 let active: ActiveDialogue | null = null;
 let speaker = "";
+/** Näytettävä muunnelma nykyisestä solmusta (arvotaan solmuun tullessa, ei joka piirrolla). */
+let shownText: TextKey | null = null;
+/** Viimeksi näytetty muunnelma solmua kohti: sama repliikki ei toistu kahdesti peräkkäin. */
+const lastVariant = new Map<string, TextKey>();
+
+/** Arpoo solmun repliikin muunnelmista yhden, mutta ei edellistä kertaa samassa solmussa. */
+function pickVariant(view: ActiveDialogue["view"]): TextKey {
+  const key = `${view.dialogueId}/${view.nodeId}`;
+  const previous = lastVariant.get(key);
+  const pool = view.variants.length > 1 ? view.variants.filter((v) => v !== previous) : view.variants;
+  const chosen = pool[Math.floor(Math.random() * pool.length)] ?? view.text;
+  lastVariant.set(key, chosen);
+  return chosen;
+}
 
 function show(messages: readonly OutMessage[]) {
   const first = messages[0];
@@ -28,7 +42,7 @@ function render() {
   if (!active) return;
   const { view } = active;
   $("dialogueName").textContent = speaker;
-  $("dialogueText").textContent = t(view.text);
+  $("dialogueText").textContent = t(shownText ?? view.text);
   const box = $("dialogueChoices");
   box.replaceChildren();
   view.choices.forEach((choice, i) => {
@@ -61,6 +75,7 @@ export function talkTo(npcId: string, name: string, runtime: WorldRuntime = worl
     return false;
   }
   active = start;
+  shownText = pickVariant(start.view);
   speaker = name;
   dialogueOpen = true;
   clearInputs();
@@ -84,7 +99,7 @@ function choose(index: number) {
   show(outcome.messages);
   const lesson = outcome.actions.find((a) => a.kind === "songLesson");
   const npcId = active.view.npcId;
-  if (outcome.next) { active = outcome.next; render(); } else closeDialogue();
+  if (outcome.next) { active = outcome.next; shownText = pickVariant(active.view); render(); } else closeDialogue();
   // Opetus alkaa vasta, kun dialogi on suljettu ja valinnan tila tallennettu.
   if (lesson && Object.prototype.hasOwnProperty.call(SONGS, lesson.songId)) {
     startLesson(lesson.songId as SongId, { npcId, name: speaker });
@@ -95,6 +110,7 @@ export function closeDialogue(silent = false) {
   if (!dialogueOpen) return;
   dialogueOpen = false;
   active = null;
+  shownText = null;
   $("dialogue").classList.add("hidden");
   $("dialogueChoices").replaceChildren();
   clearInputs();

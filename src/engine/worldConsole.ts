@@ -1,6 +1,6 @@
 // Konsoli `__world`: maailmamoottorin tila ja selitykset kehittäjälle ja savutesteille.
 import { finnishText } from "../i18n";
-import { ARENA } from "../world";
+import { ARENA, yardDebug } from "../world";
 import type { GameEvent } from "../world/types";
 import { focusedSceneItemId } from "./sceneItems";
 import { worldRuntime } from "./store";
@@ -28,6 +28,8 @@ export function initWorldConsole() {
     /** Viimeisin post-kutsun tulos (miksi säännöt eivät vaikuttaneet). */
     get last() { return worldRuntime().lastPost(); },
     scene: ARENA,
+    /** Pihan arvottu eläinsijoittelu tällä käynnillä (kanat, kukko, koira). */
+    get yard() { return yardDebug.animals; },
     /** Kohtauksen vielä paikallaan olevat poimittavat esineet ja se, jota katse osoittaa. */
     get items() {
       return {

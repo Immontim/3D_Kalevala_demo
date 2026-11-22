@@ -2,7 +2,9 @@
 // mahdu mukaan), mikään sen vaikutus ei tule voimaan. Efektit eivät kosketa maailma-aikaa
 // (`worldMinutes`): 3D-kohtaus ei kuluta aikaa.
 import { setSceneItemTakeMode, tryAddItem, tryRemoveItem, type CampaignState } from "../map/campaign";
+import { nearestUnknownHuntGround } from "../map/huntGrounds";
 import { revealSiteOnMap } from "../map/reveal";
+import { currentMoonMark } from "./conditions";
 import { totalDays } from "../map/uiState";
 import { withCounterAdded, withCounterSet, withFlag } from "./state";
 import type { Effect, OutAction, OutMessage, WorldData } from "./types";
@@ -73,6 +75,19 @@ export function applyEffects(state: CampaignState, effects: readonly Effect[], d
       case "setNpcState":
         actions.push({ kind: "npcState", npcId: effect.npcId, state: effect.state });
         break;
+      case "markMoon": {
+        if (!data.counters[effect.counter]) return fail(state, "unknown-counter", `tuntematon laskuri ${effect.counter}`);
+        const engine = withCounterSet(current.engine, effect.counter, currentMoonMark(current), data.counters[effect.counter].max);
+        if (engine !== current.engine) current = { ...current, engine };
+        break;
+      }
+      case "revealHuntGround": {
+        const ground = nearestUnknownHuntGround(current);
+        const revealed = ground ? revealSiteOnMap(current, ground.id) : null;
+        if (!revealed) return fail(state, "unknown-site", "kartalla ei ole tuntematonta metsästysapajaa");
+        current = revealed;
+        break;
+      }
     }
   }
   return { ok: true, state: current, messages, actions };
@@ -86,7 +101,7 @@ function fail(state: CampaignState, reason: EffectFailure, detail: string): Appl
 export function effectRefs(effects: readonly Effect[], out: { flags: string[]; counters: string[]; instances: string[] } = { flags: [], counters: [], instances: [] }) {
   for (const e of effects) {
     if (e.kind === "setFlag") out.flags.push(e.flag);
-    else if (e.kind === "addCounter") out.counters.push(e.counter);
+    else if (e.kind === "addCounter" || e.kind === "markMoon") out.counters.push(e.counter);
     else if (e.kind === "setSceneItemTakeMode") out.instances.push(e.instanceId);
   }
   return out;

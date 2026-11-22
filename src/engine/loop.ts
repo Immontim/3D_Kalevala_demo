@@ -28,6 +28,7 @@ import { worldRuntime } from "./store";
 import { updateSceneItemFocus } from "./sceneItems";
 import { closeDialogue, dialogueOpen } from "./dialogue";
 import { updateExit } from "./exit";
+import { postLeftBehind } from "./leave";
 import { hunt, rebindHeroBow, updateHunt, updateHuntVisuals } from "./hunt";
 
 export function onPlayerDeath() {
@@ -66,6 +67,7 @@ export function restart() {
 export function toStartMenu() {
   const route = parseAppRoute(location.href);
   if (route.mode === "scene" && route.returnToMap) {
+    postLeftBehind();
     saveSceneReturn(createEmptySceneReturn(route.scene));
     location.href = mapUrl(location.href).href;
     return;

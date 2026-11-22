@@ -1,4 +1,4 @@
-"""Pihan talousesineet rauhalliseen kohtaukseen: pukkipöytä, penkki, tuohikontti,
+"""Pihan talousesineet rauhalliseen kohtaukseen: pukkipöytä, penkki, vuode, tuohikontti,
 keittopata tulikivillä, ruokatarpeet, viljalyhde ja Poly Havenin puuastiat.
 Vie tiedoston assets/household.glb; peli sijoittelee mallit nimen mukaan.
 
@@ -12,7 +12,7 @@ Vientikansion voi vaihtaa ympäristömuuttujalla KALEVALA_ASSETS_OUT (esim. toin
 työpuu). Esikatselukuva: KALEVALA_PREVIEW=<polku.png>.
 
 Koordinaatit: Z ylös, esineen etusivu suuntaan -Y. Origo on esineen pohjan keskellä.
-Nimet: pukkipoyta, penkki, tuohikontti, pata, rieska, nauriit, kuivakalat, lyhde,
+Nimet: pukkipoyta, penkki, vuode, tuohikontti, pata, rieska, nauriit, kuivakalat, lyhde,
 kulho, kuppi, kauha, lautanen, kori sekä poyta_kattaus (pöydälle katetut esineet
 yhtenä mallina; origo sama kuin pukkipöydällä).
 """
@@ -153,6 +153,83 @@ def build_bench(col):
         b.face(pts if sx > 0 else list(reversed(pts)), "wood", (0.95, 0.9, 0.8), tile=0.4)
         for sy in (-1, 1):
             b.pole(V((sx * 0.82, sy * 0.24, -0.04)), V((sx * 0.68, sy * 0.05, H - 0.06)), 0.03, "bark", 6, (0.76, 0.73, 0.7), taper=0.9)
+    return b.finish(col)
+
+
+BED_L, BED_W = 2.0, 0.86      # vuoteen pituus (X) ja leveys (Y)
+BED_TOP = 0.50                # patjan ja taljan yläpinta keskeltä (pelin makaava hahmo asetetaan tälle)
+
+
+def build_bed(col):
+    """Vuode (lavitsa) nuotion ääreen: kaksi kuorellista sivuhirttä neljän haarajalan päällä,
+    poikittaiset halkolaudat, olkipatja, talja ja olkityyny päädyssä +X. Ei metallia eikä
+    sorvattua puuta, vain kirveellä tehtävää: sopii pronssi- ja varhaiseen rautakauteen."""
+    b = HH("vuode", 89)
+    L, W = BED_L, BED_W
+    zr = 0.27                                              # sivuhirsien keskilinja
+    for sy in (-1, 1):                                     # sivuhirret ulottuvat hieman päätyjen yli
+        y = sy * (W / 2 - 0.05)
+        b.tube([V((-L / 2 - 0.06, y, zr - 0.01)), V((0, y, zr + 0.01)), V((L / 2 + 0.06, y, zr - 0.005))],
+               [0.075, 0.07, 0.066], "bark", 7, (0.74, 0.71, 0.67))
+    for sx in (-1, 1):                                     # päätyorret ja jalat (haarukka hirren alla)
+        x = sx * (L / 2 - 0.09)
+        b.pole(V((x, -W / 2 - 0.02, zr - 0.06)), V((x, W / 2 + 0.02, zr - 0.06)), 0.05, "bark", 6, (0.7, 0.67, 0.63), taper=0.92)
+        for sy in (-1, 1):
+            y = sy * (W / 2 - 0.08)
+            b.pole(V((x + sx * 0.04, y + sy * 0.03, -0.04)), V((x, y, zr - 0.02)), 0.045, "bark", 6, (0.72, 0.69, 0.66), taper=0.88)
+    n = 9                                                  # halkolaudat sivuhirsien päällä
+    for i in range(n):
+        x = -L / 2 + 0.12 + i * (L - 0.24) / (n - 1)
+        k = 0.8 + 0.12 * b.rng.random()
+        b.box(V((x + b.rng.uniform(-0.02, 0.02), b.rng.uniform(-0.015, 0.015), zr + 0.085)), (0.15, W + 0.04, 0.035), "wood",
+              (k, k * 0.95, k * 0.88), tile=0.6, rot=Matrix.Rotation(b.rng.uniform(-0.04, 0.04), 3, 'Z'), grain=1)
+
+    zm0, zm1 = zr + 0.1, BED_TOP - 0.03                    # olkipatja: pyöristetty laatta
+    ml, mw = L - 0.12, W - 0.1
+
+    def mat_pt(u, v):
+        a = u * math.tau
+        cx, cy = math.cos(a), math.sin(a)
+        # pyöristetty suorakaide: superellipsi, reunat pullistuvat ja yläpinta painuu keskeltä
+        ex = math.copysign(abs(cx) ** 0.35, cx)
+        ey = math.copysign(abs(cy) ** 0.35, cy)
+        r = 0.72 + 0.28 * math.sin(v * math.pi)
+        p = V((ex * ml / 2 * r, ey * mw / 2 * r, 0))
+        z = zm0 + (zm1 - zm0) * (0.5 - 0.5 * math.cos(v * math.pi))
+        z += 0.012 * nz((p.x * 3, p.y * 3, v), 1.0, 2.0)
+        return p + V((0, 0, z))
+
+    def straw_col(p):
+        k = 0.78 + 0.1 * nz(p, 9.0, 1.0)
+        return (k * 0.95, k * 0.84, k * 0.56)
+    b.grid(mat_pt, 24, 5, "straw", straw_col, uvfn=lambda u, v: (u * 4.0, v * 0.6))
+    b.face([mat_pt(i / 24, 1.0) for i in range(24)], "straw", (0.8, 0.7, 0.45), tile=0.5)
+
+    def pelt_pt(u, v):                                     # talja: laskeutuu patjan reunoille, epätasainen reuna
+        x = -L / 2 + 0.16 + u * (L * 0.72)
+        y = (v - 0.5) * (W + 0.14)
+        edge = abs(v - 0.5) * 2
+        drop = max(0.0, edge - 0.72) / 0.28
+        rag = 0.035 * nz((x * 4, y * 4, 0), 1.0, 5.0)
+        z = BED_TOP + 0.012 - drop * drop * 0.16 + rag * drop + 0.008 * nz((x * 6, y * 6, 1), 1.0, 3.0)
+        return V((x, y * (1 - 0.06 * drop), z))
+
+    def pelt_col(p):
+        k = 0.36 + 0.07 * nz(p, 11.0, 6.0) + 0.05 * nz(p, 37.0, 2.0)
+        ridge = 0.08 * max(0.0, 1 - abs(p.y) / 0.14)       # selkäraita tummempi
+        rim = 0.08 * max(0.0, abs(p.y) / (W / 2) - 0.6)    # vatsapuolen karva vaaleampi
+        return (k * 0.92 - ridge + rim, k * 0.7 - ridge + rim * 0.8, k * 0.5 - ridge + rim * 0.6)
+    # olkitekstuurin kuitu taljan pituussuuntaan: tummaksi sävytettynä se lukeutuu karvaksi
+    b.grid(pelt_pt, 12, 10, "straw", pelt_col, uvfn=lambda u, v: (v * 1.4, u * 3.2))
+
+    pc = V((L / 2 - 0.2, 0, BED_TOP + 0.01))               # olkipielus poikittain päädyssä
+
+    def pillow_pt(u, v):
+        a, t = u * math.tau, (v - 0.5) * math.pi
+        d = V((math.cos(a) * math.cos(t), math.sin(a) * math.cos(t), math.sin(t)))
+        sq = 1 - 0.25 * abs(d.z) ** 3                      # litistynyt pää-ala
+        return pc + V((d.x * 0.15 * sq, d.y * 0.3, max(d.z, -0.4) * 0.075 + 0.035))
+    b.grid(pillow_pt, 14, 6, "straw", (0.84, 0.74, 0.5), uvfn=lambda u, v: (u * 3.0, v * 0.8))
     return b.finish(col)
 
 
@@ -438,7 +515,7 @@ def build_setting(col, obs):
     return ob
 
 
-HH_BUILDERS = [build_table, build_bench, build_kontti, build_pot, build_bread, build_turnips, build_fish, build_sheaf]
+HH_BUILDERS = [build_table, build_bench, build_bed, build_kontti, build_pot, build_bread, build_turnips, build_fish, build_sheaf]
 
 
 def build_household(export=True, save=True):
@@ -526,7 +603,7 @@ if __name__ == "__main__":
     if pv:
         obs = {o.name: o for o in bpy.data.collections["GAME"].objects}
         # pöytä ja kattaus päällekkäin, penkki eteen, muut ympärille
-        place = {"pukkipoyta": (0, 0, 0), "poyta_kattaus": (0, 0, 0), "penkki": (0, -0.75, 0), "tuohikontti": (-1.5, -0.6, 0), "lyhde": (1.5, 0.3, 0),
+        place = {"pukkipoyta": (0, 0, 0), "poyta_kattaus": (0, 0, 0), "penkki": (0, -0.75, 0), "vuode": (-1.0, 1.4, 0), "tuohikontti": (-1.5, -0.6, 0), "lyhde": (1.5, 0.3, 0),
                  "pata": (2.3, -0.9, 0), "kori": (1.45, -0.75, 0), "rieska": (3.2, 0, 0), "nauriit": (3.6, 0, 0), "kuivakalat": (4.0, 0, 0),
                  "kulho": (3.2, -0.5, 0), "kuppi": (3.6, -0.5, 0), "kauha": (3.9, -0.5, 0), "lautanen": (4.3, -0.5, 0)}
         for n, p in place.items():

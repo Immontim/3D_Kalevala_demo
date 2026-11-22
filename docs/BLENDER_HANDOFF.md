@@ -6,7 +6,7 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-21 (Claude, Windows; pohja main 2e60ff7)
+Päivitetty: 2026-11-22 (Claude, Windows; pohja main 218cebd; `vuode` branchissa `claude/yard-bed`)
 
 - **Metsän LOD- ja reuna-assetit** (`assets/forest_lod.glb`, 1,6 Mt; `assets-src/blender/forest_lod.py`;
   mainissa). Peli lataa tiedoston kaikissa 3D-kohtauksissa v06.00.00:sta alkaen (AGENT_HANDOFF). Skripti lukee
@@ -130,13 +130,12 @@ Päivitetty: 2026-11-21 (Claude, Windows; pohja main 2e60ff7)
   ja `kanakoppi` (718 kolmiota; paaluilla seisova lautakoppi, kulkulauta
   ja orsi kyljessä 0,6 m korkeudella). Etusivu -Y, origo pohjan keskellä,
   samat materiaalit kuin pihapiirissä.
-- **Talousesineet** (`assets/household.glb`, noin 1,4 Mt / 19 000
-  kolmiota; `assets-src/blender/household.py`): `pukkipoyta`, `penkki`,
-  `tuohikontti`, `pata`, `rieska`, `nauriit`, `kuivakalat`, `lyhde`,
-  `kulho`, `kuppi`, `kauha`, `lautanen`, `kori` ja `poyta_kattaus`.
-  Katetun pöydän esineillä on pöydän kanssa yhteinen origo; pöytälevyn
-  pinta on 0,76 m. Skriptin `HH` muuntaa sRGB-värit lineaarisiksi.
-  Viljalyhde `lyhde` on tarkoitettu myös emännän käteen.
+- **Talousesineet** (`assets/household.glb`, 1,42 Mt / 20 100 kolmiota; `assets-src/blender/household.py`):
+  `pukkipoyta`, `penkki`, `vuode`, `tuohikontti`, `pata`, `rieska`, `nauriit`, `kuivakalat`, `lyhde`
+  (myös emännän käteen), `kulho`, `kuppi`, `kauha`, `lautanen`, `kori` ja `poyta_kattaus` (sama origo kuin
+  pöydällä; levyn pinta 0,76 m). `HH` muuntaa sRGB-värit lineaarisiksi. **`vuode`** (2026-11-22, 974 kolmiota,
+  2,12 × 0,94 m): kuorelliset sivuhirret haarajaloilla, halkolaudat, olkipatja, tumma talja (olkitekstuuri
+  sävytettynä karvaksi) ja olkipielus päädyssä +X; makaavan hahmon pinta `BED_TOP` 0,50 m.
 - **Tietäjä** (`assets/villagers.glb`, noin 2,2 Mt;
   `char_folk.py` → `run_folk()`): `char_tietaja` (noin 29 700 kolmiota,
   sama `RIG` ja luiden nimet kuin taistelijoilla) sekä `sauva` (ote

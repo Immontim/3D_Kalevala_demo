@@ -24,10 +24,9 @@ export const FLAGS: Record<string, FlagDef> = {
   "campaign.endSeen": { label: "pelaaja on nähnyt loppuruudun" },
   "archer.healed": { label: "jousineito on parannettu laululla ja nousee seisomaan" },
   "archer.gaveSword": { label: "jousineito on antanut taivaanrautamiekan" },
+  "archer.dead": { label: "jousineito kuoli, koska häntä ei parannettu ajoissa" },
   "louhi.banished": { label: "Louhi on karkotettu kalmistolta ja vainolaisten leiri on paljastunut" },
-  // Varattu tarinakäänteelle "emäntä kertoo huhun" (ROADMAP V2). Sillä ei ole vielä
-  // pelisääntöä: moottorin testit käyttävät sitä esimerkkikäänteessä.
-  "rumor.heard": { label: "emäntä on kertonut huhun vainolaisista" },
+  "rumor.heard": { label: "jousineidon talon emäntä on kertonut huhun vainolaisista" },
 };
 
 export const COUNTERS: Record<string, CounterDef> = {
@@ -36,6 +35,9 @@ export const COUNTERS: Record<string, CounterDef> = {
   /** Loppuruudun tilastot kirjataan voiton hetkellä (`recordVictory`), jotta myöhempi vaeltaminen ei muuta niitä. */
   "win.days": { label: "matkaan kulunut pelipäivien määrä voitettaessa", max: 9999 },
   "win.explored": { label: "tutkittu osuus kartasta voitettaessa (prosenttia)", max: 100 },
+  "archer.healFails": { label: "parannuslaulun epäonnistuneet yritykset jousineidolle", max: 3 },
+  /** Kuunkierto + 1, jolla toisen talon emäntä viimeksi neuvoi apajan (0 = ei koskaan). */
+  "emanta.huntTipMoon": { label: "kuunkierto, jolla emäntä viimeksi neuvoi metsästysapajan", max: 9999 },
 };
 
 /** Maailmanesineiden instanssitunnisteet ihmisen luettavina nimina (yhteenvetoa varten). */

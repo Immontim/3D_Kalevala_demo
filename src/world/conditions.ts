@@ -1,6 +1,7 @@
 // Ehtojen arviointi. Jokainen tulos kertoo suomeksi, miksi ehto piti tai ei pitänyt,
 // jotta `__world.explain` voi näyttää epäonnistumisen syyn.
 import type { CampaignState } from "../map/campaign";
+import { nearestUnknownHuntGround } from "../map/huntGrounds";
 import { mapCalendarTime } from "../map/uiState";
 import { counterValue, flagValue } from "./state";
 import { MOON_PHASE_NAMES, SCENE_ITEM_LABELS } from "./registry";
@@ -102,7 +103,28 @@ export function evaluate(cond: Condition, state: CampaignState, data: WorldData)
         reason: taken ? `${itemLabel(cond.instanceId)} on jo otettu` : `${itemLabel(cond.instanceId)} on vielä ottamatta`,
       };
     }
+    case "sameMoon": {
+      const moon = currentMoonMark(state);
+      const value = counterValue(state.engine, cond.counter);
+      const pass = value === moon;
+      return {
+        pass,
+        reason: `${counterLabel(data, cond.counter)} on ${value}; nyt on kuunkierto ${moon}${pass ? " (sama kuu)" : " (eri kuu, ei täyty)"}`,
+      };
+    }
+    case "unknownHuntGround": {
+      const ground = nearestUnknownHuntGround(state);
+      return {
+        pass: ground !== null,
+        reason: ground ? `kartalla on tuntematon metsästysapaja (${ground.id})` : "kaikki metsästysapajat ovat jo tiedossa tai niitä ei ole (ei täyty)",
+      };
+    }
   }
+}
+
+/** Nykyinen kuunkierto laskurin arvona: ensimmäinen kuu on 1, jotta 0 tarkoittaa "ei koskaan". */
+export function currentMoonMark(state: CampaignState): number {
+  return mapCalendarTime(state.world.worldMinutes).moon + 1;
 }
 
 /** Kaikki ehtopuun liput, laskurit ja instanssit tarkistuksia varten (esim. rekisteritesti). */
@@ -114,9 +136,11 @@ export function conditionRefs(cond: Condition, out: { flags: string[]; counters:
       break;
     case "not": conditionRefs(cond.of, out); break;
     case "flag": out.flags.push(cond.flag); break;
-    case "counter": out.counters.push(cond.counter); break;
+    case "counter":
+    case "sameMoon": out.counters.push(cond.counter); break;
     case "itemTaken": out.instances.push(cond.instanceId); break;
-    case "moonPhase": break;
+    case "moonPhase":
+    case "unknownHuntGround": break;
   }
   return out;
 }

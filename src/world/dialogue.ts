@@ -4,15 +4,23 @@ import type { CampaignState } from "../map/campaign";
 import { evaluate } from "./conditions";
 import { applyEffects, type EffectFailure } from "./effects";
 import type { TextKey } from "../i18n";
-import type { Dialogue, DialogueChoice, OutAction, OutMessage, WorldData } from "./types";
+import type { Dialogue, DialogueChoice, DialogueNode, OutAction, OutMessage, WorldData } from "./types";
 
 export interface DialogueView {
   dialogueId: string;
   nodeId: string;
   npcId: string;
+  /** Ensimmäinen muunnelma (testit ja yhteenveto). */
   text: TextKey;
+  /** Repliikin samaa tarkoittavat muunnelmat; näkymä valitsee niistä yhden. */
+  variants: readonly TextKey[];
   /** Vain ne valinnat, joiden ehto pitää. */
   choices: { id: string; text: TextKey }[];
+}
+
+/** Solmun repliikin muunnelmat listana (yksittäinen avain = yhden muunnelman lista). */
+export function nodeVariants(node: DialogueNode): readonly TextKey[] {
+  return typeof node.text === "string" ? [node.text] : node.text;
 }
 
 export function findDialogue(data: WorldData, sceneId: string, npcId: string): Dialogue | null {
@@ -25,7 +33,8 @@ function viewOf(dialogue: Dialogue, nodeId: string, state: CampaignState, data: 
   const choices = node.choices
     .filter((c) => !c.when || evaluate(c.when, state, data).pass)
     .map((c) => ({ id: c.id, text: c.text }));
-  return { dialogueId: dialogue.id, nodeId, npcId: dialogue.npcId, text: node.text, choices };
+  const variants = nodeVariants(node);
+  return { dialogueId: dialogue.id, nodeId, npcId: dialogue.npcId, text: variants[0], variants, choices };
 }
 
 /** Aloitussolmu: ensimmäinen merkintä, jonka ehto pitää. */

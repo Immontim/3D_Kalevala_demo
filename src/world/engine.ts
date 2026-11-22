@@ -11,7 +11,12 @@ export function matchesPattern(pattern: EventPattern, event: GameEvent): boolean
   if (pattern.type !== event.type) return false;
   const want = pattern as unknown as Record<string, unknown>;
   const have = event as unknown as Record<string, unknown>;
-  return Object.keys(want).every((key) => key === "type" || want[key] === undefined || want[key] === have[key]);
+  return Object.keys(want).every((key) => {
+    if (key === "type" || want[key] === undefined) return true;
+    if (key === "minHits") return typeof have.hits === "number" && have.hits >= (want.minHits as number);
+    if (key === "maxHits") return typeof have.hits === "number" && have.hits <= (want.maxHits as number);
+    return want[key] === have[key];
+  });
 }
 
 export interface FiredRule { ruleId: string; messages: OutMessage[] }

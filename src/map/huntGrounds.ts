@@ -85,6 +85,18 @@ function placeOne(state: CampaignState, map: WorldMapDefinition, id: string, rng
   return { ...state, world: { ...state.world, siteInstances: [...state.world.siteInstances, instance] } };
 }
 
+/**
+ * Apaja, jonka emäntä voi neuvoa: sankaria lähin (Chebyshev, tasapelissä tunniste), jota pelaaja ei
+ * vielä tunne. null, jos kaikki apajat ovat jo tiedossa tai niitä ei ole.
+ */
+export function nearestUnknownHuntGround(state: CampaignState): SiteInstance | null {
+  const hero = { x: state.world.x, y: state.world.y };
+  const known = new Set(state.world.knownSiteIds);
+  const unknown = state.world.siteInstances.filter((instance) => isHuntInstance(instance) && !known.has(instance.id));
+  unknown.sort((a, b) => chebyshev(a, hero) - chebyshev(b, hero) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return unknown[0] ?? null;
+}
+
 /** Poistaa apajan kartalta ja pelaajan tiedosta. Muu tila säilyy. */
 export function removeHuntGround(state: CampaignState, id: string): CampaignState {
   if (!state.world.siteInstances.some((instance) => instance.id === id && isHuntInstance(instance))) return state;
