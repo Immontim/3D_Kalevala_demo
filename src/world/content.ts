@@ -475,9 +475,51 @@ export const YOUNG_WARRIOR_DIALOGUE: Dialogue = {
   nodes: { greet: { text: lines("dialogue.urho.greet"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] } },
 };
 
+/**
+ * Kuppikivi kummallakin kalmistolla (sama kohtaus `cairnfield`). Ukon muistaminen antaa Ukon siunauksen
+ * (+20 kestävyyden yläraja 15 päiväksi) kerran kuunkierrossa yhteensä molemmilla kivillä (omistaja 2026-11-22).
+ * Saman kuun aikana kivi vain vaikenee, ja tarjolla on tyhjä muistelu.
+ */
+export const CUPSTONE_DIALOGUE: Dialogue = {
+  id: "kuppikivi.cairnfield",
+  sceneId: "cairnfield",
+  npcId: "kuppikivi",
+  intent: "Kuppikivellä pelaaja voi muistaa Ukkoa, Tapiota ja Otavan tähtiä; siitä saa Ukon siunauksen (kestävyyden yläraja +20, 15 päivää) kerran kuunkierrossa, yhteensä kummallakin kalmistolla. Saman kuun aikana kivi on vaiti eikä muistelu tee mitään.",
+  entries: [
+    { when: { kind: "sameMoon", counter: "ukko.rememberedMoon" }, node: "silent" },
+    { node: "stone" },
+  ],
+  nodes: {
+    stone: {
+      text: lines("dialogue.cupstone.stone"),
+      choices: [
+        {
+          id: "remember-ukko",
+          text: "dialogue.cupstone.remember",
+          effects: [
+            { kind: "addLongEffect", effectId: "ukko_blessing" },
+            { kind: "markMoon", counter: "ukko.rememberedMoon" },
+            { kind: "message", text: "world.ukko.blessed", sub: "world.ukko.blessedSub" },
+          ],
+          next: "blessed",
+        },
+        { id: "leave", text: "dialogue.cupstone.leave" },
+      ],
+    },
+    blessed: { text: lines("dialogue.cupstone.blessed"), choices: [{ id: "leave", text: "dialogue.cupstone.leave" }] },
+    silent: {
+      text: lines("dialogue.cupstone.silent"),
+      choices: [
+        { id: "recall", text: "dialogue.cupstone.recall" },
+        { id: "leave", text: "dialogue.cupstone.leave" },
+      ],
+    },
+  },
+};
+
 export const GAME_WORLD: WorldData = {
   flags: FLAGS,
   counters: COUNTERS,
   rules: RULES,
-  dialogues: [SAGE_DIALOGUE, ARCHER_DIALOGUE, HOUSEWIFE_DIALOGUE, HOUSEWIFE_B_DIALOGUE, YOUNG_WARRIOR_DIALOGUE],
+  dialogues: [SAGE_DIALOGUE, ARCHER_DIALOGUE, HOUSEWIFE_DIALOGUE, HOUSEWIFE_B_DIALOGUE, YOUNG_WARRIOR_DIALOGUE, CUPSTONE_DIALOGUE],
 };

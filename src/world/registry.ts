@@ -46,6 +46,8 @@ export const COUNTERS: Record<string, CounterDef> = {
   "archer.healFails": { label: "parannuslaulun epäonnistuneet yritykset jousineidolle", max: 3 },
   /** Kuunkierto + 1, jolla jompikumpi emäntä viimeksi neuvoi apajan (0 = ei koskaan). */
   "emanta.huntTipMoon": { label: "kuunkierto, jolla jompikumpi emäntä viimeksi neuvoi metsästysapajan", max: 9999 },
+  /** Kuunkierto + 1, jolla Ukkoa viimeksi muistettiin kummalla tahansa kuppikivellä (0 = ei koskaan). */
+  "ukko.rememberedMoon": { label: "kuunkierto, jolla pelaaja viimeksi muisti Ukkoa kuppikivellä", max: 9999 },
 };
 
 /** Maailmanesineiden instanssitunnisteet ihmisen luettavina nimina (yhteenvetoa varten). */

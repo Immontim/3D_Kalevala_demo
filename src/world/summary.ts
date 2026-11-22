@@ -2,6 +2,7 @@
 // hän hyväksyy tämän proosan ja jokaisen säännön "suunnitteluaie"-lauseen.
 import type { TextKey } from "../i18n";
 import { ITEMS } from "../map/campaign";
+import { LONG_EFFECTS } from "../map/longEffects";
 import { itemLabel, moonPhaseNames } from "./conditions";
 import { nodeVariants } from "./dialogue";
 import type { Condition, Dialogue, Effect, EventPattern, Rule, WorldData } from "./types";
@@ -58,6 +59,11 @@ export function describeEffect(effect: Effect, data: WorldData, text: TextLookup
     case "startSongLesson": return `aloitetaan laulun "${effect.songId}" opettelu (rytmiharjoitus)`;
     case "markMoon": return `kirjataan laskuriin "${data.counters[effect.counter]?.label ?? effect.counter}" nykyinen kuunkierto`;
     case "revealHuntGround": return "sankaria lähin tuntematon metsästysapaja paljastuu kartalle";
+    case "addLongEffect": {
+      const def = LONG_EFFECTS[effect.effectId];
+      const mods = def.modifiers.map((m) => `${m.stat} ${m.add > 0 ? "+" : ""}${m.add}`).join(", ");
+      return `pelaaja saa pitkäkestoisen efektin "${text(def.nameKey)}" (${mods}) ${def.durationDays} päiväksi`;
+    }
   }
 }
 

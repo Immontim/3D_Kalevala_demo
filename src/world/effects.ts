@@ -3,6 +3,7 @@
 // (`worldMinutes`): 3D-kohtaus ei kuluta aikaa.
 import { setSceneItemTakeMode, tryAddItem, tryRemoveItem, type CampaignState } from "../map/campaign";
 import { nearestUnknownHuntGround } from "../map/huntGrounds";
+import { tryAddLongEffect } from "../map/longEffects";
 import { revealSiteOnMap } from "../map/reveal";
 import { currentMoonMark } from "./conditions";
 import { resolveInstanceId } from "./instances";
@@ -10,7 +11,7 @@ import { totalDays } from "../map/uiState";
 import { withCounterAdded, withCounterSet, withFlag } from "./state";
 import type { Effect, OutAction, OutMessage, WorldData } from "./types";
 
-export type EffectFailure = "inventory-full" | "missing-item" | "unknown-flag" | "unknown-counter" | "unknown-site";
+export type EffectFailure = "inventory-full" | "missing-item" | "unknown-flag" | "unknown-counter" | "unknown-site" | "effects-full";
 
 export type ApplyResult =
   | { ok: true; state: CampaignState; messages: OutMessage[]; actions: OutAction[] }
@@ -90,6 +91,12 @@ export function applyEffects(state: CampaignState, effects: readonly Effect[], d
         const revealed = ground ? revealSiteOnMap(current, ground.id) : null;
         if (!revealed) return fail(state, "unknown-site", "kartalla ei ole tuntematonta metsästysapajaa");
         current = revealed;
+        break;
+      }
+      case "addLongEffect": {
+        const next = tryAddLongEffect(current, effect.effectId);
+        if (!next) return fail(state, "effects-full", `efektipaikat ovat täynnä (${effect.effectId})`);
+        current = next;
         break;
       }
     }

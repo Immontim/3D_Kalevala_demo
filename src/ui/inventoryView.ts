@@ -1,6 +1,7 @@
 import femalePaperDollUrl from "../../assets/map/paper-doll-hero.png?url";
 import malePaperDollUrl from "../../assets/map/paper-doll-hero-male.png?url";
 import inventoryAtlasUrl from "../../assets/map/inventory-atlas.png?url";
+import ukkoBlessingUrl from "../../assets/map/effect-ukko-blessing.png?url";
 import { t } from "../i18n";
 import {
   BASE_INVENTORY_CAPACITY,
@@ -16,6 +17,9 @@ import {
   type ItemId,
   type StorageItemId,
 } from "../map/campaign";
+import { LONG_EFFECTS, LONG_EFFECT_SLOTS, activeLongEffects, longEffectDaysLeft, type LongEffectId } from "../map/longEffects";
+
+const EFFECT_ICONS: Record<LongEffectId, string> = { ukko_blessing: ukkoBlessingUrl };
 
 const EQUIPMENT_SLOTS: readonly EquipmentSlot[] = [
   "head", "torso", "hands", "legs", "feet", "mainHand", "offHand",
@@ -38,6 +42,8 @@ export interface InventoryViewModel {
   baseStacks: ReadonlyArray<{ itemId: ItemId; quantity: number } | null>;
   extraStacks: ReadonlyArray<{ itemId: ItemId; quantity: number } | null>;
   extraCapacity: number;
+  /** Kolme pitkäkestoisen efektin paikkaa; tyhjä paikka on null. */
+  effects: ReadonlyArray<{ id: LongEffectId; daysLeft: number } | null>;
 }
 
 export function inventoryViewModel(state: CampaignState): InventoryViewModel {
@@ -56,6 +62,10 @@ export function inventoryViewModel(state: CampaignState): InventoryViewModel {
     baseStacks: Array.from({ length: BASE_INVENTORY_CAPACITY }, (_, index) => stackAt(index)),
     extraStacks: Array.from({ length: extraLength }, (_, index) => stackAt(BASE_INVENTORY_CAPACITY + index)),
     extraCapacity,
+    effects: Array.from({ length: LONG_EFFECT_SLOTS }, (_, index) => {
+      const effect = activeLongEffects(state)[index];
+      return effect ? { id: effect.id, daysLeft: longEffectDaysLeft(effect, state.world.worldMinutes) } : null;
+    }),
   };
 }
 
@@ -220,10 +230,40 @@ export function mountInventoryView(root: HTMLElement, options: InventoryViewOpti
     backpackArea.append(backpackHeading, backpackSlot, extraItems);
     storage.append(baseItems, backpackArea);
 
+    const effectsTitle = element("h3");
+    effectsTitle.textContent = t("map.longEffects");
+    const effects = element("div", "inventory-effects");
+    effects.setAttribute("aria-label", t("map.longEffects"));
+    for (const effect of model.effects) {
+      const slot = element("div", "inventory-effect-slot");
+      slot.setAttribute("role", "img");
+      if (effect) {
+        const def = LONG_EFFECTS[effect.id];
+        slot.classList.add(`effect-${def.kind}`);
+        const icon = element("span", "inventory-effect-icon");
+        icon.style.backgroundImage = `url(${JSON.stringify(EFFECT_ICONS[effect.id])})`;
+        icon.setAttribute("aria-hidden", "true");
+        const name = element("span", "inventory-effect-name");
+        name.textContent = t(def.nameKey);
+        const days = t(effect.daysLeft === 1 ? "map.effectDaysOne" : "map.effectDaysMany", { days: effect.daysLeft });
+        const left = element("span", "inventory-effect-days");
+        left.textContent = String(effect.daysLeft);
+        slot.append(icon, left, name);
+        slot.title = `${t(def.nameKey)}: ${t(def.descKey)} · ${days}`;
+        slot.setAttribute("aria-label", slot.title);
+      } else {
+        const empty = element("span", "inventory-empty-mark");
+        empty.textContent = "◇";
+        slot.append(empty);
+        slot.setAttribute("aria-label", t("map.emptyEffectSlot"));
+      }
+      effects.append(slot);
+    }
+
     const note = element("p", "inventory-note");
     note.setAttribute("role", "status");
     note.textContent = options.editable ? t("inventory.hint") : t("inventory.readOnly");
-    root.append(title, content, itemsTitle, storage, note);
+    root.append(title, content, itemsTitle, storage, effectsTitle, effects, note);
   }
 
   render();

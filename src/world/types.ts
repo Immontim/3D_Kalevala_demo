@@ -2,6 +2,7 @@
 // Sääntöjen kirjoittavat agentit; omistaja hyväksyy ne moottorin tulostaman suomenkielisen yhteenvedon kautta.
 import type { TextKey } from "../i18n";
 import type { ItemId, TakeMode } from "../map/campaign";
+import type { LongEffectId } from "../map/longEffects";
 import type { CounterDef, FlagDef } from "./registry";
 
 // ---------- Ehdot ----------
@@ -58,7 +59,12 @@ export type Effect =
   /** Kirjaa laskuriin nykyisen kuunkierron (numero + 1), jota `sameMoon` vertaa. */
   | { kind: "markMoon"; counter: string }
   /** Paljastaa kartalle sankaria lähimmän apajan, jota pelaaja ei tunne. Epäonnistuu, jos sellaista ei ole. */
-  | { kind: "revealHuntGround" };
+  | { kind: "revealHuntGround" }
+  /**
+   * Antaa pitkäkestoisen efektin (`map/longEffects.ts`), esim. Ukon siunauksen. Sama efekti uudelleen alkaa
+   * alusta. Epäonnistuu, jos kaikki kolme efektipaikkaa ovat täynnä muita efektejä.
+   */
+  | { kind: "addLongEffect"; effectId: LongEffectId };
 
 export interface OutMessage { text: TextKey; sub?: TextKey }
 

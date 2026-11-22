@@ -13,7 +13,8 @@ import { canSingAtPeace, openChoice, songState } from "./song";
 import { DEG, aim, g, inputs, keys, sfx } from "./state";
 import { t } from "../i18n";
 import { ARENA_PEACEFUL, SPAWN, groundHeight } from "../world";
-import { applyActiveMapTransition } from "../map/transition";
+import { applyActiveMapTransition, applyLongEffects } from "../map/transition";
+import { campaignStore } from "./store";
 import { focusedSceneItemId, lockFocusedSceneItem } from "./sceneItems";
 import { bowActive, hunt, rebindHeroBow } from "./hunt";
 import { ARCHERY } from "../hunt/archery";
@@ -50,8 +51,14 @@ export function spawnHero() {
   g.player.yaw = SPAWN.yaw;
   aim.yaw = SPAWN.yaw;
   applyActiveMapTransition(g.player, g.gameTime);
+  refreshLongEffects();
   // Rauhallisessa paikassa sankari näkyy jo aloitusikkunan taustalla ase huotrassa.
   g.player.fighter.setSheathed(ARENA_PEACEFUL);
+}
+
+/** Pitkäkestoiset efektit (Ukon siunaus) kampanjasta sankariin: spawnissa ja kun efekti saadaan kesken käynnin. */
+export function refreshLongEffects() {
+  if (g.player) applyLongEffects(g.player, campaignStore().get(), g.gameTime);
 }
 
 /** Rakentaa sankarin 3D-mallin uudelleen vaihdetuilla varusteilla menettämättä paikkaa tai vointia. */

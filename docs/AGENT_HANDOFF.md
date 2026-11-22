@@ -6,25 +6,34 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `614bcee`)
+Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `076bb08`)
 
-- **Koodiversio v08.00.00** branchissa `claude/random-sage-cairns` (pala 1/3 tietäjä- ja uhritehtävästä;
+- **Koodiversio v08.01.00** branchissa `claude/effects-ukko-buff` (pala 2/3 tietäjä- ja uhritehtävästä;
   tarkista merge-tila `git merge-base`illa). Koodi valmis, ei deployattu, omistaja ei ole testannut. Claude
-  savutesti in-app-selaimessa: vanha tallennus sai mökin (9,6) ja Louhen kalmiston (16,16) entisille
-  paikoilleen ja `cairn-b`:n rantaruutuun (1,10); Louhiton merkki näkyy kartalla; `cairn-b`:ssä ei
-  Louhta (ei puhuteltavia), `cairnfield`issä on; aloitusnappi "Astu kalmistolle"; `renderBench` 6,8 ms
-  (1024 × 768); konsolissa vain vanha, jo korjattu virheloki. Uuden matkan arvonta tarkistettu testeillä.
-  Tarkistukset: `bun run test` 2116/2116, `bunx tsc --noEmit`, `bun run lint`, `bun run build`.
-  v07.04 (emäntien tervehdykset) ja v07.03–v06.08 ovat mainissa; omistajatestit yhä tekemättä.
+  savutesti in-app-selaimessa: `cairn-b`:n kuppikivi avaa dialogin, muistaminen antaa kestävyyden ylärajaksi
+  120 heti, toinen puhe samalla kuulla (myös Louhen kalmistolla) näyttää vain tyhjän muistelun; siunaus
+  näkyy taukovalikon ja kartan inventaariossa (15 päivää) ja säilyy kohtauksesta toiseen; Louhelle voi yhä
+  puhua; `renderBench` 6,4 ms (1024 × 768); konsolissa vain vanha, jo korjattu virheloki. Tarkistukset:
+  `bun run test` 2124/2124, `bunx tsc --noEmit`, `bun run lint`, `bun run build`. v08.00 ja aiemmat mainissa.
+- **Pitkäkestoiset efektit (v08.01, `map/longEffects.ts`).** `CampaignPlayer.effects` = `{ id, until }`
+  (maailma-aika); luetaan sallivasti (`parseLongEffects`), puuttuva = tyhjä, joten skeemaversio pysyi 7:nä.
+  Kolme paikkaa (`LONG_EFFECT_SLOTS`), sama efekti uudelleen alkaa alusta, neljäs eri efekti epäonnistuu
+  (`effects-full`). Moottorin efekti `addLongEffect`. 3D: `transition.applyLongEffects` (muunnin
+  `long-effect:<id>:<stat>`, summautuu nälän rangaistukseen) `spawnHero`ssa ja `campaignStore`-muutoksissa
+  (`refreshLongEffects`). UI: `inventoryView` piirtää paikat paperinuken alle, kuvake
+  `assets/map/effect-ukko-blessing.png` (generoitu skriptillä). Ainoa efekti nyt `ukko_blessing`.
+- **Kuppikivi (v08.01, `CUPSTONE_DIALOGUE`).** Puhuteltava `kuppikivi` kummallakin kalmistolla
+  (`populateCairnLife`). "Ukon muistan…" → `ukko_blessing` + `markMoon` `ukko.rememberedMoon`; saman kuun
+  aikana solmu `silent` ja tyhjä "Muistat muinaisia ja Ukon väkeä". Pohjolan unella `peaceTargets: ["louhi"]`,
+  jotta kivi ei vie karkotuksen kuulijaa.
 - **Tietäjän mökki ja kalmistot ovat instansseja (v08.00).** `SiteInstanceKind` `lakeside` ja `cairn`;
   tunnisteet `lakeside` (`SAGE_SITE_ID`), `cairnfield` (Louhi, `LOUHI_CAIRN_ID`) ja `cairn-b`
   (`OFFERING_CAIRN_ID`, ei Louhta) `map/sites.ts`:ssä. Kartassa ei ole enää kiinteitä paikkoja
   (`MAP_SITE_DEFINITIONS` poistettu). Uusi matka: `placeShoreSites` (`placement.ts`, `SHORE_PLACEMENT`:
   rantaruutu = vieressä avovettä, ei viistoon; mökki niitty/metsä, kalmisto niitty/metsä/umpimetsä/kallio;
   kalmisto ≥ 5 mökistä ja toisesta kalmistosta) ennen pihoja, jotka väistävät ne (`placementWith`).
-  Vanha tallennus: `completeSiteInstances` lisää mökin ja Louhen kalmiston `LEGACY_SHORE_POSITIONS`iin ja
-  arpoo `cairn-b`:n. 3D: `scene3d.ts` asettaa `cairnState.louhiHere` (`site` = `cairnfield` tai puuttuu).
-  Kartta: `cairn-b` piirretään `assets/map/cairn-site-empty.png`-merkillä.
+  Vanha tallennus: `completeSiteInstances` (mökki ja Louhen kalmisto `LEGACY_SHORE_POSITIONS`iin, `cairn-b`
+  arvotaan). `cairnState.louhiHere` `scene3d.ts`:ssä; `cairn-b`:n karttamerkki `cairn-site-empty.png`.
 - **Piha (v07.02–v07.04, `content.ts`, `world.ts`, `yardLife.ts`).** Neito `vuode`lla; `archer.healed` (`minHits`
   6), `archer.died-song`, `archer.died-left` (`npc.leftBehind`, `engine/leave.ts`). `housewifeDialogue(npc)`
   (`emanta` neidon talossa, `emanta_b` toisessa): huhu kerran kummalta tahansa (`rumor.heard`), sitten apaja
@@ -32,12 +41,10 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `614bcee`)
   (`meetingRules`: `<npc>.greeted` → lähtiessä `<npc>.met`); ruoka `householdFood`/`theftRule`
   (`<npc>.robbed`, `moonChance`, pöytäesineet roolilla `@archerYard.`/`@otherYard.`, `world/instances.ts`).
   Väen ja eläinten paikat arvotaan käynnittäin (`pickSpot`, `planYardAnimals`; `__world.yard`).
-- **Ryhmän hyökkäyskatto ja vihun reaktiot (v07.01 + v06.05, `engine/ai.ts`, säännöt `combat.ts`).** Ei vuoroja:
-  isku alkaa, jos muita windup/release-tilassa < `maxAttackers` 2; oma viive `attackStartDelay` 0,04–0,22 s,
-  `startSpacing` 0,15 s; katon takia odottava `waitBack` + `waitHold`. `hitStaggers`: horjuva ei horjahda
-  uudelleen; sankarilla `staggerImmunity` 0,4 s. `graceCovers`: torjunnan sektori ∩ ±40° torjutusta suunnasta.
-  Uhattu (`threatenedBy`) torjuu viiveellä `blockReactionDelay`; `rollsAdvance` 45 % etenee noston aikana.
-  Mitattu (3 vihua, 90 s): max 2 yhtä aikaa, aloitusväli ≥ 0,17 s. Hiljaiset jaksot = yhtäaikainen uupumus.
+- **Ryhmän hyökkäyskatto ja vihun reaktiot (v07.01 + v06.05, `engine/ai.ts`, `combat.ts`).** Isku alkaa, jos
+  muita windup/release-tilassa < `maxAttackers` 2 (`attackStartDelay`, `startSpacing`, `waitBack`/`waitHold`);
+  `hitStaggers`, `staggerImmunity` 0,4 s, `graceCovers` ±40°, `threatenedBy` + `blockReactionDelay`,
+  `rollsAdvance` 45 %. Mitattu 3 vihua: max 2 yhtä aikaa; hiljaiset jaksot = yhtäaikainen uupumus.
 - **Metsästysapajat (v06.06, `map/huntGrounds.ts` puhdas).** Apaja = `SiteInstance` `kind: "hunt"` → `wilds`,
   kertakäyttöinen (`enterSite` → `removeHuntGround`). `huntCycle` (20 päivän jakso; −1 = vanha tallennus →
   `ensureHuntGrounds` 3–6 alkuapajaa); `advanceHuntGrounds` lisää jaksoittain, enintään 6 (vanhin pois myös
@@ -208,14 +215,9 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `614bcee`)
 - Karttavauhti, kylläisyys 3,6 pistettä/päivä ja uudet niityt kaipaavat pidempää pelitestiä.
   Pihaniitty voi liittyä valmiiseen aukeaan, jolloin aukea kokonaisuutena on yli yhdeksän ruutua.
   Tallennetut pihat jäävät paikoilleen myös tulevissa maastomuutoksissa.
-- Liikkuvien ja väliaikaisten kohtaamisten luokitus sekä piirron piilotussääntö
-  ovat valmiina, mutta niiden instanssilistaa, liikeratoja tai poistumistiloja
-  ei ole vielä toteutettu.
-- Jokigrafiikka tukee suoria, kaarteita, päitä ja yhtä siltaa, mutta ei
-  vielä haaroja, siltoja, koskia, venettä tai vesianimaatiota.
-- Vanha v3-tallennus voi ensimmäisellä latauksella asettaa sankarin ruutuun,
-  joka on tässä karttaversiossa muuttunut joeksi. Sankari pääsee poistumaan
-  viereiseen maahan, mutta lataus ei vielä siirrä häntä automaattisesti.
+- Liikkuvien ja väliaikaisten kohtaamisten luokitus on valmis; instanssilista, liikeradat ja poistumistilat puuttuvat.
+- Jokigrafiikassa ei vielä haaroja, useita siltoja, koskia, venettä eikä vesianimaatiota.
+- Vanha v3-tallennus voi asettaa sankarin jokiruutuun; hän pääsee viereiseen maahan, lataus ei siirrä.
 - Keskushahmon paperinukkekuva ei kerrostu vaatekappale kerrallaan; toimiva varustetila näkyy
   sitä ympäröivissä ikonislotteissa. Hansikkailla ei vielä ole erillistä 3D-mesh-versiota eikä
   kengillä tai hansikkailla pelivaikutusta. Rauhassa kypärä on edelleen tarkoituksella pois päästä.
@@ -273,17 +275,12 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `614bcee`)
 
 ## Seuraava tehtävä
 
-Tietäjä- ja uhritehtävän pala 2/3: pitkäkestoisten efektien tilamalli ja kolme paikkaa paperinuken alle
-(referenssikuva), sekä kuppikiven "Ukon muistan…" -valinta: +20 staminan yläraja 15 pelipäiväksi,
-kerran kuunkierrossa yhteensä molemmilla kalmistoilla; käytön jälkeen vain tyhjä "Muistat muinaisia ja
-Ukon väkeä". Buffi summautuu nälän staminarangaistukseen.
+Tietäjä- ja uhritehtävän pala 3/3: tietäjä vaatii uhrin ennen laulunopetusta ja paljastaa `cairn-b`:n;
+kuppikiven solmuun `stone` valinta "Ota uhrit Ukolle ja Manaan menneille" vain kahdella lihalla (esineille
+lihatyyppi, ei vain jänis), uhri ei anna buffia; tietäjän kyselyrepliikit ja pelaajan kaksi vastausta;
+tuohikontin repliikki "ovensuussa"; tietäjän (laituri, ovensuu, pata) ja koiran arvotut paikat.
 
 ## Ei vielä aloiteta
-
-- Pala 3/3 (vasta palan 2 jälkeen): tietäjä vaatii uhrin ennen laulunopetusta ja paljastaa `cairn-b`:n;
-  kuppikivellä "Ota uhrit Ukolle ja Manaan menneille" vain kahdella lihalla (lihalle tyyppi, ei vain
-  jänis); uhri ei anna buffia; tietäjän kyselyrepliikit ja vastaukset; tuohikontin repliikki "ovensuussa";
-  tietäjän (laituri, ovensuu, pata) ja koiran arvotut paikat.
 
 - Louhen taistelu (varaukset yllä; karkotus laululla kuuluu V5:een); esine- ja puhemekaniikka kalmistolla
   on Codexin suunnittelema.
@@ -336,6 +333,8 @@ Ukon väkeä". Buffi summautuu nälän staminarangaistukseen.
   viereisestä ruudusta, myös tutkitulla alueella, tai kun toisen talon emäntä neuvoo yhden (kerran
   kuunkierrossa, 2026-11-22); eivät toisen 3D-paikan viereen. Jäniksiä 7–9, joista 1–3 suolla ja 1–3
   paloaukealla (2026-11-21).
+- Ukon siunaus (2026-11-22): +20 kestävyyden yläraja 15 päivää, kerran kuussa yhteensä molemmilla
+  kalmistoilla; uhri (pala 3) vain avaa laulunopetuksen eikä anna buffia.
 - Tietäjän mökki ja kaksi kalmistoa arvotaan uudella matkalla rannoille (2026-11-22). Kalmistot vain
   rannoille, kunnes kalmiston 3D-kohtauksesta on suo- ja vaaraversiot (järvi näkyy kohtauksessa).
 - Jousineito (2026-11-22): parannus vaatii 6/8 osumaa, kolme yritystä; kuolee myös, jos ensimmäiseltä

@@ -350,6 +350,15 @@ body.mode-scene > #mapRoot { display: none !important; }
 .inventory-grid-slot b { position: absolute; right: 3px; bottom: 1px; min-width: 18px; color: #fff1cd; background: #8f2f18; border-radius: 9px; font-size: 12px; }
 .inventory-grid-slot:disabled { cursor: default; opacity: 0.45; }
 .inventory-overflow-slot { border-style: dashed !important; border-color: #9c351c !important; }
+.inventory-effects { display: grid; grid-template-columns: repeat(3, 58px); justify-content: center; gap: 8px; }
+.inventory-effect-slot { position: relative; display: grid; justify-items: center; align-content: start; gap: 2px; width: 58px; min-height: 74px; }
+.inventory-effect-slot > .inventory-empty-mark { width: 50px; height: 50px; background: #e7d9b8; border: 2px dashed #b48a62; box-sizing: border-box; }
+.inventory-effect-icon { display: block; width: 50px; height: 50px; box-sizing: border-box; background: center / 46px 46px no-repeat; image-rendering: pixelated;
+  border: 2px solid var(--inventory-border); }
+.inventory-effect-slot.effect-blessing .inventory-effect-icon { box-shadow: 0 0 0 1px #d8a93c; }
+.inventory-effect-slot.effect-curse .inventory-effect-icon { box-shadow: 0 0 0 1px #4b2a52; }
+.inventory-effect-days { position: absolute; right: 0; top: 34px; min-width: 18px; color: #fff1cd; background: #8f2f18; border-radius: 9px; font-size: 12px; text-align: center; }
+.inventory-effect-name { font-size: 10px; line-height: 1.1; text-align: center; }
 .inventory-note { min-height: 2.5em; margin: 8px 0 0; color: #6d4b35; text-align: center; font-size: 11px; line-height: 1.25; }
 .map-danger { width: 100%; margin: 5px 0 20px; }
 .map-settings-error { min-height: 1.3em; margin: 6px 0; color: #8f2f18; font-weight: bold; text-align: center; }

@@ -5,7 +5,7 @@ import { VERSION } from "./version";
 import { $ } from "./engine/dom";
 import { initView } from "./engine/view";
 import { initEffects } from "./engine/effects";
-import { PLAYER_LOOK, spawnHero } from "./engine/hero";
+import { PLAYER_LOOK, refreshLongEffects, spawnHero } from "./engine/hero";
 import { initInput } from "./engine/input";
 import { frame, initLoop } from "./engine/loop";
 import { initPauseMenu, loadSavedTuning } from "./ui/pauseMenu";
@@ -25,7 +25,7 @@ import {
 } from "./map/transition";
 import { configureSceneItems, setPickableSource } from "./engine/sceneItems";
 import { huntPickables, initHunt } from "./engine/hunt";
-import { initCampaignStore, worldRuntime } from "./engine/store";
+import { campaignStore, initCampaignStore, worldRuntime } from "./engine/store";
 import { initWorldConsole } from "./engine/worldConsole";
 import { initDialogue } from "./engine/dialogue";
 
@@ -64,6 +64,8 @@ export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   configureSceneItems();
   initEffects();
   spawnHero();
+  // Kesken käynnin saatu siunaus (kuppikivi) tulee voimaan heti; muuntimen vaihto on idempotentti.
+  campaignStore().subscribe(() => refreshLongEffects());
   initHunt();
   setPickableSource(huntPickables);
   g.encounter = !ARENA_PEACEFUL ? skirmish : ARENA === "lakeside" ? lakesideVisit : ARENA === "lakeruin" ? lakeruinVisit : ARENA === "cairnfield" ? cairnfieldVisit : ARENA === "wilds" ? wildsVisit : visit;

@@ -60,6 +60,7 @@ function render() {
 function failureText(reason: string): TextKey {
   if (reason === "inventory-full") return "dialogue.inventoryFull";
   if (reason === "missing-item") return "dialogue.missingItem";
+  if (reason === "effects-full") return "dialogue.effectsFull";
   return "dialogue.saveFailed";
 }
 
