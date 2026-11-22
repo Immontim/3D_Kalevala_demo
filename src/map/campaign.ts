@@ -3,6 +3,7 @@
 import type { Loadout } from "../combat";
 import type { TextKey } from "../i18n";
 import { createEngineState, parseEngineState, type EngineState } from "../world/state";
+import { parseLongEffects, type ActiveLongEffect } from "./longEffects";
 
 export const CAMPAIGN_SCHEMA_VERSION = 7 as const;
 export const BASE_INVENTORY_CAPACITY = 6;
@@ -216,6 +217,8 @@ export interface CampaignPlayer {
   satiety: number;
   inventory: Inventory;
   equipment: Equipment;
+  /** Pitkäkestoiset efektit (siunaukset, kiroukset), `longEffects.ts`. Luetaan sallivasti; puuttuva = tyhjä. */
+  effects: ActiveLongEffect[];
 }
 
 export interface CampaignState {
@@ -285,6 +288,7 @@ export function createCampaign(start: CampaignStart = {}): CampaignState {
         mainHand: "sword",
         offHand: "round_shield",
       },
+      effects: [],
     },
     engine: createEngineState(),
   };
@@ -861,6 +865,7 @@ function migrateVersion6Player(player: Version6CampaignPlayer): CampaignPlayer {
     satiety: player.satiety,
     inventory: migrateStoredInventory(player.inventory.stacks),
     equipment: { ...player.equipment },
+    effects: [],
   };
 }
 
@@ -889,6 +894,7 @@ function migrateLegacyPlayer(player: LegacyCampaignPlayer): CampaignPlayer {
       mainHand: player.equipment.mainHand,
       offHand: player.equipment.offHand,
     },
+    effects: [],
   };
 }
 
@@ -943,6 +949,7 @@ function cloneCampaign(state: ParsedCampaign): CampaignState {
       satiety: state.player.satiety,
       inventory: { backpack: state.player.inventory.backpack, stacks: state.player.inventory.stacks.map((stack) => ({ ...stack })) },
       equipment: { ...state.player.equipment },
+      effects: parseLongEffects((state.player as { effects?: unknown }).effects),
     },
     // Moottoriosio luetaan aina sallivasti: tuntematon lippu pudotetaan, tallennus säilyy.
     engine: parseEngineState(state.engine),

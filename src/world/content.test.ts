@@ -656,3 +656,45 @@ describe("emäntien pöytäruoka: varkaus, sovitus ja pyytäminen (2026-11-22)",
     expect(ids(runtime.startDialogue("yard", "emanta")!).some((id) => id.startsWith("ask-food"))).toBe(false);
   });
 });
+
+describe("kuppikivi: Ukon muistaminen kerran kuussa molemmilla kalmistoilla (2026-11-22)", () => {
+  const talk = (runtime: ReturnType<typeof setup>["runtime"]) => runtime.startDialogue("cairnfield", "kuppikivi")!;
+
+  it("muistaminen antaa Ukon siunauksen ja kirjaa kuun; saman kuun aikana kivi vaikenee", () => {
+    const { store, runtime } = setup();
+    const first = talk(runtime);
+    expect(first.view.nodeId).toBe("stone");
+    expect(first.view.choices.map((c) => c.id)).toEqual(["remember-ukko", "leave"]);
+    const out = runtime.choose(first, "remember-ukko");
+    if (!out.saved) throw new Error("valinta epäonnistui");
+    expect(out.next?.view.nodeId).toBe("blessed");
+    expect(out.messages[0].text).toBe("world.ukko.blessed");
+    expect(store.get().player.effects.map((e) => e.id)).toEqual(["ukko_blessing"]);
+    expect(store.get().engine.counters["ukko.rememberedMoon"]).toBe(1);
+
+    // Sama kuu (myös toisella kalmistolla, sama kohtaus ja kivi): vain tyhjä muistelu.
+    const again = talk(runtime);
+    expect(again.view.nodeId).toBe("silent");
+    expect(again.view.choices.map((c) => c.id)).toEqual(["recall", "leave"]);
+    const before = store.get();
+    const recall = runtime.choose(again, "recall");
+    expect(recall.saved && recall.next).toBeNull();
+    expect(store.get().player.effects).toEqual(before.player.effects);
+
+    // Uusi kuu: muistaminen on taas tarjolla.
+    store.update((s) => ({ ...s, world: { ...s.world, worldMinutes: s.world.worldMinutes + WORLD_MINUTES_PER_MOON } }));
+    expect(talk(runtime).view.nodeId).toBe("stone");
+  });
+
+  it("muistaminen ei vaadi lihaa eikä ota esineitä", () => {
+    const { store, runtime } = setup();
+    const before = store.get().player.inventory;
+    runtime.choose(talk(runtime), "remember-ukko");
+    expect(store.get().player.inventory).toEqual(before);
+  });
+
+  it("yhteenveto kertoo siunauksen suomeksi", () => {
+    const { runtime } = setup();
+    expect(runtime.describe(finnishText)).toContain("Ukon siunaus");
+  });
+});

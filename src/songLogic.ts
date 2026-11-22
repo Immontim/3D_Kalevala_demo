@@ -183,7 +183,8 @@ export const SONGS: Record<SongId, SongDef> = {
   bog: { id: "bog", name: t("song.bog.name"), rune: "ᛚ", verses: SONG_VERSES, needsEnemy: true },
   heal: { id: "heal", name: t("song.heal.name"), rune: "ᛒ", verses: HEAL_VERSES, needsEnemy: false, peaceTargets: ["jousineito"] },
   // Tietäjä opettaa; vaikutus (Louhen karkotus) tulee V5:ssä, joten laulu ei vaadi vastustajaa.
-  sleep: { id: "sleep", name: t("song.sleep.name"), rune: "ᛋ", verses: SLEEP_VERSES, needsEnemy: false, peaceful: true },
+  // Kuulijaksi valitaan Louhi, jos hän on kuuluvilla: kalmiston kuppikivi on myös puhuteltava, eikä se saa viedä karkotusta.
+  sleep: { id: "sleep", name: t("song.sleep.name"), rune: "ᛋ", verses: SLEEP_VERSES, needsEnemy: false, peaceful: true, peaceTargets: ["louhi"] },
 };
 
 /** Laulu, joka avautuu laulupaikkaan vasta, kun moottorin lippu on asetettu (opeteltu). */

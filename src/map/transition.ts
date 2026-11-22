@@ -3,6 +3,8 @@
 import type { SceneId, SceneKind } from "../app/route";
 import { MAP_DIRS, type MapDir } from "../sceneLayout";
 import { effectiveStats, withModifier, type Modifier, type Stats } from "../stats";
+import { LONG_EFFECT_MOD_PREFIX, longEffectModifiers } from "./longEffects";
+import type { CampaignState } from "./campaign";
 
 export interface SceneTransitionBalance {
   hungryBelow: number;
@@ -166,6 +168,19 @@ export function applyMapToSceneTransition(
       add: -transition.maxStaminaPenalty,
     });
   }
+  actor.stats = effectiveStats(actor.base, actor.mods, now);
+  actor.hp = Math.min(actor.hp, actor.stats.maxHp);
+  actor.stamina = Math.min(actor.stamina, actor.stats.maxStamina);
+}
+
+/**
+ * Pitkäkestoisten efektien (esim. Ukon siunaus) muuntimet sankariin kampanjan tilasta. Korvaa aiemmat
+ * efektimuuntimet, joten kutsu on idempotentti ja sopii sekä spawniin että kesken käynnin saatuun
+ * siunaukseen. Summautuu nälän rangaistukseen, koska tunnisteet ovat eri.
+ */
+export function applyLongEffects(actor: TransitionActor, state: Pick<CampaignState, "player" | "world">, now = 0): void {
+  actor.mods = actor.mods.filter((mod) => !mod.id.startsWith(LONG_EFFECT_MOD_PREFIX));
+  for (const mod of longEffectModifiers(state)) actor.mods = withModifier(actor.mods, mod);
   actor.stats = effectiveStats(actor.base, actor.mods, now);
   actor.hp = Math.min(actor.hp, actor.stats.maxHp);
   actor.stamina = Math.min(actor.stamina, actor.stats.maxStamina);

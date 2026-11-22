@@ -1823,8 +1823,12 @@ export function birdSongLevel(x: number, z: number): number {
   return birdLevelAtDistance(Math.hypot(x - CUPSTONE.x, z - CUPSTONE.z));
 }
 
-/** Kalmiston väki: Louhi seisoo karsikkomännyn vieressä ja katsoo kuppikiveä kohti, rauhassa ja liikkumatta. */
+/**
+ * Kalmiston väki: Louhi seisoo karsikkomännyn vieressä ja katsoo kuppikiveä kohti, rauhassa ja liikkumatta.
+ * Kuppikivelle voi puhua kummallakin kalmistolla (Ukon muistaminen, `CUPSTONE_DIALOGUE`).
+ */
 function populateCairnLife(scene: THREE.Scene, collision: CollisionWorld) {
+  addTalkable({ id: "kuppikivi", x: CUPSTONE.x, z: CUPSTONE.z, name: t("folk.kuppikivi") });
   if (cairnState.louhiBanished || !cairnState.louhiHere) return Promise.resolve();   // karkotettu tai toinen kalmisto
   const { x, z } = LOUHI_AT;
   const yaw = Math.atan2(CUPSTONE.x - x, CUPSTONE.z - z);
