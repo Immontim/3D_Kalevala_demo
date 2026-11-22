@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MAP_HEIGHT, MAP_WIDTH, createWorldMap, type MapCell } from "./domain";
 import {
   LEGACY_YARD_POSITION,
-  MAP_SITE_DEFINITIONS,
+  mapSiteDefinition,
   discoverVisibleSites,
   legacyKnownSiteIds,
   mapSiteDisplay,
@@ -27,31 +27,34 @@ describe("2D-kohtaamisrekisteri", () => {
     { id: "yard", kind: "yard", x: 6, y: 7, archer: false },
     { id: "yard-b", kind: "yard", x: 12, y: 8, archer: true },
   ];
+  const shore: SiteInstance[] = [
+    { id: "lakeside", kind: "lakeside", x: 9, y: 9, archer: false },
+    { id: "cairnfield", kind: "cairn", x: 11, y: 11, archer: false },
+    { id: "cairn-b", kind: "cairn", x: 2, y: 2, archer: false },
+  ];
 
-  it("luokittelee kiinteät paikat ja pihainstanssit kiinteiksi ja pysyviksi", () => {
-    expect(Object.keys(MAP_SITE_DEFINITIONS).sort()).toEqual(["cairnfield", "lakeside"]);
-    for (const site of Object.values(MAP_SITE_DEFINITIONS)) {
-      expect(site).toMatchObject({ movement: "fixed", lifetime: "persistent" });
+  it("luokittelee mökin, kalmistot ja pihainstanssit kiinteiksi ja pysyviksi", () => {
+    for (const id of ["lakeside", "cairnfield", "cairn-b"]) {
+      expect(mapSiteDefinition(id, shore)).toMatchObject({ movement: "fixed", lifetime: "persistent" });
     }
+    expect(sceneForMapSite("lakeside")).toBeNull();       // mökki on v08:sta lähtien instanssi
+    expect(sceneForMapSite("lakeside", shore)).toBe("lakeside");
+    expect(sceneForMapSite("cairnfield", shore)).toBe("cairnfield");
+    expect(sceneForMapSite("cairn-b", shore)).toBe("cairnfield");   // sama kohtaus, ilman Louhta
     expect(sceneForMapSite("yard")).toBeNull();           // piha on instanssi: ilman instanssilistaa tuntematon
     expect(sceneForMapSite("yard", instances)).toBe("yard");
     expect(sceneForMapSite("yard-b", instances)).toBe("yard");
     expect(sceneForMapSite("yard-c", instances)).toBeNull();
-    expect(sceneForMapSite("lakeside")).toBe("lakeside");
     const camp: SiteInstance = { id: "camp", kind: "camp", x: 3, y: 4, archer: false };
     expect(sceneForMapSite("camp", [camp])).toBeNull();                   // leiri on lukossa, kunnes Louhi on karkotettu
     expect(sceneForMapSite("camp", [camp], { "louhi.banished": true })).toBe("clearing");
-    expect(sceneForMapSite("cairnfield")).toBe("cairnfield");
-    expect(sceneForMapSite("unknown")).toBeNull();
+    expect(sceneForMapSite("unknown", shore)).toBeNull();
   });
 
   it("löytää oman ruudun ja kahdeksan naapuria mutta ei kauempaa", () => {
-    const map = siteMap([
-      { x: 9, y: 9, siteId: "lakeside" },
-      { x: 11, y: 11, siteId: "cairnfield" },
-      { x: 12, y: 10, siteId: "lakeside" },
-    ]);
-    expect(discoverVisibleSites(map, ["lakeside"], { x: 10, y: 10 }).sort()).toEqual(["cairnfield", "lakeside"]);
+    const map = siteMap([]);
+    const far: SiteInstance = { id: "yard", kind: "yard", x: 12, y: 10, archer: false };
+    expect(discoverVisibleSites(map, ["lakeside"], { x: 10, y: 10 }, [...shore, far]).sort()).toEqual(["cairnfield", "lakeside"]);
   });
 
   it("vainolaisten leiri on piilossa ja sisäänpääsemätön ennen Louhen karkotusta, sen jälkeen tavallinen paikka", () => {
@@ -66,7 +69,7 @@ describe("2D-kohtaamisrekisteri", () => {
     expect(mapSiteDisplay("camp", visible, camp, flags)).toBe("normal");
     expect(mapSiteDisplay("camp", { ...visible, cellVisibility: "remembered" }, camp, flags)).toBe("dimmed");
     expect(sceneForMapSite("camp", camp, flags)).toBe("clearing");
-    expect(siteUnlocked(MAP_SITE_DEFINITIONS.lakeside, {})).toBe(true);        // muut paikat eivät ole lukossa
+    expect(siteUnlocked(mapSiteDefinition("lakeside", shore), {})).toBe(true);   // muut paikat eivät ole lukossa
     expect(siteIdAt(map, camp, 10, 10)).toBe("camp");
   });
 
@@ -80,10 +83,10 @@ describe("2D-kohtaamisrekisteri", () => {
   });
 
   it("näyttää lähinäön normaalina ja vain tunnetun kiinteän paikan sumussa", () => {
-    expect(mapSiteDisplay("lakeside", { active: true, known: false, cellVisibility: "visible" })).toBe("normal");
-    expect(mapSiteDisplay("lakeside", { active: true, known: true, cellVisibility: "remembered" })).toBe("dimmed");
-    expect(mapSiteDisplay("lakeside", { active: true, known: false, cellVisibility: "remembered" })).toBe("hidden");
-    expect(mapSiteDisplay("lakeside", { active: false, known: true, cellVisibility: "visible" })).toBe("hidden");
+    expect(mapSiteDisplay("lakeside", { active: true, known: false, cellVisibility: "visible" }, shore)).toBe("normal");
+    expect(mapSiteDisplay("lakeside", { active: true, known: true, cellVisibility: "remembered" }, shore)).toBe("dimmed");
+    expect(mapSiteDisplay("lakeside", { active: true, known: false, cellVisibility: "remembered" }, shore)).toBe("hidden");
+    expect(mapSiteDisplay("lakeside", { active: false, known: true, cellVisibility: "visible" }, shore)).toBe("hidden");
     expect(siteDisplayForDefinition(
       { movement: "mobile" },
       { active: true, known: true, cellVisibility: "remembered" },

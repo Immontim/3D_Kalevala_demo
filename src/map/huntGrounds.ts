@@ -7,7 +7,6 @@ import type { CampaignState, SiteInstance } from "./campaign";
 import { mapCell, mapIndex, type MapPosition, type TerrainId, type WorldMapDefinition } from "./domain";
 import { chebyshev, rngStream, travelMinutes } from "./placement";
 import { PROTOTYPE_MAP, PROTOTYPE_START } from "./prototype";
-import { MAP_SITE_DEFINITIONS } from "./sites";
 import { WORLD_MINUTES_PER_DAY } from "./uiState";
 
 /** Omistajan päätökset 2026-11-21. */
@@ -64,12 +63,9 @@ export function huntCandidates(context: HuntPlacementContext): MapPosition[] {
   return out;
 }
 
-/** Kaikkien 3D-paikkojen sijainnit tilasta: kiinteät määritelmät ja kaikki instanssit. */
+/** Kaikkien 3D-paikkojen sijainnit tilasta (kaikki paikat ovat instansseja, myös mökki ja kalmistot). */
 function sitePositions(state: CampaignState): MapPosition[] {
-  return [
-    ...Object.values(MAP_SITE_DEFINITIONS).map((site) => site.position),
-    ...state.world.siteInstances.map((instance) => ({ x: instance.x, y: instance.y })),
-  ];
+  return state.world.siteInstances.map((instance) => ({ x: instance.x, y: instance.y }));
 }
 
 function contextFor(state: CampaignState, map: WorldMapDefinition, hero: MapPosition): HuntPlacementContext {

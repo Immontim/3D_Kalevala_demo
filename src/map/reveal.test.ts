@@ -6,7 +6,7 @@ import { revealSiteOnMap } from "./reveal";
 const CAMP = { id: "camp", kind: "camp", x: 3, y: 4, archer: false } as const;
 
 function campaign() {
-  return createCampaign({ mapId: PROTOTYPE_MAP_ID, x: 10, y: 14, siteInstances: [CAMP] });
+  return createCampaign({ mapId: PROTOTYPE_MAP_ID, x: 10, y: 14, siteInstances: [CAMP, { id: "lakeside", kind: "lakeside", x: 9, y: 6, archer: false }] });
 }
 
 describe("kartan paikan paljastus (moottorin revealSite)", () => {

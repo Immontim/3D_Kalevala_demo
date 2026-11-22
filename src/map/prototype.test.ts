@@ -88,18 +88,17 @@ describe("prototyyppikartta", () => {
     expect(mapCellTravel(mapCell(PROTOTYPE_MAP, YARD_POSITION.x, YARD_POSITION.y)!).passable).toBe(true);
   });
 
-  it("sijoittaa tietäjän rantamökin kuljettavalle ruudulle järven viereen", () => {
+  it("vanhan tallennuksen tietäjän mökin paikka on rantaruutu, eikä kartassa ole enää kiinteää paikkaa", () => {
     const cell = mapCell(PROTOTYPE_MAP, LAKESIDE_POSITION.x, LAKESIDE_POSITION.y);
-    expect(cell?.siteId).toBe("lakeside");
+    expect(PROTOTYPE_MAP.cells.some((c) => c.siteId)).toBe(false);
     expect(cell?.terrainId).not.toBe("water");
     const neighbours = [[1, 0], [-1, 0], [0, 1], [0, -1]]
       .map(([dx, dy]) => mapCell(PROTOTYPE_MAP, LAKESIDE_POSITION.x + dx, LAKESIDE_POSITION.y + dy)?.terrainId);
     expect(neighbours).toContain("water");
   });
 
-  it("sijoittaa kalmiston vaaran kalliolle järven viereen", () => {
+  it("vanhan tallennuksen kalmiston paikka on vaaran kallio järven vieressä", () => {
     const cell = mapCell(PROTOTYPE_MAP, CAIRNFIELD_POSITION.x, CAIRNFIELD_POSITION.y);
-    expect(cell?.siteId).toBe("cairnfield");
     expect(cell?.terrainId).toBe("rock");
     const neighbours = [[1, 0], [-1, 0], [0, 1], [0, -1]]
       .map(([dx, dy]) => mapCell(PROTOTYPE_MAP, CAIRNFIELD_POSITION.x + dx, CAIRNFIELD_POSITION.y + dy)?.terrainId);

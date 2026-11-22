@@ -2,6 +2,7 @@ import atlasUrl from "../../assets/map/kalevala-map-atlas-v2.png?url";
 import lakeShoreEdgeUrl from "../../assets/map/lake-shore-edge.png?url";
 import femaleMapHeroUrl from "../../assets/map/map-hero-female.png?url";
 import cairnSiteUrl from "../../assets/map/cairn-site.png?url";
+import cairnSiteEmptyUrl from "../../assets/map/cairn-site-empty.png?url";
 import huntSiteUrl from "../../assets/map/hunt-site.png?url";
 import redHandUrl from "../../assets/map/red-hand-site.png?url";
 import femaleSatietyFacesUrl from "../../assets/map/satiety-faces.png?url";
@@ -14,7 +15,7 @@ import { advanceHuntGrounds, isHuntInstance, removeHuntGround } from "./huntGrou
 import { createWorldMapState, mapCell, moveOnMap, type MapDirection } from "./domain";
 import { PROTOTYPE_MAP } from "./prototype";
 import { yardMeadowMap } from "./yardMeadows";
-import { discoverVisibleSites, mapSiteDefinition, mapSiteDisplay, sceneForMapSite, siteIdAt } from "./sites";
+import { LOUHI_CAIRN_ID, discoverVisibleSites, mapSiteDefinition, mapSiteDisplay, sceneForMapSite, siteIdAt } from "./sites";
 import { clearCampaign, loadCampaignReport, newCampaign, saveCampaign } from "./storage";
 import { riverTile, shoreEdgeTurns, terrainFrame, waterShoreMask, type AtlasFrame } from "./tiles";
 import { consumeSceneReturn } from "./transition";
@@ -392,6 +393,10 @@ redHand.addEventListener("load", renderMap);
 const cairnSite = new Image();
 cairnSite.src = cairnSiteUrl;
 cairnSite.addEventListener("load", renderMap);
+/** Kalmisto ilman Louhta: kuppikivi ja pieni kiviröykkiö. */
+const cairnSiteEmpty = new Image();
+cairnSiteEmpty.src = cairnSiteEmptyUrl;
+cairnSiteEmpty.addEventListener("load", renderMap);
 const huntSite = new Image();
 huntSite.src = huntSiteUrl;
 huntSite.addEventListener("load", renderMap);
@@ -468,9 +473,10 @@ function drawRedHand(ctx: CanvasRenderingContext2D, x: number, y: number) {
   ctx.restore();
 }
 
-function drawCairnSite(ctx: CanvasRenderingContext2D, x: number, y: number) {
-  if (cairnSite.complete && cairnSite.naturalWidth > 0) {
-    ctx.drawImage(cairnSite, x, y, TILE, TILE);
+function drawCairnSite(ctx: CanvasRenderingContext2D, x: number, y: number, louhi: boolean) {
+  const image = louhi ? cairnSite : cairnSiteEmpty;
+  if (image.complete && image.naturalWidth > 0) {
+    ctx.drawImage(image, x, y, TILE, TILE);
     return;
   }
   // Varakuva: tumma kupukivi ja punainen hahmo kalpealla pohjalla.
@@ -481,8 +487,10 @@ function drawCairnSite(ctx: CanvasRenderingContext2D, x: number, y: number) {
   ctx.beginPath();
   ctx.ellipse(x + 17, y + 34, 14, 9, 0, Math.PI, 0);
   ctx.fill();
-  ctx.fillStyle = "#a7331d";
-  ctx.fillRect(x + 32, y + 12, 4, 22);
+  if (louhi) {
+    ctx.fillStyle = "#a7331d";
+    ctx.fillRect(x + 32, y + 12, 4, 22);
+  }
   ctx.restore();
 }
 
@@ -555,7 +563,7 @@ function renderMap() {
         if (sceneId === "yard") sprite(ctx, [2, 1], vx * TILE, vy * TILE);
         if (sceneId === "lakeside") sprite(ctx, [3, 1], vx * TILE, vy * TILE);
         if (sceneId === "clearing") drawRedHand(ctx, vx * TILE, vy * TILE);
-        if (sceneId === "cairnfield") drawCairnSite(ctx, vx * TILE, vy * TILE);
+        if (sceneId === "cairnfield") drawCairnSite(ctx, vx * TILE, vy * TILE, siteId === LOUHI_CAIRN_ID);
         if (sceneId === "wilds") drawHuntSite(ctx, vx * TILE, vy * TILE);
       }
       if (visibility === "remembered") {

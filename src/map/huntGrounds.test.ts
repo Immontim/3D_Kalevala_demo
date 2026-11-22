@@ -6,18 +6,16 @@ import {
 } from "./huntGrounds";
 import { chebyshev } from "./placement";
 import { PROTOTYPE_MAP, PROTOTYPE_START } from "./prototype";
-import { discoverVisibleSites, mapSiteDefinition, mapSiteDisplay, MAP_SITE_DEFINITIONS } from "./sites";
+import { discoverVisibleSites, mapSiteDefinition, mapSiteDisplay } from "./sites";
 import { newCampaign } from "./storage";
 import { WORLD_MINUTES_PER_DAY, mapCellVisibility } from "./uiState";
 
 const hunts = (state: CampaignState) => state.world.siteInstances.filter(isHuntInstance);
 const days = (n: number) => n * WORLD_MINUTES_PER_DAY;
 
+/** Kaikki muut paikat, myös tietäjän mökki ja kalmistot (instansseja v08:sta lähtien). */
 function otherSites(state: CampaignState, exceptId: string) {
-  return [
-    ...Object.values(MAP_SITE_DEFINITIONS).map((s) => s.position),
-    ...state.world.siteInstances.filter((i) => i.id !== exceptId),
-  ];
+  return state.world.siteInstances.filter((i) => i.id !== exceptId);
 }
 
 describe("metsästysapajat uudella matkalla", () => {

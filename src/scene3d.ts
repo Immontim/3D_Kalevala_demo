@@ -1,4 +1,5 @@
 // Nykyisen Three.js-pelin käynnistys. Moduuli ladataan dynaamisesti vain 3D-reitillä.
+import { LOUHI_CAIRN_ID } from "./map/sites";
 import type { AppRoute } from "./app/route";
 import { VERSION } from "./version";
 import { $ } from "./engine/dom";
@@ -53,6 +54,8 @@ export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
     const instance = campaign.world.siteInstances.find((entry) => entry.id === (route.site ?? "yard"));
     setSiteInstance(instance ? { id: instance.id, archer: instance.archer } : { id: "yard", archer: true });
   }
+  // Louhi seisoo vain omalla kalmistollaan; suoraan avattu kalmisto (ei `site`-parametria) on hänen.
+  cairnState.louhiHere = (route.site ?? LOUHI_CAIRN_ID) === LOUHI_CAIRN_ID;
   cairnState.louhiBanished = campaign.engine.flags["louhi.banished"] === true;
   yardState.archerHealed = campaign.engine.flags["archer.healed"] === true;
   yardState.archerDead = campaign.engine.flags["archer.dead"] === true;

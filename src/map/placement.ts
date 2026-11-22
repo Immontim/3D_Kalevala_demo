@@ -19,7 +19,7 @@ export const YARD_PLACEMENT = {
   maxStartMinutes: 150,
   /** Kahden pihan väli (Chebyshev), jotta yksi lähinäkö ei paljasta molempia. */
   minMutualDistance: 5,
-  /** Etäisyys kiinteistä paikoista (lakeside, kalmisto, leiri). */
+  /** Etäisyys tietäjän mökistä ja kalmistoista. */
   minFixedDistance: 3,
 } as const;
 
@@ -108,7 +108,7 @@ function computeTravelMinutes(map: WorldMapDefinition, start: MapPosition): numb
 export interface PlacementContext {
   map: WorldMapDefinition;
   start: MapPosition;
-  /** Kiinteät paikat, joiden päälle tai lähelle ei sijoiteta. */
+  /** Jo sijoitetut paikat (tietäjän mökki, kalmistot), joiden päälle tai lähelle ei sijoiteta. */
   fixedSites: readonly MapPosition[];
 }
 
@@ -237,4 +237,86 @@ export function placeCampInstance(seed: number, context: PlacementContext, other
   if (candidates.length === 0) throw new Error(`Leirille ei löydy kelvollista ruutua siemenellä ${seed}`);
   const pick = candidates[Math.floor(rngStream(seed, "camp")() * candidates.length)];
   return { id: CAMP_INSTANCE_ID, kind: "camp", x: pick.x, y: pick.y, archer: false };
+}
+
+/**
+ * Tietäjän mökin ja kalmistojen sijoittelusäännöt (omistaja 2026-11-22): kaikki rannalla, eli
+ * ruudun vieressä (ei viistoon) on avovettä. Kalmistot vain rannoille toistaiseksi, koska kalmiston
+ * 3D-kohtauksessa näkyy järvi; suo ja vaara lisätään, kun kohtauksesta on niille versiot.
+ */
+export const SHORE_PLACEMENT = {
+  sageTerrains: ["meadow", "forest"] as readonly TerrainId[],
+  cairnTerrains: ["meadow", "forest", "deepForest", "rock"] as readonly TerrainId[],
+  /** Vähintään näin kaukana aloituksesta (Chebyshev). */
+  minStartDistance: 4,
+  /** Kampanjan pitää olla läpäistävissä: sama raja kuin leirillä. */
+  maxStartMinutes: 600,
+  /** Kalmisto ei ole tietäjän mökin lähellä. */
+  minSageCairnDistance: 5,
+  /** Kalmistot eivät ole toistensa lähellä. */
+  minCairnDistance: 5,
+  /** Etäisyys muista paikoista (pihat, leiri). */
+  minOtherDistance: 3,
+} as const;
+
+/** Onko ruutu maata, jonka vieressä (pohjoinen, etelä, itä tai länsi) on avovettä? */
+export function isShoreCell(map: WorldMapDefinition, x: number, y: number): boolean {
+  const cell = mapCell(map, x, y);
+  if (!cell || cell.terrainId === "water" || cell.terrainId === "river") return false;
+  return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => mapCell(map, x + dx, y + dy)?.terrainId === "water");
+}
+
+/** Rantapaikan rikkomukset suomeksi (tyhjä = kelpaa). `others` = jo sijoitetut paikat. */
+export function validateShorePlacement(site: SiteInstance, context: PlacementContext, others: readonly SiteInstance[]): string[] {
+  const rules = SHORE_PLACEMENT;
+  const problems: string[] = [];
+  const label = `${site.kind === "lakeside" ? "tietäjän mökki" : "kalmisto"} ${site.id} (${site.x},${site.y})`;
+  const cell = mapCell(context.map, site.x, site.y);
+  if (!cell) return [`${label}: ruutu on kartan ulkopuolella`];
+  const terrains = site.kind === "lakeside" ? rules.sageTerrains : rules.cairnTerrains;
+  if (!(terrains as readonly string[]).includes(cell.terrainId) || cell.crossingId) problems.push(`${label}: maasto ${cell.terrainId} ei kelpaa`);
+  if (!isShoreCell(context.map, site.x, site.y)) problems.push(`${label}: ei ole rannalla`);
+  if (cell.siteId) problems.push(`${label}: ruudussa on jo paikka ${cell.siteId}`);
+  if (chebyshev(site, context.start) < rules.minStartDistance) problems.push(`${label}: liian lähellä aloitusta`);
+  const cost = travelMinutes(context.map, context.start)[mapIndex(context.map, site.x, site.y)];
+  if (!Number.isFinite(cost)) problems.push(`${label}: ei saavuteta aloituksesta`);
+  else if (cost > rules.maxStartMinutes) problems.push(`${label}: matka ${cost} min ylittää rajan ${rules.maxStartMinutes}`);
+  for (const fixed of context.fixedSites) {
+    if (chebyshev(site, fixed) < rules.minOtherDistance) problems.push(`${label}: liian lähellä paikkaa (${fixed.x},${fixed.y})`);
+  }
+  for (const other of others) {
+    if (other.id === site.id) continue;
+    const sageAndCairn = (other.kind === "lakeside" && site.kind === "cairn") || (other.kind === "cairn" && site.kind === "lakeside");
+    const min = sageAndCairn ? rules.minSageCairnDistance
+      : other.kind === "cairn" && site.kind === "cairn" ? rules.minCairnDistance : rules.minOtherDistance;
+    if (chebyshev(site, other) < min) problems.push(`${label}: liian lähellä paikkaa ${other.id}`);
+  }
+  return problems;
+}
+
+/**
+ * Arpoo rantapaikat (`ids`: tietäjän mökki "lakeside", kalmistot) järjestyksessä, kukin omasta
+ * satunnaisvirrastaan, joten yhden säännön muutos ei siirrä muita. `existing` väistetään.
+ */
+export function placeShoreSites(
+  seed: number,
+  context: PlacementContext,
+  ids: readonly string[],
+  existing: readonly SiteInstance[] = [],
+): SiteInstance[] {
+  const placed: SiteInstance[] = [];
+  for (const id of ids) {
+    const kind = id === "lakeside" ? "lakeside" as const : "cairn" as const;
+    const candidates: MapPosition[] = [];
+    for (let y = 0; y < context.map.height; y++) {
+      for (let x = 0; x < context.map.width; x++) {
+        const candidate: SiteInstance = { id, kind, x, y, archer: false };
+        if (validateShorePlacement(candidate, context, [...existing, ...placed]).length === 0) candidates.push({ x, y });
+      }
+    }
+    if (candidates.length === 0) throw new Error(`Paikalle ${id} ei löydy rantaruutua siemenellä ${seed}`);
+    const pick = candidates[Math.floor(rngStream(seed, `shore:${id}`)() * candidates.length)];
+    placed.push({ id, kind, x: pick.x, y: pick.y, archer: false });
+  }
+  return placed;
 }

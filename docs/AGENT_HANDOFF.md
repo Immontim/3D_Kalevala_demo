@@ -8,27 +8,30 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `614bcee`)
 
-- **Koodiversio v07.04.00** branchissa `claude/yard-greetings` (tarkista merge-tila `git merge-base`illa).
-  Koodi valmis, ei deployattu, omistaja ei ole testannut. Claude savutesti in-app-selaimessa (paneeli
-  piilossa, ruudut `renderBench`illä, kuvakaappaukset): emännän paikat pöytä/nuotio/kanakoppi/sikolätti
-  nähty kuvissa, kaikki ehdokaspaikat vapaita (`depenetrateDisc` ≤ 0,1 m väen ympyrät pois); `yard-b`:n
-  emäntä kertoi huhun ja tervehti lähdön jälkeen "taas tapaamme"; aloitusnappi "Astu rannalle" /
-  "Astu kalmistolle". Tarkistukset: `bun run test` 2114/2114, `bunx tsc --noEmit`, `bun run lint`,
-  `bun run build`. v07.03–v06.08 ovat mainissa; niiden omistajatestit ovat yhä tekemättä.
-- **Piha: jousineito, emännät ja eläimet (v07.02–v07.04).** Neito makaa `vuode`lla (`world.ts` `BED`);
-  säännöt `content.ts`: `archer.healed` (`minHits` 6), `archer.heal-failed-*` → `archer.died-song` ja
-  `archer.died-left` (`npc.leftBehind`, `engine/leave.ts`: polunsuu ja valikon paluu). Emännät tekee
-  `housewifeDialogue(npc)` (`emanta` jousineidon talossa, `emanta_b` toisessa, `yardHousewifeId()`):
-  kumpi tahansa kertoo huhun (`rumor.heard`, yksi yhteinen), sen jälkeen apajan kerran kuussa
-  (yhteinen `emanta.huntTipMoon`). Tervehdys: `greetWounded` (neito haavoittunut), `greet`,
-  `greetAgain` (`<npc>.met`), `greetHealer` (jousineidon talo + `archer.healed`); `meetingRules`:
-  `npc.talked` → `<npc>.greeted`, `npc.leftBehind` + greeted → `<npc>.met`. **Ruoka (`householdFood`,
-  `theftRule`):** varkaus → `<npc>.robbed` (2 jänistä lepyttää); `ask-food-fish` (`moonChance` 50 %) /
-  `ask-food-meat` → `offer-hare` → rieskat ja kalat `allowed`. Pöytäesineet roolilla `@archerYard.` /
-  `@otherYard.` (`world/instances.ts`). Paikat arvotaan joka käynnillä (`yardLife.ts` `pickSpot`,
-  `planYardAnimals`): emäntä pöytä/pata/nuotio/sikolätti/kanakoppi, urho nuotio/pölkky/portti/lätti,
-  aiemmin parannettu neito vuode/nuotio/portti/aitta (kesken käynnin parannettu nousee vuoteen viereen);
-  koira 55 % emännän, 20 % pöydän luona. `__world.yard` (`people`, `spots`).
+- **Koodiversio v08.00.00** branchissa `claude/random-sage-cairns` (pala 1/3 tietäjä- ja uhritehtävästä;
+  tarkista merge-tila `git merge-base`illa). Koodi valmis, ei deployattu, omistaja ei ole testannut. Claude
+  savutesti in-app-selaimessa: vanha tallennus sai mökin (9,6) ja Louhen kalmiston (16,16) entisille
+  paikoilleen ja `cairn-b`:n rantaruutuun (1,10); Louhiton merkki näkyy kartalla; `cairn-b`:ssä ei
+  Louhta (ei puhuteltavia), `cairnfield`issä on; aloitusnappi "Astu kalmistolle"; `renderBench` 6,8 ms
+  (1024 × 768); konsolissa vain vanha, jo korjattu virheloki. Uuden matkan arvonta tarkistettu testeillä.
+  Tarkistukset: `bun run test` 2116/2116, `bunx tsc --noEmit`, `bun run lint`, `bun run build`.
+  v07.04 (emäntien tervehdykset) ja v07.03–v06.08 ovat mainissa; omistajatestit yhä tekemättä.
+- **Tietäjän mökki ja kalmistot ovat instansseja (v08.00).** `SiteInstanceKind` `lakeside` ja `cairn`;
+  tunnisteet `lakeside` (`SAGE_SITE_ID`), `cairnfield` (Louhi, `LOUHI_CAIRN_ID`) ja `cairn-b`
+  (`OFFERING_CAIRN_ID`, ei Louhta) `map/sites.ts`:ssä. Kartassa ei ole enää kiinteitä paikkoja
+  (`MAP_SITE_DEFINITIONS` poistettu). Uusi matka: `placeShoreSites` (`placement.ts`, `SHORE_PLACEMENT`:
+  rantaruutu = vieressä avovettä, ei viistoon; mökki niitty/metsä, kalmisto niitty/metsä/umpimetsä/kallio;
+  kalmisto ≥ 5 mökistä ja toisesta kalmistosta) ennen pihoja, jotka väistävät ne (`placementWith`).
+  Vanha tallennus: `completeSiteInstances` lisää mökin ja Louhen kalmiston `LEGACY_SHORE_POSITIONS`iin ja
+  arpoo `cairn-b`:n. 3D: `scene3d.ts` asettaa `cairnState.louhiHere` (`site` = `cairnfield` tai puuttuu).
+  Kartta: `cairn-b` piirretään `assets/map/cairn-site-empty.png`-merkillä.
+- **Piha (v07.02–v07.04, `content.ts`, `world.ts`, `yardLife.ts`).** Neito `vuode`lla; `archer.healed` (`minHits`
+  6), `archer.died-song`, `archer.died-left` (`npc.leftBehind`, `engine/leave.ts`). `housewifeDialogue(npc)`
+  (`emanta` neidon talossa, `emanta_b` toisessa): huhu kerran kummalta tahansa (`rumor.heard`), sitten apaja
+  kerran kuussa (`emanta.huntTipMoon`); tervehdykset `greetWounded`/`greet`/`greetAgain`/`greetHealer`
+  (`meetingRules`: `<npc>.greeted` → lähtiessä `<npc>.met`); ruoka `householdFood`/`theftRule`
+  (`<npc>.robbed`, `moonChance`, pöytäesineet roolilla `@archerYard.`/`@otherYard.`, `world/instances.ts`).
+  Väen ja eläinten paikat arvotaan käynnittäin (`pickSpot`, `planYardAnimals`; `__world.yard`).
 - **Ryhmän hyökkäyskatto ja vihun reaktiot (v07.01 + v06.05, `engine/ai.ts`, säännöt `combat.ts`).** Ei vuoroja:
   isku alkaa, jos muita windup/release-tilassa < `maxAttackers` 2; oma viive `attackStartDelay` 0,04–0,22 s,
   `startSpacing` 0,15 s; katon takia odottava `waitBack` + `waitHold`. `hitStaggers`: horjuva ei horjahda
@@ -39,10 +42,8 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `614bcee`)
   kertakäyttöinen (`enterSite` → `removeHuntGround`). `huntCycle` (20 päivän jakso; −1 = vanha tallennus →
   `ensureHuntGrounds` 3–6 alkuapajaa); `advanceHuntGrounds` lisää jaksoittain, enintään 6 (vanhin pois myös
   `knownSiteIds`ista). `huntCandidates`: Chebyshev ≥ 2 muista paikoista ja sankarista; näkyy vasta 3 × 3 -näössä.
-- **Väistöaskel ja kävely (v06.07, `src/sidestep.ts` puhdas).** `dodgeDirection(A, D, S)` (eteenpäin-osa pois),
-  `sidestepPose(u)`: johtava jalka 0–0,5, perässä tuleva 0,5–1, ei koskaan molemmat ilmassa. Haara-asentoa ei
-  voi kaventaa kesken askeleen ilman liukua. Kävely `GAIT.walkNarrow*`/`standNarrow`. Arvioija hylkäsi
-  kävelyn polvikyykyn ja taka-askeleen kyykyn (istuva ilme): älä palauta niitä.
+- **Väistöaskel ja kävely (v06.07, `src/sidestep.ts` puhdas).** `dodgeDirection(A, D, S)`, `sidestepPose(u)`.
+  Arvioija hylkäsi kävelyn polvikyykyn ja taka-askeleen kyykyn (istuva ilme): älä palauta niitä.
 - **Metsästys (v06.04, `src/hunt/` puhdas + `engine/hunt.ts`).** Vain `HUNTING` = erämaa. `bow` (X), vasen
   jännittää, oikea tähtää/poimii. `ARCHERY`, `traceSegment` (maa + `firstProjectileHit` + eläinpallot),
   `SPECIES.hare`, `pickHareSpots` 7–9 jänistä. Viini ja saalis moduulin tilaa; mallit `hunt/models.ts`.
@@ -92,10 +93,8 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `614bcee`)
 - **Laulun tauot ja säekaaret (v06.08).** `songLogic.songBeats`: ryhmän (`SONG.pairSize`) jälkeen arvottu
   tauko; painallus tauolla on huti (tarkoituksella). `engine/songArcs.ts`: säkeet SVG-kaarille sankarin ylle
   (`revealVerse`, `fadeSongArcs`, `clearSongArcs`); `#verse` vain opetuksessa. `__game.songArcs`.
-- **Suon vahinko (v06.09).** `songOutcome.dotPerSec` (> 0, kun onnistunut ja osumia ≥ `SONG.bogDotMinHits` 3)
-  → `endSong` asettaa `Actor.bogDot`; `melee.updateCombatant` (tila `rooted`) → `stepBogDot` tikeittäin
-  (`bogDotInterval` 1 s, vajaa loppu pienempänä tikkinä), ohi haarniskan ja `rootedDamage`n, `killActor`
-  nollassa. `Actor.dotPulse` kasvaa tikistä; `hud.pulseOnDot` välähdyttää `#ehp`:n palkin ja `.foe`-palkin.
+- **Suon vahinko (v06.09).** `songOutcome.dotPerSec` → `Actor.bogDot`; `melee.updateCombatant` (`rooted`) →
+  `stepBogDot` tikeittäin ohi haarniskan; `hud.pulseOnDot` välähdyttää palkit.
 - **Laulun opettelu (V4, mergattu).** Laulu **Pohjolan uni** (`SONGS.sleep`, Kalevala runo 42).
   Tietäjän dialogi -> efekti `startSongLesson` (`OutAction`) -> `engine/song.ts` `startLesson`
   (ei hidastusta, säe näkyy etukäteen) -> `song.performed` -> lippu `song.sleep.learned` (raja
@@ -109,16 +108,10 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `614bcee`)
   tallentaa ennen käyttöönottoa; 3D:ssä `engine/store.ts` (`campaignStore()`,
   `worldRuntime()`). Kartta (`map/app.ts`) lataa kampanjan omaan muuttujaansa.
 - **Maailmamoottori v0 (V2), `src/world/`**, Three.js- ja DOM-vapaa: `registry.ts` (liput, laskurit;
-  **uusi lippu lisätään tänne**), `state.ts` (`campaign.engine`, sallivasti luettu), `conditions.ts`,
-  `effects.ts` (atominen, ei koske `worldMinutes`iä; UI-toimet `OutAction`eina), `engine.ts`
-  (`postEvent`; ei ajastimia, `unless`ia eikä ketjureaktioita), `take.ts`, `dialogue.ts`,
-  `summary.ts`, `runtime.ts`, `content.ts` (**pelin oikea data**: `RULES`, dialogit, `GAME_WORLD`).
-  Tapahtumat `item.taken`, `npc.talked`, `scene.entered`, `song.performed`. Jokaisella säännöllä ja
-  dialogilla pakollinen `intent`-lause. Konsoli `__world`: `flags`, `counters`, `post`, `explain`,
-  `describe()` (kaikki proosana omistajalle), `items`, `scene`. Dialogi 3D:ssä: `engine/dialogue.ts`
-  (puhe-ele -> `npc.talked` -> dialogi, jos `findDialogue(ARENA, npcId)`; pelilogiikka seisoo; numero/
-  klikkaus, Esc sulkee). Tietäjä (`lakeside`): `sage.permission` + `setSceneItemTakeMode`; luvaton
-  otto -> `sage.theft-noticed` (lippu, laskuri, viesti), anteeksipyyntö, loki säilyy.
+  **uusi lippu lisätään tänne**), `conditions.ts`, `effects.ts` (atominen, ei koske `worldMinutes`iä;
+  UI-toimet `OutAction`eina), `engine.ts` (`postEvent`; ei ajastimia eikä ketjureaktioita), `content.ts`
+  (**pelin oikea data**). Jokaisella säännöllä ja dialogilla pakollinen `intent`. Konsoli `__world`:
+  `flags`, `counters`, `post`, `explain`, `describe()`, `items`. Dialogi 3D:ssä `engine/dialogue.ts`.
 - **Rauhallisten 3D-kohtausten esineet.** `sceneInteraction.ts` valitsee katseakselilta enintään 2,8 m:n
   päässä olevan esineen (tai `Pickable`n); HUDin piste näyttää nimen, varkauden ja täyden inventaarion.
   Käytä-ele lukitsee painallushetken kohteen ja ratkaisee oton eleen keskellä. Tallennus ennen 3D-juuren
@@ -130,8 +123,8 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `614bcee`)
   on nyt kytketty tietäjän dialogiin (yllä). Pudotus-UI:ta tai pudotettujen mallien
   luontia ei vielä ole. Uusi matka alkaa kolmella ohrarieskalla ilman kalaa;
   tuohikontti on tavallinen yhden kappaleen esine.
-- **Kalmisto `cairnfield`** (friendly; Esc-oikotie, aloitusvalikko, `?scene=cairnfield`, karttapaikka ruutu
-  16,16). `world.ts`: `CAIRN`-lippu; `LAKE` = `LAKESIDE || CAIRN` (vesi, kaukoranta, rantakaista). Maasto on
+- **Kalmisto `cairnfield`** (friendly; Esc-oikotie, aloitusvalikko, `?scene=cairnfield`; karttapaikat
+  instansseina, ks. v08.00). `world.ts`: `CAIRN`-lippu; `LAKE` = `LAKESIDE || CAIRN` (vesi, kaukoranta, rantakaista). Maasto on
   kallionokka (`terrainHeight`, `shoreZ` z ≈ 21). Sijoittelu vakioina `world.ts`:n alussa (`CUPSTONE`,
   `CAIRNS_AT`, `KARSIKKO`, `LOUHI_AT`, `DARK_SOIL`). Louhi `populateCairnLife`issa, ääni `Sfx.birds`.
   Törmäyksiä vasten kävelyä ja ääntä ei ole tarkistettu.
@@ -144,22 +137,19 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `614bcee`)
   hihnan `villagers_f.glb`:stä (`char_jousineito`) ja varusteet `characters.glb`:stä (`attachFemaleGear`).
   **Avoin:** omistajan näkemä leijuva musta kypärä aloitusvalikossa (Chrome/Edge) ei toistunut;
   v03.05.01:n korjaus vahvistamatta. Keihästä ja kilvetöntä asetta naisella ei ole katsottu.
-- **Sormet.** Luurangoissa `finger1..3_L/R`; `Fighter.applyFingers` (`FINGER_OPEN`, `handOpen`): rauha 0,7,
-  eleet 0,9, taistelussa nyrkki (kilvetön miekka 0,35).
-- **Vapaa kamera** (pause-valikko; `src/freecam.ts`, `engine/freecam.ts`): peli pysyy tauolla, Esc palaa.
-- **Debug:** `__game.gesture`, `findNamed`, `freeze()`/`step(n)`, `setCamera`, `placePlayer`. Monien
-  muokkausten jälkeen dev-palvelimen moduulit voivat monistua: käynnistä uudelleen.
-- **Järven rannat.** `lakeside` on kartan (9,6) rauhallinen mökki-, keittotuli-, laituri-, vene- ja
+- **Sormet, vapaa kamera, debug.** `Fighter.applyFingers` (rauha 0,7, eleet 0,9, taistelussa nyrkki); vapaa
+  kamera pause-valikosta (`freecam.ts`); `__game.gesture`, `freeze()`/`step(n)`, `setCamera`, `placePlayer`.
+  Monien muokkausten jälkeen dev-palvelimen moduulit voivat monistua: käynnistä uudelleen.
+
+- **Järven rannat.** `lakeside` on rauhallinen mökki-, keittotuli-, laituri-, vene- ja
   tietäjäkohtaus; `lakeruin` käyttää samaa maastoa mutta palaneita rakennuksia, kuollutta tietäjää ja
   sammunutta tulta. Järvi jatkuu horisonttiin, vastaranta on sumuinen maisema ja syvä vesi estää kulun;
   laiturilla voi kävellä. Tietäjä, koira, mökki, vene ja tuli törmäävät. Tarkat mallit ja mitat ovat
   `BLENDER_HANDOFF.md`:ssä, sijoittelu ja maastosäännöt `world.ts`:ssä.
-- **Dev-palvelin työpuusta:** Clauden `preview_start` lukee sen kansion `.claude/launch.json`in, josta sessio
-  alkoi. Jos sessio alkoi pääkansiosta, "dev" palvelee pääkansion koodia: tarkista `fetch('/src/…')`illa ja
-  lisää tarvittaessa väliaikainen konfiguraatio `bun x vite <työpuun polku> --port …` (palauta tiedosto lopuksi).
-  Testipeli: `?scene=clearing` ja aloitusvalikon "Aloita" ennen `__game.tick`iä (muuten `g.running` on false). Piilotettu paneeli hidastaa rAF:n ~3 FPS:iin: aja peliä
-  `__game.step(n)`illä ja mittaa piirto `__game.renderBench()`illä. Moduulin tuonti konsolista: käytä
-  sivun latausten (`performance.getEntriesByType("resource")`) `?t=`-osoitetta, muuten saat erillisen kopion.
+- **Dev-palvelin ja savutesti:** `preview_start` lukee session aloituskansion `.claude/launch.json`in
+  (työpuussa tarkista `fetch('/src/…')`illa). 3D-kohtaus vaatii aloitusvalikon "Aloita" (`#startBtn`).
+  Piilotettu paneeli pysäyttää rAF:n: aja ruudut `__game.renderBench(n)`illä. Moduulin konsolituonti
+  muokkausten jälkeen antaa erillisen kopion: käynnistä palvelin uudelleen.
 - **Laulun tahmaus heikolla koneella:** CSS-suotimen siirto shaderiin (v05.00.01) on yhä vahvistamatta.
   Säekaarten hehku on CSS `drop-shadow` kahdeksalla tekstillä (v06.08); jos laulu tahmaa, poista ensin
   `verseGlow`-animaatio. Opetuksen (tietäjä) kaaripolkua ei ajettu selaimessa, vain koodina.
@@ -283,10 +273,17 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `614bcee`)
 
 ## Seuraava tehtävä
 
-Lisää paperinuken alle referenssikuvan mukaiset kolme pitkäkestoisen efektin paikkaa omana
-rajattuna työnään. Tässä branchissa ei ole efektien tilamallia, kuvakkeita eikä toimintaa.
+Tietäjä- ja uhritehtävän pala 2/3: pitkäkestoisten efektien tilamalli ja kolme paikkaa paperinuken alle
+(referenssikuva), sekä kuppikiven "Ukon muistan…" -valinta: +20 staminan yläraja 15 pelipäiväksi,
+kerran kuunkierrossa yhteensä molemmilla kalmistoilla; käytön jälkeen vain tyhjä "Muistat muinaisia ja
+Ukon väkeä". Buffi summautuu nälän staminarangaistukseen.
 
 ## Ei vielä aloiteta
+
+- Pala 3/3 (vasta palan 2 jälkeen): tietäjä vaatii uhrin ennen laulunopetusta ja paljastaa `cairn-b`:n;
+  kuppikivellä "Ota uhrit Ukolle ja Manaan menneille" vain kahdella lihalla (lihalle tyyppi, ei vain
+  jänis); uhri ei anna buffia; tietäjän kyselyrepliikit ja vastaukset; tuohikontin repliikki "ovensuussa";
+  tietäjän (laituri, ovensuu, pata) ja koiran arvotut paikat.
 
 - Louhen taistelu (varaukset yllä; karkotus laululla kuuluu V5:een); esine- ja puhemekaniikka kalmistolla
   on Codexin suunnittelema.
@@ -339,6 +336,8 @@ rajattuna työnään. Tässä branchissa ei ole efektien tilamallia, kuvakkeita 
   viereisestä ruudusta, myös tutkitulla alueella, tai kun toisen talon emäntä neuvoo yhden (kerran
   kuunkierrossa, 2026-11-22); eivät toisen 3D-paikan viereen. Jäniksiä 7–9, joista 1–3 suolla ja 1–3
   paloaukealla (2026-11-21).
+- Tietäjän mökki ja kaksi kalmistoa arvotaan uudella matkalla rannoille (2026-11-22). Kalmistot vain
+  rannoille, kunnes kalmiston 3D-kohtauksesta on suo- ja vaaraversiot (järvi näkyy kohtauksessa).
 - Jousineito (2026-11-22): parannus vaatii 6/8 osumaa, kolme yritystä; kuolee myös, jos ensimmäiseltä
   käynniltä lähdetään parantamatta. Huhun kertoo se emäntä, jolta ensin kysytään (2026-11-22). NPC-repliikeillä on
   vähintään kolme samaa tarkoittavaa muunnelmaa; uudet repliikit kirjoitetaan samoin.
