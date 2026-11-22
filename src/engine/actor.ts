@@ -60,6 +60,10 @@ export interface Actor {
   /** Suoja-aika muita lyöjiä vastaan: voimassa tähän pelin aikaan asti, ja kenen isku torjuttiin. */
   graceUntil: number;
   graceFrom: Actor | null;
+  /** Suunta (maailman kulma), josta torjuttu isku tuli: suoja-aika koskee vain sen ympäristöä. */
+  graceDir: number;
+  /** Horjahduksen jälkeen osumat eivät horjuta tähän pelin aikaan asti (vain sankarilla). */
+  staggerFreeUntil: number;
   /** Nimi mittarissa (vastustajilla). */
   name: string;
   /** Taso: 0 sankarilla; vastustajilla kasvattaa elämää, voimaa ja tekoälyn taitoa. */
@@ -85,7 +89,7 @@ export function makeActor(look: FighterLook, pos: THREE.Vector3, level: number, 
     attack: makeAttack(weapon, styleFor(weapon, "slash"), "light"), character: look.character, loadout: look.loadout, struck: false, hp: stats.maxHp,
     blockStart: -99, rootTime: 0, bogDot: null, dotPulse: 0, dodgeDir: new THREE.Vector3(), dodgeCd: 0,
     bashPushDir: new THREE.Vector3(), bashPushLeft: 0, moveSpeed: 0, extraRecovery: 0,
-    lunged: 0, stepFrom: pos.clone(), graceUntil: -1, graceFrom: null, name: "", level, ai: null,
+    lunged: 0, stepFrom: pos.clone(), graceUntil: -1, graceFrom: null, graceDir: 0, staggerFreeUntil: -1, name: "", level, ai: null,
   };
 }
 

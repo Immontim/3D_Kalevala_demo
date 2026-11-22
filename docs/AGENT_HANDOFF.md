@@ -6,13 +6,17 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-22 (Codex, Windows; pohja `origin/main` `6eff560`)
+Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `751afa1`)
 
-- **Koodiversio v07.00.00** branchissa `codex/dynamic-backpack-inventory` (tarkista merge-tila
-  `git merge-base`illa). Koodi valmis, ei deployattu eikä omistaja ole testannut. Codex testasi kartan
-  kuuden perusruudun sekä tuohikontin 6 lisäruudun ja 18 ruudun enimmäisasettelun `@Browser`issa
-  340 px:n paneelissa; järvenranta piirsi noin 57–60 FPS, eikä konsolivirheitä ollut. Testit 1656/1656,
-  tsc, lint ja build läpi. Suolaulun v06.09 ja laulukaarten v06.08 omistajan taistelutesti on yhä tekemättä.
+- **Koodiversio v07.01.00** branchissa `claude/enemy-attack-cap` (tarkista merge-tila `git merge-base`illa).
+  Koodi valmis, ei deployattu, omistaja ei ole testannut. v07.00 (reppu) on mainissa; sen kartta-asettelun
+  ja suolaulun v06.09 / laulukaarten v06.08 omistajan testit ovat yhä tekemättä.
+- **Ryhmän hyökkäyskatto ja vihun reaktiot (v07.01 + v06.05, `engine/ai.ts`, säännöt `combat.ts`).** Ei vuoroja:
+  isku alkaa, jos muita windup/release-tilassa < `maxAttackers` 2; oma viive `attackStartDelay` 0,04–0,22 s,
+  `startSpacing` 0,15 s; katon takia odottava `waitBack` + `waitHold`. `hitStaggers`: horjuva ei horjahda
+  uudelleen; sankarilla `staggerImmunity` 0,4 s. `graceCovers`: torjunnan sektori ∩ ±40° torjutusta suunnasta.
+  Uhattu (`threatenedBy`) torjuu viiveellä `blockReactionDelay`; `rollsAdvance` 45 % etenee noston aikana.
+  Mitattu (3 vihua, 90 s): max 2 yhtä aikaa, aloitusväli ≥ 0,17 s. Hiljaiset jaksot = yhtäaikainen uupumus.
 - **Metsästysapajat (v06.06, `map/huntGrounds.ts` puhdas).** Apaja = `SiteInstance` `kind: "hunt"` → `wilds`,
   kertakäyttöinen (`enterSite` → `removeHuntGround`). `huntCycle` (20 päivän jakso; −1 = vanha tallennus →
   `ensureHuntGrounds` 3–6 alkuapajaa); `advanceHuntGrounds` lisää jaksoittain, enintään 6 (vanhin pois myös
@@ -21,9 +25,6 @@ Päivitetty: 2026-11-22 (Codex, Windows; pohja `origin/main` `6eff560`)
   `sidestepPose(u)`: johtava jalka 0–0,5, perässä tuleva 0,5–1, ei koskaan molemmat ilmassa. Haara-asentoa ei
   voi kaventaa kesken askeleen ilman liukua. Kävely `GAIT.walkNarrow*`/`standNarrow`. Arvioija hylkäsi
   kävelyn polvikyykyn ja taka-askeleen kyykyn (istuva ilme): älä palauta niitä.
-- **Vihollisen torjuntareaktio ja etenevä nosto (v06.05, `engine/ai.ts`).** Uhattu vastustaja (`threatenedBy`,
-  25°, < 3,2 m) torjuu viiveellä `blockReactionDelay` (0,03–0,16 s, vain jos `BLOCK_RAISE` ehtii). `rollsAdvance`
-  (45 %, ei kilpityöntö) astuu noston aikana eteen 0,6 × kävely; paneelissa `advanceChance`/`advanceScale`.
 - **Metsästys (v06.04, `src/hunt/` puhdas + `engine/hunt.ts`).** Vain `HUNTING` = erämaa. `bow` (X), vasen
   jännittää, oikea tähtää/poimii. `ARCHERY`, `traceSegment` (maa + `firstProjectileHit` + eläinpallot),
   `SPECIES.hare`, `pickHareSpots` 7–9 jänistä. Viini ja saalis moduulin tilaa; mallit `hunt/models.ts`.
@@ -159,8 +160,10 @@ Päivitetty: 2026-11-22 (Codex, Windows; pohja `origin/main` `6eff560`)
   sammunutta tulta. Järvi jatkuu horisonttiin, vastaranta on sumuinen maisema ja syvä vesi estää kulun;
   laiturilla voi kävellä. Tietäjä, koira, mökki, vene ja tuli törmäävät. Tarkat mallit ja mitat ovat
   `BLENDER_HANDOFF.md`:ssä, sijoittelu ja maastosäännöt `world.ts`:ssä.
-- **Dev-palvelin työpuusta:** Clauden in-app-esikatselu (`preview_start` "dev") lukee työpuun oman
-  `.claude/launch.json`in ja palvelee työpuun koodia. Piilotettu paneeli hidastaa rAF:n ~3 FPS:iin: aja peliä
+- **Dev-palvelin työpuusta:** Clauden `preview_start` lukee sen kansion `.claude/launch.json`in, josta sessio
+  alkoi. Jos sessio alkoi pääkansiosta, "dev" palvelee pääkansion koodia: tarkista `fetch('/src/…')`illa ja
+  lisää tarvittaessa väliaikainen konfiguraatio `bun x vite <työpuun polku> --port …` (palauta tiedosto lopuksi).
+  Testipeli: `?scene=clearing` ja aloitusvalikon "Aloita" ennen `__game.tick`iä (muuten `g.running` on false). Piilotettu paneeli hidastaa rAF:n ~3 FPS:iin: aja peliä
   `__game.step(n)`illä ja mittaa piirto `__game.renderBench()`illä. Moduulin tuonti konsolista: käytä
   sivun latausten (`performance.getEntriesByType("resource")`) `?t=`-osoitetta, muuten saat erillisen kopion.
 - **Laulun tahmaus heikolla koneella:** CSS-suotimen siirto shaderiin (v05.00.01) on yhä vahvistamatta.
@@ -247,6 +250,9 @@ Päivitetty: 2026-11-22 (Codex, Windows; pohja `origin/main` `6eff560`)
   vaatisi scene/world-singletonien laajemman elinkaarirefaktoroinnin.
 - 3D-taistelun tasapainoa ei ole kattavasti pelitestattu. Suuntatorjunta,
   keihään kantama, usean vastustajan rytmi, etenevä nosto ja nuotion vahinko ovat arvioita.
+  v07.01:n jälkeen ryhmät ovat vaarallisempia (aaltojen ja metsästysmaiden ryhmät viritettiin vuorottelulle),
+  laulu katkeaa useammin, ja ryhmä uupuu samaan aikaan (yhteinen hiljainen jakso). Älä palauta id- tai
+  järjestyspohjaista vuoroa: omistaja haluaa tilannepohjaisen katon.
 - Torjunta ratkeaa yhä tilan (`block`) eikä asennon mukaan: hetken vielä nouseva asento torjuu. Keihäsmiehen
   hitaampi torjunta-animaatio (tulossa) tehdään suurentamalla `BLOCK_RAISE.spear`ia, joka hidastaa myös
   keihästä kantavaa sankaria; jos vain vihollisen pitää hidastua, erota arvot silloin.
