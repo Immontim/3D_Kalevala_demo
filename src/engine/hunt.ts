@@ -9,7 +9,7 @@ import {
   returnArrow, stepArrow, takeArrow, traceSegment,
 } from "../hunt/archery";
 import { ARROW_LEN, buildArrow, buildBow, buildHare, type BowModel, type HareModel } from "../hunt/models";
-import { SPECIES, type Prey, type Stimulus, killPrey, spawnPrey, updatePrey } from "../hunt/prey";
+import { SPECIES, type Prey, type Stimulus, killPrey, meatToTake, spawnPrey, updatePrey } from "../hunt/prey";
 import { pickHareSpots } from "../hunt/spawns";
 import { ITEMS, tryAddItem } from "../map/campaign";
 import { t } from "../i18n";
@@ -372,6 +372,8 @@ function updateGame(dt: number) {
 export function updateHunt(dt: number) {
   if (!HUNTING) return;
   updateInput(dt);
+  // Tähtäyksen kädet (Fighter.bowArms): jousikäsi linjalla, vetokäsi jänteellä.
+  g.player.fighter.setBowAim(bowActive() ? hunt.aimBlend : 0, -aim.pitch, hunt.draw);
   updateArrows(dt);
   updateGame(dt);
 }
@@ -420,17 +422,22 @@ export function huntPickables(): Pickable[] {
     if (e.prey.state !== "dead") continue;
     const def = SPECIES[e.prey.species];
     const item = ITEMS[def.meat.itemId];
+    const fits = (n: number) => tryAddItem(campaignStore().get().player.inventory, def.meat.itemId, n) !== null;
     out.push({
       id: `hunt:${e.prey.id}`, x: e.prey.x, y: groundHeight(e.prey.x, e.prey.z) + 0.3, z: e.prey.z, radius: 0.6,
       label: t("hunt.carcass", { animal: t(def.nameKey) }),
-      room: () => tryAddItem(campaignStore().get().player.inventory, def.meat.itemId, def.meat.quantity) !== null,
+      room: () => meatToTake(e.prey, fits) > 0,
       fullText: t("interact.inventoryFull"),
       take: () => {
+        // Mahtuva määrä otetaan; loput jäävät ruhoon, jos inventaario täyttyy kesken.
+        const count = meatToTake(e.prey, fits);
+        if (count === 0) return false;
         const update = campaignStore().update((state) => {
-          const inventory = tryAddItem(state.player.inventory, def.meat.itemId, def.meat.quantity);
+          const inventory = tryAddItem(state.player.inventory, def.meat.itemId, count);
           return inventory ? { ...state, player: { ...state.player, inventory } } : state;
         });
         if (!update.ok) { showMsg(t("interact.saveFailed"), "", 1.6); return false; }
+        e.prey.meat -= count;
         // Ruhoon jääneet nuolet palaavat viiniin (täyteen viiniin ei mahdu enempää).
         let back = 0;
         for (let i = stuck.length - 1; i >= 0; i--) {
@@ -439,9 +446,11 @@ export function huntPickables(): Pickable[] {
           stuck[i].mesh.removeFromParent();
           stuck.splice(i, 1);
         }
-        e.model.root.removeFromParent();
-        game.splice(game.indexOf(e), 1);
-        const name = t(item.nameKey);
+        if (e.prey.meat <= 0) {
+          e.model.root.removeFromParent();
+          game.splice(game.indexOf(e), 1);
+        }
+        const name = count > 1 ? `${t(item.nameKey)} ×${count}` : t(item.nameKey);
         showMsg(back ? t("hunt.gutArrows", { item: name, count: back }) : t("hunt.gutted", { item: name }), "", 1.8);
         g.events.push(`pelaaja:otti:${e.prey.id}:${def.meat.itemId}`);
         return true;

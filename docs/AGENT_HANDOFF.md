@@ -6,16 +6,20 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `2260807`)
+Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `6338589`)
 
-- **Koodiversio v08.02.00** branchissa `claude/sage-offering` (pala 3/3 tietäjä- ja uhritehtävästä; tarkista
-  merge-tila `git merge-base`illa). Koodi valmis, ei deployattu, omistaja ei ole testannut. Claude savutesti
-  in-app-selaimessa koko ketju: laulupyyntö → uhrivaatimus ja `cairn-b` kartalle → kartalle ja takaisin →
-  "onko uhrit toimitettu" → uhrikivellä "Ota uhrit…" (2 jänistä lähti, ei siunausta) → "Toki toimitin" →
-  opetus alkoi. Tietäjä nähty padalla, ovensuussa ja laiturilla, koira tulella, ovella, laiturin tyvellä ja
-  kuivaustelineellä; ehdokaspaikat vapaita törmäyksistä. `renderBench` ranta 6,8 ms (1024 × 768); konsolissa
-  vain vanha, jo korjattu virheloki. Tarkistukset: `bun run test` 2131/2131, `bunx tsc --noEmit`,
-  `bun run lint`, `bun run build`. v08.01 ja aiemmat mainissa.
+- **Koodiversio v08.03.00** branchissa `claude/bow-pose` (tarkista merge-tila `git merge-base`illa). Koodi
+  valmis, ei deployattu, omistaja ei ole testannut. Claude kuvasi erämaassa sivulta ja olan yli: kanto,
+  tähtäys ilman jännitystä ja täysi jännitys; kilpi poissa, konsoli puhdas. `bunx vitest run --dir src`,
+  `bunx tsc --noEmit`, `bun run lint`, `bun run build` läpi. v08.02 (tietäjä ja uhri) on mainissa.
+- **Jousen kädet (v08.03, `Fighter.bowArms`).** `hunt.ts` kutsuu joka ruutu `setBowAim(aimBlend, elev, draw)`.
+  Paino > 0: rinta kiertyy `BOW_TORSO_TURN` (vasen olka eteen), pää katsoo tähtäyssuuntaan, ankkuri
+  `BOW_ANCHOR` pään luusta; kahva linjalle `ankkuri + A · min(ulottuma, BOW_DRAW_LEN 0,68)`, oikea nyrkki
+  jänteellä `BOW_BRACE` 0,1 m → ankkuri jännityksen mukaan. Kummankin nyrkin kehys: kyynärvarsi A:han
+  (−y), otekanava pystyyn (±U, pienempi ranteen kierto), `twoBone` + kyynärvarren kierto. Kanto (paino 0)
+  on yhä `POSES.bowCarry`. Kilpi: `world.ts` `sceneLoadout` muuttaa erämaassa `sword_shield` → `sword`
+  (`scene3d.ts`, taukovalikko); kampanjan varusteet eivät muutu. Jänis antaa 1–3 lihaa (`killPrey` arpoo
+  `Prey.meat`, `meatToTake`: täyteen inventaarioon otetaan mahtuva osa, loput jäävät ruhoon).
 - **Uhri ennen laulua (v08.02, `content.ts`).** `ASK_SONG` on kaksi valintaa: `ask-song` (ei uhria, ei
   pyydetty) → `sage.offeringAsked`, `revealSite cairn-b`, solmu `offeringDemand`; `ask-song-taught`
   (`offering.made`) → `songIntro`. Sääntö `sage.offering-awaited` (`npc.leftBehind` tietäjä) → lippu

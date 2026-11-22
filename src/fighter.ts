@@ -446,6 +446,8 @@ export class Fighter {
   private bowObj: THREE.Object3D | null = null;
   private bowHolder: THREE.Group | null = null;
   private bowMode = false;
+  /** Jousen tähtäyksen käänteiskinematiikka: paino 0..1, pystykulma (rad, + = ylös) ja jännitys 0..1. */
+  private bowIk = { w: 0, elev: 0, draw: 0 };
   sink = 0; // suohon vajoaminen metreinä
   fall = 0; // 0..1 kaatuminen
   /** Asento, johon hahmo kaatuu. Valitaan kuolinhetkellä (setFallen). */
@@ -654,6 +656,17 @@ export class Fighter {
   }
 
   get bowReady() { return this.bowMode && !!this.bowHolder; }
+
+  /**
+   * Tähtäyksen kädet: w 0..1 sulauttaa suoraan ohjatun kantoasennon käänteiskinematiikkaan, jossa
+   * vasen nyrkki pitää jousen kahvaa tähtäyslinjalla ja oikea nyrkki on jänteellä (draw 0 = lepo,
+   * 1 = poskella). Vartalo kääntyy vasen olka edellä, pää katsoo tähtäyssuuntaan.
+   */
+  setBowAim(w: number, elev: number, draw: number) {
+    this.bowIk.w = THREE.MathUtils.clamp(w, 0, 1);
+    this.bowIk.elev = elev;
+    this.bowIk.draw = THREE.MathUtils.clamp(draw, 0, 1);
+  }
 
   /** Nyrkin keskikohta maailmassa (oikea käsi vetää jännettä). null, jos malli ei ole vielä ladattu. */
   fistWorld(side: "L" | "R", out: THREE.Vector3): THREE.Vector3 | null {
@@ -941,6 +954,83 @@ export class Fighter {
     });
   }
 
+  /**
+   * Nyrkin kehys, jonka kyynärvarsi osoittaa suuntaan A (virtuaalikehyksen −y) ja otekanava (z)
+   * pystyakselille U. Kanavan kahdesta suunnasta valitaan se, jossa ranne kiertyy vähemmän.
+   */
+  private bowFist(side: "L" | "R", fist: THREE.Vector3, A: THREE.Vector3, U: THREE.Vector3, pole: THREE.Vector3) {
+    const S = this.body.worldToLocal(this.bones.get(`upper_arm_${side}`)!.bone.getWorldPosition(new THREE.Vector3()));
+    const Y = A.clone().negate();
+    let best: { c: number; v1: THREE.Quaternion; v2: THREE.Quaternion; v: THREE.Quaternion } | null = null;
+    for (const sz of [1, -1]) {
+      const Z = U.clone().multiplyScalar(sz);
+      const X = new THREE.Vector3().crossVectors(Y, Z);
+      const v = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, Y, Z));
+      const W = fist.clone().sub(vTmp.set(GRIP.x, GRIP.y, GRIP.z).applyQuaternion(v));
+      const v1 = new THREE.Quaternion(), v2 = new THREE.Quaternion();
+      this.twoBone(S, W, pole, v1, v2);
+      const rel = qC.copy(v2).invert().multiply(v);
+      const c = 2 * Math.acos(Math.min(1, Math.abs(rel.w)));
+      if (!best || c < best.c) best = { c, v1, v2, v };
+    }
+    const { v1, v2, v } = best!;
+    // Kämmenen kierto viedään suurimmaksi osaksi kyynärvarteen kuten keihäsotteessa.
+    const rel = qC.copy(v2).invert().multiply(v);
+    const tw = qA.set(0, rel.y, 0, rel.w);
+    if (tw.lengthSq() > 1e-9) v2.multiply(tw.normalize().slerp(IDENT, 1 - FOREARM_TWIST));
+    return [v1, v2, v] as const;
+  }
+
+  /** Jousen tähtäys- ja jännitysasento käänteiskinematiikalla (setBowAim). */
+  private bowArms() {
+    const { w, elev, draw } = this.bowIk;
+    const lx = this.leftX;
+    // Vartalo kääntyy vasen olka kohti maalia; pää palaa katsomaan tähtäyssuuntaan.
+    const chest = this.bones.get("chest")!;
+    const S = chest.world.clone().multiply(qA.copy(chest.canon).invert());
+    const turn = qB.setFromAxisAngle(vTmp.set(0, 1, 0), -lx * BOW_TORSO_TURN * w);
+    const St = new THREE.Quaternion().copy(turn).multiply(S);
+    const head = new THREE.Quaternion().setFromEuler(eul.set(-elev * 0.75 + 0.05, 0, 0));
+    const headW = new THREE.Quaternion().slerpQuaternions(
+      this.bones.get("head")!.world.clone().multiply(qA.copy(this.bones.get("head")!.canon).invert()), head, w);
+    this.setBone("spine", qA.slerpQuaternions(IDENT, St, 0.5));
+    this.setBone("chest", St);
+    this.setBone("neck", qA.slerpQuaternions(St, headW, 0.5));
+    this.setBone("head", headW);
+    this.body.updateMatrixWorld(true);
+
+    const H = this.body.worldToLocal(this.bones.get("head")!.bone.getWorldPosition(new THREE.Vector3()));
+    const SL = this.body.worldToLocal(this.bones.get("upper_arm_L")!.bone.getWorldPosition(new THREE.Vector3()));
+    const A = new THREE.Vector3(0, Math.sin(elev), Math.cos(elev));
+    const U = new THREE.Vector3(0, 1, 0).addScaledVector(A, -A.y).normalize();
+    const right = new THREE.Vector3(-lx, 0, 0);
+    // Ankkuri (täysi jännitys): oikea suupieli. Nuolen linja kulkee siitä tähtäyssuuntaan.
+    const anchor = H.clone().addScaledVector(right, BOW_ANCHOR.side).addScaledVector(U, -BOW_ANCHOR.down)
+      .addScaledVector(A, BOW_ANCHOR.fwd);
+    // Kahva linjalle niin kauas kuin vasen käsi ylettää (vedon pituus enintään BOW_DRAW_LEN).
+    const reach = (this.armLen[0] + this.armLen[1]) * 0.985 - GRIP.y;
+    const f = anchor.clone().sub(SL);
+    const b = f.dot(A), c = f.lengthSq() - reach * reach;
+    const disc = b * b - c;
+    const tMax = disc > 0 ? -b + Math.sqrt(disc) : BOW_DRAW_LEN;
+    const len = THREE.MathUtils.clamp(tMax, BOW_BRACE + 0.2, BOW_DRAW_LEN);
+    const grip = anchor.clone().addScaledVector(A, len);
+    // Jänteen vetokohta: lepoasennossa kahvan takana jännekorkeudella, täydellä jännityksellä ankkurissa.
+    const nock = grip.clone().addScaledVector(A, -(BOW_BRACE + (len - BOW_BRACE) * draw));
+    const poleL = new THREE.Vector3(lx * 0.6, -1, -0.1);
+    const poleR = new THREE.Vector3(-lx * 0.8, 0.35, -1);
+    const ikL = this.bowFist("L", grip, A, U, poleL);
+    const ikR = this.bowFist("R", nock, A, U, poleR);
+    for (const [side, ik] of [["L", ikL], ["R", ikR]] as const) {
+      (["upper_arm", "forearm", "hand"] as const).forEach((n, i) => {
+        const name = `${n}_${side}` as BoneName;
+        const bn = this.bones.get(name)!;
+        const fk = bn.world.clone().multiply(qA.copy(bn.canon).invert());
+        this.setBone(name, w >= 0.999 ? ik[i] : fk.slerp(ik[i], w));
+      });
+    }
+  }
+
   /** Mittari: jalkaterien paikka maailmassa (x, y, z) ja askelsyklin vaihe. Savutestiin. */
   /**
    * Väistöaskel: u = vaihe 0..1 (null = ei väistöä), dir = askeleen suunta maailmassa, distance = pituus.
@@ -1086,6 +1176,7 @@ export class Fighter {
       this.shieldHolder.quaternion.slerpQuaternions(this.shieldFront, qB, hw);
     }
     if (this.look.loadout === "spear") this.spearArms();
+    if (this.bowMode && this.bowHolder && this.bowIk.w > 0.001) this.bowArms();
     this.applyFingers();
 
     // Jalat: asennon mukainen jalan paikka lasketaan ensin (reisi ja polvi), siihen lisätään
@@ -1405,6 +1496,13 @@ const GRIP = { x: 0, y: -0.085, z: 0.0 };
 const HAND_TWIST = 0;
 /** Jousen kierto lapojen akselin ympäri vasemmassa kädessä: jänne ampujaan päin (tarkistettu kuvista). */
 const BOW_ROLL = Math.PI;
+/** Tähtäyksen vartalokierto (rad): vasen olka eteen, jotta jousikäsi ylettää linjalle. */
+const BOW_TORSO_TURN = 0.75;
+/** Vedon ankkuri pään luusta (m): oikealle, alas ja eteen. */
+const BOW_ANCHOR = { side: 0.055, down: 0.09, fwd: 0.07 };
+/** Täysi vedon pituus ankkurista kahvaan ja jänteen lepoetäisyys kahvasta (m). */
+const BOW_DRAW_LEN = 0.68;
+const BOW_BRACE = 0.1;
 
 interface ShieldUniforms {
   uNotch: { value: number };
