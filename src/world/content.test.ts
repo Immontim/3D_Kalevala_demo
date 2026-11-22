@@ -1,12 +1,13 @@
 // Pelin oikean maailmadatan tarkistukset ja ensimmäinen dialogipolku: tietäjä ja tuohikontti.
 import { describe, expect, it } from "vitest";
 import { finnishText } from "../i18n";
-import { BASE_INVENTORY_CAPACITY, createCampaign, parseCampaign, serializeCampaign, type SceneItemDefinition } from "../map/campaign";
+import { BASE_INVENTORY_CAPACITY, createCampaign, parseCampaign, sceneItemTakeMode, serializeCampaign, tryAddItem, type SceneItemDefinition } from "../map/campaign";
 import { createCampaignStore } from "../map/campaignStore";
 import { PROTOTYPE_MAP_ID } from "../map/prototype";
 import { newSiteInstances } from "../map/siteInstances";
-import { conditionRefs } from "./conditions";
-import { GAME_WORLD } from "./content";
+import { conditionRefs, itemCount, moonRoll } from "./conditions";
+import { FISH_RUN_CHANCE, GAME_WORLD } from "./content";
+import { resolveInstanceId } from "./instances";
 import { effectRefs } from "./effects";
 import { createWorldRuntime } from "./runtime";
 import { SCENE_ITEM_LABELS } from "./registry";
@@ -19,6 +20,11 @@ import { WORLD_MINUTES_PER_MOON } from "../map/uiState";
 const PACK: SceneItemDefinition = {
   instanceId: "lakeside.sage-pack", siteId: "lakeside", itemId: "birch_bark_pack", quantity: 1, takeMode: "theft", ownerId: "tietaja",
 };
+
+/** Dialogin valinnat ilman ruoan pyytämistä (se testataan omassa osiossaan). */
+function newsChoices(talk: { view: { choices: { id: string }[] } }) {
+  return talk.view.choices.map((c) => c.id).filter((id) => !id.startsWith("ask-food"));
+}
 
 function setup() {
   const store = createCampaignStore(createCampaign({ mapId: PROTOTYPE_MAP_ID, siteInstances: newSiteInstances(1) }), () => true);
@@ -319,13 +325,13 @@ describe("jousineito, emäntä ja nuori urho (V6)", () => {
     const { store, runtime } = setup();
     const talk = runtime.startDialogue("yard", "emanta")!;
     expect(talk.view.nodeId).toBe("greet");
-    expect(talk.view.choices.map((c) => c.id)).toEqual(["ask-news", "leave"]);
+    expect(newsChoices(talk)).toEqual(["ask-news", "leave"]);
     const asked = runtime.choose(talk, "ask-news");
     expect(asked.saved && asked.next?.view.nodeId).toBe("rumor");
     expect(store.get().engine.flags["rumor.heard"]).toBe(true);
     expect(store.get().world.knownSiteIds).toContain("lakeside");
     const again = runtime.startDialogue("yard", "emanta")!;
-    expect(again.view.choices.map((c) => c.id)).toEqual(["ask-news-again", "leave"]);
+    expect(newsChoices(again)).toEqual(["ask-news-again", "leave"]);
     expect(again.view.choices[0].text).toBe(talk.view.choices[0].text);          // sama kysymys
     const none = runtime.choose(again, "ask-news-again");
     expect(none.saved && none.next?.view.nodeId).toBe("noNews");
@@ -411,7 +417,7 @@ describe("jousineidon parannus: 6/8 osumaa ja kolme yritystä (2026-11-22)", () 
     expect(runtime.startDialogue("yard", "emanta")!.view.choices.some((c) => c.id === "ask-maiden")).toBe(false);
     runtime.post({ type: "npc.leftBehind", npcId: "jousineito", sceneId: "yard" });
     const talk = runtime.startDialogue("yard", "emanta")!;
-    expect(talk.view.choices.map((c) => c.id)).toEqual(["ask-news", "ask-maiden", "leave"]);
+    expect(newsChoices(talk)).toEqual(["ask-news", "ask-maiden", "leave"]);
     const told = runtime.choose(talk, "ask-maiden");
     expect(told.saved && told.next?.view.nodeId).toBe("maidenDied");
   });
@@ -482,5 +488,141 @@ describe("repliikkien muunnelmat", () => {
   it("ei uutta -vastauksella on runsaasti vaihtelua (omistajan toive)", () => {
     const node = GAME_WORLD.dialogues.find((d) => d.npcId === "emanta_b")!.nodes.noNews;
     expect(nodeVariants(node).length).toBeGreaterThanOrEqual(6);
+  });
+});
+
+describe("emäntien pöytäruoka: varkaus, sovitus ja pyytäminen (2026-11-22)", () => {
+  type Npc = "emanta" | "emanta_b";
+  type Store = ReturnType<typeof setup>["store"];
+  const yardOf = (store: Store, npc: Npc) =>
+    store.get().world.siteInstances.find((i) => i.kind === "yard" && i.archer === (npc === "emanta"))!.id;
+  const table = (store: Store, npc: Npc, what: "bread" | "fish"): SceneItemDefinition => {
+    const yard = yardOf(store, npc);
+    return what === "bread"
+      ? { instanceId: `${yard}.table-flatbread`, siteId: yard, itemId: "barley_flatbread", quantity: 3, takeMode: "theft", ownerId: npc }
+      : { instanceId: `${yard}.table-dried-fish`, siteId: yard, itemId: "dried_fish", quantity: 3, takeMode: "theft", ownerId: npc };
+  };
+  function take(store: Store, item: SceneItemDefinition) {
+    let out: ReturnType<typeof takeSceneItemWithEvents> | null = null;
+    store.update((s) => { const r = takeSceneItemWithEvents(s, item, "yard", GAME_WORLD); out = r; return r.state; });
+    return out!;
+  }
+  function addHares(store: Store, n: number) {
+    store.update((s) => ({ ...s, player: { ...s.player, inventory: tryAddItem(s.player.inventory, "hare_meat", n)! } }));
+  }
+  /** Siirtää ajan kuunkiertoon, jolla emännän kala-arpa osuu (`fish`) tai ei osu. */
+  function moonWhere(store: Store, npc: Npc, fish: boolean) {
+    for (let i = 0; i < 64; i++) {
+      const s = { ...store.get(), world: { ...store.get().world, worldMinutes: i * WORLD_MINUTES_PER_MOON + 60 } };
+      if ((moonRoll(s, `${npc}.fish`) < FISH_RUN_CHANCE) === fish) { store.update(() => s); return; }
+    }
+    throw new Error("sopivaa kuuta ei löytynyt");
+  }
+  const ids = (talk: { view: { choices: { id: string }[] } }) => talk.view.choices.map((c) => c.id);
+
+  it("roolitunniste osoittaa oikean talon pöytään", () => {
+    const { store } = setup();
+    expect(resolveInstanceId(store.get(), "@archerYard.table-flatbread")).toBe(`${yardOf(store, "emanta")}.table-flatbread`);
+    expect(resolveInstanceId(store.get(), "@otherYard.table-dried-fish")).toBe(`${yardOf(store, "emanta_b")}.table-dried-fish`);
+    expect(yardOf(store, "emanta")).not.toBe(yardOf(store, "emanta_b"));
+    expect(resolveInstanceId(store.get(), "lakeside.sage-pack")).toBe("lakeside.sage-pack");
+  });
+
+  it("kala-arpa vaihtelee kuunkierroittain, mutta pysyy kuun sisällä samana", () => {
+    const { store } = setup();
+    const at = (minutes: number) => moonRoll({ ...store.get(), world: { ...store.get().world, worldMinutes: minutes } }, "emanta.fish");
+    expect(at(60)).toBe(at(WORLD_MINUTES_PER_MOON - 60));
+    const hits = Array.from({ length: 200 }, (_, i) => at(i * WORLD_MINUTES_PER_MOON + 60) < FISH_RUN_CHANCE).filter(Boolean).length;
+    expect(hits).toBeGreaterThan(70);
+    expect(hits).toBeLessThan(130);
+    // Emäntien arvat eivät korreloi: lähes samanlaiset suolat eivät anna samaa tulosta.
+    const atB = (minutes: number) => moonRoll({ ...store.get(), world: { ...store.get().world, worldMinutes: minutes } }, "emanta_b.fish");
+    const agree = Array.from({ length: 200 }, (_, i) => i * WORLD_MINUTES_PER_MOON + 60)
+      .filter((m) => (at(m) < FISH_RUN_CHANCE) === (atB(m) < FISH_RUN_CHANCE)).length;
+    expect(agree).toBeGreaterThan(70);
+    expect(agree).toBeLessThan(130);
+  });
+
+  for (const npc of ["emanta", "emanta_b"] as const) {
+    it(`${npc}: varkaus näkyy heti samalla käynnillä, ja kaksi jänistä lepyttää`, () => {
+      const { store, runtime } = setup();
+      const other: Npc = npc === "emanta" ? "emanta_b" : "emanta";
+      const r = take(store, table(store, npc, "bread"));
+      expect(r.take.status === "taken" && r.take.takeMode).toBe("theft");
+      expect(r.post?.messages[0].text).toBe("world.emanta.theftNoticed");
+      expect(store.get().engine.counters["thefts.noticed"]).toBe(1);
+      // Ilman jäniksiä vain lähteminen; toinen emäntä ei tiedä mitään.
+      const angry = runtime.startDialogue("yard", npc)!;
+      expect(angry.view.nodeId).toBe("robbed");
+      expect(ids(angry)).toEqual(["leave"]);
+      expect(runtime.startDialogue("yard", other)!.view.nodeId).toBe("greet");
+      // Yksi jänis ei riitä.
+      addHares(store, 1);
+      expect(ids(runtime.startDialogue("yard", npc)!)).toEqual(["leave"]);
+      addHares(store, 1);
+      const pay = runtime.startDialogue("yard", npc)!;
+      expect(ids(pay)).toEqual(["give-hares", "leave"]);
+      const paid = runtime.choose(pay, "give-hares");
+      expect(paid.saved && paid.next?.view.nodeId).toBe("appeased");
+      expect(itemCount(store.get(), "hare_meat")).toBe(0);
+      expect(runtime.startDialogue("yard", npc)!.view.nodeId).toBe("greet");
+      // Uusi varkaus suututtaa uudelleen.
+      take(store, table(store, npc, "fish"));
+      expect(runtime.startDialogue("yard", npc)!.view.nodeId).toBe("robbed");
+    });
+  }
+
+  it("kalaonnen kuulla emäntä antaa kalat pyytämällä, rieskat jäävät varastettaviksi", () => {
+    const { store, runtime } = setup();
+    moonWhere(store, "emanta", true);
+    const talk = runtime.startDialogue("yard", "emanta")!;
+    expect(ids(talk)).toContain("ask-food-fish");
+    expect(ids(talk)).not.toContain("ask-food-meat");
+    const out = runtime.choose(talk, "ask-food-fish");
+    expect(out.saved && out.next?.view.nodeId).toBe("foodFish");
+    expect(out.saved && out.messages[0].text).toBe("world.emanta.fishAllowed");
+    expect(sceneItemTakeMode(store.get(), table(store, "emanta", "fish"))).toBe("allowed");
+    expect(sceneItemTakeMode(store.get(), table(store, "emanta", "bread"))).toBe("theft");
+    const fish = take(store, table(store, "emanta", "fish"));
+    expect(fish.take.status === "taken" && fish.take.takeMode).toBe("allowed");
+    expect(store.get().engine.flags["emanta.robbed"]).toBeUndefined();
+    // Kalat viety: rieskoista pitää nyt tarjota jänistä.
+    expect(ids(runtime.startDialogue("yard", "emanta")!)).toContain("ask-food-meat");
+  });
+
+  it("lihapulan kuulla yksi jänis antaa luvan ottaa sekä rieskat että kalat", () => {
+    const { store, runtime } = setup();
+    moonWhere(store, "emanta_b", false);
+    const talk = runtime.startDialogue("yard", "emanta_b")!;
+    expect(ids(talk)).toContain("ask-food-meat");
+    const meat = runtime.choose(talk, "ask-food-meat");
+    if (!meat.saved || !meat.next) throw new Error("valinta epäonnistui");
+    expect(meat.next.view.nodeId).toBe("foodMeat");
+    expect(ids(meat.next)).toEqual(["no-hare"]);          // ei jänistä: ei tarjousta
+    addHares(store, 3);
+    const again = runtime.choose(runtime.startDialogue("yard", "emanta_b")!, "ask-food-meat");
+    if (!again.saved || !again.next) throw new Error("valinta epäonnistui");
+    expect(ids(again.next)).toEqual(["offer-hare", "no-hare"]);
+    const traded = runtime.choose(again.next, "offer-hare");
+    expect(traded.saved && traded.next?.view.nodeId).toBe("foodTraded");
+    expect(itemCount(store.get(), "hare_meat")).toBe(2);
+    expect(sceneItemTakeMode(store.get(), table(store, "emanta_b", "bread"))).toBe("allowed");
+    expect(sceneItemTakeMode(store.get(), table(store, "emanta_b", "fish"))).toBe("allowed");
+    expect(ids(runtime.startDialogue("yard", "emanta_b")!).some((id) => id.startsWith("ask-food"))).toBe(false);
+    take(store, table(store, "emanta_b", "bread"));
+    take(store, table(store, "emanta_b", "fish"));
+    expect(store.get().engine.flags["emanta_b.robbed"]).toBeUndefined();
+    // Toisen talon lupa ei koske jousineidon taloa.
+    expect(sceneItemTakeMode(store.get(), table(store, "emanta", "bread"))).toBe("theft");
+  });
+
+  it("tyhjästä pöydästä ei voi pyytää", () => {
+    const { store, runtime } = setup();
+    moonWhere(store, "emanta", false);
+    take(store, table(store, "emanta", "bread"));
+    take(store, table(store, "emanta", "fish"));
+    addHares(store, 2);
+    runtime.choose(runtime.startDialogue("yard", "emanta")!, "give-hares");
+    expect(ids(runtime.startDialogue("yard", "emanta")!).some((id) => id.startsWith("ask-food"))).toBe(false);
   });
 });

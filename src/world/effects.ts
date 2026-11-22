@@ -5,6 +5,7 @@ import { setSceneItemTakeMode, tryAddItem, tryRemoveItem, type CampaignState } f
 import { nearestUnknownHuntGround } from "../map/huntGrounds";
 import { revealSiteOnMap } from "../map/reveal";
 import { currentMoonMark } from "./conditions";
+import { resolveInstanceId } from "./instances";
 import { totalDays } from "../map/uiState";
 import { withCounterAdded, withCounterSet, withFlag } from "./state";
 import type { Effect, OutAction, OutMessage, WorldData } from "./types";
@@ -45,9 +46,12 @@ export function applyEffects(state: CampaignState, effects: readonly Effect[], d
         current = { ...current, player: { ...current.player, inventory } };
         break;
       }
-      case "setSceneItemTakeMode":
-        current = setSceneItemTakeMode(current, effect.instanceId, effect.takeMode);
+      case "setSceneItemTakeMode": {
+        const id = resolveInstanceId(current, effect.instanceId);
+        if (!id) return fail(state, "unknown-site", `pihaa ei löydy esineelle ${effect.instanceId}`);
+        current = setSceneItemTakeMode(current, id, effect.takeMode);
         break;
+      }
       case "message":
         messages.push(effect.sub ? { text: effect.text, sub: effect.sub } : { text: effect.text });
         break;

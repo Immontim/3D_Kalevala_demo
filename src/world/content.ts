@@ -2,7 +2,7 @@
 // NPC:iden repliikeillä on vähintään kolme samaa tarkoittavaa muunnelmaa (`lines`), joista näytetään yksi.
 import type { TextKey } from "../i18n";
 import { COUNTERS, FLAGS } from "./registry";
-import type { Condition, Dialogue, DialogueChoice, Rule, WorldData } from "./types";
+import type { Condition, Dialogue, DialogueChoice, DialogueEntry, DialogueNode, Rule, WorldData } from "./types";
 
 const SAGE_PACK = "lakeside.sage-pack";
 /** Jousineidon haava vaatii vähintään näin monta osumaa parannuslaulun kahdeksasta säkeestä (omistaja 2026-11-22). */
@@ -24,7 +24,120 @@ const NO_NEWS: readonly TextKey[] = [
   "dialogue.emanta.noNews.4", "dialogue.emanta.noNews.5", "dialogue.emanta.noNews.6",
 ];
 
+/** Emäntien pöytäruoka: varkaus, sovitus kahdella jäniksellä ja ruoan pyytäminen (omistaja 2026-11-22). */
+export const APPEASE_HARES = 2;
+/** Todennäköisyys, että kalaa on kuunkierrolla noussut niin hyvin, että emäntä antaa sitä pyytämättä vastalahjaa. */
+export const FISH_RUN_CHANCE = 0.5;
+
+type HousewifeId = "emanta" | "emanta_b";
+const HOUSEHOLD = {
+  emanta: { yard: "@archerYard", name: "jousineidon talon emäntä" },
+  emanta_b: { yard: "@otherYard", name: "toisen talon emäntä" },
+} as const;
+
+/** Emännän pöydältä varastaminen: emäntä huomaa sen heti ja muistaa, kunnes hänet lepytetään. */
+function theftRule(npc: HousewifeId): Rule {
+  return {
+    id: `${npc}.theft-noticed`,
+    intent: `Jos pelaaja vie ruokaa pöydältä kysymättä, ${HOUSEHOLD[npc].name} huomaa sen eikä puhu muusta ennen kuin saa kaksi jänislihaa hyvitykseksi.`,
+    on: { type: "item.taken", takeMode: "theft", sceneId: "yard", ownerId: npc },
+    then: [
+      { kind: "setFlag", flag: `${npc}.robbed` },
+      { kind: "addCounter", counter: "thefts.noticed", amount: 1 },
+      { kind: "message", text: "world.emanta.theftNoticed", sub: "world.emanta.theftNoticedSub" },
+    ],
+  };
+}
+
+/**
+ * Emännän ruokadialogin palat: varkauden jälkeinen aloitus, sovitus ja ruoan pyytäminen. Kalaa on
+ * joka toisena kuunkiertona noussut hyvin (`moonChance`), jolloin emäntä antaa kalat pyytämällä;
+ * muuten rieskat ja kalat saa yhdellä jänislihalla.
+ */
+function householdFood(npc: HousewifeId, greetChoices: DialogueChoice[]): {
+  entry: DialogueEntry; greet: DialogueChoice[]; nodes: Record<string, DialogueNode>;
+} {
+  const bread = `${HOUSEHOLD[npc].yard}.table-flatbread`;
+  const fish = `${HOUSEHOLD[npc].yard}.table-dried-fish`;
+  const robbed = `${npc}.robbed`;
+  const shared = `${npc}.foodShared`;
+  const fishOffer: Condition = {
+    kind: "all",
+    of: [{ kind: "moonChance", salt: `${npc}.fish`, chance: FISH_RUN_CHANCE }, { kind: "not", of: { kind: "itemTaken", instanceId: fish } }],
+  };
+  const tableEmpty: Condition = { kind: "all", of: [{ kind: "itemTaken", instanceId: bread }, { kind: "itemTaken", instanceId: fish }] };
+  const askFood: DialogueChoice[] = [
+    {
+      id: "ask-food-fish",
+      text: "dialogue.emanta.askFood",
+      when: { kind: "all", of: [{ kind: "flag", flag: shared, value: false }, fishOffer] },
+      effects: [
+        { kind: "setSceneItemTakeMode", instanceId: fish, takeMode: "allowed" },
+        { kind: "message", text: "world.emanta.fishAllowed" },
+      ],
+      next: "foodFish",
+    },
+    {
+      id: "ask-food-meat",
+      text: "dialogue.emanta.askFood",
+      when: {
+        kind: "all",
+        of: [{ kind: "flag", flag: shared, value: false }, { kind: "not", of: fishOffer }, { kind: "not", of: tableEmpty }],
+      },
+      next: "foodMeat",
+    },
+  ];
+  const greet = [...greetChoices.slice(0, -1), ...askFood, ...greetChoices.slice(-1)];
+  const leave: DialogueChoice = { id: "leave", text: "dialogue.sage.leave" };
+  return {
+    entry: { when: { kind: "flag", flag: robbed }, node: "robbed" },
+    greet,
+    nodes: {
+      robbed: {
+        text: lines("dialogue.emanta.robbed"),
+        choices: [
+          {
+            id: "give-hares",
+            text: "dialogue.emanta.giveHares",
+            when: { kind: "hasItem", itemId: "hare_meat", quantity: APPEASE_HARES },
+            effects: [
+              { kind: "takeItem", itemId: "hare_meat", quantity: APPEASE_HARES },
+              { kind: "setFlag", flag: robbed, value: false },
+            ],
+            next: "appeased",
+          },
+          leave,
+        ],
+      },
+      appeased: { text: lines("dialogue.emanta.appeased"), choices: greet },
+      foodFish: { text: lines("dialogue.emanta.foodFish"), choices: [leave] },
+      foodMeat: {
+        text: lines("dialogue.emanta.foodMeat"),
+        choices: [
+          {
+            id: "offer-hare",
+            text: "dialogue.emanta.offerHare",
+            when: { kind: "hasItem", itemId: "hare_meat", quantity: 1 },
+            effects: [
+              { kind: "takeItem", itemId: "hare_meat", quantity: 1 },
+              { kind: "setSceneItemTakeMode", instanceId: bread, takeMode: "allowed" },
+              { kind: "setSceneItemTakeMode", instanceId: fish, takeMode: "allowed" },
+              { kind: "setFlag", flag: shared },
+              { kind: "message", text: "world.emanta.foodAllowed" },
+            ],
+            next: "foodTraded",
+          },
+          { id: "no-hare", text: "dialogue.emanta.noHare" },
+        ],
+      },
+      foodTraded: { text: lines("dialogue.emanta.foodTraded"), choices: [leave] },
+    },
+  };
+}
+
 export const RULES: Rule[] = [
+  theftRule("emanta"),
+  theftRule("emanta_b"),
   {
     id: "sage.theft-noticed",
     intent: "Jos pelaaja vie tietäjän tuohikontin luvatta, siitä jää näkyvä seuraus: tietäjä muistaa sen ja puhuu siitä.",
@@ -253,36 +366,37 @@ export const ARCHER_DIALOGUE: Dialogue = {
 /** Kysymys uutisista: sama sanamuoto molemmille emännille. */
 const ASK_NEWS_TEXT: TextKey = "dialogue.emanta.askNews";
 
+const HOUSEWIFE_FOOD = householdFood("emanta", [
+  {
+    id: "ask-news",
+    text: ASK_NEWS_TEXT,
+    when: { kind: "flag", flag: "rumor.heard", value: false },
+    effects: [
+      { kind: "setFlag", flag: "rumor.heard" },
+      { kind: "revealSite", siteId: "lakeside" },
+      { kind: "message", text: "world.emanta.rumor", sub: "world.emanta.rumorSub" },
+    ],
+    next: "rumor",
+  },
+  { id: "ask-news-again", text: ASK_NEWS_TEXT, when: { kind: "flag", flag: "rumor.heard" }, next: "noNews" },
+  { id: "ask-maiden", text: "dialogue.emanta.askMaiden", when: { kind: "flag", flag: "archer.dead" }, next: "maidenDied" },
+  { id: "leave", text: "dialogue.sage.leave" },
+]);
+
 /**
  * Jousineidon talon emäntä (`emanta`): kertoo kerran huhun vainolaisista ja merkitsee tietäjän rannan
  * kartalle. Jos jousineito kuoli, hän kertoo siitä. Muuten uutta ei ole kuulunut.
+ * Ruoka ja varkaus: `householdFood`.
  */
 export const HOUSEWIFE_DIALOGUE: Dialogue = {
   id: "emanta.yard",
   sceneId: "yard",
   npcId: "emanta",
-  intent: "Jousineidon talon emäntä kertoo huhun Pohjan akan vainolaisista ja neuvoo tietäjän luo (ranta kartalle); jos jousineito kuoli, emäntä kertoo, ettei ollut laulajaa eikä rohtojen sitojaa. Kun kaikki on kerrottu, uutta ei ole kuultu.",
-  entries: [{ node: "greet" }],
+  intent: "Jousineidon talon emäntä kertoo huhun Pohjan akan vainolaisista ja neuvoo tietäjän luo (ranta kartalle); jos jousineito kuoli, emäntä kertoo, ettei ollut laulajaa eikä rohtojen sitojaa. Kun kaikki on kerrottu, uutta ei ole kuultu. Ruokaa voi pyytää; pöydältä varastanut saa lepyttää emännän kahdella jänislihalla.",
+  entries: [HOUSEWIFE_FOOD.entry, { node: "greet" }],
   nodes: {
-    greet: {
-      text: lines("dialogue.emanta.greet"),
-      choices: [
-        {
-          id: "ask-news",
-          text: ASK_NEWS_TEXT,
-          when: { kind: "flag", flag: "rumor.heard", value: false },
-          effects: [
-            { kind: "setFlag", flag: "rumor.heard" },
-            { kind: "revealSite", siteId: "lakeside" },
-            { kind: "message", text: "world.emanta.rumor", sub: "world.emanta.rumorSub" },
-          ],
-          next: "rumor",
-        },
-        { id: "ask-news-again", text: ASK_NEWS_TEXT, when: { kind: "flag", flag: "rumor.heard" }, next: "noNews" },
-        { id: "ask-maiden", text: "dialogue.emanta.askMaiden", when: { kind: "flag", flag: "archer.dead" }, next: "maidenDied" },
-        { id: "leave", text: "dialogue.sage.leave" },
-      ],
-    },
+    greet: { text: lines("dialogue.emanta.greet"), choices: HOUSEWIFE_FOOD.greet },
+    ...HOUSEWIFE_FOOD.nodes,
     rumor: { text: lines("dialogue.emanta.rumor"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
     maidenDied: { text: lines("dialogue.emanta.maidenDied"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
     noNews: { text: NO_NEWS, choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
@@ -299,31 +413,31 @@ const HUNT_TIP_AVAILABLE: Condition = {
  * Toisen talon emäntä (`emanta_b`): ei tiedä vainolaisista, mutta neuvoo kerran kuunkierrossa yhden
  * metsästysapajan, jota pelaaja ei vielä tunne. Jos sellaista ei ole tai hän on jo neuvonut, uutta ei ole.
  */
+const HOUSEWIFE_B_FOOD = householdFood("emanta_b", [
+  {
+    id: "ask-news",
+    text: ASK_NEWS_TEXT,
+    when: HUNT_TIP_AVAILABLE,
+    effects: [
+      { kind: "revealHuntGround" },
+      { kind: "markMoon", counter: "emanta.huntTipMoon" },
+      { kind: "message", text: "world.emanta.huntTip", sub: "world.emanta.huntTipSub" },
+    ],
+    next: "huntTip",
+  },
+  { id: "ask-news-none", text: ASK_NEWS_TEXT, when: { kind: "not", of: HUNT_TIP_AVAILABLE }, next: "noNews" },
+  { id: "leave", text: "dialogue.sage.leave" },
+]);
+
 export const HOUSEWIFE_B_DIALOGUE: Dialogue = {
   id: "emanta_b.yard",
   sceneId: "yard",
   npcId: "emanta_b",
-  intent: "Toisen talon emäntä neuvoo kerran kuunkierrossa yhden metsästysapajan, jota pelaaja ei vielä tunne (apaja kartalle); muuten tältä kuulta ei ole uutta kuultu.",
-  entries: [{ node: "greet" }],
+  intent: "Toisen talon emäntä neuvoo kerran kuunkierrossa yhden metsästysapajan, jota pelaaja ei vielä tunne (apaja kartalle); muuten tältä kuulta ei ole uutta kuultu. Ruokaa voi pyytää; pöydältä varastanut saa lepyttää emännän kahdella jänislihalla.",
+  entries: [HOUSEWIFE_B_FOOD.entry, { node: "greet" }],
   nodes: {
-    greet: {
-      text: lines("dialogue.emanta.greet"),
-      choices: [
-        {
-          id: "ask-news",
-          text: ASK_NEWS_TEXT,
-          when: HUNT_TIP_AVAILABLE,
-          effects: [
-            { kind: "revealHuntGround" },
-            { kind: "markMoon", counter: "emanta.huntTipMoon" },
-            { kind: "message", text: "world.emanta.huntTip", sub: "world.emanta.huntTipSub" },
-          ],
-          next: "huntTip",
-        },
-        { id: "ask-news-none", text: ASK_NEWS_TEXT, when: { kind: "not", of: HUNT_TIP_AVAILABLE }, next: "noNews" },
-        { id: "leave", text: "dialogue.sage.leave" },
-      ],
-    },
+    greet: { text: lines("dialogue.emanta.greet"), choices: HOUSEWIFE_B_FOOD.greet },
+    ...HOUSEWIFE_B_FOOD.nodes,
     huntTip: { text: lines("dialogue.emanta.huntTip"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
     noNews: { text: NO_NEWS, choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
   },
