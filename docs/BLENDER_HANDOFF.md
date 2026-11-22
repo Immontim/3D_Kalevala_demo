@@ -6,7 +6,7 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-22 (Claude, Windows; pohja main 616bf48; villisika branchissa `claude/boar-model-94a069`,
+Päivitetty: 2026-11-22 (Claude, Windows; pohja main 7740904; villisika pelissä branchissa `claude/boar-hunt`,
 tarkista merge-tila `git merge-base --is-ancestor`)
 
 - **Metsän LOD- ja reuna-assetit** (`assets/forest_lod.glb`, 1,6 Mt; `assets-src/blender/forest_lod.py`;
@@ -167,10 +167,9 @@ tarkista merge-tila `git merge-base --is-ancestor`)
   Origo maassa jalkojen välissä, kärsä −Y (pelissä +z). Juurisolmu `villisika` (armature, 28 luuta) ja lapsena
   `villisika_mesh`. Leikkeet 30 fps paikallaan: `idle` 2,0 s, `walk` 1,0 s (1,2 m/s), `run` 0,5 s (rynnäkkö,
   6,5 m/s), `attack` 0,8 s (osumaikkuna 0,30–0,45 s), `hit` 0,4 s ja `death` 1,5 s (kyljelleen, pidä viimeinen
-  ruutu). `KALEVALA_PREVIEW=<kansio>` tekee kuvat ja `report.json`in uudelleen tuodusta GLB:stä. Arvioija
-  hyväksyi iteraation 5; ei katsottu pelissä. Hylätty iter. 4: reiden yläkansi pisti läpi (nyt jalka alkaa
-  rungon sisältä) ja hammas oli kärsän kärjessä (nyt suupielessä 13 cm kiekon takana). Profiilissa hammas jää
-  pään ääriviivan sisään; riittävän pitkä hammas (15–18 cm) olisi sarjakuvamainen.
+  ruutu). `KALEVALA_PREVIEW=<kansio>` tekee kuvat uudelleen tuodusta GLB:stä. Arvioija hyväksyi iter. 5
+  (iter. 4: reisi pisti läpi, hammas kärsän kärjessä). Pelissä v08.04:stä (`engine/boars.ts`): kaikki leikkeet
+  käytössä, `run` nopeutettuna 9 m/s:iin; suunta ja mittakaava oikein kuvissa. Hammas jää profiilissa pään sisään.
 - **Tarkistuksen taso:** Blenderin kuvat; kyläläiset, eläimet, esineet ja rakennelmat myös pelin
   kuvakaappauksista, ei liikkeessä. Eläinten GLB:t on tuotu takaisin Blenderiin ja jokainen leike kuvattu.
 - **Blender-putket** (`assets-src/blender/`): metsä `build_all.py`,

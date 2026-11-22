@@ -41,6 +41,7 @@ const WALK_CLIP_SPEED = 1.2;
 const CHARGE_PUSH = 1.4;
 /** Verijäljen tippojen enimmäismäärä (vanhimmat korvautuvat). */
 const BLOOD_MAX = 400;
+const BLOOD_LIFT = 0.07;
 
 interface BoarView {
   boar: Boar;
@@ -115,11 +116,11 @@ export function addBoar(x: number, z: number, yaw = 0): Boar {
   return boar;
 }
 
-function play(v: BoarView, name: string, fade = 0.25, loop = true, timeScale = 1) {
+function play(v: BoarView, name: string, fade = 0.25, loop = true, timeScale = 1): boolean {
   const a = v.actions.get(name);
-  if (!a) return;
+  if (!a) return false;
   a.timeScale = timeScale;
-  if (v.clip === name) return;
+  if (v.clip === name) return true;
   const prev = v.actions.get(v.clip);
   a.reset();
   a.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
@@ -129,12 +130,16 @@ function play(v: BoarView, name: string, fade = 0.25, loop = true, timeScale = 1
   a.play();
   if (prev && prev !== a) { if (fade > 0) prev.fadeOut(fade); else prev.stop(); }
   v.clip = name;
+  return true;
 }
 
 function ensureBlood() {
   if (blood) return;
-  const geo = new THREE.CircleGeometry(0.07, 7);
-  const mat = new THREE.MeshStandardMaterial({ color: 0x5c0f0b, roughness: 0.45, polygonOffset: true, polygonOffsetFactor: -2 });
+  const geo = new THREE.CircleGeometry(0.1, 7);
+  // Kirkas, kostea punainen ja hieman omaa valoa, jotta jälki erottuu varvikossa ja varjossa.
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x6e0f09, emissive: 0x240302, roughness: 0.35, polygonOffset: true, polygonOffsetFactor: -4,
+  });
   blood = new THREE.InstancedMesh(geo, mat, BLOOD_MAX);
   blood.count = 0;
   blood.frustumCulled = false;
@@ -146,12 +151,13 @@ function ensureBlood() {
 /** Veritippa maahan (verijälki). Useampi tippa ryppäänä, jotta jälki erottuu maastosta. */
 export function dropBlood(x: number, z: number, amount = 1) {
   if (!blood) return;
-  const n = Math.max(1, Math.round(2 * amount));
+  const n = Math.max(1, Math.round(3 * amount));
   for (let i = 0; i < n; i++) {
     const px = x + (Math.random() - 0.5) * 0.5, pz = z + (Math.random() - 0.5) * 0.5;
     const s = (0.6 + Math.random() * 0.9) * (0.7 + 0.3 * amount);
     q.copy(FLAT).premultiply(new THREE.Quaternion().setFromAxisAngle(UP, Math.random() * Math.PI));
-    m4.compose(pos.set(px, groundHeight(px, pz) + 0.02, pz), q, sc.set(s, s * (0.6 + Math.random() * 0.5), 1));
+    // Maastoverkko on laskettua pintaa harvempi: tippa nostetaan hieman, ettei se jää verkon alle.
+    m4.compose(pos.set(px, groundHeight(px, pz) + BLOOD_LIFT, pz), q, sc.set(s, s * (0.6 + Math.random() * 0.5), 1));
     blood.setMatrixAt(bloodNext, m4);
     bloodNext = (bloodNext + 1) % BLOOD_MAX;
     bloodCount = Math.min(BLOOD_MAX, bloodCount + 1);
@@ -250,7 +256,7 @@ function afterHurt(v: BoarView, result: "dead" | "hurt" | "none") {
     showMsg(t("hunt.killed", { animal: t(BOAR.nameKey) }), t("hunt.killedSub"), 2.6);
     return;
   }
-  if (v.boar.state === "flinch") { play(v, "hit", 0.08, false, 1); v.oneShot = 0.4; }
+  if (v.boar.state === "flinch" && play(v, "hit", 0.08, false, 1)) v.oneShot = 0.4;
 }
 
 /** Päivitys joka ruudulla. Palauttaa, onko jokin sika vaarallinen (asettaa `g.danger`). */
@@ -292,8 +298,7 @@ function handleEvent(v: BoarView, e: BoarEvent) {
     }
     case "charge": sfx.boarGrunt(0.8); g.events.push(`villisika:ryntää:${b.id}`); break;
     case "contact":
-      play(v, "attack", 0.08, false, 1.6);
-      v.oneShot = 0.5;
+      if (play(v, "attack", 0.08, false, 1.6)) v.oneShot = 0.5;
       chargeHitsHero(e.dirX, e.dirZ);
       break;
     case "rammed":

@@ -6,32 +6,27 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `6338589`)
+Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `7740904`)
 
-- **Koodiversio v08.03.00** branchissa `claude/forest-birds-d078f7` (Erämaan taustalinnut; tarkista merge-tila
-  `git merge-base`illa). Koodi valmis, ei deployattu, omistaja ei ole testannut. Claude savutesti in-app-
-  selaimessa: 16 lintua, korppi maassa, peippo kuusen latvuksessa, korpin ja rastaan lento kuvattu; maassa oleva
-  peippo lähti 3 m:stä puuhun. `renderBench` erämaa (1024 × 768, 4 × 120 ruutua): linnut näkyvissä 5,3–5,7 ms /
-  148–151 kutsua, piilossa 5,2–5,4 ms / 145–148 kutsua. Konsolissa ei virheitä. Tarkistukset: `bun run test`
-  482/482, `bunx tsc --noEmit`, `bun run lint`, `bun run build`. v08.02 ja aiemmat mainissa.
-- **Taustalinnut (v08.03, `fauna/birds.ts` puhdas + `engine/birds.ts`).** `Flock` tilakone (`perch`/`fly`/
-  `ground`), `planFlight` Bézier-kaari, `PerchSet` ruudukko; lajit ja luvut `BIRD_SPECIES`/`BIRD_FLOCK`.
-  Istumapaikat `perchTemplate`: kuoriverteksit (männyn/koivun oksat, latva), kuusessa rungon vieressä
-  (kuusen oksat ovat lehvästökortteja). Kytkentä vain `world.ts`:n `buildWorld`issa (`WILDS`), ei `loop.ts`:ää.
-  Siivet ja nokkiminen varjostimessa (`aAnim`), 3 `InstancedMesh`iä, ei varjoja. Konsoli `__world.birds`,
-  `__world.birdsShow(bool)`. Linnut eivät ole riistaa eivätkä kuuntele nuolia.
-- **Koodiversio v08.03.00** branchissa `claude/bow-pose` (tarkista merge-tila `git merge-base`illa). Koodi
-  valmis, ei deployattu, omistaja ei ole testannut. Claude kuvasi erämaassa sivulta ja olan yli: kanto,
-  tähtäys ilman jännitystä ja täysi jännitys; kilpi poissa, konsoli puhdas. `bunx vitest run --dir src`,
-  `bunx tsc --noEmit`, `bun run lint`, `bun run build` läpi. v08.02 (tietäjä ja uhri) on mainissa.
-- **Jousen kädet (v08.03, `Fighter.bowArms`).** `hunt.ts` kutsuu joka ruutu `setBowAim(aimBlend, elev, draw)`.
-  Paino > 0: rinta kiertyy `BOW_TORSO_TURN` (vasen olka eteen), pää katsoo tähtäyssuuntaan, ankkuri
-  `BOW_ANCHOR` pään luusta; kahva linjalle `ankkuri + A · min(ulottuma, BOW_DRAW_LEN 0,68)`, oikea nyrkki
-  jänteellä `BOW_BRACE` 0,1 m → ankkuri jännityksen mukaan. Kummankin nyrkin kehys: kyynärvarsi A:han
-  (−y), otekanava pystyyn (±U, pienempi ranteen kierto), `twoBone` + kyynärvarren kierto. Kanto (paino 0)
-  on yhä `POSES.bowCarry`. Kilpi: `world.ts` `sceneLoadout` muuttaa erämaassa `sword_shield` → `sword`
-  (`scene3d.ts`, taukovalikko); kampanjan varusteet eivät muutu. Jänis antaa 1–3 lihaa (`killPrey` arpoo
-  `Prey.meat`, `meatToTake`: täyteen inventaarioon otetaan mahtuva osa, loput jäävät ruhoon).
+- **Koodiversio v08.04.00** branchissa `claude/boar-hunt` (tarkista merge-tila `git merge-base`illa). Koodi
+  valmis, ei deployattu, omistaja ei testannut. In-app-savutesti (`__game.spawnBoar`/`hurtBoar`): varoitus ja
+  rynnäkkö osuivat ja horjuttivat, nuoli ja miekka osuivat, X vaihtoi jousen ja aseen vaarassa, verijälki,
+  "Sianliha ×5", kuolema `?return=map` → kartta (R estetty). `renderBench` 3,4–5,0 ms / 142–146 kutsua.
+  Konsoli puhdas; `bunx vitest run --dir src`, `tsc`, `lint`, `build` läpi. v08.03 on mainissa.
+- **Villisika (v08.04, `hunt/boar.ts` puhdas + `engine/boars.ts`).** `initBoars`: 0–2 sikaa (`boarCount`
+  40/40/20 %, ≥ 45 m saapumisesta). Tilat root/walk/alert/threat/charge/recover/flinch/flee/bed/dead, luvut
+  `BOAR` (aggressio 0,35, varoitus 0,7 s, rynnäkkö 9 m/s, käännös 1,1 rad/s, vahinko 22, elämä 3; pako terve
+  34 m, haavoittunut 70–100 m → `bed`; paon todennäköisyys kasvaa vahingosta). `updateBoar` palauttaa
+  tapahtumat (`contact`, `blood`…). Nuolet: `boarBodies` (`boar-N#i`) `traceWorld`iin, `arrowDamage(draw)`;
+  lyönnit `melee.setCreatureStrike` → `meleeBoarDamage`. `g.danger` (`boarDangerous`) kumoaa `heroAtPeace`n;
+  `bowActive` sallii jousen vaarassa (miekka tupessa), X vaihtaa jousen ja aseen. Verijälki `InstancedMesh`
+  400 tippaa. Kuolema erämaassa: `huntDeathReturn(toStartMenu)`. Ruho `boar_meat` 4–6. Lukitus ei tunne sikaa.
+- **Taustalinnut (v08.03, `fauna/birds.ts` puhdas + `engine/birds.ts`).** `Flock` (`perch`/`fly`/`ground`),
+  `planFlight` Bézier, istumapaikat `perchTemplate` puiden oikeista oksista; kytkentä `world.ts` `buildWorld`
+  (`WILDS`). 3 `InstancedMesh`iä, siivet varjostimessa. `__world.birds`. Eivät ole riistaa.
+- **Jousen kädet (v08.03, `Fighter.bowArms`).** `hunt.ts` → `setBowAim(aimBlend, elev, draw)`: rinta kiertyy
+  (`BOW_TORSO_TURN`), kahva ankkurista (`BOW_ANCHOR`) tähtäyslinjalle, oikea nyrkki jänteellä (`BOW_BRACE` →
+  ankkuri), `twoBone`. Kanto on `POSES.bowCarry`. Erämaassa `sceneLoadout` jättää kilven pois. Jänis 1–3 lihaa.
 - **Uhri ennen laulua (v08.02, `content.ts`).** `ASK_SONG` on kaksi valintaa: `ask-song` (ei uhria, ei
   pyydetty) → `sage.offeringAsked`, `revealSite cairn-b`, solmu `offeringDemand`; `ask-song-taught`
   (`offering.made`) → `songIntro`. Sääntö `sage.offering-awaited` (`npc.leftBehind` tietäjä) → lippu
@@ -64,10 +59,8 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `6338589`)
   muita windup/release-tilassa < `maxAttackers` 2 (`attackStartDelay`, `startSpacing`, `waitBack`/`waitHold`);
   `hitStaggers`, `staggerImmunity` 0,4 s, `graceCovers` ±40°, `threatenedBy` + `blockReactionDelay`,
   `rollsAdvance` 45 %. Mitattu 3 vihua: max 2 yhtä aikaa; hiljaiset jaksot = yhtäaikainen uupumus.
-- **Metsästysapajat (v06.06, `map/huntGrounds.ts` puhdas).** Apaja = `SiteInstance` `kind: "hunt"` → `wilds`,
-  kertakäyttöinen (`enterSite` → `removeHuntGround`). `huntCycle` (20 päivän jakso; −1 = vanha tallennus →
-  `ensureHuntGrounds` 3–6 alkuapajaa); `advanceHuntGrounds` lisää jaksoittain, enintään 6 (vanhin pois myös
-  `knownSiteIds`ista). `huntCandidates`: Chebyshev ≥ 2 muista paikoista ja sankarista; näkyy vasta 3 × 3 -näössä.
+- **Metsästysapajat (v06.06, `map/huntGrounds.ts`).** Instanssi `kind: "hunt"` → `wilds`; `huntCycle` (20 pv),
+  `ensureHuntGrounds`/`advanceHuntGrounds`, `huntCandidates`; ei tunnettu ennen 3 × 3 -näköä; `enterSite` kuluttaa.
 - **Väistöaskel ja kävely (v06.07, `src/sidestep.ts` puhdas).** `dodgeDirection(A, D, S)`, `sidestepPose(u)`.
   Arvioija hylkäsi kävelyn polvikyykyn ja taka-askeleen kyykyn (istuva ilme): älä palauta niitä.
 - **Metsästys (v06.04, `src/hunt/` puhdas + `engine/hunt.ts`).** Vain `HUNTING` = erämaa. `bow` (X), vasen
@@ -273,9 +266,9 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `6338589`)
 
 ## Seuraava tehtävä
 
-Omistajan pelitesti tietäjä- ja uhriketjusta (v08.00–v08.02) uudella matkalla: mökin ja kalmistojen
-arvonta, uhrivaatimus, jäniksen metsästys, uhri, Ukon siunaus ja laulunopetus. Korjaa löydökset ennen uusia
-ominaisuuksia.
+Omistajan pelitesti metsästysapajalla (v08.03–v08.04): jousen asento, linnut ja villisika (varoitus,
+rynnäkön väistö, X-vaihto aseeseen, verijäljen seuraaminen, kuolema → kartta). Viritys `BOAR`-arvoista.
+Tietäjä- ja uhriketjun (v08.00–v08.02) pelitesti on yhä tekemättä.
 
 ## Ei vielä aloiteta
 
@@ -288,8 +281,8 @@ ominaisuuksia.
 - 3D-kohtausten mount/dispose ilman sivun uudelleenlatausta.
 - Git LFS (omistajan päätös 2026-11-10: ei vielä).
 - Isojen skannattujen puiden lataus ja kevennys.
-- Kylä ja markkinat sekä vihollisten pako. Jousi taisteluaseena (vasta metsästyksen palautteen jälkeen),
-  uudet riistalajit ja ruoanlaitto.
+- Kylä ja markkinat sekä vihollisten pako. Jousi ihmisvihollisia vastaan, hirvi (pakenee aina, verijälki
+  valmiina sialla), muut riistalajit ja ruoanlaitto.
 - Aseiden laatuerot ja vahingon hajonta.
 
 ## Pysyvät päätökset
@@ -325,6 +318,9 @@ ominaisuuksia.
   nuolet saa poimia samassa kohtauksessa (2026-11-21).
 - Jousi: oikea painike tähtää, vasen jännittää, tähdätään aina (ei lonkalta); jousi esiin/pois X,
   sidottavissa Esc-valikossa (2026-11-21).
+- Villisika: 0–2 apajalla, osa pakenee ja osa ryntää; nuoli suututtaa; 3 nuolta kaataa; kilpi jää leiriin,
+  joten väistetään tai lyödään. Haavoittunut pakenee useammin ja kauemmas ja jättää verijäljen. Kuolema
+  apajalla palauttaa kartalle saaliin kanssa. X vaihtaa vaarassa jousen ja aseen (2026-11-22).
 - Metsästysapajat: kertakäyttöisiä (kuluvat sisään mentäessä), uudella matkalla 3–6, 20 päivän välein
   yksi lisää ja enintään 6 (täynnä vanhin väistyy). Eivät koskaan valmiiksi näkyvissä: paljastuvat vasta
   viereisestä ruudusta, myös tutkitulla alueella, tai kun toisen talon emäntä neuvoo yhden (kerran
