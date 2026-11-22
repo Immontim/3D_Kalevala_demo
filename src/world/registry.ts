@@ -27,6 +27,10 @@ export const FLAGS: Record<string, FlagDef> = {
   "archer.dead": { label: "jousineito kuoli, koska häntä ei parannettu ajoissa" },
   "louhi.banished": { label: "Louhi on karkotettu kalmistolta ja vainolaisten leiri on paljastunut" },
   "rumor.heard": { label: "jousineidon talon emäntä on kertonut huhun vainolaisista" },
+  "emanta.robbed": { label: "jousineidon talon emäntä tietää, että hänen pöydältään vietiin ruokaa kysymättä" },
+  "emanta_b.robbed": { label: "toisen talon emäntä tietää, että hänen pöydältään vietiin ruokaa kysymättä" },
+  "emanta.foodShared": { label: "jousineidon talon emäntä antoi jänislihasta luvan ottaa pöydän rieskat ja kalat" },
+  "emanta_b.foodShared": { label: "toisen talon emäntä antoi jänislihasta luvan ottaa pöydän rieskat ja kalat" },
 };
 
 export const COUNTERS: Record<string, CounterDef> = {
@@ -43,6 +47,10 @@ export const COUNTERS: Record<string, CounterDef> = {
 /** Maailmanesineiden instanssitunnisteet ihmisen luettavina nimina (yhteenvetoa varten). */
 export const SCENE_ITEM_LABELS: Record<string, string> = {
   "lakeside.sage-pack": "tietäjän tuohikontti rannalla",
+  "@archerYard.table-flatbread": "jousineidon talon pöydän rieskat",
+  "@archerYard.table-dried-fish": "jousineidon talon pöydän kuivatut kalat",
+  "@otherYard.table-flatbread": "toisen talon pöydän rieskat",
+  "@otherYard.table-dried-fish": "toisen talon pöydän kuivatut kalat",
 };
 
 /** Kuun vaiheet 0–7 samassa järjestyksessä kuin kartan kalenteri (0 = uusikuu, 4 = täysikuu). */

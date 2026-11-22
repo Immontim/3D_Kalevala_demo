@@ -85,6 +85,8 @@ export const ARENA: ArenaId = requestedArena() ?? savedArena();
  * `scene3d.ts` asettaa arvon kampanjan paikkainstanssista ennen maailman rakentamista.
  */
 export const siteInstance = { id: "yard", archer: true };
+/** Pihan emännän tunniste: jousineidon talossa `emanta`, toisessa `emanta_b` (myös pöydän ruoan omistaja). */
+export function yardHousewifeId() { return siteInstance.archer ? "emanta" : "emanta_b"; }
 export function setSiteInstance(next: { id: string; archer: boolean }) {
   siteInstance.id = next.id;
   siteInstance.archer = next.archer;
@@ -1398,14 +1400,14 @@ function populate(
       const [breadX, breadZ] = tablePoint(-0.12, -0.08);
       putSceneItem({
         id: `${siteInstance.id}.table-flatbread`, siteId: siteInstance.id, itemId: "barley_flatbread", model: "rieska", quantity: 3,
-        takeMode: "theft", ownerId: "household",
+        takeMode: "theft", ownerId: yardHousewifeId(),
         x: breadX, y: tableTopY, z: breadZ, yaw: TABLE.yaw,
         focusY: 0.05, focusRadius: 0.28,
       });
       const [fishX, fishZ] = tablePoint(0.42, 0.08);
       putSceneItem({
         id: `${siteInstance.id}.table-dried-fish`, siteId: siteInstance.id, itemId: "dried_fish", model: "kuivakalat", quantity: 3,
-        takeMode: "theft", ownerId: "household",
+        takeMode: "theft", ownerId: yardHousewifeId(),
         x: fishX, y: tableTopY + 0.012, z: fishZ, yaw: TABLE.yaw + 0.5,
         focusY: 0.04, focusRadius: 0.29,
       });
@@ -1651,7 +1653,7 @@ function populateYardLife(scene: THREE.Scene, collision: CollisionWorld) {
   // Naiset on mallinnettu miehen pituisiksi; pelissä heidät skaalataan hieman pienemmiksi.
   // Emäntiä on kaksi eri tunnisteella, jotta heillä on omat dialoginsa: jousineidon talon emäntä
   // kertoo huhun (`emanta`), toisen talon emäntä neuvoo metsästysapajia (`emanta_b`).
-  const housewifeId = siteInstance.archer ? "emanta" : "emanta_b";
+  const housewifeId = yardHousewifeId();
   const [ex, ez] = fromLocal(tb, 1.85, 0.75);
   const [potX, potZ] = fromLocal(tb, 2.5, -0.5);
   jobs.push(spawnVillager(scene, {

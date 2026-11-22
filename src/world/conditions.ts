@@ -1,9 +1,10 @@
 // Ehtojen arviointi. Jokainen tulos kertoo suomeksi, miksi ehto piti tai ei pitänyt,
 // jotta `__world.explain` voi näyttää epäonnistumisen syyn.
-import type { CampaignState } from "../map/campaign";
+import type { CampaignState, ItemId } from "../map/campaign";
 import { nearestUnknownHuntGround } from "../map/huntGrounds";
 import { mapCalendarTime } from "../map/uiState";
 import { counterValue, flagValue } from "./state";
+import { resolveInstanceId } from "./instances";
 import { MOON_PHASE_NAMES, SCENE_ITEM_LABELS } from "./registry";
 import type { Condition, CounterOp, WorldData } from "./types";
 
@@ -97,10 +98,27 @@ export function evaluate(cond: Condition, state: CampaignState, data: WorldData)
       };
     }
     case "itemTaken": {
-      const taken = state.world.sceneItems.takenInstanceIds.includes(cond.instanceId);
+      const id = resolveInstanceId(state, cond.instanceId);
+      const taken = id !== null && state.world.sceneItems.takenInstanceIds.includes(id);
       return {
         pass: taken,
         reason: taken ? `${itemLabel(cond.instanceId)} on jo otettu` : `${itemLabel(cond.instanceId)} on vielä ottamatta`,
+      };
+    }
+    case "hasItem": {
+      const have = itemCount(state, cond.itemId);
+      const pass = have >= cond.quantity;
+      return {
+        pass,
+        reason: `pelaajalla on ${have} × ${cond.itemId}; vaadittiin vähintään ${cond.quantity}${pass ? "" : " (ei täyty)"}`,
+      };
+    }
+    case "moonChance": {
+      const roll = moonRoll(state, cond.salt);
+      const pass = roll < cond.chance;
+      return {
+        pass,
+        reason: `kuunkierron ${currentMoonMark(state)} arpa "${cond.salt}" on ${roll.toFixed(2)}; vaadittiin alle ${cond.chance}${pass ? "" : " (ei täyty)"}`,
       };
     }
     case "sameMoon": {
@@ -127,6 +145,23 @@ export function currentMoonMark(state: CampaignState): number {
   return mapCalendarTime(state.world.worldMinutes).moon + 1;
 }
 
+/** Esineen kappalemäärä pelaajan inventaariossa. */
+export function itemCount(state: CampaignState, itemId: ItemId): number {
+  return state.player.inventory.stacks.reduce((sum, stack) => sum + (stack.itemId === itemId ? stack.quantity : 0), 0);
+}
+
+/** Kuunkierron arpa 0–1: sama koko kuunkierron saman siemenen ja suolan kanssa (FNV-1a + Murmur3-sekoitus). */
+export function moonRoll(state: CampaignState, salt: string): number {
+  let h = 0x811c9dc5;
+  for (const ch of `${state.world.worldSeed}|${currentMoonMark(state)}|${salt}`) {
+    h ^= ch.charCodeAt(0);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  // Murmur3:n loppusekoitus: lähes samanlaiset suolat ("emanta.fish", "emanta_b.fish") eivät korreloi.
+  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
 /** Kaikki ehtopuun liput, laskurit ja instanssit tarkistuksia varten (esim. rekisteritesti). */
 export function conditionRefs(cond: Condition, out: { flags: string[]; counters: string[]; instances: string[] } = { flags: [], counters: [], instances: [] }) {
   switch (cond.kind) {
@@ -140,6 +175,8 @@ export function conditionRefs(cond: Condition, out: { flags: string[]; counters:
     case "sameMoon": out.counters.push(cond.counter); break;
     case "itemTaken": out.instances.push(cond.instanceId); break;
     case "moonPhase":
+    case "hasItem":
+    case "moonChance":
     case "unknownHuntGround": break;
   }
   return out;

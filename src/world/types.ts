@@ -17,8 +17,18 @@ export type Condition =
   | { kind: "counter"; counter: string; op: CounterOp; value: number }
   /** Kuun vaihe (0–7, kartan kalenterin mukaan) on jokin annetuista. */
   | { kind: "moonPhase"; phases: number[] }
-  /** Staattinen maailmanesine on jo otettu. */
+  /**
+   * Staattinen maailmanesine on jo otettu. Pihojen pöytäesineisiin viitataan pihan roolilla:
+   * `@archerYard.<esine>` (jousineidon talo) ja `@otherYard.<esine>` (toinen talo), ks. `instances.ts`.
+   */
   | { kind: "itemTaken"; instanceId: string }
+  /** Pelaajan inventaariossa on vähintään `quantity` kappaletta esinettä. */
+  | { kind: "hasItem"; itemId: ItemId; quantity: number }
+  /**
+   * Kuunkierron arpa: pitää todennäköisyydellä `chance`, ja tulos pysyy samana koko kuunkierron
+   * (siemen, kuunkierto ja `salt`). Esim. "kalaa on tällä kuulla noussut hyvin".
+   */
+  | { kind: "moonChance"; salt: string; chance: number }
   /** Laskuriin on kirjattu tämä kuunkierto (`markMoon`): esim. emäntä on jo neuvonut tällä kuulla. */
   | { kind: "sameMoon"; counter: string }
   /** Kartalla on metsästysapaja, jota pelaaja ei vielä tunne. */
@@ -31,6 +41,7 @@ export type Effect =
   | { kind: "addCounter"; counter: string; amount: number }
   | { kind: "giveItem"; itemId: ItemId; quantity: number }
   | { kind: "takeItem"; itemId: ItemId; quantity: number }
+  /** Muuttaa ottamisen luvan. `instanceId` voi viitata pihan rooliin (`@archerYard.` / `@otherYard.`). */
   | { kind: "setSceneItemTakeMode"; instanceId: string; takeMode: TakeMode }
   /** Viesti pelaajalle. Ei muuta tilaa; moottori palauttaa sen kutsujalle näytettäväksi. */
   | { kind: "message"; text: TextKey; sub?: TextKey }

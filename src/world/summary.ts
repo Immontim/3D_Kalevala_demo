@@ -31,6 +31,8 @@ export function describeCondition(cond: Condition, data: WorldData): string {
     case "moonPhase": return `kuu on vaiheessa: ${moonPhaseNames(cond.phases)}`;
     case "itemTaken": return `${itemLabel(cond.instanceId)} on otettu`;
     case "sameMoon": return `${data.counters[cond.counter]?.label ?? cond.counter} on tämä kuunkierto`;
+    case "hasItem": return `pelaajalla on mukana vähintään ${cond.quantity} × ${cond.itemId}`;
+    case "moonChance": return `tämän kuunkierron arpa "${cond.salt}" osuu (${Math.round(cond.chance * 100)} %)`;
     case "unknownHuntGround": return "kartalla on metsästysapaja, jota pelaaja ei vielä tunne";
   }
 }
