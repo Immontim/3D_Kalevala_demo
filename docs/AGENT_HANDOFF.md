@@ -8,6 +8,18 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `6338589`)
 
+- **Koodiversio v08.03.00** branchissa `claude/forest-birds-d078f7` (Erämaan taustalinnut; tarkista merge-tila
+  `git merge-base`illa). Koodi valmis, ei deployattu, omistaja ei ole testannut. Claude savutesti in-app-
+  selaimessa: 16 lintua, korppi maassa, peippo kuusen latvuksessa, korpin ja rastaan lento kuvattu; maassa oleva
+  peippo lähti 3 m:stä puuhun. `renderBench` erämaa (1024 × 768, 4 × 120 ruutua): linnut näkyvissä 5,3–5,7 ms /
+  148–151 kutsua, piilossa 5,2–5,4 ms / 145–148 kutsua. Konsolissa ei virheitä. Tarkistukset: `bun run test`
+  482/482, `bunx tsc --noEmit`, `bun run lint`, `bun run build`. v08.02 ja aiemmat mainissa.
+- **Taustalinnut (v08.03, `fauna/birds.ts` puhdas + `engine/birds.ts`).** `Flock` tilakone (`perch`/`fly`/
+  `ground`), `planFlight` Bézier-kaari, `PerchSet` ruudukko; lajit ja luvut `BIRD_SPECIES`/`BIRD_FLOCK`.
+  Istumapaikat `perchTemplate`: kuoriverteksit (männyn/koivun oksat, latva), kuusessa rungon vieressä
+  (kuusen oksat ovat lehvästökortteja). Kytkentä vain `world.ts`:n `buildWorld`issa (`WILDS`), ei `loop.ts`:ää.
+  Siivet ja nokkiminen varjostimessa (`aAnim`), 3 `InstancedMesh`iä, ei varjoja. Konsoli `__world.birds`,
+  `__world.birdsShow(bool)`. Linnut eivät ole riistaa eivätkä kuuntele nuolia.
 - **Koodiversio v08.03.00** branchissa `claude/bow-pose` (tarkista merge-tila `git merge-base`illa). Koodi
   valmis, ei deployattu, omistaja ei ole testannut. Claude kuvasi erämaassa sivulta ja olan yli: kanto,
   tähtäys ilman jännitystä ja täysi jännitys; kilpi poissa, konsoli puhdas. `bunx vitest run --dir src`,
@@ -160,22 +172,11 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `6338589`)
   (työpuussa tarkista `fetch('/src/…')`illa). 3D-kohtaus vaatii aloitusvalikon "Aloita" (`#startBtn`).
   Piilotettu paneeli pysäyttää rAF:n: aja ruudut `__game.renderBench(n)`illä. Moduulin konsolituonti
   muokkausten jälkeen antaa erillisen kopion: käynnistä palvelin uudelleen.
-- **Laulun tahmaus heikolla koneella:** CSS-suotimen siirto shaderiin (v05.00.01) on yhä vahvistamatta.
-  Säekaarten hehku on CSS `drop-shadow` kahdeksalla tekstillä (v06.08); jos laulu tahmaa, poista ensin
-  `verseGlow`-animaatio. Opetuksen (tietäjä) kaaripolkua ei ajettu selaimessa, vain koodina.
-- **Sovellusrakenne.** URL ilman `scene`-parametria käynnistää 2D-kartan;
-  `?scene=<id>&return=map` lataa dynaamisesti `src/scene3d.ts`:n ja Three.js-
-  moottorin. Kartta ei pyydä GLB-tiedostoja eikä aja 3D-silmukkaa.
-- **2D-maailmankartta** (`src/map/app.ts`) on Canvas 2D -näkymä: 20 × 20
-  ruudun maailma, 48 × 48 px:n tiilet ja 17 × 13 ruudun kamera
-  (816 × 624 px). Näkyvyys: ks. Pysyvät päätökset. WASD/nuolet liikuttavat vain
-  neljään pääilmansuuntaan.
-- **Karttadata ja säännöt** ovat puhtaassa `src/map/domain.ts`:ssä. Kuusi
-  aiempaa maastoa (niitty, metsä, umpimetsä, suo, kallio ja vesi) sekä uusi
-  joki. Kohderuudun `minuteCost` lisää maailmanaikaa; estynyt liike ei kuluta
-  aikaa. Ainoa kuljettava vesiruutu on pohjois–eteläsuuntainen puusilta (13,11),
-  joka piirretään jokitiilen päälle `bridgeArt.ts`:ssä. Pohjoisen metsässä on yhden ja
-  kolmen ruudun niityt. Keskustan metsikkö pilkkoo perusniittyä.
+- **Laulun tahmaus heikolla koneella:** shaderisiirto (v05.00.01) vahvistamatta; jos tahmaa, poista ensin
+  säekaarten `verseGlow` (CSS `drop-shadow`). Opetuksen kaaripolku on tarkistettu vain koodina.
+- **Sovellusrakenne ja kartta.** Ilman `scene`-parametria käynnistyy 2D-kartta (`map/app.ts`, Canvas 2D, 20 × 20
+  ruutua, 48 px:n tiilet, kamera 17 × 13); `?scene=<id>&return=map` lataa dynaamisesti `scene3d.ts`:n. Säännöt
+  puhtaassa `map/domain.ts`:ssä (maastot, `minuteCost`, ainoa kuljettava vesiruutu silta (13,11), `bridgeArt.ts`).
 - **Aika ja kylläisyys.** Erillistä karttavoimaa ei ole. Piilotettu `worldMinutes` sallii päivän
   murto-osat; vanhojen tallennusten jo kertynyt aika, 180 yksikön kuunkierto ja 28 päivää säilyvät.
   Kohderuudun kulku: niitty 1/6 päivää, metsä 1/4, umpimetsä 1/3, kallio 1/2, suo 0,7 ja silta
@@ -188,17 +189,11 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `6338589`)
   `validWorldTime`illa**, ei kokonaislukuna (kartan aika on murtolukuja).
 - **Matkan asetukset.** Esc-dialogissa ovat FI/GB-kieli, sukupuoli, vahvistettava uudelleenaloitus
   ja 3D-oikotiet kohtaustyyppeineen.
-- **Paikat.** `sites.ts` omistaa liikkumisen, elinkaaren, sijainnin ja `sceneId`-kytkennän; nykyiset
-  ovat `fixed+persistent`, ja kaksi pihainstanssia käyttää samaa 3D-sceneä.
 - **2D↔3D-sillat.** `transition.ts` vähentää nälkäisessä taistelussa HP- ja staminakattoa 20,
   nääntyneenä 40; vaikutus on idempotentti eikä koske ystävällisiä kohtauksia. Paluukuorma
   `laulun-miekka.scene-return.v1` kulutetaan kerran; `rewards` on vielä tyhjä varaus.
-- **Karttagrafiikka ja sankari.** `kalevala-map-atlas-v2.png` sisältää kaksi terrainvariaatiota
-  ja naapureista kierrettävät jokipalat. 48 px:n `lake-shore-edge.png` pyöristää rannat.
-  Naisella ovat `paper-doll-hero.png`, `satiety-faces.png` ja nelisuuntainen
-  `map-hero-female.png`; sininen viitta erottaa hänet kartalla. Miehellä ovat
-  `paper-doll-hero-male.png`, `satiety-faces-male.png` ja atlaksen nykyiset
-  neljä sankariruutua. Valinta vaihtaa kaikki kolme 2D-esitystä heti.
+- **Karttagrafiikka.** `kalevala-map-atlas-v2.png` (maasto, joki, miehen sankariruudut), `lake-shore-edge.png`;
+  naisella `paper-doll-hero.png`, `satiety-faces.png`, `map-hero-female.png`, miehellä `*-male.png`-parit.
 - **3D-moottori.** Rauhassa miekka on huotrassa, kilpi selässä ja kypärä poissa;
   taistelu palauttaa varustuksen. Keihäs pysyy kädessä. Assettiriskit: `BLENDER_HANDOFF.md`.
 - **Taistelun stamina-arvot:** kevyt isku 6, raskas isku 12, toteutunut
