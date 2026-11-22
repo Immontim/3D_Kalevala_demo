@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { SONG_SLOT_ACTIONS, codeLabel } from "../bindings";
 import { renderVerbatim, t } from "../i18n";
-import { SONG, SONGS, SONG_SLOTS, SongId, beatGap, healOnHit, inZone, slotPositions, songLead, songOutcome, songSlots, zoneHalf } from "../songLogic";
+import { SONG, SONGS, SONG_SLOTS, SongId, beatGap, healOnHit, inZone, slotPositions, songBeats, songOutcome, songSlots, zoneHalf } from "../songLogic";
 import { ARENA } from "../world";
 import { setState } from "./actor";
 import { talkTo } from "./dialogue";
@@ -10,6 +10,7 @@ import { focusEnemy } from "./enemies";
 import { flash, showMsg } from "./hud";
 import { bindings, clearInputs, lockPointer } from "./input";
 import { paused } from "./loop";
+import { beginSongArcs, fadeSongArcs, revealVerse } from "./songArcs";
 import { fx, g, inputs, sfx } from "./state";
 import { campaignStore, worldRuntime } from "./store";
 import { heroAtPeace } from "./hero";
@@ -156,7 +157,8 @@ export function startSong(id: SongId, lesson: SongLesson | null = null) {
   const track = $("track");
   track.querySelectorAll(".rune, .zone").forEach((r) => r.remove());
   const playAt = g.realTime + SONG.intro;
-  const beats = verses.map((_, i) => playAt + songLead() + i * beatGap());
+  // Riimut tulevat pareittain, ja parien väliin arvotaan tauko (SONG.pairPause).
+  const beats = songBeats(verses.length, playAt);
   const zones = beats.map(() => {
     const d = document.createElement("div");
     d.className = "zone";
@@ -172,6 +174,7 @@ export function startSong(id: SongId, lesson: SongLesson | null = null) {
   });
   songState = { id, lesson, verseShown: -1, healed: 0, start: g.realTime, playAt, shown: false, beats, results: beats.map(() => null), runes, zones, endAt: -1 };
   $("verse").textContent = "";
+  beginSongArcs(id, verses);
   setSongLook(true);
   $("song").classList.toggle("heal", id === "heal");
   $("songHint").textContent = t(lesson ? "song.lesson.hint" : "song.rhythmHint");
@@ -226,8 +229,9 @@ export function judge(i: number, hit: boolean) {
   s.runes[i].classList.add(hit ? "hit" : "miss");
   s.zones[i].classList.add(hit ? "hit" : "miss");
   sfx.pluck(i + 1, hit);
-  if (hit) renderVerbatim($("verse"), SONGS[s.id].verses[i]);
-  else $("verse").textContent = "…";
+  // Säe singahtaa kaarelleen sankarin ylle (kulta = osuma, tuhka = ohi). Nauhan yläpuolinen
+  // säerivi on käytössä vain opetuksessa, jossa tietäjä laulaa seuraavan säkeen etukäteen.
+  revealVerse(i, hit);
   if (hit && s.id === "heal") {
     // Parannus tulee heti jokaisesta osumasta, joten katkennutkin laulu ehtii auttaa.
     const before = g.player.hp;
@@ -240,6 +244,7 @@ export function judge(i: number, hit: boolean) {
 /** Sulkee laulun näkymän ja palauttaa ajan kulun. */
 export function closeSong(instant = false) {
   songState = null;
+  fadeSongArcs();
   sfx.stopDrone();
   $("song").classList.add("hidden");
   setSongLook(false);

@@ -19,6 +19,13 @@ export const SONG = {
   lead: 1.3,
   /** Riimujen väli nauhan nopeudella 1. */
   beatGap: 0.8,
+  /**
+   * Tauko riimuryhmien välissä riimuvälin osuutena (0 = tasainen rytmi). Jokainen tauko arvotaan
+   * välillä 30–100 % tästä, joten laulu ei toistu samanlaisena ja täydellinen tasarytmi ei riitä.
+   */
+  pairPause: 0.5,
+  /** Montako riimua tulee peräkkäin ennen taukoa (2 = säepari, kuten Kalevalan kerrossa). */
+  pairSize: 2,
   /** Aika viimeisestä riimusta loitsun laukeamiseen. */
   outro: 0.45,
   /** Ensimmäisen osuma-alueen puolikas nauhan nopeudella 1. */
@@ -31,7 +38,12 @@ export const SONG = {
   rootTimePerHit: 0.75,
   /** Parannuslaulu: elämää jokaisesta osumasta, heti osuman hetkellä. */
   healPerHit: 5,
+  /** Säekaarten hiipumisaika laulun päätyttyä, laulukohtaisesti (sekunteja, reaaliaikaa). */
+  fade: { bog: 1.2, heal: 1.2, sleep: 1.6 },
 };
+
+/** Pienin osuus pairPause-maksimista, jonka arvottu tauko saa: tauon pitää aina erottua. */
+export const PAUSE_MIN_SHARE = 0.3;
 
 /** Riimujen väli sekunteina nykyisellä nauhan nopeudella. */
 export function beatGap(): number {
@@ -40,6 +52,25 @@ export function beatGap(): number {
 /** Aika rytmipelin alusta ensimmäiseen riimuun nykyisellä nauhan nopeudella. */
 export function songLead(): number {
   return SONG.lead / SONG.speed;
+}
+
+/**
+ * Riimujen ajat (reaaliaikaa): ensimmäinen riimu `songLead()` alun jälkeen, sitten riimuväli, ja
+ * jokaisen `pairSize`-ryhmän jälkeen lisäksi arvottu tauko. rng palauttaa luvun väliltä [0, 1).
+ */
+export function songBeats(count: number, playAt: number, rng: () => number = Math.random): number[] {
+  const gap = beatGap();
+  const size = Math.max(1, Math.round(SONG.pairSize));
+  const out: number[] = [];
+  let at = playAt + songLead();
+  for (let i = 0; i < count; i++) {
+    if (i > 0) {
+      at += gap;
+      if (i % size === 0 && SONG.pairPause > 0) at += gap * SONG.pairPause * (PAUSE_MIN_SHARE + (1 - PAUSE_MIN_SHARE) * rng());
+    }
+    out.push(at);
+  }
+  return out;
 }
 
 /** Osuma-alueen puolikas sekunteina riimulle i (0 = ensimmäinen). */
@@ -156,4 +187,87 @@ export function slotPositions(cx: number, cy: number, r: number, count = SONG_SL
     const a = from + ((to - from) * i) / Math.max(1, count - 1);
     return [cx + Math.cos(a) * r, cy - Math.sin(a) * r];
   });
+}
+
+// ---------- Säekaaret ----------
+// Laulun säkeet piirtyvät sankarin ylle sisäkkäisiksi kaariksi: säepari = yksi kaari, parin
+// ensimmäinen säe vasemmalla ja toinen oikealla puoliskolla. Sisin kaari on ensimmäinen pari.
+
+/**
+ * Kaaret ovat ellipsejä (leveys = korkeus × ARC_ASPECT), jotta teksti ei nouse päistään pystyyn.
+ * Puoliskojen kulmat asteina ellipsin parametrina (0 = oikealle, 90 = ylös); teksti kulkee vasemmalta oikealle.
+ */
+export const ARC_ASPECT = 1.6;
+export const ARC_HALVES: readonly [number, number][] = [[155, 93], [87, 25]];
+
+/** Säkeen paikka kaarissa: rengas (0 = sisin) ja puolisko (0 = vasen, 1 = oikea). */
+export function versePlace(i: number): { ring: number; side: 0 | 1 } {
+  return { ring: Math.floor(i / 2), side: (i % 2) as 0 | 1 };
+}
+
+/** Ellipsin piste kulmassa deg (keskipiste cx, cy; säteet rx, ry). */
+export function arcPoint(cx: number, cy: number, rx: number, ry: number, deg: number): [number, number] {
+  const a = (deg * Math.PI) / 180;
+  return [cx + Math.cos(a) * rx, cy - Math.sin(a) * ry];
+}
+
+/** Puoliskon kaaren pituus (numeerisesti). */
+export function halfLength(rx: number, ry: number, side: 0 | 1): number {
+  const [d0, d1] = ARC_HALVES[side];
+  const n = 48;
+  let len = 0;
+  let prev = arcPoint(0, 0, rx, ry, d0);
+  for (let k = 1; k <= n; k++) {
+    const p = arcPoint(0, 0, rx, ry, d0 + ((d1 - d0) * k) / n);
+    len += Math.hypot(p[0] - prev[0], p[1] - prev[1]);
+    prev = p;
+  }
+  return len;
+}
+
+export interface ArcLayout {
+  /** Sisimmän kaaren pystysäde. */
+  inner: number;
+  /** Renkaiden väli. */
+  gap: number;
+  rings: number;
+}
+
+/**
+ * Kaarten mitat: sisin kaari niin, että pisin säe mahtuu puoliskolle väljästi (90 %), ja renkaiden
+ * väli fontin koosta. longestPx = pisimmän säkeen leveys pikseleinä.
+ */
+export function arcLayout(longestPx: number, fontPx: number, rings: number): ArcLayout {
+  const perUnit = Math.min(halfLength(ARC_ASPECT, 1, 0), halfLength(ARC_ASPECT, 1, 1));
+  return { inner: Math.max(fontPx * 5, longestPx / 0.9 / perUnit), gap: fontPx * 1.45, rings };
+}
+
+/** Renkaan säteet [rx, ry]. Renkaat ovat tasavälein sekä leveys- että korkeussuunnassa. */
+export function ringRadii(l: ArcLayout, ring: number): [number, number] {
+  return [l.inner * ARC_ASPECT + ring * l.gap, l.inner + ring * l.gap];
+}
+
+/** Kaarten tarvitsema tila keskipisteen ympärillä: puolileveys ja korkeus ylöspäin (ilman fonttia). */
+export function arcExtent(l: ArcLayout): { halfWidth: number; up: number } {
+  const [rx, ry] = ringRadii(l, Math.max(0, l.rings - 1));
+  const edge = Math.max(Math.abs(Math.cos((ARC_HALVES[0][0] * Math.PI) / 180)), Math.abs(Math.cos((ARC_HALVES[1][1] * Math.PI) / 180)));
+  return { halfWidth: rx * edge, up: ry };
+}
+
+/** SVG-polku renkaan puoliskolle keskipisteen (cx, cy) ympäri. Suunta vasemmalta oikealle. */
+export function arcPath(cx: number, cy: number, rx: number, ry: number, side: 0 | 1): string {
+  const [d0, d1] = ARC_HALVES[side];
+  const f = (p: [number, number]) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+  return `M${f(arcPoint(cx, cy, rx, ry, d0))} A${rx.toFixed(1)},${ry.toFixed(1)} 0 0 1 ${f(arcPoint(cx, cy, rx, ry, d1))}`;
+}
+
+/** Puoliskon keskikohta (säkeen lentämisen maali). */
+export function arcMid(cx: number, cy: number, rx: number, ry: number, side: 0 | 1): [number, number] {
+  return arcPoint(cx, cy, rx, ry, (ARC_HALVES[side][0] + ARC_HALVES[side][1]) / 2);
+}
+
+/** Kaarten läpinäkyvyys hiipumisen aikana: 1 → 0 ajassa fade (s). fade ≤ 0 = katoaa heti. */
+export function fadeOpacity(elapsed: number, fade: number): number {
+  if (fade <= 0) return elapsed >= 0 ? 0 : 1;
+  return Math.max(0, Math.min(1, 1 - elapsed / fade));
 }

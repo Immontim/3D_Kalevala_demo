@@ -12,6 +12,7 @@ import { pause, paused, resume, simulate } from "./engine/loop";
 import { setShowcase, showcase } from "./engine/showcase";
 import { ENEMIES, currentWave, skipToWave, skirmish } from "./engine/skirmish";
 import { choosing, slotEls, songState } from "./engine/song";
+import { songArcsDebug } from "./engine/songArcs";
 import { aim, fx, g, inputs } from "./engine/state";
 import { composer, renderer, scene, world } from "./engine/view";
 import { FALLEN, POSES } from "./fighter";
@@ -72,6 +73,7 @@ export function initDebug() {
         radius: g.player.radius,
       };
     },
+    get songArcs() { return songArcsDebug(); },
     get song() { return songState ? { results: [...songState.results], done: songState.endAt >= 0, realTime: g.realTime, playAt: songState.playAt, beats: songState.beats } : null; },
     fillSong() { g.songPower = COMBAT.songMax; },
     get meters() { return JSON.parse(JSON.stringify(meterOff)); },

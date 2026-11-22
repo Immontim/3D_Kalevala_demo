@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HEAL_VERSES, SLEEP_VERSES, SONG, SONGS, SONG_SLOTS, SONG_UNLOCK_FLAG, SONG_VERSES, beatGap, healOnHit, inZone, slotPositions, songOutcome, songSlots, zoneHalf } from "./songLogic";
+import { ARC_ASPECT, HEAL_VERSES, PAUSE_MIN_SHARE, SLEEP_VERSES, SONG, SONGS, SONG_SLOTS, SONG_UNLOCK_FLAG, SONG_VERSES, arcExtent, arcLayout, arcMid, arcPath, halfLength, ringRadii, beatGap, fadeOpacity, healOnHit, inZone, slotPositions, songBeats, songLead, songOutcome, songSlots, versePlace, zoneHalf } from "./songLogic";
 
 describe("laulun osuma-alueet", () => {
   it("jokainen alue on edellistä lyhyempi", () => {
@@ -90,5 +90,83 @@ describe("laulut ja laulupaikat", () => {
     expect(p[2][0]).toBeCloseTo(500);
     expect(p[2][1]).toBeCloseTo(300);
     for (const [x, y] of p) expect(Math.hypot(x - 500, y - 400)).toBeCloseTo(100);
+  });
+});
+
+describe("riimuparien tauko", () => {
+  const restore = { pairPause: SONG.pairPause, pairSize: SONG.pairSize };
+  const reset = () => Object.assign(SONG, restore);
+  const gaps = (b: number[]) => b.slice(1).map((t, i) => t - b[i]);
+
+  it("tauko nollassa: tasainen rytmi kuten ennen", () => {
+    SONG.pairPause = 0;
+    const b = songBeats(8, 10, () => 0.7);
+    expect(b[0]).toBeCloseTo(10 + songLead());
+    for (const d of gaps(b)) expect(d).toBeCloseTo(beatGap());
+    reset();
+  });
+  it("tauko tulee vain jokaisen parin jälkeen ja pysyy 30–100 %:ssa maksimista", () => {
+    SONG.pairPause = 0.5;
+    for (const r of [0, 0.5, 0.999]) {
+      const d = gaps(songBeats(8, 0, () => r));
+      d.forEach((gap, i) => {
+        const afterPair = (i + 1) % 2 === 0;
+        if (!afterPair) expect(gap).toBeCloseTo(beatGap());
+        else {
+          const extra = gap - beatGap();
+          expect(extra).toBeGreaterThanOrEqual(beatGap() * 0.5 * PAUSE_MIN_SHARE - 1e-9);
+          expect(extra).toBeLessThanOrEqual(beatGap() * 0.5 + 1e-9);
+        }
+      });
+    }
+    reset();
+  });
+  it("taukoja on kahdeksan säkeen laulussa kolme, ja ryhmän kokoa voi muuttaa", () => {
+    SONG.pairPause = 1;
+    expect(gaps(songBeats(8, 0, () => 1)).filter((d) => d > beatGap() * 1.01)).toHaveLength(3);
+    SONG.pairSize = 3;
+    expect(gaps(songBeats(8, 0, () => 1)).filter((d) => d > beatGap() * 1.01)).toHaveLength(2);
+    reset();
+  });
+  it("jokaisella laululla on oma hiipumisaika", () => {
+    for (const id of Object.keys(SONGS)) expect(SONG.fade[id as keyof typeof SONG.fade]).toBeGreaterThan(0);
+  });
+});
+
+describe("säekaaret", () => {
+  it("säepari jakaa kaaren: parillinen vasemmalle, pariton oikealle, pari ulospäin", () => {
+    expect(versePlace(0)).toEqual({ ring: 0, side: 0 });
+    expect(versePlace(1)).toEqual({ ring: 0, side: 1 });
+    expect(versePlace(7)).toEqual({ ring: 3, side: 1 });
+  });
+  it("pisin säe mahtuu sisimmän kaaren kummallekin puoliskolle", () => {
+    const l = arcLayout(400, 30, 4);
+    const [rx, ry] = ringRadii(l, 0);
+    expect(rx).toBeCloseTo(ry * ARC_ASPECT);
+    expect(halfLength(rx, ry, 0)).toBeGreaterThan(400);
+    expect(halfLength(rx, ry, 1)).toBeGreaterThan(400);
+    expect(ringRadii(l, 3)[1]).toBeCloseTo(l.inner + 3 * l.gap);
+    expect(l.gap).toBeGreaterThan(30);
+  });
+  it("kaaret ovat leveämpiä kuin korkeita, ja tilantarve kasvaa renkaiden mukana", () => {
+    const e4 = arcExtent(arcLayout(400, 30, 4));
+    const e2 = arcExtent(arcLayout(400, 30, 2));
+    expect(e4.halfWidth).toBeGreaterThan(e4.up);
+    expect(e4.up).toBeGreaterThan(e2.up);
+  });
+  it("kaaren puoliskot ovat keskipisteen yläpuolella ja vasen on vasemmalla", () => {
+    const [lx, ly] = arcMid(500, 500, 480, 300, 0);
+    const [rx, ry] = arcMid(500, 500, 480, 300, 1);
+    expect(lx).toBeLessThan(500);
+    expect(rx).toBeGreaterThan(500);
+    expect(ly).toBeLessThan(500);
+    expect(ry).toBeCloseTo(ly);
+    expect(arcPath(500, 500, 480, 300, 0)).toMatch(/^M[\d.]+,[\d.]+ A480.0,300.0 0 0 1 [\d.]+,[\d.]+$/);
+  });
+  it("hiipuminen: täysi alussa, puolivälissä puolet, lopussa näkymätön", () => {
+    expect(fadeOpacity(0, 1.2)).toBe(1);
+    expect(fadeOpacity(0.6, 1.2)).toBeCloseTo(0.5);
+    expect(fadeOpacity(2, 1.2)).toBe(0);
+    expect(fadeOpacity(0, 0)).toBe(0);
   });
 });

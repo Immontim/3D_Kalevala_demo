@@ -10,6 +10,8 @@ import { camera } from "./view";
 // ---------- HUD ----------
 export let msgTimer = 0;
 export function showMsg(text: string, sub = "", dur = 1.6) {
+  // Laulun aikana viesti on säekaarten sisällä; muuten tavallisella paikallaan.
+  if ($("songArcs").classList.contains("hidden")) document.documentElement.style.removeProperty("--msg-top");
   $("msg").textContent = text;
   $("sub").textContent = sub;
   $("msg").style.opacity = "1";
