@@ -26,7 +26,11 @@ export const FLAGS: Record<string, FlagDef> = {
   "archer.gaveSword": { label: "jousineito on antanut taivaanrautamiekan" },
   "archer.dead": { label: "jousineito kuoli, koska häntä ei parannettu ajoissa" },
   "louhi.banished": { label: "Louhi on karkotettu kalmistolta ja vainolaisten leiri on paljastunut" },
-  "rumor.heard": { label: "jousineidon talon emäntä on kertonut huhun vainolaisista" },
+  "rumor.heard": { label: "jompikumpi emäntä on kertonut huhun vainolaisista" },
+  "emanta.greeted": { label: "pelaaja on puhunut jousineidon talon emännälle" },
+  "emanta_b.greeted": { label: "pelaaja on puhunut toisen talon emännälle" },
+  "emanta.met": { label: "jousineidon talon emäntä on tavattu aiemmalla käynnillä" },
+  "emanta_b.met": { label: "toisen talon emäntä on tavattu aiemmalla käynnillä" },
   "emanta.robbed": { label: "jousineidon talon emäntä tietää, että hänen pöydältään vietiin ruokaa kysymättä" },
   "emanta_b.robbed": { label: "toisen talon emäntä tietää, että hänen pöydältään vietiin ruokaa kysymättä" },
   "emanta.foodShared": { label: "jousineidon talon emäntä antoi jänislihasta luvan ottaa pöydän rieskat ja kalat" },
@@ -40,8 +44,8 @@ export const COUNTERS: Record<string, CounterDef> = {
   "win.days": { label: "matkaan kulunut pelipäivien määrä voitettaessa", max: 9999 },
   "win.explored": { label: "tutkittu osuus kartasta voitettaessa (prosenttia)", max: 100 },
   "archer.healFails": { label: "parannuslaulun epäonnistuneet yritykset jousineidolle", max: 3 },
-  /** Kuunkierto + 1, jolla toisen talon emäntä viimeksi neuvoi apajan (0 = ei koskaan). */
-  "emanta.huntTipMoon": { label: "kuunkierto, jolla emäntä viimeksi neuvoi metsästysapajan", max: 9999 },
+  /** Kuunkierto + 1, jolla jompikumpi emäntä viimeksi neuvoi apajan (0 = ei koskaan). */
+  "emanta.huntTipMoon": { label: "kuunkierto, jolla jompikumpi emäntä viimeksi neuvoi metsästysapajan", max: 9999 },
 };
 
 /** Maailmanesineiden instanssitunnisteet ihmisen luettavina nimina (yhteenvetoa varten). */

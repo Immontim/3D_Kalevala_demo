@@ -6,27 +6,29 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `d198b63`)
+Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `614bcee`)
 
-- **Koodiversio v07.03.00** branchissa `claude/yard-food-theft` (tarkista merge-tila `git merge-base`illa).
-  Koodi valmis, ei deployattu, omistaja ei ole testannut. Claude savutesti `?scene=yard` ja `site=yard-b`
-  in-app-selaimessa (paneeli piilossa, ruudut ajettu `renderBench`illä): rieskojen varkaus → emäntä vihainen
-  samalla käynnillä, 1 jänis ei riitä, 2 lepyttää; kalaonnen kuulla kalat luvalla ("Ota: Kuivattu kala"),
-  lihapulan kuulla 1 jänis → molemmat luvalla; ei konsolivirheitä; `renderBench` 5,9 ms (1024 × 768).
-  Tarkistukset: `bun run test` 2111/2111, `bunx tsc --noEmit`, `bun run lint`, `bun run build`.
-  v07.02 (jousineito, emännät) ja v07.01–v06.08 ovat mainissa; niiden omistajatestit ovat yhä tekemättä.
-- **Piha: jousineito, emännät ja eläimet (v07.02–v07.03).** Neito makaa `vuode`lla (`world.ts` `BED`);
+- **Koodiversio v07.04.00** branchissa `claude/yard-greetings` (tarkista merge-tila `git merge-base`illa).
+  Koodi valmis, ei deployattu, omistaja ei ole testannut. Claude savutesti in-app-selaimessa (paneeli
+  piilossa, ruudut `renderBench`illä, kuvakaappaukset): emännän paikat pöytä/nuotio/kanakoppi/sikolätti
+  nähty kuvissa, kaikki ehdokaspaikat vapaita (`depenetrateDisc` ≤ 0,1 m väen ympyrät pois); `yard-b`:n
+  emäntä kertoi huhun ja tervehti lähdön jälkeen "taas tapaamme"; aloitusnappi "Astu rannalle" /
+  "Astu kalmistolle". Tarkistukset: `bun run test` 2114/2114, `bunx tsc --noEmit`, `bun run lint`,
+  `bun run build`. v07.03–v06.08 ovat mainissa; niiden omistajatestit ovat yhä tekemättä.
+- **Piha: jousineito, emännät ja eläimet (v07.02–v07.04).** Neito makaa `vuode`lla (`world.ts` `BED`);
   säännöt `content.ts`: `archer.healed` (`minHits` 6), `archer.heal-failed-*` → `archer.died-song` ja
-  `archer.died-left` (`npc.leftBehind`, `engine/leave.ts`: polunsuu ja valikon paluu). Emännät: jousineidon
-  talossa `emanta` (huhu kerran, `noNews`, `maidenDied`), toisessa `emanta_b` (`revealHuntGround` +
-  `markMoon` kerran kuussa). `yardHousewifeId()` antaa kummankin talon emännän; pöydän rieskat ja kalat
-  ovat hänen (`ownerId`). **Ruoka (v07.03, `householdFood` + `theftRule`):** varkaus → `<npc>.robbed`
-  (aloitussolmu `robbed`, vain lähtö tai `give-hares` kun mukana 2 jänislihaa); `ask-food-fish`, kun
-  `moonChance` (`<npc>.fish`, 50 %, sama koko kuunkierron) ja kalat pöydällä → kalat `allowed`;
-  muuten `ask-food-meat` → `offer-hare` (1 jänis) → molemmat `allowed` + `<npc>.foodShared`. Pöytäesineisiin
-  viitataan roolilla `@archerYard.` / `@otherYard.` (`world/instances.ts`), koska jousineidon talo voi olla
-  `yard` tai `yard-b`. Uudet ehdot `hasItem`, `moonChance`. Eläimet: `yardLife.ts`, `__world.yard`.
-  Dialogisolmun `text` voi olla muunnelmalista (`lines()`, `engine/dialogue.ts` ei toista peräkkäin).
+  `archer.died-left` (`npc.leftBehind`, `engine/leave.ts`: polunsuu ja valikon paluu). Emännät tekee
+  `housewifeDialogue(npc)` (`emanta` jousineidon talossa, `emanta_b` toisessa, `yardHousewifeId()`):
+  kumpi tahansa kertoo huhun (`rumor.heard`, yksi yhteinen), sen jälkeen apajan kerran kuussa
+  (yhteinen `emanta.huntTipMoon`). Tervehdys: `greetWounded` (neito haavoittunut), `greet`,
+  `greetAgain` (`<npc>.met`), `greetHealer` (jousineidon talo + `archer.healed`); `meetingRules`:
+  `npc.talked` → `<npc>.greeted`, `npc.leftBehind` + greeted → `<npc>.met`. **Ruoka (`householdFood`,
+  `theftRule`):** varkaus → `<npc>.robbed` (2 jänistä lepyttää); `ask-food-fish` (`moonChance` 50 %) /
+  `ask-food-meat` → `offer-hare` → rieskat ja kalat `allowed`. Pöytäesineet roolilla `@archerYard.` /
+  `@otherYard.` (`world/instances.ts`). Paikat arvotaan joka käynnillä (`yardLife.ts` `pickSpot`,
+  `planYardAnimals`): emäntä pöytä/pata/nuotio/sikolätti/kanakoppi, urho nuotio/pölkky/portti/lätti,
+  aiemmin parannettu neito vuode/nuotio/portti/aitta (kesken käynnin parannettu nousee vuoteen viereen);
+  koira 55 % emännän, 20 % pöydän luona. `__world.yard` (`people`, `spots`).
 - **Ryhmän hyökkäyskatto ja vihun reaktiot (v07.01 + v06.05, `engine/ai.ts`, säännöt `combat.ts`).** Ei vuoroja:
   isku alkaa, jos muita windup/release-tilassa < `maxAttackers` 2; oma viive `attackStartDelay` 0,04–0,22 s,
   `startSpacing` 0,15 s; katon takia odottava `waitBack` + `waitHold`. `hitStaggers`: horjuva ei horjahda
@@ -231,13 +233,13 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `d198b63`)
   sekä 3D-sankarin (jousineidon vartalo). Jousineito-NPC pihalla (vain `archer`-talossa) on
   jousen kanssa, joten naissankarin rinnalla on kaksi samannäköistä hahmoa.
 - Jousineito v07.02: välilehden sulkeminen tai 3D-sivun uudelleenlataus ei ole "lähtö", joten neito säilyy
-  silloin hengissä (vain polunsuu ja valikon paluu kartalle lähettävät `npc.leftBehind`). Kuollut neito jää
+  silloin hengissä, eikä emäntä myöskään muista tapaamista (`<npc>.met`) (vain polunsuu ja valikon paluu kartalle lähettävät `npc.leftBehind`). Kuollut neito jää
   samalla käynnillä vuoteelle silmät auki (ei kuolinasentoa). Emännän "kuoli"-vastaus ei erottele, lauloiko
   pelaaja itse. Kukko ja istuva kana katolla: korkeus `COOP_ROOST` on yard.py:n mitoista, kaltevaa kattoa
   ei seurata.
 - Emäntien pöytäruoka ei uusiudu (`takenInstanceIds` pysyvä), joten ruokaa saa kerran taloa kohden.
-  Kalaonni on siemenestä ja kuunkierrosta, ei käyntikohtainen. Tervehdys "Istu pöytään, jos nälkä
-  vaivaa" ristiriidassa sen kanssa, että ottaminen kysymättä on varkaus.
+  Kalaonni on siemenestä ja kuunkierrosta, ei käyntikohtainen. Väen paikat on valittu käsin ja
+  tarkistettu törmäysmaailmasta; pihan rakennusten siirto vaatii niiden tarkistuksen (`__world.yard.spots`).
   Naissankarin kilpi on selässä jousineidon viinen päällä.
 - Paluusillan kuljetus toimii, mutta 3D ei vielä myönnä palkintoja eikä kartta
   lisää `rewards`-kentän esineitä inventaarioon.
@@ -338,7 +340,7 @@ rajattuna työnään. Tässä branchissa ei ole efektien tilamallia, kuvakkeita 
   kuunkierrossa, 2026-11-22); eivät toisen 3D-paikan viereen. Jäniksiä 7–9, joista 1–3 suolla ja 1–3
   paloaukealla (2026-11-21).
 - Jousineito (2026-11-22): parannus vaatii 6/8 osumaa, kolme yritystä; kuolee myös, jos ensimmäiseltä
-  käynniltä lähdetään parantamatta. Vain jousineidon talon emäntä tietää huhun. NPC-repliikeillä on
+  käynniltä lähdetään parantamatta. Huhun kertoo se emäntä, jolta ensin kysytään (2026-11-22). NPC-repliikeillä on
   vähintään kolme samaa tarkoittavaa muunnelmaa; uudet repliikit kirjoitetaan samoin.
 - Emäntien ruoka (2026-11-22): pöydältä kysymättä otettu ruoka suututtaa sen talon emännän heti; kaksi
   jänislihaa lepyttää. Ruokaa pyydettäessä kalaonnen kuulla kalat annetaan, muuten yksi jänis antaa

@@ -321,29 +321,54 @@ describe("jousineito, emäntä ja nuori urho (V6)", () => {
     expect(runtime.startDialogue("yard", "jousineito")!.view.nodeId).toBe("reward");
   });
 
-  it("jousineidon talon emäntä kertoo huhun kerran; sen jälkeen tältä kuulta ei ole uutta", () => {
-    const { store, runtime } = setup();
-    const talk = runtime.startDialogue("yard", "emanta")!;
-    expect(talk.view.nodeId).toBe("greet");
-    expect(newsChoices(talk)).toEqual(["ask-news", "leave"]);
-    const asked = runtime.choose(talk, "ask-news");
-    expect(asked.saved && asked.next?.view.nodeId).toBe("rumor");
-    expect(store.get().engine.flags["rumor.heard"]).toBe(true);
-    expect(store.get().world.knownSiteIds).toContain("lakeside");
-    const again = runtime.startDialogue("yard", "emanta")!;
-    expect(newsChoices(again)).toEqual(["ask-news-again", "leave"]);
-    expect(again.view.choices[0].text).toBe(talk.view.choices[0].text);          // sama kysymys
-    const none = runtime.choose(again, "ask-news-again");
-    expect(none.saved && none.next?.view.nodeId).toBe("noNews");
-  });
+  for (const [first, second] of [["emanta", "emanta_b"], ["emanta_b", "emanta"]] as const) {
+    it(`huhu on yksi emäntien kesken: ${first} kertoo sen ensin, ${second} ei toista`, () => {
+      const { store, runtime } = setup();
+      const talk = runtime.startDialogue("yard", first)!;
+      expect(newsChoices(talk)).toEqual(["ask-news", "leave"]);
+      const asked = runtime.choose(talk, "ask-news");
+      expect(asked.saved && asked.next?.view.nodeId).toBe("rumor");
+      expect(store.get().engine.flags["rumor.heard"]).toBe(true);
+      expect(store.get().world.knownSiteIds).toContain("lakeside");
+      for (const npc of [first, second]) {
+        const again = runtime.startDialogue("yard", npc)!;
+        expect(newsChoices(again)).toEqual(["ask-news-none", "leave"]);       // ei apajia: ei uutta
+        expect(again.view.choices[0].text).toBe(talk.view.choices[0].text);   // sama kysymys
+        const none = runtime.choose(again, "ask-news-none");
+        expect(none.saved && none.next?.view.nodeId).toBe("noNews");
+      }
+    });
+  }
 
-  it("toisen talon emäntä ei tunne huhua: kumpikin emäntä puhuu omasta asiastaan", () => {
+  it("emäntä tervehtii ensikertalaista, tuttua ja neidon parantajaa eri tavoin", () => {
     const { store, runtime } = setup();
-    const b = runtime.startDialogue("yard", "emanta_b")!;
-    expect(b.view.choices.some((c) => c.id === "ask-news-again")).toBe(false);
-    runtime.choose(b, b.view.choices[0].id);
-    expect(store.get().engine.flags["rumor.heard"]).toBeUndefined();               // ei väitä kertoneensa kaikkea
-    expect(runtime.startDialogue("yard", "emanta")!.view.choices[0].id).toBe("ask-news");
+    const greet = (npc: "emanta" | "emanta_b") => {
+      runtime.post({ type: "npc.talked", npcId: npc, sceneId: "yard" });   // kuten 3D:n puhe
+      return runtime.startDialogue("yard", npc)!.view.nodeId;
+    };
+    const leave = () => { for (const npcId of ["emanta", "emanta_b", "jousineito"]) runtime.post({ type: "npc.leftBehind", npcId, sceneId: "yard" }); };
+    // Ensimmäisellä käynnillä haavoittunut neito on paikalla.
+    expect(greet("emanta")).toBe("greetWounded");
+    expect(greet("emanta")).toBe("greetWounded");                         // sama käynti: yhä ensitapaaminen
+    expect(greet("emanta_b")).toBe("greet");
+    // Parannus samalla käynnillä: ensitapaamisen tervehdys ei enää puhu ehjistä nahoista.
+    runtime.post(heal());
+    expect(greet("emanta")).toBe("greet");
+    leave();
+    expect(greet("emanta")).toBe("greetHealer");
+    expect(greet("emanta_b")).toBe("greetAgain");                          // toisen talon emännällä ei neitoa
+    // Emäntä, jota ei puhuteltu, ei muista.
+    const other = setup();
+    other.runtime.post({ type: "npc.leftBehind", npcId: "emanta_b", sceneId: "yard" });
+    expect(other.runtime.startDialogue("yard", "emanta_b")!.view.nodeId).toBe("greet");
+    // Kuollut neito: tuttu tervehdys ilman parantajaa.
+    const dead = setup();
+    dead.runtime.post({ type: "npc.talked", npcId: "emanta", sceneId: "yard" });
+    dead.runtime.post({ type: "npc.leftBehind", npcId: "jousineito", sceneId: "yard" });
+    dead.runtime.post({ type: "npc.leftBehind", npcId: "emanta", sceneId: "yard" });
+    expect(dead.store.get().engine.flags["archer.dead"]).toBe(true);
+    expect(dead.runtime.startDialogue("yard", "emanta")!.view.nodeId).toBe("greetAgain");
+    expect(store.get().engine.flags["emanta.met"]).toBe(true);
   });
 
   it("nuorella urholla on dialogi pihassa, mutta tietäjällä ei enää ole (yksi tietäjä, rannalla)", () => {
@@ -423,11 +448,12 @@ describe("jousineidon parannus: 6/8 osumaa ja kolme yritystä (2026-11-22)", () 
   });
 });
 
-describe("toisen talon emäntä neuvoo metsästysapajan kerran kuussa", () => {
+describe("huhun jälkeen kumpi tahansa emäntä neuvoo metsästysapajan kerran kuussa", () => {
   function withHunts(ids: string[]) {
     const ctx = setup();
     ctx.store.update((s) => ({
       ...s,
+      engine: { ...s.engine, flags: { ...s.engine.flags, "rumor.heard": true } },
       world: {
         ...s.world,
         siteInstances: [
@@ -469,7 +495,11 @@ describe("toisen talon emäntä neuvoo metsästysapajan kerran kuussa", () => {
 
   it("ilman apajia vastaus on aina, ettei tältä kuulta ole uutta", () => {
     const { store, runtime } = setup();
-    store.update((s) => ({ ...s, world: { ...s.world, siteInstances: s.world.siteInstances.filter((i) => i.kind !== "hunt") } }));
+    store.update((s) => ({
+      ...s,
+      engine: { ...s.engine, flags: { ...s.engine.flags, "rumor.heard": true } },
+      world: { ...s.world, siteInstances: s.world.siteInstances.filter((i) => i.kind !== "hunt") },
+    }));
     expect(ask(runtime).next?.view.nodeId).toBe("noNews");
   });
 });
@@ -555,7 +585,7 @@ describe("emäntien pöytäruoka: varkaus, sovitus ja pyytäminen (2026-11-22)",
       const angry = runtime.startDialogue("yard", npc)!;
       expect(angry.view.nodeId).toBe("robbed");
       expect(ids(angry)).toEqual(["leave"]);
-      expect(runtime.startDialogue("yard", other)!.view.nodeId).toBe("greet");
+      expect(runtime.startDialogue("yard", other)!.view.nodeId).toMatch(/^greet/);
       // Yksi jänis ei riitä.
       addHares(store, 1);
       expect(ids(runtime.startDialogue("yard", npc)!)).toEqual(["leave"]);
@@ -565,7 +595,7 @@ describe("emäntien pöytäruoka: varkaus, sovitus ja pyytäminen (2026-11-22)",
       const paid = runtime.choose(pay, "give-hares");
       expect(paid.saved && paid.next?.view.nodeId).toBe("appeased");
       expect(itemCount(store.get(), "hare_meat")).toBe(0);
-      expect(runtime.startDialogue("yard", npc)!.view.nodeId).toBe("greet");
+      expect(runtime.startDialogue("yard", npc)!.view.nodeId).toMatch(/^greet/);
       // Uusi varkaus suututtaa uudelleen.
       take(store, table(store, npc, "fish"));
       expect(runtime.startDialogue("yard", npc)!.view.nodeId).toBe("robbed");

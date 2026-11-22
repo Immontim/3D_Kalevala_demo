@@ -4,7 +4,8 @@
 // - Kanoja 2–4 ja kukko. Kanat ovat enimmäkseen animoitua mallia (kana.glb) maassa kopin
 //   ympärillä, joskus joku kauempana pihalla. Paikallaan oleva kana (kukko_kana.glb `kana_b`)
 //   on korkeintaan yksi, ja se istuu orrella tai kopin katolla. Kukko on orrella tai katolla.
-// - Koira on useimmiten emännän ja ruokapöydän luona, välillä portinpielessä tai muualla pihassa.
+// - Koira on useimmiten emännän tai ruokapöydän luona, välillä portinpielessä tai muualla pihassa.
+// - Emäntä, parannettu jousineito ja nuori urho seisovat käynnistä riippuen eri paikoissa (`pickSpot`).
 
 export interface Point { x: number; z: number }
 export interface Circle extends Point { r: number }
@@ -16,6 +17,8 @@ export interface YardLifeContext {
   coop: CoopFrame;
   /** Emännän paikka: koira viihtyy hänen lähellään. */
   housewife: Point;
+  /** Ruokapöydän keskikohta: koira käy myös siellä, kun emäntä on muualla. */
+  table?: Point;
   /** Koiran muut mahdolliset paikat (portinpieli, nuotio, kopin edusta, talon ovi...). */
   dogSpots: readonly Point[];
   /** Onko kohta rakennuksen, aidan, nuotion tai polun päällä (world.ts:n `blocked`). */
@@ -50,8 +53,12 @@ export const YARD_LIFE = {
   /** Kopin ympärys, jolla kanat kuopsuttavat (m kopin keskeltä). */
   nearCoop: [1.1, 3.4] as const,
   /** Todennäköisyys, että koira on emännän luona. */
-  dogNearHousewife: 0.6,
+  dogNearHousewife: 0.55,
   dogNearHousewifeDist: [1.1, 2.6] as const,
+  /** Lisätodennäköisyys, että koira on ruokapöydän luona (kun emäntä on muualla). */
+  dogNearTable: 0.2,
+  /** Pöydän keskeltä: pöydän ja penkkien este ulottuu noin 2 m:iin. */
+  dogNearTableDist: [2.4, 3.2] as const,
   /** Eläinten välinen vähimmäisväli. */
   spacing: 0.6,
 } as const;
@@ -109,16 +116,21 @@ export function planYardAnimals(ctx: YardLifeContext, rng: () => number = Math.r
 
 function placeDog(ctx: YardLifeContext, rng: () => number, taken: readonly Circle[]): HenPlacement {
   const facing = (p: Point, t: Point) => Math.atan2(t.x - p.x, t.z - p.z);
-  const nearHousewife = rng() < YARD_LIFE.dogNearHousewife;
-  const tryNear = () => {
+  const roll = rng();
+  // Emäntä pöydän luona: pöytä ja emäntä ovat sama paikka, joten pöydän osuus siirtyy emännälle.
+  const tableApart = ctx.table && Math.hypot(ctx.table.x - ctx.housewife.x, ctx.table.z - ctx.housewife.z) > 3;
+  const nearTable = tableApart && roll >= YARD_LIFE.dogNearHousewife && roll < YARD_LIFE.dogNearHousewife + YARD_LIFE.dogNearTable;
+  const nearHousewife = roll < YARD_LIFE.dogNearHousewife + (tableApart ? 0 : YARD_LIFE.dogNearTable);
+  const around = (c: Point, dist: readonly [number, number]) => {
     for (let k = 0; k < TRIES; k++) {
-      const a = rng() * Math.PI * 2, d = between(rng, YARD_LIFE.dogNearHousewifeDist);
-      const p = { x: ctx.housewife.x + Math.sin(a) * d, z: ctx.housewife.z + Math.cos(a) * d };
-      // Koira katsoo emäntää (ja ruokaa) tai vähän ohi.
-      if (freeSpot(ctx, taken, p, 0.35)) return { ...p, yaw: facing(p, ctx.housewife) + (rng() - 0.5) * 0.8 };
+      const a = rng() * Math.PI * 2, d = between(rng, dist);
+      const p = { x: c.x + Math.sin(a) * d, z: c.z + Math.cos(a) * d };
+      // Koira katsoo emäntää tai ruokaa, tai vähän ohi.
+      if (freeSpot(ctx, taken, p, 0.35)) return { ...p, yaw: facing(p, c) + (rng() - 0.5) * 0.8 };
     }
     return null;
   };
+  const tryNear = () => around(ctx.housewife, YARD_LIFE.dogNearHousewifeDist);
   const trySpot = () => {
     const order = ctx.dogSpots.map((s) => ({ s, k: rng() })).sort((a, b) => a.k - b.k).map((e) => e.s);
     for (const s of order) {
@@ -130,7 +142,27 @@ function placeDog(ctx: YardLifeContext, rng: () => number, taken: readonly Circl
     }
     return null;
   };
-  const dog = nearHousewife ? tryNear() ?? trySpot() : trySpot() ?? tryNear();
+  const dog = nearHousewife ? tryNear() ?? trySpot()
+    : nearTable ? around(ctx.table!, YARD_LIFE.dogNearTableDist) ?? tryNear() ?? trySpot()
+    : trySpot() ?? tryNear();
   // Viimeinen varapaikka on pihan keskiosa (vanha kiinteä paikka).
   return dog ?? { x: -1.7, z: -3.9, yaw: facing({ x: -1.7, z: -3.9 }, { x: 1, z: 3 }) };
+}
+
+/** Hahmon mahdollinen paikka: sijainti, suunta ja arvontapaino. */
+export interface Spot extends Point { key: string; yaw: number; weight: number }
+
+/**
+ * Arpoo painotetusti yhden paikan niistä, jotka `free` hyväksyy (esim. eivät ole toisen hahmon
+ * päällä). Jos mikään ei kelpaa, arvotaan kaikista. Sama paikka voi toistua käynnistä toiseen.
+ */
+export function pickSpot<S extends Spot>(spots: readonly S[], rng: () => number = Math.random, free: (spot: S) => boolean = () => true): S {
+  const ok = spots.filter(free);
+  const pool = ok.length > 0 ? ok : spots;
+  let r = rng() * pool.reduce((sum, spot) => sum + spot.weight, 0);
+  for (const spot of pool) {
+    r -= spot.weight;
+    if (r < 0) return spot;
+  }
+  return pool[pool.length - 1];
 }

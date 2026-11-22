@@ -26,7 +26,7 @@ import { COLLISION, CollisionWorld } from "./collision";
 import { spawnAnimal, spawnVillager, updateFolk, vanishVillager } from "./folk";
 import { t, type TextKey } from "./i18n";
 import { addTalkable, removeTalkable } from "./interact";
-import { planYardAnimals, type Circle, type YardAnimals } from "./yardLife";
+import { pickSpot, planYardAnimals, type Circle, type Point, type Spot, type YardAnimals } from "./yardLife";
 import { birdLevelAtDistance } from "./ambience";
 import { SCENE_IDS, type SceneId } from "./app/route";
 import { Forest, ScatterField, placeForestWall, type ScatterItem, type TreeSpot } from "./forest";
@@ -100,11 +100,14 @@ export const yardState = { archerHealed: false, archerDead: false };
 
 /** Makaavan jousineidon jalkojen kohta vuoteella (vartalo ulottuu juuresta pielukseen päin, +X). */
 const archerLyingAt = () => { const [x, z] = fromLocal(BED, -0.8, 0); return { x, z, yaw: BED.yaw - Math.PI / 2 }; };
-/** Parannettu jousineito seisoo vuoteen etelälaidalla pihan keskustaan päin. */
-const archerStandingAt = () => {
+/** Vuoteen etelälaita pihan keskustaan päin: tähän neito nousee, kun hänet parannetaan kesken käynnin. */
+const archerBedside = () => {
   const [x, z] = fromLocal(BED, -0.1, 1.0);
   return { x, z, yaw: Math.atan2(-0.5 - x, 3 - z) };
 };
+/** Parannetun jousineidon paikka tällä käynnillä (`populateYardLife` arpoo sen myöhemmillä käynneillä). */
+let archerStand: { x: number; z: number; yaw: number } | null = null;
+const archerStandingAt = () => archerStand ?? archerBedside();
 /** Puhepiste: makaavalla vuoteen keskellä (vartalon kohdalla), seisovalla hänen paikallaan. */
 const archerTalkAt = (standing: boolean) => standing ? archerStandingAt() : { x: BED.x, z: BED.z };
 
@@ -143,6 +146,7 @@ export function setNpcStateInScene(scene: THREE.Scene, collision: CollisionWorld
   if (npcId !== "jousineito") return false;
   if (state === "dead") return removeTalkable("jousineito");
   if (state !== "healed" || !vanishVillager("jousineito", true)) return false;
+  archerStand = archerBedside();        // nousee vuoteeltaan juuri siihen viereen
   void spawnArcher(scene, true);
   placeArcherPresence(collision, true);
   return true;
@@ -1636,8 +1640,8 @@ const folkName = (id: string) => t(`folk.${id.replace(/_[a-z0-9]+$/, "")}` as Te
 const COOP_ROOST = { perch: { lx: 1.15, lz: 0, y: 0.6 }, roof: { lx: -0.1, lz: 0, y: 1.44 } } as const;
 
 /**
- * Rauhallisen pihan väki: emäntä pöydän luona, jousineito vuoteella nuotion ääressä (tai urho tulella),
- * possu lätissä. Kanat (2–4 + kukko) ja koira arvotaan joka käynnillä (`yardLife.ts`).
+ * Rauhallisen pihan väki: emäntä, jousineito vuoteella nuotion ääressä (tai urho), possu lätissä.
+ * Emännän, parannetun neidon, urhon, kanojen (2–4 + kukko) ja koiran paikat arvotaan joka käynnillä (`yardLife.ts`).
  */
 function populateYardLife(scene: THREE.Scene, collision: CollisionWorld) {
   const tb = { ...TABLE, hx: 0, front: 0, back: 0 };
@@ -1650,47 +1654,82 @@ function populateYardLife(scene: THREE.Scene, collision: CollisionWorld) {
   const jobs: Promise<void>[] = [];
   const avoid: Circle[] = [];
 
-  // Naiset on mallinnettu miehen pituisiksi; pelissä heidät skaalataan hieman pienemmiksi.
-  // Emäntiä on kaksi eri tunnisteella, jotta heillä on omat dialoginsa: jousineidon talon emäntä
-  // kertoo huhun (`emanta`), toisen talon emäntä neuvoo metsästysapajia (`emanta_b`).
-  const housewifeId = yardHousewifeId();
-  const [ex, ez] = fromLocal(tb, 1.85, 0.75);
+  // Seisovan väen paikat arvotaan joka käynnillä (`pickSpot`); kaksi hahmoa ei osu samaan kohtaan.
+  const spot = (key: string, weight: number, [x, z]: [number, number], tx: number, tz: number): Spot => ({ key, weight, x, z, yaw: facing(x, z, tx, tz) });
+  const listed = <S extends Spot>(who: string, spots: S[]) => { yardDebug.spots[who] = spots.map(({ key, x, z }) => ({ key, x, z })); return spots; };
+  const people: Point[] = [];
+  const apart = (p: Point) => people.every((q) => Math.hypot(p.x - q.x, p.z - q.z) > 1.5);
   const [potX, potZ] = fromLocal(tb, 2.5, -0.5);
+  const [jarX, jarZ] = fromLocal(tb, 2.0, 0.55);
+  avoid.push({ x: potX, z: potZ, r: 0.6 }, { x: jarX, z: jarZ, r: 0.3 }, { x: FIRE.x + 1.9, z: FIRE.z + 1.3, r: 0.7 });
+
+  // Naiset on mallinnettu miehen pituisiksi; pelissä heidät skaalataan hieman pienemmiksi.
+  // Emäntiä on kaksi eri tunnisteella (`emanta`, `emanta_b`), jotta kumpikin muistaa omat asiansa.
+  // Emäntä on pöydän, padan tai tulen ääressä, joskus sikolätillä tai kanakopilla.
+  const housewifeId = yardHousewifeId();
+  const housewife = pickSpot(listed("housewife", [
+    spot("table", 0.3, fromLocal(tb, 0.2, 1.45), TABLE.x, TABLE.z),
+    spot("pot", 0.25, fromLocal(tb, 3.25, -0.95), potX, potZ),
+    spot("fire", 0.2, [FIRE.x + 0.9, FIRE.z + 1.3], FIRE.x, FIRE.z),
+    spot("sty", 0.12, fromLocal(STY, 0.2, 3.3), STY.x, STY.z),
+    spot("coop", 0.13, fromLocal(COOP, 0.9, 2.1), COOP.x, COOP.z),
+  ]));
+  const { x: ex, z: ez } = housewife;
   jobs.push(spawnVillager(scene, {
-    url: villagersFUrl, character: "emanta", x: ex, y: groundHeight(ex, ez), z: ez, yaw: facing(ex, ez, potX + 0.6, potZ + 3), scale: 0.95,
+    url: villagersFUrl, character: "emanta", x: ex, y: groundHeight(ex, ez), z: ez, yaw: housewife.yaw, scale: 0.95,
     armL: { upper: [0.1, -1, 0.1], fore: [-0.25, -0.75, 0.6] }, armR: { upper: [0.1, -1, 0.1], fore: [-0.25, -0.75, 0.6] },
   }));
   solid(housewifeId, ex, ez, 0.35);
-  avoid.push({ x: ex, z: ez, r: 0.5 }, { x: potX, z: potZ, r: 0.6 });
-  const [jarX, jarZ] = fromLocal(tb, 2.0, 0.55);
-  avoid.push({ x: jarX, z: jarZ, r: 0.3 }, { x: FIRE.x + 1.9, z: FIRE.z + 1.3, r: 0.7 });
+  avoid.push({ x: ex, z: ez, r: 0.5 });
+  people.push(housewife);
 
-  // Tietäjä asuu vain rannalla (MVP:ssä yksi tietäjä). Pihassa, jossa ei ole jousineitoa, tulen
-  // vieressä seisoo nuori urho (aseeton, rauhassa).
+  // Tietäjä asuu vain rannalla (MVP:ssä yksi tietäjä). Pihassa, jossa ei ole jousineitoa, seisoo
+  // nuori urho (aseeton, rauhassa) tulella, hakkuupölkyllä, portinpielessä tai sikolätin luona.
   if (!siteInstance.archer) {
-    const ux = FIRE.x + 2.5, uz = FIRE.z - 1.5;
+    const [blockX, blockZ] = fromLocal(SHED, 2.2, 2.6);
+    const urho = pickSpot(listed("urho", [
+      spot("fire", 0.35, [FIRE.x + 2.5, FIRE.z - 1.5], FIRE.x - 2, FIRE.z + 4),
+      spot("block", 0.25, fromLocal(SHED, 2.2, 3.4), blockX, blockZ),
+      spot("gate", 0.2, [-2.6, FENCE_R - 2.9], 0, 3),
+      spot("sty", 0.2, fromLocal(STY, -1.4, 3.6), 0, 0),
+    ]), Math.random, apart);
+    const { x: ux, z: uz } = urho;
     jobs.push(spawnVillager(scene, {
-      id: "urho", url: charactersUrl, character: "urho", x: ux, y: groundHeight(ux, uz), z: uz, yaw: facing(ux, uz, FIRE.x - 2, FIRE.z + 4),
+      id: "urho", url: charactersUrl, character: "urho", x: ux, y: groundHeight(ux, uz), z: uz, yaw: urho.yaw,
       armL: { upper: [0.14, -1, 0.04], fore: [0.1, -0.8, 0.45] }, armR: { upper: [0.14, -1, 0.04], fore: [0.1, -0.8, 0.45] },
     }));
     solid("urho", ux, uz, 0.4);
     avoid.push({ x: ux, z: uz, r: 0.6 });
+    people.push(urho);
+    yardDebug.people.urho = urho.key;
   }
 
   // Jousineito on vain siinä pihassa, jonka instanssi niin määrää (satunnaisesti valittu talo):
   // loukkaantuneena vuoteella, kunnes pelaaja parantaa hänet laululla. Kuollutta ei enää ole.
+  // Aiemmalla käynnillä parannettu seisoo vuoteen vieressä, nuotiolla, portinpielessä tai aitalla.
   if (siteInstance.archer && !yardState.archerDead) {
     const healed = yardState.archerHealed;
+    const bed = archerBedside();
+    const stand = healed ? pickSpot(listed("archer", [
+      { key: "bed", weight: 0.35, ...bed },
+      spot("fire", 0.25, [FIRE.x - 0.4, FIRE.z + 1.6], FIRE.x, FIRE.z),
+      spot("gate", 0.2, [2.6, FENCE_R - 2.9], 0, 3),
+      spot("storehouse", 0.2, fromLocal(STOREHOUSE, -0.9, 3.6), 0, 0),
+    ]), Math.random, apart) : { key: "bed", weight: 1, ...bed };
+    archerStand = { x: stand.x, z: stand.z, yaw: stand.yaw };
     jobs.push(spawnArcher(scene, healed));
     placeArcherPresence(collision, healed);
-    const stand = archerStandingAt();
     avoid.push({ x: stand.x, z: stand.z, r: 0.6 });
+    if (healed) people.push(stand);
+    yardDebug.people.archer = stand.key;
   }
+  yardDebug.people.housewife = housewife.key;
 
   // Kanat ja koira arvotaan joka käynnillä.
   const plan = planYardAnimals({
     coop: COOP,
     housewife: { x: ex, z: ez },
+    table: { x: TABLE.x, z: TABLE.z },
     dogSpots: [
       { x: 1.9, z: FENCE_R - 1.4 }, { x: -1.9, z: FENCE_R - 1.4 },          // portinpielet sisäpuolella
       { x: FIRE.x - 0.6, z: FIRE.z + 2.4 },                                 // nuotion etelälaidalla
@@ -1726,8 +1765,13 @@ function populateYardLife(scene: THREE.Scene, collision: CollisionWorld) {
   return Promise.all(jobs).then(() => undefined);
 }
 
-/** Savutesteille: tämän käynnin arvottu eläinten sijoittelu (`__world.yard`). */
-export const yardDebug: { animals: YardAnimals | null } = { animals: null };
+/** Savutesteille: tämän käynnin arvottu eläinten ja väen sijoittelu (`__world.yard`). */
+export const yardDebug: {
+  animals: YardAnimals | null;
+  /** Kenen paikka arvottiin mistäkin ehdokkaasta, ja kaikki ehdokkaat (savutestit tarkistavat esteet). */
+  people: Record<string, string>;
+  spots: Record<string, { key: string; x: number; z: number }[]>;
+} = { animals: null, people: {}, spots: {} };
 
 /** Rantakohtauksen väki: tietäjä seisoo keittotulen vieressä sauvaansa nojaten, koira lepäilee
  *  tulen ja mökin välissä. */

@@ -138,6 +138,8 @@ function householdFood(npc: HousewifeId, greetChoices: DialogueChoice[]): {
 export const RULES: Rule[] = [
   theftRule("emanta"),
   theftRule("emanta_b"),
+  ...meetingRules("emanta"),
+  ...meetingRules("emanta_b"),
   {
     id: "sage.theft-noticed",
     intent: "Jos pelaaja vie tietäjän tuohikontin luvatta, siitä jää näkyvä seuraus: tietäjä muistaa sen ja puhuu siitä.",
@@ -366,82 +368,102 @@ export const ARCHER_DIALOGUE: Dialogue = {
 /** Kysymys uutisista: sama sanamuoto molemmille emännille. */
 const ASK_NEWS_TEXT: TextKey = "dialogue.emanta.askNews";
 
-const HOUSEWIFE_FOOD = householdFood("emanta", [
-  {
-    id: "ask-news",
-    text: ASK_NEWS_TEXT,
-    when: { kind: "flag", flag: "rumor.heard", value: false },
-    effects: [
-      { kind: "setFlag", flag: "rumor.heard" },
-      { kind: "revealSite", siteId: "lakeside" },
-      { kind: "message", text: "world.emanta.rumor", sub: "world.emanta.rumorSub" },
-    ],
-    next: "rumor",
-  },
-  { id: "ask-news-again", text: ASK_NEWS_TEXT, when: { kind: "flag", flag: "rumor.heard" }, next: "noNews" },
-  { id: "ask-maiden", text: "dialogue.emanta.askMaiden", when: { kind: "flag", flag: "archer.dead" }, next: "maidenDied" },
-  { id: "leave", text: "dialogue.sage.leave" },
-]);
-
-/**
- * Jousineidon talon emäntä (`emanta`): kertoo kerran huhun vainolaisista ja merkitsee tietäjän rannan
- * kartalle. Jos jousineito kuoli, hän kertoo siitä. Muuten uutta ei ole kuulunut.
- * Ruoka ja varkaus: `householdFood`.
- */
-export const HOUSEWIFE_DIALOGUE: Dialogue = {
-  id: "emanta.yard",
-  sceneId: "yard",
-  npcId: "emanta",
-  intent: "Jousineidon talon emäntä kertoo huhun Pohjan akan vainolaisista ja neuvoo tietäjän luo (ranta kartalle); jos jousineito kuoli, emäntä kertoo, ettei ollut laulajaa eikä rohtojen sitojaa. Kun kaikki on kerrottu, uutta ei ole kuultu. Ruokaa voi pyytää; pöydältä varastanut saa lepyttää emännän kahdella jänislihalla.",
-  entries: [HOUSEWIFE_FOOD.entry, { node: "greet" }],
-  nodes: {
-    greet: { text: lines("dialogue.emanta.greet"), choices: HOUSEWIFE_FOOD.greet },
-    ...HOUSEWIFE_FOOD.nodes,
-    rumor: { text: lines("dialogue.emanta.rumor"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
-    maidenDied: { text: lines("dialogue.emanta.maidenDied"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
-    noNews: { text: NO_NEWS, choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
-  },
-};
-
-/** Apajavinkki on tarjolla, kun tuntematon apaja on olemassa eikä emäntä ole vielä neuvonut tällä kuulla. */
+/** Apajavinkki on tarjolla, kun tuntematon apaja on olemassa eikä kumpikaan emäntä ole vielä neuvonut tällä kuulla. */
 const HUNT_TIP_AVAILABLE: Condition = {
   kind: "all",
   of: [{ kind: "unknownHuntGround" }, { kind: "not", of: { kind: "sameMoon", counter: "emanta.huntTipMoon" } }],
 };
+const RUMOR_TOLD: Condition = { kind: "flag", flag: "rumor.heard" };
 
 /**
- * Toisen talon emäntä (`emanta_b`): ei tiedä vainolaisista, mutta neuvoo kerran kuunkierrossa yhden
- * metsästysapajan, jota pelaaja ei vielä tunne. Jos sellaista ei ole tai hän on jo neuvonut, uutta ei ole.
+ * Emännän tapaaminen muistetaan käynnin yli: puhe merkitsee `<npc>.greeted`, ja kun sankari lähtee
+ * pihasta (`npc.leftBehind`), emäntä on tavattu (`<npc>.met`). Saman käynnin uusi puhe on yhä ensitapaaminen.
  */
-const HOUSEWIFE_B_FOOD = householdFood("emanta_b", [
-  {
-    id: "ask-news",
-    text: ASK_NEWS_TEXT,
-    when: HUNT_TIP_AVAILABLE,
-    effects: [
-      { kind: "revealHuntGround" },
-      { kind: "markMoon", counter: "emanta.huntTipMoon" },
-      { kind: "message", text: "world.emanta.huntTip", sub: "world.emanta.huntTipSub" },
-    ],
-    next: "huntTip",
-  },
-  { id: "ask-news-none", text: ASK_NEWS_TEXT, when: { kind: "not", of: HUNT_TIP_AVAILABLE }, next: "noNews" },
-  { id: "leave", text: "dialogue.sage.leave" },
-]);
+function meetingRules(npc: HousewifeId): Rule[] {
+  return [
+    {
+      id: `${npc}.greeted`,
+      intent: `Kun pelaaja puhuu ${HOUSEHOLD[npc].name.replace("emäntä", "emännälle")}, siitä jää merkintä tätä käyntiä varten.`,
+      on: { type: "npc.talked", npcId: npc, sceneId: "yard" },
+      then: [{ kind: "setFlag", flag: `${npc}.greeted` }],
+    },
+    {
+      id: `${npc}.met`,
+      intent: `Kun pelaaja lähtee pihasta puhuttuaan emännälle, ${HOUSEHOLD[npc].name} muistaa hänet seuraavalla käynnillä ("taas tapaamme").`,
+      on: { type: "npc.leftBehind", npcId: npc, sceneId: "yard" },
+      when: { kind: "flag", flag: `${npc}.greeted` },
+      then: [{ kind: "setFlag", flag: `${npc}.met` }],
+    },
+  ];
+}
 
-export const HOUSEWIFE_B_DIALOGUE: Dialogue = {
-  id: "emanta_b.yard",
-  sceneId: "yard",
-  npcId: "emanta_b",
-  intent: "Toisen talon emäntä neuvoo kerran kuunkierrossa yhden metsästysapajan, jota pelaaja ei vielä tunne (apaja kartalle); muuten tältä kuulta ei ole uutta kuultu. Ruokaa voi pyytää; pöydältä varastanut saa lepyttää emännän kahdella jänislihalla.",
-  entries: [HOUSEWIFE_B_FOOD.entry, { node: "greet" }],
-  nodes: {
-    greet: { text: lines("dialogue.emanta.greet"), choices: HOUSEWIFE_B_FOOD.greet },
-    ...HOUSEWIFE_B_FOOD.nodes,
-    huntTip: { text: lines("dialogue.emanta.huntTip"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
-    noNews: { text: NO_NEWS, choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
-  },
-};
+/**
+ * Emäntä (`emanta` jousineidon talossa, `emanta_b` toisessa). Kumpi tahansa kertoo huhun vainolaisista,
+ * jos sitä ei ole vielä kuultu (yksi huhu emäntien kesken); sen jälkeen kumpi tahansa neuvoo kerran
+ * kuunkierrossa apajan. Tervehdys riippuu tapaamisesta ja jousineidosta. Jousineidon talon emäntä
+ * kertoo kuolleesta neidosta. Ruoka ja varkaus: `householdFood`.
+ */
+function housewifeDialogue(npc: HousewifeId): Dialogue {
+  const archerHouse = npc === "emanta";
+  const met: Condition = { kind: "flag", flag: `${npc}.met` };
+  const food = householdFood(npc, [
+    {
+      id: "ask-news",
+      text: ASK_NEWS_TEXT,
+      when: { kind: "not", of: RUMOR_TOLD },
+      effects: [
+        { kind: "setFlag", flag: "rumor.heard" },
+        { kind: "revealSite", siteId: "lakeside" },
+        { kind: "message", text: "world.emanta.rumor", sub: "world.emanta.rumorSub" },
+      ],
+      next: "rumor",
+    },
+    {
+      id: "ask-news-tip",
+      text: ASK_NEWS_TEXT,
+      when: { kind: "all", of: [RUMOR_TOLD, HUNT_TIP_AVAILABLE] },
+      effects: [
+        { kind: "revealHuntGround" },
+        { kind: "markMoon", counter: "emanta.huntTipMoon" },
+        { kind: "message", text: "world.emanta.huntTip", sub: "world.emanta.huntTipSub" },
+      ],
+      next: "huntTip",
+    },
+    { id: "ask-news-none", text: ASK_NEWS_TEXT, when: { kind: "all", of: [RUMOR_TOLD, { kind: "not", of: HUNT_TIP_AVAILABLE }] }, next: "noNews" },
+    ...(archerHouse ? [{ id: "ask-maiden", text: "dialogue.emanta.askMaiden" as TextKey, when: { kind: "flag", flag: "archer.dead" } as Condition, next: "maidenDied" }] : []),
+    { id: "leave", text: "dialogue.sage.leave" },
+  ]);
+  const leave: DialogueChoice[] = [{ id: "leave", text: "dialogue.sage.leave" }];
+  return {
+    id: `${npc}.yard`,
+    sceneId: "yard",
+    npcId: npc,
+    intent: `${archerHouse ? "Jousineidon talon" : "Toisen talon"} emäntä tervehtii ensikertalaista${archerHouse ? " (haavoittuneen neidon aikaan: \"ehjin nahoin\")" : ""} ja tuttua eri tavoin${archerHouse ? " (neidon parantajaa erikseen)" : ""}. Kumpi tahansa emäntä kertoo huhun vainolaisista, jos sitä ei vielä ole kuultu, ja muuten neuvoo kerran kuunkierrossa apajan; muuten tältä kuulta ei ole uutta.${archerHouse ? " Kuolleesta jousineidosta hän kertoo, ettei ollut laulajaa eikä rohtojen sitojaa." : ""} Ruokaa voi pyytää; pöydältä varastanut saa lepyttää emännän kahdella jänislihalla.`,
+    entries: [
+      food.entry,
+      ...(archerHouse ? [{ when: { kind: "all", of: [met, { kind: "flag", flag: "archer.healed" }] } as Condition, node: "greetHealer" }] : []),
+      { when: met, node: "greetAgain" },
+      ...(archerHouse ? [{ when: ARCHER_WOUNDED, node: "greetWounded" }] : []),
+      { node: "greet" },
+    ],
+    nodes: {
+      greet: { text: lines("dialogue.emanta.greet"), choices: food.greet },
+      greetAgain: { text: lines("dialogue.emanta.greetAgain"), choices: food.greet },
+      ...(archerHouse ? {
+        greetWounded: { text: lines("dialogue.emanta.greetWounded"), choices: food.greet },
+        greetHealer: { text: lines("dialogue.emanta.greetHealer"), choices: food.greet },
+        maidenDied: { text: lines("dialogue.emanta.maidenDied"), choices: leave },
+      } : {}),
+      ...food.nodes,
+      rumor: { text: lines("dialogue.emanta.rumor"), choices: leave },
+      huntTip: { text: lines("dialogue.emanta.huntTip"), choices: leave },
+      noNews: { text: NO_NEWS, choices: leave },
+    },
+  };
+}
+
+export const HOUSEWIFE_DIALOGUE = housewifeDialogue("emanta");
+export const HOUSEWIFE_B_DIALOGUE = housewifeDialogue("emanta_b");
 
 /** Nuori urho (pihassa ilman jousineitoa): vihjaa kalmiston lähettilääseen. */
 export const YOUNG_WARRIOR_DIALOGUE: Dialogue = {

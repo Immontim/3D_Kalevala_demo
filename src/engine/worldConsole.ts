@@ -29,7 +29,7 @@ export function initWorldConsole() {
     get last() { return worldRuntime().lastPost(); },
     scene: ARENA,
     /** Pihan arvottu eläinsijoittelu tällä käynnillä (kanat, kukko, koira). */
-    get yard() { return yardDebug.animals; },
+    get yard() { return yardDebug.animals ? { ...yardDebug.animals, people: { ...yardDebug.people }, spots: yardDebug.spots } : null; },
     /** Kohtauksen vielä paikallaan olevat poimittavat esineet ja se, jota katse osoittaa. */
     get items() {
       return {
