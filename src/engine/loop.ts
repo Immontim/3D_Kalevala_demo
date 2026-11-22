@@ -20,6 +20,7 @@ import { keepApartAndInside, updateCombatant } from "./melee";
 import { updateHazards } from "./hazards";
 import { updateShowcase } from "./showcase";
 import { choosing, closeChoice, closeSong, songState, updateChoice, updateSong } from "./song";
+import { clearSongArcs, updateSongArcs } from "./songArcs";
 import { aim, bindUi, fx, g, inputs, keys, sfx } from "./state";
 import { camera, canvas, composer, updateSongLook, world } from "./view";
 import { createEmptySceneReturn, saveSceneReturn } from "../map/transition";
@@ -48,6 +49,7 @@ function resetField() {
   aim.pitch = 0;
   g.songPower = 0;
   if (songState) closeSong(true);
+  clearSongArcs();
   if (choosing) closeChoice();
   closeDialogue(true);
   g.gameOver = false;
@@ -93,6 +95,7 @@ export function frame(now: number) {
 /** Yksi pelin askel ilman piirtoa. Erillään, jotta savutesti voi ajaa peliä tasaisin askelin. */
 export function simulate(realDt: number) {
   if (!paused) g.realTime += realDt; // tauko pysäyttää myös laulun riimut
+  updateSongArcs(); // säekaaret hiipuvat reaaliajassa myös laulun jälkeen
   fpsAcc += realDt; fpsFrames++;
   if (fpsAcc > 0.5) { $("fps").textContent = String(Math.round(fpsFrames / fpsAcc)); fpsAcc = 0; fpsFrames = 0; }
 
