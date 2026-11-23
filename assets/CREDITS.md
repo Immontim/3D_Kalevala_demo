@@ -135,8 +135,9 @@ Ei uusia ulkopuolisia lähteitä. `louhi.glb` on kuvattu aiemmin.
 
 ## `smithy.glb`
 
-Sepän paja: avokatos, turvekatto, kiviseinä, ahjo, hiillos ja palkeet. Geometria ja
-hiilten hehkutekstuuri itse tehty Blenderissä (skripti `assets-src/blender/smithy.py`).
+Sepän paja: avokatos, turvekatto, kiviseinä, ahjo, hiillos, palkeet, alasimet, karkaisuastiat,
+työkalut, keihäänterän aihiot, keihästeline ja säärisuojat. Geometria ja hiilten hehkutekstuuri itse
+tehty Blenderissä (skripti `assets-src/blender/smithy.py`).
 Sepän asuintalo `talo_seppa` on `homestead.glb`:ssä samoilla lähteillä kuin muut talot.
 
 | Osa | Lähde (Poly Haven -tunniste, CC0) | Käyttö |
@@ -146,6 +147,7 @@ Sepän asuintalo `talo_seppa` on `homestead.glb`:ssä samoilla lähteillä kuin 
 | Ahjon kivet ja suojakivi | `mossy_rock` | Sammal poistettu kuten kalmistossa |
 | Palkeiden nahka | `brown_leather` | |
 | Ahjon savi, katon puu, tuohi ja turve | `clay_plaster`, `pine_bark`, `forest_leaves_02` | Samat kuin `homestead.glb`:ssä |
+| Hiilikori | itse tehty punontatekstuuri | Sama kuin `homestead.glb`:n aidoissa |
 
 Haku: `tools/fetch-smithy.ps1`.
 

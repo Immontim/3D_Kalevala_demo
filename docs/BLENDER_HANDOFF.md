@@ -6,19 +6,22 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-23 (Claude, Windows; pohja main 02cc7d5; sepän paja branchissa `claude/smithy`, tarkista
-merge-tila `git merge-base --is-ancestor`)
+Päivitetty: 2026-11-23 (Claude, Windows; pohja main 231d61a; sepän paja B2 branchissa `claude/smithy-b2`,
+tarkista merge-tila `git merge-base --is-ancestor`)
 
-- **Sepän paja, vaihe B1** (`assets/smithy.glb`, 1,45 Mt / 9 550 kolmiota; `assets-src/blender/smithy.py`,
-  taustalla noin 1 min, lukee cairnfield.py:n → homestead.py, household.py; tekstuurit `tools/fetch-smithy.ps1`).
+- **Sepän paja, vaiheet B1–B2** (`assets/smithy.glb`, 1,78 Mt / 15 450 kolmiota; `assets-src/blender/smithy.py`,
+  taustalla noin 15 s, lukee cairnfield.py:n → homestead.py, household.py; tekstuurit `tools/fetch-smithy.ps1`).
   Koodi valmis, ei pelissä (pelikoodi on Codexin). **Kaikilla solmuilla sama origo** (pajan lattian keskikohta):
-  `paja` (paalut, orret, kiviseinä, lattialaikku), `paja_katto` (oma solmu häivytystä varten), `ahjo` (kivi + savi,
-  0,55 m, henkari, suojakivi; tyhjät `mount_ahjo`, `mount_kipinat`), `ahjo_hiillos` (`M_Embers`, emissio 3) ja
-  `palkeet` (muotoavaimet `palje_a`/`palje_b`). Mitat, törmäykset ja pumppaajan paikka skriptin alun kommentissa.
-  `talo_seppa` (8,4 × 5,0 m, 2 660 kolmiota) on `homestead.glb`:ssä: `build_house` sai parametrit, oletustalo
-  todettu ennallaan verkkotiivisteellä ja muut homestead-solmut GLB-vertailulla. Arvioija hyväksyi suunnitelman
-  ja tarkisti B1:n kuvat (korjattu: hehkupohjan normaali, hiilikumpu, palkeiden väli, malka, tuohen reuna).
-  Riski: smithy.glb monistaa homesteadin tekstuurit (noin 0,6 Mt), ellei peli jaa niitä nimellä.
+  `paja`, `paja_katto` (oma solmu häivytystä varten), `ahjo` (`mount_ahjo`, `mount_kipinat`), `ahjo_hiillos`
+  (`M_Embers`, emissio 3), `palkeet` (muotoavaimet `palje_a`/`palje_b`), `paja_rekvisiitta` (alasimet,
+  kaukalo, kimpiastia, työkaluorsi, kanget, kuona- ja hiilikasa; `mount_alasin`, `mount_karkaisu`),
+  `keihasteline` (`mount_keihas_1..3` = `spear`in otteen muunnos; esikatselussa oikea keihäs istuu niissä) ja
+  `saarisuojat_myytavat`. Poikkeus: `poyta_aihiot`-solmun paikka on household.glb:n `pukkipoyta`n paikka.
+  Mitat, törmäykset ja seisomapaikat skriptin alun kommentissa. B2:n B1-verkot todettu tavu tavulta ennallaan.
+  `talo_seppa` (8,4 × 5,0 m) on `homestead.glb`:ssä. Arvioija tarkisti B2:n kuvat; korjattu telineen haarat,
+  vasaroiden ripustus, kaukalo pölleille, kivialasimen laakakivi, säärisuojien harjanne, kuonakeko.
+  Riskit: smithy.glb monistaa homesteadin tekstuurit (noin 0,6 Mt), ellei peli jaa niitä nimellä; kaukalo
+  näyttää yhä hieman laatikolta; vesi on läpinäkymätön tumma pinta.
 
 - **Metsän LOD- ja reuna-assetit** (`assets/forest_lod.glb`, 1,6 Mt; `assets-src/blender/forest_lod.py`;
   mainissa). Peli lataa tiedoston kaikissa 3D-kohtauksissa v06.00.00:sta alkaen (AGENT_HANDOFF). Skripti lukee
@@ -224,14 +227,9 @@ merge-tila `git merge-base --is-ancestor`)
 
 ## Seuraava Blender-tehtävä
 
-**Sepän paja B2** (omistajan hyväksymä suunnitelma 2026-11-23): rekvisiitta `smithy.glb`:hen samaan origoon:
-alasimet (pieni rautainen alasin isossa pölkyssä, litteä kivialasin; ei sarvialasinta), karkaisukaukalo ja
-vitsavanteinen kimpiastia, työkaluteline (pihdit, vasarat), rautakangit, kuona- ja hiilikasa, `poyta_aihiot`
-(household.glb:n `pukkipoyta`n origolla; keihäänterän aihiot vaiheittain), `keihasteline` tyhjin pistein
-`mount_keihas_*` (peli kloonaa `spear`in ja tekee siitä poimittavan; otetaan sepän luvalla) ja
-`saarisuojat_myytavat` omana solmuna. Kauppapaikka katoksen etureunan eteen. Rautaan oma `M_Iron`
-(metalness 0,3), koska staattinen metalli ilman ympäristökarttaa näkyy mustana. Sitten B3 pihan sommittelukuva,
-B4 seppä (tavallinen kyläseppä) ja aikuinen sälli (`smithfolk.glb`), B5 lapsisälli aikuisvartalon muunnoksena
+**Sepän paja B3**: pihan sommittelukuva Blenderissä (talo, paja, 2–3 homestead.glb:n `pino`a, kauppapaikka) ja
+sijoitusehdotus Codexille. Sitten B4 seppä (tavallinen kyläseppä) ja aikuinen sälli (`smithfolk.glb`; seppä
+tarvitsee kädessä pidettävän vasaran, kun Codex lisää `prop.kind`in), B5 lapsisälli aikuisvartalon muunnoksena
 (omistaja hyväksyy mittasuhteet kuvasta). Sulatusuunia ei tehdä.
 
 Muut: metsäjänis, rautakautinen jousi, nuoli ja miehen nuoliviini (korvikkeiden mitat yllä); kaukopuiden
