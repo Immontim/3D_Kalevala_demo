@@ -6,8 +6,19 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-22 (Claude, Windows; pohja main 7740904; villisika pelissä branchissa `claude/boar-hunt`,
-tarkista merge-tila `git merge-base --is-ancestor`)
+Päivitetty: 2026-11-23 (Claude, Windows; pohja main 02cc7d5; sepän paja branchissa `claude/smithy`, tarkista
+merge-tila `git merge-base --is-ancestor`)
+
+- **Sepän paja, vaihe B1** (`assets/smithy.glb`, 1,45 Mt / 9 550 kolmiota; `assets-src/blender/smithy.py`,
+  taustalla noin 1 min, lukee cairnfield.py:n → homestead.py, household.py; tekstuurit `tools/fetch-smithy.ps1`).
+  Koodi valmis, ei pelissä (pelikoodi on Codexin). **Kaikilla solmuilla sama origo** (pajan lattian keskikohta):
+  `paja` (paalut, orret, kiviseinä, lattialaikku), `paja_katto` (oma solmu häivytystä varten), `ahjo` (kivi + savi,
+  0,55 m, henkari, suojakivi; tyhjät `mount_ahjo`, `mount_kipinat`), `ahjo_hiillos` (`M_Embers`, emissio 3) ja
+  `palkeet` (muotoavaimet `palje_a`/`palje_b`). Mitat, törmäykset ja pumppaajan paikka skriptin alun kommentissa.
+  `talo_seppa` (8,4 × 5,0 m, 2 660 kolmiota) on `homestead.glb`:ssä: `build_house` sai parametrit, oletustalo
+  todettu ennallaan verkkotiivisteellä ja muut homestead-solmut GLB-vertailulla. Arvioija hyväksyi suunnitelman
+  ja tarkisti B1:n kuvat (korjattu: hehkupohjan normaali, hiilikumpu, palkeiden väli, malka, tuohen reuna).
+  Riski: smithy.glb monistaa homesteadin tekstuurit (noin 0,6 Mt), ellei peli jaa niitä nimellä.
 
 - **Metsän LOD- ja reuna-assetit** (`assets/forest_lod.glb`, 1,6 Mt; `assets-src/blender/forest_lod.py`;
   mainissa). Peli lataa tiedoston kaikissa 3D-kohtauksissa v06.00.00:sta alkaen (AGENT_HANDOFF). Skripti lukee
@@ -41,21 +52,10 @@ tarkista merge-tila `git merge-base --is-ancestor`)
   paikassa `lakeside` (AGENT_HANDOFF); mallit on katsottu myös pelissä
   (mökki, tuli, pata, tietäjä, laituri, vene ja ruoko toimivat). Koiralle
   puuttuu kävelyleike, jotta se voisi käyskennellä.
-- **Sankarin rauhan varustus** (`characters.glb`, `char_build.py`; peli
-  käyttää sitä rauhallisella pihalla, ks. AGENT_HANDOFF):
-  - Huotra vyöllä (sankari ja Pohjan soturi) on nyt 0,80 m (oli 0,58 m,
-    miekan terä 0,74 m) ja painotettu vain lantioon (`SHEATH_TOP`,
-    `SHEATH_D`, `SHEATH_LEN`).
-  - Kiinnityspisteet ovat tyhjiä solmuja luiden lapsina (`build_mounts`):
-    `mount_huotra` lantioluun (`hips`) alla ja `mount_kilpi_selka`
-    rintaluun (`chest`) alla. Kun miekka tai kilpi siirretään pisteen
-    lapseksi nollasijaintiin ja -kiertoon, miekka on huotrassa (väistin
-    suuaukon helalla, lape kuvetta vasten) ja kilpi selässä etupinta
-    taaksepäin.
-  - `char_hero_hihna` (72 kolmiota) on kilven kantohihna oikean olan yli,
-    samassa luurangossa kuin hahmo. Nimi alkaa `char_`, joten nykyinen
-    `Fighter.build` poistaa sen; rauhan varustuksessa se jätetään näkyviin.
-  - Kypärä on jo oma kappaleensa, joten rauhassa sen voi jättää pois.
+- **Sankarin rauhan varustus** (`characters.glb`, `char_build.py`): huotra 0,80 m, painotettu vain lantioon
+  (`SHEATH_*`). Tyhjät `mount_huotra` (`hips`-luun lapsi) ja `mount_kilpi_selka` (`chest`): ase tai kilpi pisteen
+  lapseksi nollasijaintiin ja -kiertoon. `char_hero_hihna` (72 kolmiota) on kilven kantohihna; `char_`-alkuisena
+  `Fighter.build` poistaa sen, rauhassa se jätetään näkyviin. Kypärä on oma kappaleensa.
 - **Otekanavat pysyville hahmoille** (lepoasento, Blenderin koordinaatit;
   peliin x, z, -y): tietäjällä on miesvartalon koverrettu nyrkki, joten
   `GRIP_P`/`GRIP_D` (`char_build.py`, pelissä `GRIP_CHANNEL`) käy
@@ -87,28 +87,14 @@ tarkista merge-tila `git merge-base --is-ancestor`)
 - **Modulaariset sankariosat** (`char_build.py`: `build_hero_modular`, `legs_trousers_wraps`, `legs_shoes`,
   `legs_greaves`, `foot_skin_parts`, `belt_flange`; naiselle `char_folk.py`: `build_jousineito_modular`,
   `_jousineito_core`): nykyisten täysien `char_hero`n ja `char_jousineito`n **rinnalle** (ne ovat verteksi
-  verteksiltä ennallaan, tarkistettu tiivisteellä) samalla luurangolla (23 luuta, yksi skin), painoilla ja
-  lepoasennolla. Solmut: `char_hero_base` / `_mail` / `_greaves` / `_shoes` (`characters.glb`) ja
-  `char_jousineito_base` / `_mail` / `_greaves` / `_shoes` (`villagers_f.glb`). `Fighter.build` valitsee nyt
-  kampanjavarusteiden mukaiset osat kummallekin sankarille. Kolmiot: hero base 27 600,
-  mail 2 800, greaves 260, shoes 4 700; jousineito base 28 500, mail 3 200, greaves 260, shoes 4 700. Tiedostot
-  kasvoivat: `characters.glb` 5,3 -> 7,1 Mt ja `villagers_f.glb` 3,2 -> 5,0 Mt (base kopioi kokonaisen hahmon);
-  koko asussa miehellä ~35 400 kolmiota (legacy 28 200). Sisältö:
-  - mies base: iho, hiukset, **kokonainen** sininen pellavatunika hihoineen ja helma (0,98 -> 0,50), housut, säärikäärit,
-    **paljas jalkaterä** (`foot_skin_parts`), vyö (`flange=0,014`: rengaslevyt tunikan pinnasta vyön ulkopintaan, jotta
-    vyö ei leiju ilman rengaspaitaa) ja huotra; mail = rengaspaita 0,47:ään, rengashelma (`skirt` 1,0 -> 0,57) ja
-    hihansuun nauha, samat mitat kuin legacyssa; kokonaisuus näyttää legacyn kaltaiselta;
-  - nainen base: legacy-asu ilman kenkiä (paljas jalkaterä), viitta ja viini mukana; mail = rengaspaita (infl. 0,021)
-    ja rengashelma, joka käyttää tunikan helman rivejä (`fitted_skirt` 1,05 -> 0,62) mutta jokainen säteen termi
-    >= 1,2 cm suurempi (ei läpileikkausta missään kulmassa) sekä oma vyönauha rengaspaidan päällä; ei hihansuun nauhaa
-    (polven ja kyynärpään akseli ei istu naisen käsivarteen); greaves/shoes samoilla funktioilla kuin miehellä;
-  - `legs_parts` on jaettu apufunktioiksi (tuloksen järjestys sama), joten muiden hahmojen jalat eivät muuttuneet.
-  Tarkistus: `char_modular_check.py` (`check_set("hero"|"fem")`) taivuttaa luurangon lepo-, kävely-, torjunta-,
-  ylälyönti- ja sivuasentoon ja mittaa kerrosten välin; vyö-, huotra-, viini- ja kengän yläreunan päällekkäisyydet ovat
-  tarkoituksellisia. Ääriasennoissa (jalka eteen yli 0,35 rad) sininen tunika pistää rengashelman läpi etureidestä
-  **kuten legacyssakin**; naisen säärisuojat jäävät baggy-housujen alle polven kohdalla. Katsottu: edestä, sivulta,
-  takaa ja yläviistosta lepoasennossa sekä kolmessa ääriasennossa molemmilla. Runtime-integraation jälkeinen
-  varusteiden vaihtuminen odottaa omistajan käsisavutestiä.
+  verteksiltä ennallaan) samalla luurangolla (23 luuta, yksi skin). Solmut `char_hero_base` / `_mail` / `_greaves` /
+  `_shoes` (`characters.glb`) ja `char_jousineito_*` samoin (`villagers_f.glb`); `Fighter.build` valitsee osat
+  kampanjavarusteiden mukaan. Kolmiot: base noin 28 000, mail 2 800–3 200, greaves 260, shoes 4 700; base kopioi
+  kokonaisen hahmon, joten `characters.glb` on 7,1 Mt ja `villagers_f.glb` 5,0 Mt. Base = asu ilman rengaspaitaa ja
+  kenkiä (paljas jalkaterä `foot_skin_parts`, vyön `flange` estää leijumisen); naisen rengashelma on jokaisella
+  säteellä ≥ 1,2 cm tunikan helman ulkopuolella. Tarkistus `char_modular_check.py` (`check_set("hero"|"fem")`, viisi
+  asentoa). Ääriasennossa (jalka eteen yli 0,35 rad) tunika pistää rengashelman läpi kuten legacyssa; naisen
+  säärisuojat jäävät housujen alle polvessa. Varusteiden vaihto pelissä odottaa omistajan käsisavutestiä.
 - **Taivaanrautamiekka** (`sword_sky_iron`, `characters.glb`, 600 kolmiota): sama origo, suunta, terän pituus (0,74 m)
   ja kahvan geometria (y -0,05..0,055, säde 1,4 -> 1,3 cm) kuin `sword`illa, joten käsikiinnitystä ei tarvitse
   muuttaa. Lehtimäinen terä (leveimmillään 6 cm), kuusikulmainen poikkileikkaus, tumma siniharmaa meteoriittirauta
@@ -176,7 +162,7 @@ tarkista merge-tila `git merge-base --is-ancestor`)
   taistelijat `char_all.py` → `run_chars()`, kyläläiset `char_folk.py` →
   `run_folk()`, suo `bog.py` → `build_bog()`, pihapiiri `homestead.py` ja
   esineet `household.py`, rauhallisen pihan rakennelmat `yard.py`,
-  eläimet `animals.py` ja villisika `boar.py`.
+  eläimet `animals.py`, villisika `boar.py` ja sepän paja `smithy.py` (sepän talo `homestead.py`).
   - Hahmot rakennetaan **avoimessa `characters.blend`-tiedostossa** Blender
     MCP:n kautta (kokoelmat GAME, SRC, WORK, FOLK, FOLK_F). Uusi
     kyläläinen: oma `build_…`-funktio ja rivi `run_folk`iin.
@@ -238,11 +224,19 @@ tarkista merge-tila `git merge-base --is-ancestor`)
 
 ## Seuraava Blender-tehtävä
 
-Metsästyksen mallit omistajan v06.04-testin jälkeen: metsäjänis (kesäturkki, mustat korvankärjet),
-pronssi-/rautakautinen jousi ja nuoli (korvikkeiden mitat yllä) sekä miessankarin nuoliviini. Muuta: jos
-omistaja näkee kaukopuiden vaihtorajan, leivo `forest_lod.py`:n atlas valaistuna ja pudota `LOD_TINT`;
-legacy-hahmojen poisto omistajan käsisavutestin jälkeen (säästää noin 1,7 Mt kummassakin), sormien
-viimeistely, koiran kävelyleike, istuva tietäjä ja loukkaantuneen jousineidon asento.
+**Sepän paja B2** (omistajan hyväksymä suunnitelma 2026-11-23): rekvisiitta `smithy.glb`:hen samaan origoon:
+alasimet (pieni rautainen alasin isossa pölkyssä, litteä kivialasin; ei sarvialasinta), karkaisukaukalo ja
+vitsavanteinen kimpiastia, työkaluteline (pihdit, vasarat), rautakangit, kuona- ja hiilikasa, `poyta_aihiot`
+(household.glb:n `pukkipoyta`n origolla; keihäänterän aihiot vaiheittain), `keihasteline` tyhjin pistein
+`mount_keihas_*` (peli kloonaa `spear`in ja tekee siitä poimittavan; otetaan sepän luvalla) ja
+`saarisuojat_myytavat` omana solmuna. Kauppapaikka katoksen etureunan eteen. Rautaan oma `M_Iron`
+(metalness 0,3), koska staattinen metalli ilman ympäristökarttaa näkyy mustana. Sitten B3 pihan sommittelukuva,
+B4 seppä (tavallinen kyläseppä) ja aikuinen sälli (`smithfolk.glb`), B5 lapsisälli aikuisvartalon muunnoksena
+(omistaja hyväksyy mittasuhteet kuvasta). Sulatusuunia ei tehdä.
+
+Muut: metsäjänis, rautakautinen jousi, nuoli ja miehen nuoliviini (korvikkeiden mitat yllä); kaukopuiden
+valaistu atlas, jos vaihtoraja näkyy; legacy-hahmojen poisto käsisavutestin jälkeen (noin 1,7 Mt kummassakin);
+sormet, koiran kävely, istuva tietäjä ja loukkaantuneen jousineidon asento.
 
 ## Ei vielä aloiteta
 

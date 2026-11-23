@@ -133,6 +133,22 @@ kivipinta on Poly Havenin `mossy_rock`-tekstuurista (CC0), josta sammal on poist
 ja karsikon kaarna `pine_bark` (CC0) sekä oksakorttiatlas (`assets-src/cards`, oma).
 Ei uusia ulkopuolisia lähteitä. `louhi.glb` on kuvattu aiemmin.
 
+## `smithy.glb`
+
+Sepän paja: avokatos, turvekatto, kiviseinä, ahjo, hiillos ja palkeet. Geometria ja
+hiilten hehkutekstuuri itse tehty Blenderissä (skripti `assets-src/blender/smithy.py`).
+Sepän asuintalo `talo_seppa` on `homestead.glb`:ssä samoilla lähteillä kuin muut talot.
+
+| Osa | Lähde (Poly Haven -tunniste, CC0) | Käyttö |
+| --- | --- | --- |
+| Takaseinän ladottu kivi | `stacked_stone_wall` | Punertava liuske harmaannettu |
+| Pajan nokinen lattia | `burned_ground_01` | |
+| Ahjon kivet ja suojakivi | `mossy_rock` | Sammal poistettu kuten kalmistossa |
+| Palkeiden nahka | `brown_leather` | |
+| Ahjon savi, katon puu, tuohi ja turve | `clay_plaster`, `pine_bark`, `forest_leaves_02` | Samat kuin `homestead.glb`:ssä |
+
+Haku: `tools/fetch-smithy.ps1`.
+
 ## `map/cairn-site.png`
 
 Kalmiston karttaikoni (48 × 48). Johdettu omistajan ImageGen-kuvasta
