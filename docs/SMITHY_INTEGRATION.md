@@ -1,6 +1,6 @@
 # Sepän pihapiiri: sijoitusehdotus pelikoodille
 
-Claude, 2026-11-23 (vaihe B3, pohja main 9329df9). Muistio Codexille: miten valmiit mallit asetetaan
+Claude, 2026-11-23 (vaiheet B3–B4, pohja main ebd6a23). Muistio Codexille: miten valmiit mallit asetetaan
 peliin. Tämä on ehdotus. Pelikoodin päätökset ja toteutuksen tila kirjataan `AGENT_HANDOFF.md`:hen,
 mallien sisältö ja mitat `BLENDER_HANDOFF.md`:hen ja `assets-src/blender/smithy.py`:n alkuun.
 
@@ -15,6 +15,7 @@ Muutos kannattaa tehdä skriptiin ja ajaa uudelleen, ei laskea käsin.
 | `smithy.glb` | `paja`, `paja_katto`, `ahjo`, `ahjo_hiillos`, `palkeet`, `paja_rekvisiitta`, `poyta_aihiot`, `keihasteline`, `saarisuojat_myytavat` + tyhjät pisteet |
 | `homestead.glb` | `talo_seppa`, `aitta`, `pino` ×6, `polkky`, `aita`, `portinpieli` |
 | `household.glb` | `pukkipoyta` (aihioiden alle), `penkki`, `pata` |
+| `smithfolk.glb` | `char_seppa`, `char_salli`, `sepan_vasara`, luuranko `RIG` (sama kuin `villagers.glb`:ssä) |
 
 ## Pihan pohja
 
@@ -106,8 +107,34 @@ Ehdotus:
 | Lapsi hiilikorilla | 4.31 | -12.55 | 8.638 | 1,35 m |
 | Sankari kauppapaikalla | 4.05 | -8.92 | kohti pajaa | pöydän ja telineen välissä |
 
-Katse on suunta (sin yaw, cos yaw), kuten `src/engine/ai.ts`:ssä. Seppä, sälli ja lapsi tulevat vaiheissa B4–B5
-(`smithfolk.glb`, `smithfolk_child.glb`). Siihen asti paikat ovat varattuja.
+Katse on suunta (sin yaw, cos yaw), kuten `src/engine/ai.ts`:ssä. Lapsi tulee vaiheessa B5
+(`smithfolk_child.glb`); siihen asti sen paikka on varattu.
+
+### Seppä ja sälli (`smithfolk.glb`)
+
+- `char_seppa` ja `char_salli` käyttävät samaa miesvartaloa ja luurankoa (23 luuta) kuin tietäjä.
+  Ne ladataan kuten `villagers.glb`:n `char_tietaja`. Kumpikin on noin 27 000–28 500 kolmiota, ja
+  tiedosto on 3,25 Mt.
+- Molemmilla on koverrettu miehen nyrkki, joten vasara mahtuu oikeaan käteen otekanavalle
+  `GRIP_P`/`GRIP_D` (`GRIP_CHANNEL`) kuten keihäs.
+- `sepan_vasara`: ote origossa, varsi kulkee +Y:stä −Y:hen ja pää on −Y:n päässä 0,285 m:n kohdalla,
+  kuten keihään kärki. Iskupinta osoittaa +Z:aan ja poikkipeeni −Z:aan (pelissä ±Y).
+  - `folk.ts`:n `prop.kind` tuntee nyt vain `staff` ja `bow`. `staff` seisoo maassa käden
+    vieressä, joten kädessä pidettävä vasara tarvitsee uuden tavan.
+  - Ehdotus: kind `tool`, joka asettaa paikallisen −Y:n otekanavan suuntaan `GRIP_D` ja origon
+    pisteeseen `GRIP_P` käden luun lapsena.
+- Testatut asennot (`char_smith.py`, `SMITH_POSES`), joissa esiliina ei mene tunikan eikä
+  housujen läpi:
+  - lepo kädet alhaalla (vähintään 19 mm);
+  - vasara ylhäällä `isku_ylhaalla` (10 mm);
+  - isku alasimeen `isku_alhaalla` (12 mm);
+  - palkeiden pumppaus `palkeet` (18 mm).
+
+  Pelin asennot voi tehdä samoilla luukierroilla.
+- Kävely: ääriasennossa (reisi eteen 0,6 rad) reisi työntyy esiliinan alareunan läpi 7–22 mm, kuten
+  tunikan helma muillakin hahmoilla. NPC:n kävelyn reisiheilahdus kannattaa rajata noin 0,45
+  rad:iin, tai esiliinan läpimeno hyväksytään.
+- Vasen käsi on töissä tyhjä. Pihdit sen käteen ovat myöhempi lisä.
 
 Kauppa (omistajan päätös): keihäs ja säärisuojat otetaan telineestä **sepän luvalla**, kuten emännän
 ruoka (`putSceneItem`, `ownerId` seppä).
@@ -132,8 +159,8 @@ ruoka (`putSceneItem`, `ownerId` seppä).
 
 ## Kuorma ja riskit
 
-- `smithy.glb` 1,78 Mt / noin 15 450 kolmiota. Pihan muut mallit ovat jo ladattavissa olevia
-  tiedostoja.
+- `smithy.glb` 1,78 Mt / noin 15 450 kolmiota ja `smithfolk.glb` 3,25 Mt / noin 55 000 kolmiota.
+  Pihan muut mallit ovat jo ladattavissa olevia tiedostoja.
 - `smithy.glb` sisältää homesteadin tekstuurien kopiot (noin 0,6 Mt), ellei peli jaa niitä nimellä.
 - Pajan lattialaikku on 1,2–1,8 cm maan yläpuolella, joten maaston pitää olla pajan alla tasainen
   (`rough` pieni, kuten tilan pihalla 0,03).
