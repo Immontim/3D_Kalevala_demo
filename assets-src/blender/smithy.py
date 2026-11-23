@@ -1,4 +1,5 @@
-"""Sepän paja: avokatos, ahjo, hiillos ja palkeet. Vie tiedoston assets/smithy.glb; peli
+"""Sepän paja: avokatos, ahjo, hiillos, palkeet, rekvisiitta, aihiopöytä, keihästeline ja myytävät
+säärisuojat. Vie tiedoston assets/smithy.glb; peli
 sijoittelee mallit nimen mukaan. Sepän asuintalo `talo_seppa` on homestead.py:ssä (homestead.glb),
 jotta se jakaa tekstuurit pihapiirin kanssa.
 
@@ -35,6 +36,26 @@ ja samalla muunnoksella.
   Muotoavaimet (glTF morph target) `palje_a` (+Y-puolen palje painuu kiinni) ja `palje_b`
   (-Y-puoli). Lepoasennossa molemmat ovat auki; vuorotteleva pumppaus = painot
   0..1 vastakkaisessa vaiheessa. Törmäys: laatikko x -3,0..-1,8, y 0,4..1,4.
+- paja_rekvisiitta (yksi verkko): rautainen alasin pölkyssä (0,35; 0,3), pölkky säde 0,3, alasimen
+  yläpinta 0,72 m (seppä seisoo noin kohdassa (0,35; -0,3)); litteä kivialasin (1,45; -0,4), yläpinta
+  noin 0,42 m; karkaisukaukalo (0,85; 1,32), 1,3 x 0,6 m, kahden pöllin päällä; kimpiastia (2,3; 1,22),
+  säde 0,31, korkeus 0,55; työkaluorsi oikeiden paalujen välissä (x 2,88, z 1,48) pihtien ja vasaroiden
+  kanssa; rautakangit (2,05; 0,5); rautamöhkäle (1,68; 1,0); puuhiilikasa (-2,35; -0,95) ja kori
+  (-1,72; -1,42); kuonakasa katoksen ulkopuolella (3,8; 1,15). Tyhjät `mount_alasin` (alasimen
+  yläpinta; kipinät) ja `mount_karkaisu` (kaukalon vesipinta; höyry). Törmäys: pölkky ympyränä
+  (säde 0,32), kivialasin ympyränä (0,4), kaukalo x 0,2..1,5 y 0,98..1,66, astia ympyränä (0,33),
+  hiilikasa ympyränä (0,55), kuonakasa ympyränä (0,7).
+- poyta_aihiot: keihäänterän aihiot viitenä vaiheena (kanki, taottu lehti, holkin siivet, käännetty
+  holkki, hiottu terä) sekä vasara, pihdit ja hiomakivi. **Solmun paikka (-1,25; -3,35) on pöydän
+  paikka:** peli asettaa household.glb:n `pukkipoyta`n samaan maailmamuunnokseen. Pöytä on katoksen
+  etureunan edessä kauppapaikkana; seppä seisoo sen takana noin kohdassa (-1,25; -2,7).
+- keihasteline: kaksi haarapuuta (x 0,9 ja 2,3; y -3,15), orsi 1,45 m:ssä ja maapuu tyvien edessä.
+  Tyhjät `mount_keihas_1..3` ovat characters.glb:n `spear`in otekohdan muunnoksia: kloonattu keihäs
+  asetetaan suoraan pisteen maailmamuunnokseen, jolloin tyvi on maassa, varsi nojaa orteen ja kärki
+  on ylhäällä. Törmäys: laatikko x 0,6..2,9, y -3,7..-3,0.
+- saarisuojat_myytavat: säärisuojapari roikkuu orren oikeassa päässä (x 2,48 ja 2,68). Oma solmu,
+  jotta peli voi piilottaa sen, kun pelaaja on saanut suojat. Rautaiset säärisuojat ovat pelin
+  suunnittelupäätös; Suomen rautakauden löydöistä niitä ei juuri tunneta.
 - Lattialaikku on 1,2–1,8 cm maan yläpuolella: maaston pitää olla pajan alla tasainen.
 """
 import bpy, bmesh, math, os, random, json
@@ -121,6 +142,7 @@ def make_smithy_materials():
         "iron": pbr("M_Iron", plain, rough=0.55),
         "charcoal": pbr("M_Charcoal", plain, rough=0.85, twosided=False),
         "embers": embers_mat(),
+        "water": pbr("M_SM_Water", plain, rough=0.25, twosided=False),
     })
     MATS["iron"].node_tree.nodes["Principled BSDF"].inputs["Metallic"].default_value = 0.3
 
@@ -517,7 +539,358 @@ def build_palkeet(col):
     return ob
 
 
-BUILDERS = [build_paja, build_paja_katto, build_ahjo, build_hiillos, build_palkeet]
+# ---------- B2: rekvisiitta, aihiopöytä, keihästeline ja säärisuojat ----------
+ANVIL = V((0.35, 0.3, 0.0))         # rautainen alasin pölkyn päällä
+STUMP_R, STUMP_H, ANVIL_TOP = 0.3, 0.6, 0.72
+STONE_ANVIL = V((1.45, -0.4, 0.0))  # litteä kivialasin, yläpinta noin 0,45 m
+TROUGH = V((0.85, 1.32, 0.0))       # karkaisukaukalo x-suunnassa
+TROUGH_L, TROUGH_R, TROUGH_TOP = 1.3, 0.3, 0.36
+TUB = V((2.3, 1.22, 0.0))           # vitsavanteinen kimpiastia
+TUB_H = 0.55
+RAIL_X = 2.88                       # työkaluorsi oikeiden paalujen (y 0 ja 2) välissä
+TABLE_POS = V((-1.25, -3.35, 0.0))  # aihiopöydän (household.glb:n pukkipoyta) paikka
+RACK_X, RACK_Y, RACK_Z = (0.9, 2.3), -3.15, 1.45   # keihästeline: pystypuut, orsi
+SPEAR_BUTT_Y = -3.55
+SPEARS_X = (1.25, 1.6, 1.95)
+SPEAR_GRIP = 0.62                   # characters.glb:n `spear`: ote origossa, tyvi 0,62 m takana
+
+IRON = (0.3, 0.29, 0.28)
+SCALE = (0.24, 0.22, 0.21)          # takomahilse
+BRIGHT = (0.62, 0.62, 0.64)          # hiottu terä
+RUST = (0.4, 0.27, 0.19)
+
+
+def face_dir(b, pts, want, mat, color=(1, 1, 1), tile=1.0, **kw):
+    """Tasopinta, jonka normaali käännetään suuntaan want."""
+    pts = [V(p) for p in pts]
+    n = V((0, 0, 0))
+    for i in range(len(pts)):
+        a, c = pts[i], pts[(i + 1) % len(pts)]
+        n += V(((a.y - c.y) * (a.z + c.z), (a.z - c.z) * (a.x + c.x), (a.x - c.x) * (a.y + c.y)))
+    if n.dot(V(want)) < 0:
+        pts = pts[::-1]
+    return b.face(pts, mat, color, tile, **kw)
+
+
+def grid_out(b, fn, nu, nv, mat, color=(1, 1, 1), uvfn=None, out=None, smooth=True):
+    """Kuten b.grid, mutta pinta käännetään niin, että normaali osoittaa suuntaan out(p)."""
+    e = 1e-3
+    p = V(fn(0.5, 0.5))
+    du, dv = V(fn(0.5 + e, 0.5)) - p, V(fn(0.5, 0.5 + e)) - p
+    if du.cross(dv).dot(V(out(p))) < 0:
+        f0 = fn
+        fn = lambda u, v: f0(1 - u, v)
+        if uvfn:
+            g0 = uvfn
+            uvfn = lambda u, v: g0(1 - u, v)
+    b.grid(fn, nu, nv, mat, color, uvfn=uvfn, smooth=smooth)
+
+
+def frustum(b, c, w0, d0, w1, d1, z0, z1, mat, color, tile=0.2, rot=None):
+    """Kartiomainen särmiö: pohja w0 x d0 korkeudella z0, yläpinta w1 x d1 korkeudella z1."""
+    c = V(c)
+    R = rot if rot else Matrix.Identity(3)
+    ring = lambda w, d, z: [c + R @ V((sx * w / 2, sy * d / 2, z)) for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    lo, hi = ring(w0, d0, z0), ring(w1, d1, z1)
+    up = R @ V((0, 0, 1))
+    face_dir(b, hi, up, mat, color, tile)
+    face_dir(b, lo, -up, mat, color, tile)
+    mid = c + R @ V((0, 0, (z0 + z1) / 2))
+    for i in range(4):
+        j = (i + 1) % 4
+        q = [lo[i], lo[j], hi[j], hi[i]]
+        face_dir(b, q, (q[0] + q[2]) / 2 - mid, mat, color, tile)
+
+
+def stump(b, c, r, h, seed):
+    """Iso pölkky: tyvi levenee, yläpinta vaalea katkaisupinta."""
+    c = V(c)
+    rng = random.Random(seed)
+    k = rng.uniform(0.78, 0.88)
+    b.tube([c + V((0, 0, -0.05)), c + V((0, 0, 0.07)), c + V((0, 0, h))], [r * 1.2, r * 1.04, r], "bark", 12,
+           (k, k * 0.96, k * 0.92), vtile=0.8, urep=2.0, caps=False)
+    top = [c + V((math.cos(i / 12 * math.tau) * r, math.sin(i / 12 * math.tau) * r, h)) for i in range(12)]
+    face_dir(b, top, (0, 0, 1), "wood", lambda p: (0.62 + 0.1 * nz(p, 9.0, seed),) * 3, tile=0.35)
+
+
+def hammer(b, grip, d, up, L=0.36, head=(0.11, 0.035, 0.04), seed=0):
+    """Vasara: puuvarsi suuntaan d otteesta, rautapää varren päässä (pään pituus suuntaan up)."""
+    grip, d, up = V(grip), V(d).normalized(), V(up).normalized()
+    end = grip + d * L
+    b.tube([grip, end + d * 0.01], [0.014, 0.012], "wood", 6, (0.82, 0.74, 0.62), vtile=0.3)
+    side = d.cross(up).normalized()
+    R = Matrix((up, side, d)).transposed()
+    b.box(end, head, "iron", IRON, tile=0.1, rot=R)
+
+
+def tongs(b, pivot, d, side, L=0.5, open_=0.03):
+    """Pihdit: kaksi rautavartta niitin kohdalla ristissä; d = kahvojen suunta, side = avautumissuunta."""
+    pivot, d, side = V(pivot), V(d).normalized(), V(side).normalized()
+    for s in (-1, 1):
+        b.tube([pivot - d * 0.12 + side * s * 0.008, pivot - d * 0.05 + side * s * 0.012, pivot,
+                pivot + d * (L * 0.4) - side * s * open_ * 0.5, pivot + d * L - side * s * open_],
+               [0.008, 0.009, 0.011, 0.008, 0.007], "iron", 5, IRON, vtile=0.2)
+    b.tube([pivot - side * 0.016, pivot + side * 0.016], 0.007, "iron", 5, SCALE, vtile=0.1)
+
+
+def spearhead(b, base, d, stage, ln=0.3, w=0.024, th=0.0065, seed=0):
+    """Keihäänterä pöydällä lappeellaan: base = holkin pää, d = kärjen suunta (vaakatasossa).
+    stage 1 kanki, 2 taottu lehti, 3 litteä holkin siipi, 4 käännetty holkki, 5 valmis hiottu."""
+    base, d = V(base), V(d).normalized()
+    s = V((0, 0, 1)).cross(d).normalized()
+    up = V((0, 0, 1))
+    col = BRIGHT if stage == 5 else SCALE
+    if stage == 1:
+        R = Matrix((d, s, up)).transposed()
+        frustum(b, base + d * 0.08, 0.16, 0.03, 0.15, 0.026, 0.0, 0.022, "iron", SCALE, rot=R)
+        return
+    lift = th if stage >= 2 else 0
+    blade0 = 0.1 if stage >= 3 else 0.06
+    secs = [(0.0, 0.22), (0.12, 0.62), (0.32, 1.0), (0.6, 0.8), (0.85, 0.38), (1.0, 0.02)]
+    rings = []
+    for t, k in secs:
+        c = base + d * (blade0 + (ln - blade0) * t) + up * lift
+        kk = k if stage >= 3 else min(1.0, k * 0.85 + 0.1)
+        rings.append([c + s * x * w * kk + up * z * th * max(kk, 0.35) for x, z in ((1, 0), (0, 1), (-1, 0), (0, -1))])
+    for a, c2 in zip(rings, rings[1:]):
+        for k in range(4):
+            q = [a[k], a[(k + 1) % 4], c2[(k + 1) % 4], c2[k]]
+            ctr = sum(q, V((0, 0, 0))) / 4
+            axis = sum(a, V((0, 0, 0))) / 4
+            face_dir(b, q, ctr - axis, "iron", col, tile=0.05)
+    if stage == 2:            # kangen tynkä jää vielä terän tyveen
+        R = Matrix((d, s, up)).transposed()
+        frustum(b, base + d * 0.04, 0.07, 0.024, 0.06, 0.02, 0.0, 0.018, "iron", SCALE, rot=R)
+    elif stage == 3:          # holkin siivet levitettynä
+        R = Matrix((d, s, up)).transposed()
+        frustum(b, base + d * 0.05, 0.1, 0.06, 0.1, 0.05, 0.0, 0.004, "iron", SCALE, rot=R)
+    else:                     # putkiholkki
+        b.tube([base + up * 0.013, base + d * (blade0 + 0.02) + up * 0.013], [0.0135, 0.01], "iron", 7, col, vtile=0.1)
+
+
+def build_rekvisiitta(col):
+    b = HH("paja_rekvisiitta", 86)
+    rng = b.rng
+    # rautainen alasin isossa pölkyssä; vasara ja pihdit vieressä
+    stump(b, ANVIL, STUMP_R, STUMP_H, 11)
+    frustum(b, ANVIL + V((0, 0, 0)), 0.12, 0.09, 0.17, 0.115, STUMP_H - 0.04, ANVIL_TOP - 0.015, "iron", SCALE)
+    frustum(b, ANVIL, 0.17, 0.115, 0.165, 0.11, ANVIL_TOP - 0.015, ANVIL_TOP, "iron", BRIGHT)
+    hammer(b, ANVIL + V((-0.2, -0.12, STUMP_H + 0.016)), (1, 0.25, 0), (0.25, -1, 0))
+    tongs(b, ANVIL + V((0.26, -0.32, 0.13)), (-0.18, 0.22, 1.0), (0.78, 0.63, 0), L=0.32)
+    # litteä kivialasin: iso maakivi ja sen päällä tasainen laakakivi; moukari nojaa siihen
+    stc = lambda sd, g: (lambda p: tuple(x * (g + 0.06 * nz(p, 7.0, sd)) for x in (1.0, 0.97, 0.92)))
+    rock(b, STONE_ANVIL + V((0, 0, 0.16)), (1, 0.2, 0), (-0.2, 1, 0), 0.38, 0.3, 0.18, 501, stc(501, 0.58), e=0.6, nu=9, nv=6)
+    rock(b, STONE_ANVIL + V((0.02, 0.0, 0.385)), (1, 0.1, 0), (-0.1, 1, 0), 0.3, 0.24, 0.035, 502, stc(502, 0.46), e=0.3, nu=10, nv=5)
+    hammer(b, STONE_ANVIL + V((0.3, 0.05, 0.44)), (0.5, 0.0, -1.0), (0, 1, 0), L=0.47, head=(0.16, 0.06, 0.065))
+
+    # karkaisukaukalo: koverrettu puolihirsi, päissä umpinaiset tukit
+    L, R, zc = TROUGH_L, TROUGH_R, TROUGH_TOP + 0.06     # halkaistu keskilinjan alta, lepää kahden pöllin päällä
+    Ri, end = R - 0.05, 0.09
+    ph0 = math.acos(max(-1.0, (zc - TROUGH_TOP) / R))
+    phi0 = math.acos(max(-1.0, (zc - TROUGH_TOP) / Ri))
+    cyl = lambda x, r, ph: TROUGH + V((x, r * math.sin(ph), zc - r * math.cos(ph)))
+    axis = lambda p: TROUGH + V((p.x - TROUGH.x, 0, zc))
+    k = 0.8
+    grid_out(b, lambda u, v: cyl(-L / 2 + L * u, R, -ph0 + 2 * ph0 * v), 10, 8, "bark", (k, k * 0.96, k * 0.92),
+             uvfn=lambda u, v: (v * 1.6, u * L / 0.8), out=lambda p: p - axis(p))
+    Lh = L - 2 * end
+    grid_out(b, lambda u, v: cyl(-Lh / 2 + Lh * u, Ri, -phi0 + 2 * phi0 * v), 8, 8, "wood", (0.5, 0.46, 0.42),
+             uvfn=lambda u, v: (v * 1.2, u * Lh / 0.7), out=lambda p: axis(p) - p)
+    for sgn in (-1, 1):
+        # päätypinnat ja onton päätyseinät
+        outer = [cyl(sgn * L / 2, R, -ph0 + 2 * ph0 * i / 10) for i in range(11)]
+        face_dir(b, outer, (sgn, 0, 0), "wood", (0.8, 0.74, 0.66), tile=0.4)
+        inner = [cyl(sgn * Lh / 2, Ri, -phi0 + 2 * phi0 * i / 10) for i in range(11)]
+        face_dir(b, inner, (-sgn, 0, 0), "wood", (0.48, 0.44, 0.4), tile=0.4)
+        # päätytukkien yläpinta
+        wo = R * math.sin(ph0)
+        face_dir(b, [TROUGH + V((sgn * Lh / 2, -wo, TROUGH_TOP)), TROUGH + V((sgn * L / 2, -wo, TROUGH_TOP)),
+                     TROUGH + V((sgn * L / 2, wo, TROUGH_TOP)), TROUGH + V((sgn * Lh / 2, wo, TROUGH_TOP))],
+                 (0, 0, 1), "wood", (0.72, 0.66, 0.58), tile=0.5)
+        # reunalistat
+        wi = Ri * math.sin(phi0)
+        face_dir(b, [TROUGH + V((-Lh / 2, sgn * wi, TROUGH_TOP)), TROUGH + V((Lh / 2, sgn * wi, TROUGH_TOP)),
+                     TROUGH + V((Lh / 2, sgn * wo, TROUGH_TOP)), TROUGH + V((-Lh / 2, sgn * wo, TROUGH_TOP))],
+                 (0, 0, 1), "wood", (0.72, 0.66, 0.58), tile=0.5)
+    for dx in (-0.42, 0.42):
+        b.pole(TROUGH + V((dx, -0.34, 0.075)), TROUGH + V((dx, 0.34, 0.075)), 0.085, "bark", 7, (0.76, 0.73, 0.7), taper=0.95)
+    zw = TROUGH_TOP - 0.07
+    ww = math.sqrt(max(0.0, Ri ** 2 - (zw - zc) ** 2))
+    face_dir(b, [TROUGH + V((-Lh / 2, -ww, zw)), TROUGH + V((Lh / 2, -ww, zw)), TROUGH + V((Lh / 2, ww, zw)),
+                 TROUGH + V((-Lh / 2, ww, zw))], (0, 0, 1), "water", (0.13, 0.12, 0.1), tile=0.6)
+
+    # kimpiastia: 16 kimpi, kaksi vitsavannetta, vettä
+    N = 32
+    rb, rt = 0.31, 0.28
+    stave_k = [random.Random(700 + i).uniform(0.72, 0.95) for i in range(16)]
+
+    def tub_col(p):
+        a = math.atan2(p[1] - TUB.y, p[0] - TUB.x) % math.tau
+        i = int(round(a / math.tau * N)) % N
+        kk = stave_k[(i // 2) % 16] * (0.62 if i % 2 == 0 else 1.0)
+        return (kk, kk * 0.93, kk * 0.84)
+    lathe(b, [(rb, 0.0), (rb - 0.005, 0.2), (rt, TUB_H), (rt - 0.025, TUB_H), (rt - 0.03, TUB_H - 0.2)], N, "wood",
+          tub_col, c=TUB, uvrep=(5.0, 0.8))
+    zw = TUB_H - 0.08
+    face_dir(b, [TUB + V((math.cos(i / 16 * math.tau) * (rt - 0.03), math.sin(i / 16 * math.tau) * (rt - 0.03), zw)) for i in range(16)],
+             (0, 0, 1), "water", (0.13, 0.12, 0.1), tile=0.6)
+    for zh in (0.1, 0.43):
+        rr = rb + (rt - rb) * zh / TUB_H + 0.012
+        for strand in (0, 1):
+            pts = [TUB + V((math.cos(i / 16 * math.tau) * (rr + 0.006 * math.sin(i * 2.4 + strand * math.pi)),
+                            math.sin(i / 16 * math.tau) * (rr + 0.006 * math.sin(i * 2.4 + strand * math.pi)),
+                            zh + 0.012 * math.cos(i * 2.4 + strand * math.pi))) for i in range(17)]
+            b.tube(pts, 0.011, "bark", 4, (0.62, 0.6, 0.5), vtile=0.3, caps=False)
+
+    # työkaluorsi oikeiden paalujen välissä; pihdit ja vasarat roikkuvat
+    b.pole(V((RAIL_X, -0.12, 1.48)), V((RAIL_X, 2.1, 1.48)), 0.04, "bark", 6, (0.78, 0.75, 0.72), taper=0.9)
+    for y in (0.4, 0.62, 1.0, 1.25, 1.55):
+        b.pole(V((RAIL_X, y, 1.48)), V((RAIL_X - 0.13, y, 1.5)), 0.014, "wood", 5, (0.8, 0.75, 0.66))
+    for y, L_, op in ((0.4, 0.52, 0.025), (0.62, 0.44, 0.04)):
+        tongs(b, V((RAIL_X - 0.1, y, 1.5 - L_ * 0.75)), (0, 0, 1), (0, 1, 0), L=L_ * 0.75, open_=op)
+    for y in (1.0, 1.25):
+        hammer(b, V((RAIL_X - 0.1, y, 1.465)), (0, 0, -1), (0, 1, 0), L=0.34)
+        loop = [V((RAIL_X - 0.1, y + math.sin(i / 8 * math.tau) * 0.02, 1.485 - math.cos(i / 8 * math.tau) * 0.022)) for i in range(9)]
+        b.tube(loop, 0.006, "leather", 4, (0.8, 0.68, 0.56), vtile=0.1, caps=False)
+
+    # rautakangit pinossa astian edessä ja rautamöhkäle kaukalon päässä
+    for i in range(6):
+        c = V((2.05 + rng.uniform(-0.02, 0.02), 0.45 + (i % 3) * 0.06, 0.035 + (i // 3) * 0.03))
+        R_ = Matrix.Rotation(rng.uniform(-0.08, 0.08), 3, 'Z')
+        frustum(b, c, 0.42, 0.04, 0.4, 0.035, -0.015, 0.015, "iron", (0.3, 0.23, 0.18) if i % 3 == 1 else SCALE, rot=R_)
+    rock(b, V((1.68, 1.0, 0.08)), (1, 0.3, 0), (-0.3, 1, 0), 0.13, 0.11, 0.1, 511,
+         lambda p: tuple(x * (0.7 + 0.3 * nz(p, 18.0, 3.0)) for x in RUST), e=1.1, nu=9, nv=5)
+
+    # kuonakasa katoksen ulkopuolella oikealla: matala keko ja pajakuonakakkuja sen pinnalla
+    sc_ = V((3.8, 1.15, 0.0))
+    slag_col = lambda p: tuple(x * (0.6 + 0.4 * nz(p, 9.0, 5.0)) for x in (0.3, 0.24, 0.2))
+
+    def slag_heap(u, v):
+        a, r = u * math.tau, 0.6 * (1 - v)
+        z = 0.3 * (1 - (r / 0.6) ** 2.0) + 0.03 * nz((math.cos(a) * r, math.sin(a) * r, 1), 5.0, 6.0)
+        return sc_ + V((math.cos(a) * r * 1.2, math.sin(a) * r, max(0.0, z) - 0.03))
+    grid_out(b, slag_heap, 16, 5, "rock", slag_col, uvfn=lambda u, v: (u * 3, v), out=lambda p: (0, 0, 1))
+    for i in range(22):
+        r = 0.55 * math.sqrt(rng.random())
+        a = rng.uniform(0, math.tau)
+        zz = 0.3 * (1 - (r / 0.6) ** 2.0) - 0.01
+        c = sc_ + V((math.cos(a) * r * 1.2, math.sin(a) * r, max(0.02, zz)))
+        sd = 520 + i
+        rock(b, c, (math.cos(a), math.sin(a), 0), (-math.sin(a), math.cos(a), rng.uniform(-0.3, 0.3)),
+             rng.uniform(0.07, 0.11), rng.uniform(0.07, 0.11), rng.uniform(0.035, 0.05), sd,
+             lambda p, sd=sd: tuple(x * (0.6 + 0.4 * nz(p, 12.0, sd)) for x in (0.26, 0.2, 0.17)), e=0.8, nu=6, nv=4)
+
+    # puuhiilikasa ja hiilikori palkeiden edessä
+    hc = V((-2.35, -0.95, 0.0))
+
+    def heap(u, v):
+        a, r = u * math.tau, 0.5 * (1 - v)
+        z = 0.32 * (1 - (r / 0.5) ** 1.6) + 0.025 * nz((math.cos(a) * r, math.sin(a) * r, 0), 6.0, 4.0)
+        return hc + V((math.cos(a) * r * 1.15, math.sin(a) * r, max(0.0, z) - 0.02))
+    grid_out(b, heap, 16, 5, "charcoal", (0.1, 0.097, 0.095), uvfn=lambda u, v: (u * 3, v), out=lambda p: (0, 0, 1))
+    for i in range(45):
+        r = 0.5 * math.sqrt(rng.random())
+        a = rng.uniform(0, math.tau)
+        z = 0.32 * (1 - (r / 0.5) ** 1.6) - 0.005
+        R_ = Matrix.Rotation(rng.uniform(0, math.tau), 3, 'Z') @ Matrix.Rotation(rng.uniform(-0.6, 0.6), 3, 'X')
+        kk = rng.uniform(0.08, 0.15)
+        b.box(hc + V((math.cos(a) * r * 1.15, math.sin(a) * r, max(0.02, z))), (rng.uniform(0.035, 0.065), rng.uniform(0.025, 0.045), rng.uniform(0.02, 0.035)),
+              "charcoal", (kk, kk * 0.97, kk * 0.95), tile=0.15, rot=R_)
+    kc = V((-1.72, -1.42, 0.0))
+    lathe(b, [(0.17, 0.0), (0.23, 0.26), (0.235, 0.29), (0.215, 0.29), (0.2, 0.08)], 16, "wattle", (0.75, 0.66, 0.5), c=kc, uvrep=(3.0, 0.6))
+    face_dir(b, [kc + V((math.cos(i / 12 * math.tau) * 0.21, math.sin(i / 12 * math.tau) * 0.21, 0.25)) for i in range(12)],
+             (0, 0, 1), "charcoal", (0.1, 0.1, 0.1), tile=0.2)
+    for i in range(10):
+        r = 0.17 * math.sqrt(rng.random())
+        a = rng.uniform(0, math.tau)
+        kk = rng.uniform(0.08, 0.14)
+        b.box(kc + V((math.cos(a) * r, math.sin(a) * r, 0.265)), (0.045, 0.035, 0.03), "charcoal", (kk,) * 3, tile=0.15,
+              rot=Matrix.Rotation(rng.uniform(0, math.tau), 3, 'Z'))
+    ob = b.finish(col)
+    mount(col, ob, "mount_alasin", (ANVIL.x, ANVIL.y, ANVIL_TOP))
+    mount(col, ob, "mount_karkaisu", (TROUGH.x, TROUGH.y, TROUGH_TOP - 0.07))
+    return ob
+
+
+def build_poyta_aihiot(col):
+    """Aihiot, vasara, pihdit ja hiomakivi pukkipöydän päällä. Solmun paikka = pöydän paikka; verkko
+    on household.glb:n `pukkipoyta`n omissa koordinaateissa (levyn yläpinta TABLE_H, x ±1,15, y ±0,38)."""
+    b = HH("poyta_aihiot", 87)
+    rng = b.rng
+    z = TABLE_H + 0.001
+    # etumainen rivi: valmistuksen vaiheet vasemmalta oikealle, kärki poispäin pöydän edestä
+    for i, stage in enumerate((1, 2, 3, 4, 5)):
+        x = -0.85 + i * 0.27
+        spearhead(b, V((x, -0.33, z)), (rng.uniform(-0.08, 0.08), 1, 0), stage)
+    # takarivi: lisää aihioita ja kankia
+    for i, stage in enumerate((2, 2, 3, 1, 1)):
+        x = -0.75 + i * 0.22
+        spearhead(b, V((x, 0.04, z)), (rng.uniform(-0.15, 0.15), 1, 0), stage, ln=0.27)
+    hammer(b, V((0.62, -0.05, z + 0.017)), (0.9, -0.4, 0), (0.4, 0.9, 0))
+    tongs(b, V((0.5, 0.26, z + 0.009)), (1, -0.12, 0), (0, 1, 0), L=0.4, open_=0.02)
+    # hiomakivi
+    rock(b, V((1.02, 0.02, z + 0.017)), (1, 0.2, 0), (-0.2, 1, 0), 0.1, 0.032, 0.018, 530,
+         lambda p: (0.62, 0.6, 0.56), e=0.5, nu=7, nv=4)
+    ob = b.finish(col)
+    ob.location = TABLE_POS
+    return ob
+
+
+def spear_dir():
+    """Telineeseen nojaavan keihään suunta tyvestä kärkeen."""
+    return V((0, RACK_Y - 0.06 - SPEAR_BUTT_Y, RACK_Z + 0.01)).normalized()
+
+
+def build_keihasteline(col):
+    """Keihästeline kauppapaikalla: kaksi haarapuuta, orsi ja maapuu tyvien edessä."""
+    b = HH("keihasteline", 88)
+    for x in RACK_X:
+        b.pole(V((x, RACK_Y, -0.15)), V((x, RACK_Y + 0.02, RACK_Z - 0.16)), 0.055, "bark", 7, (0.8, 0.77, 0.74), taper=0.85)
+        for s in (-1, 1):       # haara orren alla
+            b.pole(V((x, RACK_Y + 0.02, RACK_Z - 0.18)), V((x + s * 0.1, RACK_Y + 0.02, RACK_Z + 0.08)), 0.03, "bark", 5, (0.78, 0.75, 0.72))
+    b.pole(V((RACK_X[0] - 0.25, RACK_Y, RACK_Z)), V((RACK_X[1] + 0.55, RACK_Y, RACK_Z)), 0.045, "bark", 7, (0.8, 0.77, 0.74), taper=0.92)
+    b.pole(V((RACK_X[0] - 0.05, SPEAR_BUTT_Y - 0.08, 0.05)), V((RACK_X[1] + 0.05, SPEAR_BUTT_Y - 0.08, 0.05)), 0.06, "bark", 7,
+           (0.78, 0.75, 0.72), taper=0.95)
+    ob = b.finish(col)
+    d = spear_dir()
+    z_ = (V((0, -1, 0)) + d * d.y).normalized()       # terän lappe kohti katsojaa (-Y)
+    y_ = -d                                            # keihään paikallinen -Y on kärjen suunta
+    x_ = y_.cross(z_)
+    rot = Matrix((x_, y_, z_)).transposed().to_euler()
+    for i, x in enumerate(SPEARS_X):
+        grip = V((x, SPEAR_BUTT_Y, -0.01)) + d * SPEAR_GRIP
+        e = mount(col, ob, "mount_keihas_%d" % (i + 1), grip)
+        e.rotation_euler = rot
+    return ob
+
+
+def build_saarisuojat(col):
+    """Myytävät säärisuojat: kaarevat rautalevyt nahkahihnoineen roikkuvat keihästelineen orren päässä."""
+    b = HH("saarisuojat_myytavat", 89)
+    for x in (RACK_X[1] + 0.18, RACK_X[1] + 0.38):
+        top, ln = RACK_Z - 0.12, 0.34
+        yc = RACK_Y - 0.02
+
+        def plate(u, v, rr=0.0, x=x):
+            a = math.pi - 1.25 + 2.5 * u
+            z = top - ln * v
+            r = 0.074 - 0.014 * v + rr + 0.012 * max(0.0, (v - 0.8) / 0.2) + 0.008 * max(0.0, 1 - abs(u - 0.5) * 6)
+            return V((x + math.sin(a) * r, yc + math.cos(a) * r * 1.05 + 0.06, z))
+        grid_out(b, plate, 8, 7, "iron", lambda p: tuple(c_ * (0.85 + 0.15 * nz(p, 25.0, 2.0)) for c_ in (0.27, 0.27, 0.29)), out=lambda p, x=x: V((p.x - x, p.y - yc - 0.06, 0)))
+        grid_out(b, lambda u, v, x=x: plate(u, v, -0.003), 8, 7, "iron", (0.2, 0.19, 0.19),
+                 out=lambda p, x=x: V((x - p.x, yc + 0.06 - p.y, 0)))
+        for vv in (0.25, 0.7):            # nahkahihnat levyn takana
+            pts = [plate(0.0, vv, 0.004)] + [V((x + math.sin(math.pi - 1.6 + 3.2 * t) * 0.068, yc + 0.06 + math.cos(math.pi - 1.6 + 3.2 * t) * -0.07,
+                                                top - ln * vv)) for t in (0.25, 0.5, 0.75)] + [plate(1.0, vv, 0.004)]
+            b.tube(pts, 0.009, "leather", 4, (0.85, 0.72, 0.6), vtile=0.1, caps=False)
+        # ripustushihna orren yli
+        b.tube([V((x, yc - 0.01, top + 0.005)), V((x, RACK_Y - 0.05, RACK_Z + 0.02)), V((x, RACK_Y, RACK_Z + 0.055)),
+                V((x, RACK_Y + 0.05, RACK_Z + 0.02)), V((x, RACK_Y + 0.04, top + 0.04))], 0.008, "leather", 4, (0.8, 0.68, 0.56), vtile=0.1)
+    return b.finish(col)
+
+
+BUILDERS = [build_paja, build_paja_katto, build_ahjo, build_hiillos, build_palkeet,
+            build_rekvisiitta, build_poyta_aihiot, build_keihasteline, build_saarisuojat]
 
 
 def build_smithy(export=True):
@@ -575,7 +948,7 @@ def preview_scene(prefix):
     # mittakaava: 1,8 m:n hahmo ahjon edessä ja palkeiden vieressä
     rm = bpy.data.materials.new("pv_ref")
     rm.diffuse_color = (0.25, 0.3, 0.55, 1)
-    for nm, (x, y) in (("pv_seppa", (-0.75, 0.05)), ("pv_salli", (-3.3, 0.9))):
+    for nm, (x, y) in (("pv_seppa", (-0.75, 0.05)), ("pv_salli", (-3.3, 0.9)), ("pv_sankari", (0.4, -4.0))):
         bpy.ops.mesh.primitive_cylinder_add(radius=0.2, depth=1.8, location=(x, y, 0.9))
         o = bpy.context.active_object
         o.name = nm
@@ -585,6 +958,23 @@ def preview_scene(prefix):
     sc.collection.children.link(hc)
     t = build_smith_house(hc)
     t.location = (11.5, 3.0, 0)
+    # pukkipöytä household.glb:stä aihioiden alle ja characters.glb:n keihäät telineen pisteisiin
+    tb = build_table(hc)
+    tb.location = TABLE_POS
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=os.path.join(_HERE, "..", "..", "assets", "characters.glb"))
+    new = [o for o in bpy.data.objects if o not in before]
+    spear = next(o for o in new if o.name.startswith("spear"))
+    spear.parent = None
+    for o in new:
+        if o is not spear:
+            o.hide_render = True
+    for i in range(len(SPEARS_X)):
+        m = bpy.data.objects["mount_keihas_%d" % (i + 1)]
+        s2 = spear if i == 0 else spear.copy()
+        if i:
+            sc.collection.objects.link(s2)
+        s2.matrix_world = m.matrix_world.copy()
     sun = bpy.data.objects.new("pv_sun", bpy.data.lights.new("pv_sun", 'SUN'))
     sun.data.energy = 4
     sun.rotation_euler = (0.9, 0.2, 0.6)
@@ -609,11 +999,20 @@ def preview_scene(prefix):
         ("f", (-0.7, -0.6, 1.1), (-0.7, -5.4, 2.3), 45, None),        # pelikamera: sankari ahjon edessä, 4,4 m takana, 2,3 m
         ("g", (11.5, 3.0, 2.0), (16.0, -7.5, 3.5), 32, None),        # sepän talo
         ("h", (-1.0, 0.9, 0.5), (0.4, -1.4, 2.0), 35, "night"),      # hämärässä: hehku
+        ("i", (1.0, 0.6, 0.6), (3.2, -5.6, 3.2), 30, None),           # rekvisiitta edestä oikealta
+        ("j", (-1.25, -3.3, 0.76), (-1.0, -4.5, 1.75), 40, None),     # aihiopöytä
+        ("k", (1.7, -3.2, 1.1), (3.6, -7.2, 1.9), 35, None),          # keihästeline, säärisuojat, sankari
+        ("l", (0.4, -3.0, 1.1), (0.4, -8.4, 2.3), 45, None),          # pelikamera kauppapaikalla
+        ("m", (1.3, 1.0, 0.45), (1.0, -1.6, 1.7), 38, None),          # alasimet, kaukalo, astia
+        ("n", (2.6, 0.9, 1.1), (0.6, 0.2, 1.6), 40, None),            # työkaluorsi sisältä
     ]
-    refs = [bpy.data.objects["pv_seppa"], bpy.data.objects["pv_salli"]]
+    only = os.environ.get("KALEVALA_SHOTS")
+    if only:
+        shots = [s_ for s_ in shots if s_[0] in only]
+    refs = [bpy.data.objects["pv_seppa"], bpy.data.objects["pv_salli"], bpy.data.objects["pv_sankari"]]
     for name, tgt, pos, lens, mode in shots:
         for r in refs:
-            r.hide_render = name in ("c", "d", "e", "h")
+            r.hide_render = name in ("c", "d", "e", "h", "j", "m", "n")
         for k in pk[1:]:
             k.value = 0.0
         sun.data.energy, bg.inputs[1].default_value = 4, 1.0
