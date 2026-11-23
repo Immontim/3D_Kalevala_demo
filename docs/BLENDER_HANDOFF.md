@@ -6,8 +6,8 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-23 (Claude, Windows; pohja main 231d61a; sepän paja B2 branchissa `claude/smithy-b2`,
-tarkista merge-tila `git merge-base --is-ancestor`)
+Päivitetty: 2026-11-23 (Claude, Windows; pohja main 9329df9; sepän pihan sommittelu B3 branchissa
+`claude/smithy-b3`, tarkista merge-tila `git merge-base --is-ancestor`)
 
 - **Sepän paja, vaiheet B1–B2** (`assets/smithy.glb`, 1,78 Mt / 15 450 kolmiota; `assets-src/blender/smithy.py`,
   taustalla noin 15 s, lukee cairnfield.py:n → homestead.py, household.py; tekstuurit `tools/fetch-smithy.ps1`).
@@ -18,10 +18,14 @@ tarkista merge-tila `git merge-base --is-ancestor`)
   `keihasteline` (`mount_keihas_1..3` = `spear`in otteen muunnos; esikatselussa oikea keihäs istuu niissä) ja
   `saarisuojat_myytavat`. Poikkeus: `poyta_aihiot`-solmun paikka on household.glb:n `pukkipoyta`n paikka.
   Mitat, törmäykset ja seisomapaikat skriptin alun kommentissa. B2:n B1-verkot todettu tavu tavulta ennallaan.
-  `talo_seppa` (8,4 × 5,0 m) on `homestead.glb`:ssä. Arvioija tarkisti B2:n kuvat; korjattu telineen haarat,
-  vasaroiden ripustus, kaukalo pölleille, kivialasimen laakakivi, säärisuojien harjanne, kuonakeko.
+  `talo_seppa` (8,4 × 5,0 m) on `homestead.glb`:ssä. Arvioija tarkisti B1:n ja B2:n kuvat.
   Riskit: smithy.glb monistaa homesteadin tekstuurit (noin 0,6 Mt), ellei peli jaa niitä nimellä; kaukalo
   näyttää yhä hieman laatikolta; vesi on läpinäkymätön tumma pinta.
+- **Sepän pihan sommittelu B3** (`assets-src/blender/smithy_yard.py`, ei uutta GLB:tä): kokoaa pajan, `talo_seppa`n,
+  aitan, kuusi `pino`a, pölkyn, penkin, padan ja aidan pelin koordinaateissa `world.ts`:n kaavoilla ja piirtää
+  kuvat (`KALEVALA_PREVIEW`). Sijoitusehdotus, törmäysohje ja hahmojen paikat Codexille:
+  `docs/SMITHY_INTEGRATION.md` (ei kiinteää laatikkotörmäystä: seppä jäisi puhevälin ulkopuolelle).
+  Arvioija tarkisti.
 
 - **Metsän LOD- ja reuna-assetit** (`assets/forest_lod.glb`, 1,6 Mt; `assets-src/blender/forest_lod.py`;
   mainissa). Peli lataa tiedoston kaikissa 3D-kohtauksissa v06.00.00:sta alkaen (AGENT_HANDOFF). Skripti lukee
@@ -227,10 +231,10 @@ tarkista merge-tila `git merge-base --is-ancestor`)
 
 ## Seuraava Blender-tehtävä
 
-**Sepän paja B3**: pihan sommittelukuva Blenderissä (talo, paja, 2–3 homestead.glb:n `pino`a, kauppapaikka) ja
-sijoitusehdotus Codexille. Sitten B4 seppä (tavallinen kyläseppä) ja aikuinen sälli (`smithfolk.glb`; seppä
-tarvitsee kädessä pidettävän vasaran, kun Codex lisää `prop.kind`in), B5 lapsisälli aikuisvartalon muunnoksena
-(omistaja hyväksyy mittasuhteet kuvasta). Sulatusuunia ei tehdä.
+**Sepän paja B4**: seppä (tavallinen kyläseppä: nahkaesiliina, parta, käärityt hihat) ja aikuinen sälli
+(`smithfolk.glb`, miesvartalo ja `RIG`, lepo + 3 testiasentoa ilman läpimenoa); seppä tarvitsee kädessä pidettävän
+vasaran, kun Codex lisää `prop.kind`in. Sitten B5 lapsisälli aikuisvartalon muunnoksena (omistaja hyväksyy
+mittasuhteet kuvasta). Sulatusuunia ei tehdä.
 
 Muut: metsäjänis, rautakautinen jousi, nuoli ja miehen nuoliviini (korvikkeiden mitat yllä); kaukopuiden
 valaistu atlas, jos vaihtoraja näkyy; legacy-hahmojen poisto käsisavutestin jälkeen (noin 1,7 Mt kummassakin);
