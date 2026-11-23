@@ -16,7 +16,7 @@ import numpy as np
 from mathutils import Vector, Matrix, noise
 
 ROOT = r"C:\Data\3D Kalevala"
-OUT = os.path.join(ROOT, "assets")
+OUT = os.environ.get("KALEVALA_ASSETS_OUT", os.path.join(ROOT, "assets"))
 DL = os.path.join(ROOT, "assets-src", "_downloads")
 TEXDIR = os.path.join(ROOT, "assets-src", "textures")
 BLEND = os.path.join(ROOT, "assets-src", "homestead.blend")
@@ -417,19 +417,23 @@ def plank_door(b, hinge, width, height, angle, thick=0.05):
 
 
 # ---------- päätalo ----------
-def build_house(col):
+def build_house(col, name="talo", seed=21, L=10.4, W=5.4, RZ=4.9, nposts=9, door=(-0.2, 0.85),
+                wins=((-3.1, 0.82, 0.36, 0.3), (3.0, 0.82, 0.36, 0.3)), rafters=13, crooks=9, thatch_seed=5.0):
     """Kolmilaivainen paalurunkoinen asuintalo: savella silattu oksapunosseinä, olkikatto,
-    savuaukot päätykolmioiden huipulla. Ovi pitkällä sivulla (-Y)."""
-    b = HB("talo", 21)
-    L, W, HW = 10.4, 5.4, 1.75           # pituus, leveys, seinän korkeus
-    RZ, OVER, EAVE = 4.9, 0.7, 0.45      # harjan korkeus, päätyräystäs, sivuräystäs
+    savuaukot päätykolmioiden huipulla. Ovi pitkällä sivulla (-Y).
+
+    Oletusarvot tekevät pihapiirin `talo`n. Muissa koossa ovi ja ikkunat (x, z, leveys,
+    korkeus) kannattaa sijoittaa paaluvälien keskelle: paalut ovat tasavälein x = -L/2..L/2,
+    eikä paalua jätetä pois aukon kohdalta."""
+    b = HB(name, seed)
+    HW = 1.75                            # seinän korkeus
+    OVER, EAVE = 0.7, 0.45               # päätyräystäs, sivuräystäs
     hx, hy = L / 2, W / 2
     wt = wall_tint(0, HW)
-    door_x0, door_x1, door_h = -0.2, 0.85, 1.62
-    wins = [(-3.1, 0.82, 0.36, 0.3), (3.0, 0.82, 0.36, 0.3)]   # luukulliset valoaukot: x, z, leveys, korkeus
+    door_x0, door_x1, door_h = door[0], door[1], 1.62
+    wins = [tuple(w) for w in wins]      # luukulliset valoaukot: x, z, leveys, korkeus
 
     # pitkät seinät: savirappaus paalujen väleissä
-    nposts = 9
     xs = [-hx + i * L / (nposts - 1) for i in range(nposts)]
     for side in (-1, 1):
         y = side * hy
@@ -494,8 +498,8 @@ def build_house(col):
 
     # kattoruoteet räystään alla
     for side in (-1, 1):
-        for i in range(13):
-            x = -hx - OVER + 0.25 + i * (L + 2 * OVER - 0.5) / 12
+        for i in range(rafters):
+            x = -hx - OVER + 0.25 + i * (L + 2 * OVER - 0.5) / (rafters - 1)
             top = V((x, 0, RZ - 0.02))
             # ruode kulkee harjalta seinähirren yli räystäälle
             ez = HW + 0.2 - (RZ - HW - 0.2) / hy * EAVE
@@ -503,8 +507,8 @@ def build_house(col):
             b.pole(top, bot, 0.05, "bark", 5, (0.6, 0.57, 0.55), taper=0.8, caps=False)
 
     eave_z = HW + 0.2 - (RZ - HW - 0.2) / hy * EAVE + 0.06
-    thatch_roof(b, L, hy + EAVE + 0.1, eave_z, RZ, OVER, seed=5.0, courses=5, nu=16)
-    ridge_crooks(b, L + 2 * OVER, RZ + 0.05, 9, 3)
+    thatch_roof(b, L, hy + EAVE + 0.1, eave_z, RZ, OVER, seed=thatch_seed, courses=5, nu=16)
+    ridge_crooks(b, L + 2 * OVER, RZ + 0.05, crooks, 3)
 
     # sisätila: tumma laatikko, jotta oviaukosta ja luukuista näkyy hämärä tupa eikä tyhjää
     ix, iy = hx - 0.17, hy - 0.17
@@ -819,8 +823,16 @@ def build_pot(col):
     return b.finish(col)
 
 
+def build_smith_house(col):
+    """Sepän asuintalo: sama rakenne kuin `talo`, mutta lyhyempi, kapeampi ja matalampi
+    (8,4 × 5,0 m, harja 4,6 m). Seitsemän paalua 1,4 m:n välein; ovi ja luukut paaluvälien
+    keskellä (ovi x 0,17..1,23)."""
+    return build_house(col, name="talo_seppa", seed=24, L=8.4, W=5.0, RZ=4.6, nposts=7, door=(0.17, 1.23),
+                       wins=((-2.1, 0.82, 0.36, 0.3), (3.5, 0.82, 0.36, 0.3)), rafters=11, crooks=7, thatch_seed=7.0)
+
+
 BUILDERS = [build_house, build_pithouse, build_storehouse, build_shed, build_fence, build_gatepost,
-            build_woodpile, build_block, build_rack, build_pot]
+            build_woodpile, build_block, build_rack, build_pot, build_smith_house]
 
 
 def build_homestead(export=True, save=True):
@@ -850,6 +862,7 @@ def build_homestead(export=True, save=True):
 
 def export_homestead():
     col = bpy.data.collections["GAME"]
+    bpy.context.view_layer.update()      # taustaajossa näkymäkerroksen lista voi muuten sisältää poistettuja
     for o in bpy.context.view_layer.objects:
         o.select_set(False)
     objs = list(col.objects)
