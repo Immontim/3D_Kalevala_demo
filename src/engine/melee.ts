@@ -257,6 +257,13 @@ export function killActor(a: Actor, fromBehind = false) {
   else enemyDown(a);
 }
 
+/**
+ * Sankarin isku muihin kuin taistelijoihin (metsästyksen villisika). Metsästysmoduuli rekisteröi
+ * käsittelijän, joka palauttaa true, jos isku osui eläimeen; muuten isku ratkeaa tavalliseen tapaan.
+ */
+let creatureStrike: ((att: Actor) => boolean) | null = null;
+export function setCreatureStrike(fn: ((att: Actor) => boolean) | null) { creatureStrike = fn; }
+
 /** Kehen isku kohdistuu: vastustajan isku sankariin, sankarin isku lukittuun tai lähimpään ulottuvilla olevaan. */
 function strikeTarget(att: Actor): Actor | null {
   if (att !== g.player) return g.player.state === "dead" ? null : g.player;
@@ -317,7 +324,8 @@ export function updateCombatant(a: Actor, dt: number) {
     if (lands && !a.struck) {
       const target = strikeTarget(a);
       a.struck = true;
-      if (!resolveEnvironmentStrike(a, target) && target) {
+      if (a === g.player && creatureStrike?.(a)) { /* osui eläimeen (metsästys) */ }
+      else if (!resolveEnvironmentStrike(a, target) && target) {
         resolveStrike(a, target);
         if ((a.state as ActionState) === "stagger") return; // täydellinen torjunta keskeytti
       }

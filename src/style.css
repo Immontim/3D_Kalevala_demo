@@ -324,6 +324,7 @@ body.mode-scene > #mapRoot { display: none !important; }
 .inventory-item-icon.item-dried_fish { background-position: -48px 0; }
 /* Jäniksenliha: väliaikainen CSS-kuvake, kunnes inventaarioatlakseen piirretään oma ruutu. */
 .item-hare_meat, .inventory-item-icon.item-hare_meat { background: radial-gradient(ellipse 36% 26% at 46% 54%, #b5483f 0 70%, #7e2a26 72% 100%, transparent 101%), radial-gradient(circle at 78% 34%, #efe4cf 0 12%, transparent 13%), linear-gradient(35deg, transparent 58%, #e6dac2 59% 66%, transparent 67%); }
+.item-boar_meat, .inventory-item-icon.item-boar_meat { background: radial-gradient(ellipse 40% 30% at 48% 54%, #9c3a32 0 64%, #e9d9bd 66% 74%, #6e2420 76% 100%, transparent 101%), radial-gradient(ellipse 14% 10% at 50% 54%, #f1e6d0 0 90%, transparent 100%); }
 .inventory-item-icon.item-birch_bark_pack { background-position: -96px 0; }
 .inventory-item-icon.item-sword { background-position: -144px 0; }
 .inventory-item-icon.item-sky_iron_sword { background-position: 0 -48px; }
