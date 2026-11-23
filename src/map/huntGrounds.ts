@@ -9,12 +9,12 @@ import { chebyshev, rngStream, travelMinutes } from "./placement";
 import { PROTOTYPE_MAP, PROTOTYPE_START } from "./prototype";
 import { WORLD_MINUTES_PER_DAY } from "./uiState";
 
-/** Omistajan päätökset 2026-11-21. */
+/** Omistajan päätökset 2026-11-21 ja 2026-11-23. */
 export const HUNT_RULES = {
   /** Uuden matkan alussa arvottavat apajat. */
-  initial: [3, 6] as const,
+  initial: [2, 4] as const,
   /** Aktiivisia apajia enintään; täynnä vanhin väistyy uuden tieltä. */
-  maxActive: 6,
+  maxActive: 4,
   /** Näin monen pelipäivän välein arvotaan yksi uusi apaja. */
   periodDays: 20,
   terrains: ["meadow", "forest", "deepForest", "bog"] as readonly TerrainId[],
@@ -107,7 +107,7 @@ export function removeHuntGround(state: CampaignState, id: string): CampaignStat
 }
 
 /**
- * Uuden matkan tai vanhan tallennuksen alkuapajat (3–6). Tehdään kerran: `huntCycle` asetetaan
+ * Uuden matkan tai vanhan tallennuksen alkuapajat (2–4). Tehdään kerran: `huntCycle` asetetaan
  * nykyiseen jaksoon, joten vanha tallennus ei saa ryöppyä apajia kuluneista päivistä.
  */
 export function ensureHuntGrounds(state: CampaignState, map: WorldMapDefinition = PROTOTYPE_MAP): CampaignState {
@@ -126,16 +126,21 @@ export function ensureHuntGrounds(state: CampaignState, map: WorldMapDefinition 
 }
 
 /**
- * Ajan kuluessa: jokaista alkanutta 20 päivän jaksoa kohti yksi uusi apaja. Jos aktiivisia on jo
- * kuusi, vanhin (listan ensimmäinen) väistyy ensin. Uusi apaja ei ole tunnettu.
+ * Ajan kuluessa: jokaista alkanutta 20 päivän jaksoa kohti yksi uusi apaja. Yli neljän apajan vanhat
+ * tallennukset rajataan heti neljään. Täydellä kartalla vanhin väistyy uuden tieltä. Uusi apaja ei ole tunnettu.
  */
 export function advanceHuntGrounds(state: CampaignState, map: WorldMapDefinition = PROTOTYPE_MAP): CampaignState {
   if (state.world.huntCycle < 0) return state;
   const target = huntCycleAt(state.world.worldMinutes);
   let next = state;
   const hero = { x: state.world.x, y: state.world.y };
+  let hunts = next.world.siteInstances.filter(isHuntInstance);
+  while (hunts.length > HUNT_RULES.maxActive) {
+    next = removeHuntGround(next, hunts[0].id);
+    hunts = next.world.siteInstances.filter(isHuntInstance);
+  }
   for (let cycle = state.world.huntCycle + 1; cycle <= target; cycle++) {
-    const hunts = next.world.siteInstances.filter(isHuntInstance);
+    hunts = next.world.siteInstances.filter(isHuntInstance);
     if (hunts.length >= HUNT_RULES.maxActive) next = removeHuntGround(next, hunts[0].id);
     next = placeOne(next, map, `${HUNT_INSTANCE_PREFIX}c${cycle}`, rngStream(state.world.worldSeed, `hunt-${cycle}`), hero);
     next = { ...next, world: { ...next.world, huntCycle: cycle } };
