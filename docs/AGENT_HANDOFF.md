@@ -6,13 +6,13 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `7740904`)
+Päivitetty: 2026-11-23 (Codex, Windows; pohja `origin/main` `22126c8`)
 
-- **Koodiversio v08.04.00** branchissa `claude/boar-hunt` (tarkista merge-tila `git merge-base`illa). Koodi
-  valmis, ei deployattu, omistaja ei testannut. In-app-savutesti (`__game.spawnBoar`/`hurtBoar`): varoitus ja
-  rynnäkkö osuivat ja horjuttivat, nuoli ja miekka osuivat, X vaihtoi jousen ja aseen vaarassa, verijälki,
-  "Sianliha ×5", kuolema `?return=map` → kartta (R estetty). `renderBench` 3,4–5,0 ms / 142–146 kutsua.
-  Konsoli puhdas; `bunx vitest run --dir src`, `tsc`, `lint`, `build` läpi. v08.03 on mainissa.
+- **Koodiversio v08.04.01** branchissa `codex/hunt-ground-cap` (tarkista merge-tila `git merge-base`illa).
+  Koodi valmis, ei deployattu, omistaja ei testannut. Apajien alkuarvonta on 2–4 ja aktiivisten katto 4;
+  vanhan tallennuksen ylimääräiset apajat poistuvat vanhimmasta alkaen. Codexin in-app-savutestissä kartta
+  renderöityi ja versio näkyi, konsoli puhdas. Tarkistukset: `bun run test` 3228/3228, `bunx tsc --noEmit`,
+  `bun run lint`, `bun run build`; kohdennettu apajatesti 46/46. Ei renderöintimuutosta eikä FPS-vaikutusta.
 - **Villisika (v08.04, `hunt/boar.ts` puhdas + `engine/boars.ts`).** `initBoars`: 0–2 sikaa (`boarCount`
   40/40/20 %, ≥ 45 m saapumisesta). Tilat root/walk/alert/threat/charge/recover/flinch/flee/bed/dead, luvut
   `BOAR` (aggressio 0,35, varoitus 0,7 s, rynnäkkö 9 m/s, käännös 1,1 rad/s, vahinko 22, elämä 3; pako terve
@@ -59,17 +59,12 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `7740904`)
   muita windup/release-tilassa < `maxAttackers` 2 (`attackStartDelay`, `startSpacing`, `waitBack`/`waitHold`);
   `hitStaggers`, `staggerImmunity` 0,4 s, `graceCovers` ±40°, `threatenedBy` + `blockReactionDelay`,
   `rollsAdvance` 45 %. Mitattu 3 vihua: max 2 yhtä aikaa; hiljaiset jaksot = yhtäaikainen uupumus.
-- **Metsästysapajat (v06.06, `map/huntGrounds.ts`).** Instanssi `kind: "hunt"` → `wilds`; `huntCycle` (20 pv),
+- **Metsästysapajat (v06.06, v08.04.01, `map/huntGrounds.ts`).** Instanssi `kind: "hunt"` → `wilds`;
+  alussa 2–4, enintään 4 aktiivista (vanhat 5–6 apajan tallennukset rajataan heti), `huntCycle` (20 pv),
   `ensureHuntGrounds`/`advanceHuntGrounds`, `huntCandidates`; ei tunnettu ennen 3 × 3 -näköä; `enterSite` kuluttaa.
-- **Väistöaskel ja kävely (v06.07, `src/sidestep.ts` puhdas).** `dodgeDirection(A, D, S)`, `sidestepPose(u)`.
-  Arvioija hylkäsi kävelyn polvikyykyn ja taka-askeleen kyykyn (istuva ilme): älä palauta niitä.
 - **Metsästys (v06.04, `src/hunt/` puhdas + `engine/hunt.ts`).** Vain `HUNTING` = erämaa. `bow` (X), vasen
   jännittää, oikea tähtää/poimii. `ARCHERY`, `traceSegment` (maa + `firstProjectileHit` + eläinpallot),
   `SPECIES.hare`, `pickHareSpots` 7–9 jänistä. Viini ja saalis moduulin tilaa; mallit `hunt/models.ts`.
-- **Tallennuksen hylkäys (v06.03.01).** Kelvoton tallennus kopioidaan avaimelle `laulun-miekka.campaign.rejected`
-  ja kartta näyttää `map.saveRejected`; lataus on tarkoituksella tiukka, jotta vika näkyy.
-- **Saapuminen ja aallot (v06.02).** `sceneLayout.entrySpawn` (`ENTRY_INSET` 3,5 m, pihat 6,4) ja
-  `approachSpawns` (vastakkaiselta puolelta; `ai.arriveUntil` 12 s ohittaa alueen rajauksen).
 - **Kohtausmalli (`src/sceneLayout.ts`, puhdas).** `SceneLayout`: kuljettava monikulmio `bounds`, `arena`
   ja polunsuut `exits` (`mapDir`); kuljettava = monikulmio tai polunsuun käytävä, rajaus `clampToWalkable`.
   Vanhat kohtaukset ovat 11 m:n ympyröitä. Konventio: 3D:n −z = pohjoinen, +x = itä.
@@ -93,12 +88,6 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `7740904`)
   shoes-solmuja ja Taivaanrautamiekka omaa `sword_sky_iron`-malliaan. Rengaspaita kertoo vahingon
   0,85:llä, säärisuojat 0,95:llä. Vain ylälyönti voi irrottaa kypärän; silloin koko isku torjutaan.
   Sama sääntö on pelaajalla ja vihollisilla. Tarkat arvot ovat `combat.ts`in `ARMOUR`-vakiossa.
-- **Leirin aallot ja voitto (V7).** `src/waves.ts`: `CAMPAIGN_WAVES` 5 kiinteää aaltoa (9 vihollista),
-  **vastustajat perusarvoissa**, vain tekoäly paranee (`aiLevelForWave`). Viimeinen aalto → `battle.won` →
-  `campaign.victory` (`recordVictory`). Kaatuminen → `player.deaths`. Debug: `killEnemies()`, `skipTo(1..5)`.
-- **Loppuruutu** (`map/ending.ts` puhdas, `map/app.ts` `#mapEnding`): näkyy kartalla voiton jälkeen kerran
-  (päivät, tutkittu %, laulut, kukistetut, kaatumiset, luvattomat otot, sivupolut); "Jatka vaellusta"
-  asettaa `campaign.endSeen`, asetuksista voi katsoa uudelleen. Päivät ja kartta jäädytetään voittoon.
 - **V6 ja leirin arvonta (mergattu).** Leiri on instanssi `camp` (`placement.ts` `CAMP_PLACEMENT`: reunakaista,
   >= 8 ruutua aloituksesta, <= 600 min, lukossa lipulla `louhi.banished`). Jousineito on `archer`-pihassa
   (v07.02 yllä); dialogista `sky_iron_sword` (vahinko 1,3; oma GLB-malli). Tietäjä vain rannalla, nuori urho
@@ -106,13 +95,6 @@ Päivitetty: 2026-11-22 (Claude, Windows; pohja `origin/main` `7740904`)
 - **Louhen karkotus (V5).** Pohjolan uni ≤ 6 m (`SONG_AUDIENCE_RANGE`) Louhesta: `song.performed` (cast,
   `nearNpcId`) → sääntö `louhi.banished` (lippu, `revealSite camp`, `removeNpc`). Lukitut paikat:
   `requiresFlag`/`siteUnlocked`; Esc-oikotie `clearing`iin on kehittäjälle auki.
-- **Laulun tauot ja säekaaret (v06.08).** `songLogic.songBeats`: ryhmän (`SONG.pairSize`) jälkeen arvottu
-  tauko; painallus tauolla on huti (tarkoituksella). `engine/songArcs.ts`: säkeet SVG-kaarille sankarin ylle
-  (`revealVerse`, `fadeSongArcs`, `clearSongArcs`); `#verse` vain opetuksessa. `__game.songArcs`.
-- **Suon vahinko (v06.09).** `songOutcome.dotPerSec` → `Actor.bogDot`; `melee.updateCombatant` (`rooted`) →
-  `stepBogDot` tikeittäin ohi haarniskan; `hud.pulseOnDot` välähdyttää palkit.
-- **Laulun opettelu (V4).** Pohjolan uni (`SONGS.sleep`): dialogin `startSongLesson` → `startLesson` →
-  `song.performed` → `song.sleep.learned` (4/8, ei rangaistusta); `songSlots(flags)` paikkaan F3.
 - **Satunnaiset pihapiirit.** `map/siteInstances.ts` tallentaa siemenen ja paikat (`yard`/`yard-b`).
   `yardMeadows.ts` kasvattaa taloruudusta 3–9 sivuttain kiinni olevaa niittyruutua viiden ruudun
   levyisellä alueella. Metsät ja nykyinen niitty käyvät, ranta ja muut paikat rajaavat kasvua.
@@ -321,8 +303,8 @@ Tietäjä- ja uhriketjun (v08.00–v08.02) pelitesti on yhä tekemättä.
 - Villisika: 0–2 apajalla, osa pakenee ja osa ryntää; nuoli suututtaa; 3 nuolta kaataa; kilpi jää leiriin,
   joten väistetään tai lyödään. Haavoittunut pakenee useammin ja kauemmas ja jättää verijäljen. Kuolema
   apajalla palauttaa kartalle saaliin kanssa. X vaihtaa vaarassa jousen ja aseen (2026-11-22).
-- Metsästysapajat: kertakäyttöisiä (kuluvat sisään mentäessä), uudella matkalla 3–6, 20 päivän välein
-  yksi lisää ja enintään 6 (täynnä vanhin väistyy). Eivät koskaan valmiiksi näkyvissä: paljastuvat vasta
+- Metsästysapajat: kertakäyttöisiä (kuluvat sisään mentäessä), uudella matkalla 2–4, 20 päivän välein
+  yksi lisää ja enintään 4 (täynnä vanhin väistyy; 2026-11-23). Eivät koskaan valmiiksi näkyvissä: paljastuvat vasta
   viereisestä ruudusta, myös tutkitulla alueella, tai kun toisen talon emäntä neuvoo yhden (kerran
   kuunkierrossa, 2026-11-22); eivät toisen 3D-paikan viereen. Jäniksiä 7–9, joista 1–3 suolla ja 1–3
   paloaukealla (2026-11-21).

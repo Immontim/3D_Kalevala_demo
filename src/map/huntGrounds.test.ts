@@ -19,7 +19,7 @@ function otherSites(state: CampaignState, exceptId: string) {
 }
 
 describe("metsästysapajat uudella matkalla", () => {
-  it("200 siementä: 3–6 apajaa, kelvollisessa maastossa eikä toisen paikan vieressä", () => {
+  it("200 siementä: 2–4 apajaa, kelvollisessa maastossa eikä toisen paikan vieressä", () => {
     const counts = new Set<number>();
     for (let seed = 1; seed <= 200; seed++) {
       const state = newCampaign(seed);
@@ -36,7 +36,7 @@ describe("metsästysapajat uudella matkalla", () => {
         for (const other of otherSites(state, h.id)) expect(chebyshev(h, other)).toBeGreaterThanOrEqual(HUNT_RULES.minSiteDistance);
       }
     }
-    expect([...counts].sort()).toEqual([3, 4, 5, 6]);
+    expect([...counts].sort()).toEqual([2, 3, 4]);
   });
 
   it("apajat eivät ole tunnettuja eivätkä näy alussa", () => {
@@ -60,7 +60,8 @@ describe("metsästysapajat uudella matkalla", () => {
   it("vanha tallennus saa alkuapajat kerran, ilman kuluneiden jaksojen ryöppyä", () => {
     const old = { ...createCampaign({ worldSeed: 77 }), world: { ...createCampaign({ worldSeed: 77 }).world, worldMinutes: days(65) } };
     const done = ensureHuntGrounds(old);
-    expect(hunts(done).length).toBeGreaterThanOrEqual(3);
+    expect(hunts(done).length).toBeGreaterThanOrEqual(HUNT_RULES.initial[0]);
+    expect(hunts(done).length).toBeLessThanOrEqual(HUNT_RULES.initial[1]);
     expect(done.world.huntCycle).toBe(3);
     expect(ensureHuntGrounds(done)).toBe(done);
     expect(advanceHuntGrounds(done)).toBe(done);
@@ -97,9 +98,9 @@ describe("apajien uusiutuminen", () => {
     for (const other of otherSites(after, fresh.id)) expect(chebyshev(fresh, other)).toBeGreaterThanOrEqual(HUNT_RULES.minSiteDistance);
   });
 
-  it("kuuden apajan kartalla vanhin väistyy uuden tieltä", () => {
+  it("neljän apajan kartalla vanhin väistyy uuden tieltä", () => {
     let state = newCampaign(11);
-    // Täytetään kuuteen ajamalla jaksoja.
+    // Täytetään neljään ajamalla jaksoja.
     for (let d = 20; hunts(state).length < HUNT_RULES.maxActive; d += 20) {
       state = advanceHuntGrounds({ ...state, world: { ...state.world, worldMinutes: days(d) } });
     }
@@ -111,6 +112,33 @@ describe("apajien uusiutuminen", () => {
     expect(hunts(next).some((h) => h.id === oldest.id)).toBe(false);
     expect(next.world.knownSiteIds).not.toContain(oldest.id);
     expect(hunts(next).at(-1)!.id).toBe(`hunt-c${cycle + 1}`);
+  });
+
+  it("vanhan tallennuksen yli neljä apajaa rajataan heti vanhimmat poistamalla", () => {
+    const base = newCampaign(11);
+    let state = base;
+    for (let cycle = 1; cycle <= 6; cycle++) {
+      state = advanceHuntGrounds({ ...state, world: { ...state.world, worldMinutes: days(cycle * 20) } });
+    }
+    const legacyHunts = [
+      { id: "hunt-legacy-1", kind: "hunt" as const, x: 0, y: 0, archer: false },
+      { id: "hunt-legacy-2", kind: "hunt" as const, x: 1, y: 0, archer: false },
+      ...hunts(state),
+    ];
+    const legacy = {
+      ...state,
+      world: {
+        ...state.world,
+        siteInstances: [...state.world.siteInstances.filter((i) => !isHuntInstance(i)), ...legacyHunts],
+        knownSiteIds: [...state.world.knownSiteIds, "hunt-legacy-1", "hunt-legacy-2"],
+      },
+    };
+
+    const capped = advanceHuntGrounds(legacy);
+    expect(hunts(capped)).toEqual(legacyHunts.slice(-HUNT_RULES.maxActive));
+    expect(capped.world.knownSiteIds).not.toContain("hunt-legacy-1");
+    expect(capped.world.knownSiteIds).not.toContain("hunt-legacy-2");
+    expect(capped.world.huntCycle).toBe(legacy.world.huntCycle);
   });
 
   it("jakson laskenta: päivät 0–19 jakso 0, päivä 20 jakso 1", () => {
