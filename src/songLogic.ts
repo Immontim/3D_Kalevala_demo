@@ -44,6 +44,9 @@ export const SONG = {
   bogDotInterval: 1,
   /** Parannuslaulu: elämää jokaisesta osumasta, heti osuman hetkellä. */
   healPerHit: 5,
+  /** Pohjolan uni hidastaa elossa olevien vastustajien kaikkea toimintaa onnistuneen laulun jälkeen. */
+  sleepSlowScale: 0.5,
+  sleepSlowSeconds: 6,
   /** Säekaarten hiipumisaika laulun päätyttyä, laulukohtaisesti (sekunteja, reaaliaikaa). */
   fade: { bog: 1.2, heal: 1.2, sleep: 1.6 },
 };
@@ -178,13 +181,18 @@ export interface SongDef {
   peaceful?: boolean;
   /** Rauhassa laulu on käytettävissä vain, kun jokin näistä hahmoista on kuuluvilla (esim. loukkaantunut jousineito). */
   peaceTargets?: readonly string[];
+  /** Taistelussa laulu on valittavissa vain, kun jokin näistä hahmoista on kuuluvilla. */
+  combatTargets?: readonly string[];
 }
 export const SONGS: Record<SongId, SongDef> = {
   bog: { id: "bog", name: t("song.bog.name"), rune: "ᛚ", verses: SONG_VERSES, needsEnemy: true },
   heal: { id: "heal", name: t("song.heal.name"), rune: "ᛒ", verses: HEAL_VERSES, needsEnemy: false, peaceTargets: ["jousineito"] },
-  // Tietäjä opettaa; vaikutus (Louhen karkotus) tulee V5:ssä, joten laulu ei vaadi vastustajaa.
-  // Kuulijaksi valitaan Louhi, jos hän on kuuluvilla: kalmiston kuppikivi on myös puhuteltava, eikä se saa viedä karkotusta.
-  sleep: { id: "sleep", name: t("song.sleep.name"), rune: "ᛋ", verses: SLEEP_VERSES, needsEnemy: false, peaceful: true, peaceTargets: ["louhi"] },
+  // Kuulijaksi valitaan Louhi, jos hän on kuuluvilla: kalmiston kuppikivi on myös puhuteltava,
+  // eikä se saa viedä karkotusta. Taistelussa Louhen pitää olla kuuluvilla.
+  sleep: {
+    id: "sleep", name: t("song.sleep.name"), rune: "ᛋ", verses: SLEEP_VERSES, needsEnemy: false,
+    peaceful: true, peaceTargets: ["louhi"], combatTargets: ["louhi"],
+  },
 };
 
 /** Laulu, joka avautuu laulupaikkaan vasta, kun moottorin lippu on asetettu (opeteltu). */

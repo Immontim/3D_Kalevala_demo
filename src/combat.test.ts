@@ -301,6 +301,7 @@ describe("ajoitukset", () => {
   });
   it("suohon laulettu ottaa tuplavahingon", () => {
     expect(damageFor(20, "rooted")).toBe(40);
+    expect(damageFor(20, "rooted", 1)).toBe(20); // Louhen suo ei tuplaa vartijoiden iskuja
     expect(damageFor(20, "idle")).toBe(20);
   });
   it("kulmaero kiertyy välille -PI..PI", () => {

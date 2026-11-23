@@ -2,6 +2,7 @@
 // seuraa, kun vastustaja kaatuu. Moottori itse ei tiedä aalloista mitään. Aaltotaistelu
 // (skirmish.ts) on yksi kohtaus; rauhallinen kohtaus ilman vastustajia on toinen.
 import type { Actor } from "./actor";
+import type { SongId } from "../songLogic";
 import { t, type TextKey } from "../i18n";
 import { $ } from "./dom";
 import { showMsg } from "./hud";
@@ -10,9 +11,19 @@ export interface Encounter {
   /** Kohtaus alkaa tai aloitetaan alusta: oma tila nollataan ja ensimmäiset vastustajat tuodaan. */
   start(): void;
   /** Kutsutaan joka pelin askeleella (ei tauolla eikä laulun valinnassa). */
-  update(dt: number): void;
+  update(dt: number, realDt?: number): void;
   /** Vastustaja kaatui. Se on jo poistettu elävien listalta (g.enemies). */
   onEnemyDown(e: Actor): void;
+  /** Laulun elinkaarikoukut paikallisille kohtaamisreaktioille. */
+  onPlayerSongStart?(songId: SongId, listenerId: string | null): void;
+  /** True tarkoittaa, että kohtaaminen katkaisi laulun tämän riimun jälkeen. */
+  onPlayerSongBeat?(songId: SongId, beat: number): boolean;
+  /** Kutsutaan sen jälkeen, kun kohtaamisen pyytämä laulunkatkaisu on sulkenut laulu-UI:n. */
+  afterPlayerSongInterrupted?(): void;
+  /** Vahingoittumaton kohtauskohde voi kuluttaa pelaajan iskun. */
+  onPlayerStrike?(attacker: Actor, combatTarget: Actor | null): boolean;
+  /** Maailmasääntö poisti paikallisen hahmon kesken kohtaamisen. */
+  onNpcRemoved?(npcId: string): void;
   /** Rauhallinen kohtaus: niin kauan kuin kentällä ei ole vastustajia, sankarin ase on huotrassa. */
   peaceful?: boolean;
 }

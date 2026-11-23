@@ -6,13 +6,14 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-23 (Codex, Windows; pohja `origin/main` `22126c8`)
+Päivitetty: 2026-11-23 (Codex, Windows; pohja `origin/main` `ebd6a23`)
 
-- **Koodiversio v08.04.01** branchissa `codex/hunt-ground-cap` (tarkista merge-tila `git merge-base`illa).
-  Koodi valmis, ei deployattu, omistaja ei testannut. Apajien alkuarvonta on 2–4 ja aktiivisten katto 4;
-  vanhan tallennuksen ylimääräiset apajat poistuvat vanhimmasta alkaen. Codexin in-app-savutestissä kartta
-  renderöityi ja versio näkyi, konsoli puhdas. Tarkistukset: `bun run test` 3228/3228, `bunx tsc --noEmit`,
-  `bun run lint`, `bun run build`; kohdennettu apajatesti 46/46. Ei renderöintimuutosta eikä FPS-vaikutusta.
+- **Koodiversio v08.05.00** branchissa `codex/louhi-graveyard-encounter` (tarkista merge-tila
+  `git merge-base`illa). Koodi valmis, ei deployattu, omistaja ei vielä testannut. Codexin in-app-savutestissä
+  Louhen dialogi, haasteen kahden soturin aalto, soturien saapuminen Louhen takaa ja Louhen lauluasento
+  toimivat; FPS pysyi 60:ssä ja konsoli oli puhdas. Tarkistukset: `bun run test` 516/516,
+  `bunx tsc --noEmit`, `bun run lint`, `bun run build`. Vitest rajataan `src/**/*.test.ts`:ään, jotta
+  projektikansion sisäiset toisten agenttien työpuut eivät aja samoja testejä uudelleen.
 - **Villisika (v08.04, `hunt/boar.ts` puhdas + `engine/boars.ts`).** `initBoars`: 0–2 sikaa (`boarCount`
   40/40/20 %, ≥ 45 m saapumisesta). Tilat root/walk/alert/threat/charge/recover/flinch/flee/bed/dead, luvut
   `BOAR` (aggressio 0,35, varoitus 0,7 s, rynnäkkö 9 m/s, käännös 1,1 rad/s, vahinko 22, elämä 3; pako terve
@@ -92,9 +93,16 @@ Päivitetty: 2026-11-23 (Codex, Windows; pohja `origin/main` `22126c8`)
   >= 8 ruutua aloituksesta, <= 600 min, lukossa lipulla `louhi.banished`). Jousineito on `archer`-pihassa
   (v07.02 yllä); dialogista `sky_iron_sword` (vahinko 1,3; oma GLB-malli). Tietäjä vain rannalla, nuori urho
   `archer`-vapaassa pihassa.
-- **Louhen karkotus (V5).** Pohjolan uni ≤ 6 m (`SONG_AUDIENCE_RANGE`) Louhesta: `song.performed` (cast,
-  `nearNpcId`) → sääntö `louhi.banished` (lippu, `revealSite camp`, `removeNpc`). Lukitut paikat:
-  `requiresFlag`/`siteUnlocked`; Esc-oikotie `clearing`iin on kehittäjälle auki.
+- **Louhen yhteenotto ja karkotus (v08.05).** Puhdas `louhiEncounter.ts` erottaa taistelun vaiheen,
+  Louhen läsnäolon ja aktiivisen kyvyn, jotta Louhelle voi myöhemmin lisätä liikkeen ja kykyjä ilman
+  dialogin tai vartija-aallon muutosta. `engine/louhi.ts`: dialogihaaste tai suoran Pohjolan unen 2.–3.
+  riimu kutsuu kerran kaksi `pohja/sword_shield`-soturia Louhen takaa. Soturien kuoltua paikka rauhoittuu.
+  Louhi on paikallaan ja vahingoittumaton; aktiivisessa taistelussa hän aloittaa 8 m:n sisältä 18 s:n
+  reaaliaikaisen suolaulun. Louheen osuva lyönti katkaisee sen. Läpimeno juurruttaa 4 s, tekee 5 HP/s ja
+  pitää asevahingon normaalina. Pohjolan uni vaatii taistelussa Louhen ≤ 6 m:n päähän, hidastaa viholliset
+  50 %:iin 6 s:ksi ja käyttää vanhaa `song.performed` → `louhi.banished`/leirin paljastus -ketjua.
+  `folk.ts`:n `idle|sing|hit`-toimintakerros animoi nykyistä Louhi-mallia koodissa. Karkotus käyttää vielä
+  vanhaa kutistumista; lumihiutalekatoaminen on myöhempi työ.
 - **Satunnaiset pihapiirit.** `map/siteInstances.ts` tallentaa siemenen ja paikat (`yard`/`yard-b`).
   `yardMeadows.ts` kasvattaa taloruudusta 3–9 sivuttain kiinni olevaa niittyruutua viiden ruudun
   levyisellä alueella. Metsät ja nykyinen niitty käyvät, ranta ja muut paikat rajaavat kasvua.
@@ -123,9 +131,7 @@ Päivitetty: 2026-11-23 (Codex, Windows; pohja `origin/main` `22126c8`)
   instansseina, ks. v08.00). `world.ts`: `CAIRN`-lippu; `LAKE` = `LAKESIDE || CAIRN` (vesi, kaukoranta, rantakaista). Maasto on
   kallionokka (`terrainHeight`, `shoreZ` z ≈ 21). Sijoittelu vakioina `world.ts`:n alussa (`CUPSTONE`,
   `CAIRNS_AT`, `KARSIKKO`, `LOUHI_AT`, `DARK_SOIL`). Louhi `populateCairnLife`issa, ääni `Sfx.birds`.
-  Törmäyksiä vasten kävelyä ja ääntä ei ole tarkistettu.
-- **Taisteluvaraukset (Louhi suohon):** kuppikiven ympärillä on noin 5 m:n vapaa alue ja suoloitsun efekti
-  (`bog`). Puuttuu vihollistyyppi `louhi`, taistelumalli ja animaatiot sekä `Encounter` kalmiston taisteluun.
+  Louhen kalmisto käyttää hybridi-Encounteria; toinen kalmisto pysyy rauhallisena.
 - **Rauhan kävely ja eleet** (`fighter.ts`, `interact.ts`, `engine/{hero,melee,animate}.ts`): rauhassa
   (`heroAtPeace`) iskunappi = `talk`, torjuntanappi = `use`; eleet ovat `gesturePose()`-avainkehyksiä ja
   vaikutus ratkeaa `gestureEffect`issä (`TALK_ZONE` 2,3 m / ±60°). Puhuteltava väki `world.ts`:n `solid()`ista.
@@ -220,6 +226,10 @@ Päivitetty: 2026-11-23 (Codex, Windows; pohja `origin/main` `22126c8`)
   v07.01:n jälkeen ryhmät ovat vaarallisempia (aaltojen ja metsästysmaiden ryhmät viritettiin vuorottelulle),
   laulu katkeaa useammin, ja ryhmä uupuu samaan aikaan (yhteinen hiljainen jakso). Älä palauta id- tai
   järjestyspohjaista vuoroa: omistaja haluaa tilannepohjaisen katon.
+- Louhen kahden kilpisoturin lähitaistelu on tarkoituksella vaarallinen: suojaamatta paikallaan seisova
+  testihahmo kaatui noin kahdeksassa sekunnissa. Louhen 18 s:n laulun keskeytys, taistelulaulun rytmi ja
+  vartijoiden lopullinen tasapaino tarvitsevat omistajan käsin pelattavan testin. Vartijat syntyivät
+  savutestissä esteittä ja saapuivat Louhen takaa. Lumihiutalekarkotus puuttuu suunnitellusti.
 - Torjunta ratkeaa yhä tilan (`block`) eikä asennon mukaan: hetken vielä nouseva asento torjuu. Keihäsmiehen
   hitaampi torjunta-animaatio (tulossa) tehdään suurentamalla `BLOCK_RAISE.spear`ia, joka hidastaa myös
   keihästä kantavaa sankaria; jos vain vihollisen pitää hidastua, erota arvot silloin.
@@ -248,14 +258,12 @@ Päivitetty: 2026-11-23 (Codex, Windows; pohja `origin/main` `22126c8`)
 
 ## Seuraava tehtävä
 
-Omistajan pelitesti metsästysapajalla (v08.03–v08.04): jousen asento, linnut ja villisika (varoitus,
-rynnäkön väistö, X-vaihto aseeseen, verijäljen seuraaminen, kuolema → kartta). Viritys `BOAR`-arvoista.
-Tietäjä- ja uhriketjun (v08.00–v08.02) pelitesti on yhä tekemättä.
+Omistajan pelitesti Louhen kalmistolla (v08.05): suora Pohjolan uni, dialogihaaste, vartijoiden vaikeus,
+Louhen suolaulun katkaisu, suohon joutuminen ja karkotus taistelun aikana sekä vartijoiden kaaduttua.
 
 ## Ei vielä aloiteta
 
-- Louhen taistelu (varaukset yllä; karkotus laululla kuuluu V5:een); esine- ja puhemekaniikka kalmistolla
-  on Codexin suunnittelema.
+- Louhen lumihiutalekarkotus, liikkuminen tai uudet kyvyt ennen v08.05:n omistajatestiä.
 - Täysi karttaeditori, satunnaiset matkakohtaamiset ja sivujuonigeneraattori.
 - 3D-palkintojen tai ruokien lisääminen paluukuormasta inventaarioon.
 - Yleinen quest-editori, laaja dialogipuu, ajastimet, `unless` ja kyläläisten vapaa liikkuminen.

@@ -64,6 +64,7 @@ describe("laulut ja laulupaikat", () => {
     for (const verse of SLEEP_VERSES) expect(verse).toMatchObject({ kind: "verbatim", lang: "fi", source: "Kalevala, runo 42" });
     expect(SONGS.sleep.needsEnemy).toBe(false);
     expect(SONGS.sleep.peaceful).toBe(true);                       // vain tämän voi laulaa rauhassa
+    expect(SONGS.sleep.combatTargets).toEqual(["louhi"]);          // taistelussa laulu vaatii Louhen kuuluville
     expect(SONGS.bog.peaceful).toBeUndefined();
     expect(SONGS.heal.peaceful).toBeUndefined();
     expect(SONGS.heal.peaceTargets).toEqual(["jousineito"]);       // parannus rauhassa vain loukkaantuneen jousineidon luona
@@ -82,6 +83,10 @@ describe("laulut ja laulupaikat", () => {
   });
   it("hidastus laulun aikana on 1/15", () => {
     expect(SONG.slowmo).toBeCloseTo(1 / 15);
+  });
+  it("onnistunut Pohjolan uni puolittaa vastustajien toimintanopeuden kuudeksi sekunniksi", () => {
+    expect(SONG.sleepSlowScale).toBe(0.5);
+    expect(SONG.sleepSlowSeconds).toBe(6);
   });
   it("paikat ovat kaarella hahmon yläpuolella vasemmalta oikealle", () => {
     const p = slotPositions(500, 400, 100);

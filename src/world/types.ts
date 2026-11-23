@@ -58,6 +58,10 @@ export type Effect =
   | { kind: "removeNpc"; npcId: string }
   /** Pyytää 3D:tä vaihtamaan hahmon tilan heti (esim. jousineito "healed": nousee seisomaan). Pysyvyys tulee lipusta. */
   | { kind: "setNpcState"; npcId: string; state: string }
+  /** Pyytää 3D:tä käynnistämään nimetyn kohtaamisen. Kohtaamisen oma tila ei tallennu kampanjaan. */
+  | { kind: "startEncounter"; encounterId: string }
+  /** Pyytää 3D:tä palaamaan nykyisestä kohtauksesta heti kartalle. */
+  | { kind: "returnToMap" }
   /** Kirjaa kampanjan voitetuksi ja tallentaa loppuruudun tilastot (päivät, tutkittu kartta) lipuiksi ja laskureiksi. */
   | { kind: "recordVictory" }
   /** Kirjaa laskuriin nykyisen kuunkierron (numero + 1), jota `sameMoon` vertaa. */
@@ -76,7 +80,9 @@ export interface OutMessage { text: TextKey; sub?: TextKey }
 export type OutAction =
   | { kind: "songLesson"; songId: string }
   | { kind: "removeNpc"; npcId: string }
-  | { kind: "npcState"; npcId: string; state: string };
+  | { kind: "npcState"; npcId: string; state: string }
+  | { kind: "startEncounter"; encounterId: string }
+  | { kind: "returnToMap" };
 
 // ---------- Tapahtumat ----------
 
@@ -121,7 +127,8 @@ export interface Rule {
 
 export interface DialogueChoice {
   id: string;
-  text: TextKey;
+  /** Valinnan teksti tai samaa tarkoittavat muunnelmat, joista UI näyttää yhden. */
+  text: TextKey | readonly TextKey[];
   /** Valinta näkyy vain, kun ehto pitää. */
   when?: Condition;
   effects?: Effect[];

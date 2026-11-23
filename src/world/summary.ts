@@ -4,7 +4,7 @@ import type { TextKey } from "../i18n";
 import { ITEMS } from "../map/campaign";
 import { LONG_EFFECTS } from "../map/longEffects";
 import { itemLabel, moonPhaseNames } from "./conditions";
-import { nodeVariants } from "./dialogue";
+import { choiceVariants, nodeVariants } from "./dialogue";
 import type { Condition, Dialogue, Effect, EventPattern, Rule, WorldData } from "./types";
 
 export type TextLookup = (key: TextKey) => string;
@@ -59,6 +59,8 @@ export function describeEffect(effect: Effect, data: WorldData, text: TextLookup
     case "recordVictory": return "kampanja merkitään voitetuksi ja loppuruudun tilastot (päivät, tutkittu kartta) kirjataan";
     case "setNpcState": return `hahmon "${effect.npcId}" tila vaihtuu: ${effect.state}`;
     case "removeNpc": return `hahmo "${effect.npcId}" poistuu kohtauksesta`;
+    case "startEncounter": return `käynnistetään kohtaaminen "${effect.encounterId}"`;
+    case "returnToMap": return "palataan heti 2D-kartalle";
     case "startSongLesson": return `aloitetaan laulun "${effect.songId}" opettelu (rytmiharjoitus)`;
     case "markMoon": return `kirjataan laskuriin "${data.counters[effect.counter]?.label ?? effect.counter}" nykyinen kuunkierto`;
     case "revealHuntGround": return "sankaria lähin tuntematon metsästysapaja paljastuu kartalle";
@@ -132,9 +134,11 @@ export function summarizeDialogue(dialogue: Dialogue, data: WorldData, text: Tex
     const variants = nodeVariants(node);
     lines.push(`  Solmu ${id}: "${text(variants[0])}"${variants.length > 1 ? ` (+ ${variants.length - 1} samaa tarkoittavaa muunnelmaa)` : ""}`);
     for (const c of node.choices) {
+      const choiceTexts = choiceVariants(c);
       const cond = c.when ? ` (näkyy, jos ${describeCondition(c.when, data)})` : "";
       const fx = (c.effects ?? []).map((e) => describeEffect(e, data, text)).join("; ");
-      lines.push(`    - "${text(c.text)}"${cond}${fx ? ` → ${fx}` : ""}${c.next ? ` → solmu ${c.next}` : " → päättyy"}`);
+      const varied = choiceTexts.length > 1 ? ` (+ ${choiceTexts.length - 1} samaa tarkoittavaa muunnelmaa)` : "";
+      lines.push(`    - "${text(choiceTexts[0])}"${varied}${cond}${fx ? ` → ${fx}` : ""}${c.next ? ` → solmu ${c.next}` : " → päättyy"}`);
     }
   }
   return lines;

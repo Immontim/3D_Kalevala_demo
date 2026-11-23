@@ -83,6 +83,11 @@ export function songAvailable(id: SongId | null): id is SongId {
     const listener = songListener(id);
     return !!def.peaceTargets && !!listener && def.peaceTargets.includes(listener.id);
   }
+  const combatTargets = SONGS[id].combatTargets;
+  if (combatTargets) {
+    const listener = songListener(id);
+    if (!listener || !combatTargets.includes(listener.id)) return false;
+  }
   return !SONGS[id].needsEnemy || focusEnemy() !== null;
 }
 
@@ -193,6 +198,7 @@ export function startSong(id: SongId, lesson: SongLesson | null = null) {
   $("songHint").textContent = t(lesson ? "song.lesson.hint" : "song.rhythmHint");
   setState(g.player, "idle");
   showMsg(SONGS[id].name, "", 1);
+  if (!lesson) g.encounter.onPlayerSongStart?.(id, songListener(id)?.id ?? null);
 }
 
 export let lastTick = -1;
@@ -205,6 +211,7 @@ export function updateSong() {
   const markerX = trackW * 0.25;
   const pxPerSec = trackW * 0.45 * SONG.speed;
   s.beats.forEach((bt, i) => {
+    if (songState !== s) return;
     const x = markerX + (bt - g.realTime) * pxPerSec;
     const w = 2 * zoneHalf(i) * pxPerSec;
     s.runes[i].style.left = `${x}px`;
@@ -212,6 +219,7 @@ export function updateSong() {
     s.zones[i].style.width = `${w}px`;
     if (s.results[i] === null && g.realTime > bt + zoneHalf(i)) judge(i, false);
   });
+  if (songState !== s) return;
   // Opetuksessa tietäjä laulaa säkeen etukäteen: seuraava arvioimaton säe näkyy ruudulla.
   if (s.lesson) {
     const n = s.results.findIndex((r) => r === null);
@@ -228,6 +236,7 @@ export function updateSong() {
     const i = s.results.findIndex((r) => r === null);
     if (i >= 0) judge(i, inZone(g.realTime - s.beats[i], i));
   }
+  if (songState !== s) return;
   if (s.endAt < 0 && s.results.every((r) => r !== null)) s.endAt = g.realTime + SONG.outro;
   if (s.endAt >= 0 && g.realTime >= s.endAt) {
     const out = songOutcome(s.results as boolean[]);
@@ -252,6 +261,10 @@ export function judge(i: number, hit: boolean) {
     s.healed += g.player.hp - before;
     flash("#e8736a", 0.16);
   } else if (hit) flash("#f0c766", 0.14);
+  if (g.encounter.onPlayerSongBeat?.(s.id, i + 1)) {
+    closeSong(true);
+    g.encounter.afterPlayerSongInterrupted?.();
+  }
 }
 
 /** Sulkee laulun näkymän ja palauttaa ajan kulun. */
@@ -291,7 +304,10 @@ export function endSong(id: SongId, success: boolean, rootTime: number, hits: nu
   });
   // Sääntöjen pyytämät toimet: hahmo poistuu kohtauksesta heti (pysyvyys tulee säännön asettamasta lipusta).
   for (const action of posted.result.actions) {
-    if (action.kind === "removeNpc") world.removeNpc(action.npcId);
+    if (action.kind === "removeNpc") {
+      world.removeNpc(action.npcId);
+      g.encounter.onNpcRemoved?.(action.npcId);
+    }
     else if (action.kind === "npcState") world.setNpcState(action.npcId, action.state);
   }
   // Suo lauletaan lukitun tai lähimmän vastustajan alle.
@@ -303,6 +319,12 @@ export function endSong(id: SongId, success: boolean, rootTime: number, hits: nu
     else if (hits > 0) showMsg(t("song.healSuccess"), t("song.healed", { hits, total, healed: Math.round(healed) }), 2.4);
     else showMsg(t("song.failed"), t("song.rhythmFailed"), 1.6);
   } else if (id === "sleep") {
+    if (success) {
+      for (const enemy of g.enemies) {
+        enemy.tempoScale = Math.min(enemy.tempoScale, SONG.sleepSlowScale);
+        enemy.tempoUntil = Math.max(enemy.tempoUntil, g.gameTime + SONG.sleepSlowSeconds);
+      }
+    }
     // Vaikutus tulee sääntöjen kautta (Louhen karkotus); ilman kuulijaa laulu vain kaikuu.
     const consequence = posted.saved ? posted.result.messages[0] : undefined;
     if (success && consequence) { sfx.swamp(); fx.shake = 0.2; showMsg(t(consequence.text), consequence.sub ? t(consequence.sub) : "", 3.6); }

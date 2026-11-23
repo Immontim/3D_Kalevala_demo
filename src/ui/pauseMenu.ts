@@ -10,8 +10,8 @@ import { VERSION } from "../version";
 import { mountInventoryView, type InventoryView } from "./inventoryView";
 import { campaignStore } from "../engine/store";
 import { combatLoadout, isSkyIron } from "../map/campaign";
-import { PLAYER_LOOK, refreshHeroLook } from "../engine/hero";
-import { ARENA_PEACEFUL, sceneLoadout } from "../world";
+import { PLAYER_LOOK, heroAtPeace, refreshHeroLook } from "../engine/hero";
+import { sceneLoadout } from "../world";
 
 // Säätövälilehdellä tehdyt muutokset ovat tallessa selaimen muistissa ja otetaan käyttöön
 // ennen kuin yhtään hahmoa luodaan.
@@ -135,8 +135,10 @@ export function openTune() {
 }
 
 export type PauseTab = "binds" | "tune" | "inventory";
+let pauseInventoryView: InventoryView | null = null;
 
 export function showTab(tab: PauseTab) {
+  if (tab === "inventory") pauseInventoryView?.render();
   for (const name of ["Binds", "Tune", "Inventory"] as const) {
     const active = name.toLowerCase() === tab;
     $(`pane${name}`).classList.toggle("hidden", !active);
@@ -200,10 +202,9 @@ export function initPauseMenu() {
   $("tabTune").addEventListener("click", () => showTab("tune"));
   $("tabInventory").addEventListener("click", () => showTab("inventory"));
 
-  let inventoryView: InventoryView;
-  inventoryView = mountInventoryView($("pauseInventory"), {
+  const inventoryView = mountInventoryView($("pauseInventory"), {
     getState: () => campaignStore().get(),
-    editable: ARENA_PEACEFUL,
+    editable: heroAtPeace,
     commit(next) {
       return campaignStore().update(() => next).ok;
     },
@@ -220,6 +221,7 @@ export function initPauseMenu() {
       refreshHeroLook();
     },
   });
+  pauseInventoryView = inventoryView;
   campaignStore().subscribe(() => inventoryView.render());
 
   tuneText.addEventListener("input", () => {

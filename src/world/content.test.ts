@@ -210,6 +210,34 @@ describe("Louhen karkotus (V5)", () => {
     sceneId: "cairnfield", nearNpcId: "louhi", ...over,
   }) as import("./types").GameEvent;
 
+  it("Louhen dialogi arpoo repliikin ja vetäytymisvastauksen kolmesta muodosta", () => {
+    const { runtime } = setup();
+    const talk = runtime.startDialogue("cairnfield", "louhi")!;
+    expect(talk.view.nodeId).toBe("greet");
+    expect(talk.view.variants).toEqual([
+      "dialogue.louhi.greet", "dialogue.louhi.greet.2", "dialogue.louhi.greet.3",
+    ]);
+    expect(talk.view.choices.map((c) => c.id)).toEqual(["retreat", "challenge"]);
+    expect(talk.view.choices[0].variants).toEqual([
+      "dialogue.louhi.retreat", "dialogue.louhi.retreat.2", "dialogue.louhi.retreat.3",
+    ]);
+    expect(talk.view.choices[1].variants).toEqual(["dialogue.louhi.challenge"]);
+  });
+
+  it("vetäytyminen pyytää kartalle paluuta ja haaste nimetyn Louhi-kohtaamisen ilman pysyvää lippua", () => {
+    const retreat = setup();
+    const retreatTalk = retreat.runtime.startDialogue("cairnfield", "louhi")!;
+    const left = retreat.runtime.choose(retreatTalk, "retreat");
+    expect(left.saved && left.actions).toEqual([{ kind: "returnToMap" }]);
+    expect(retreat.store.get().engine.flags["louhi.banished"]).toBeUndefined();
+
+    const challenge = setup();
+    const challengeTalk = challenge.runtime.startDialogue("cairnfield", "louhi")!;
+    const provoked = challenge.runtime.choose(challengeTalk, "challenge");
+    expect(provoked.saved && provoked.actions).toEqual([{ kind: "startEncounter", encounterId: "louhi" }]);
+    expect(challenge.store.get().engine.flags["louhi.banished"]).toBeUndefined();
+  });
+
   it("onnistunut laulu Louhen kuuluvilla asettaa lipun, paljastaa leirin ja pyytää poistamaan Louhen", () => {
     const { store, runtime } = setup();
     const out = runtime.post(cast());
@@ -261,6 +289,10 @@ describe("Louhen karkotus (V5)", () => {
     expect(text).toContain("louhi.banished");
     expect(text).toContain("poistuu kohtauksesta");
     expect(text).toContain("paljastuu kartalle");
+    expect(text).toContain("Louhi käskee kalmistolle tullutta pelaajaa poistumaan");
+    expect(text).toContain("(+ 2 samaa tarkoittavaa muunnelmaa)");
+    expect(text).toContain("käynnistetään kohtaaminen \"louhi\"");
+    expect(text).toContain("palataan heti 2D-kartalle");
   });
 });
 

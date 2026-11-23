@@ -518,6 +518,28 @@ export const YOUNG_WARRIOR_DIALOGUE: Dialogue = {
 };
 
 /**
+ * Louhen kalmisto: pelaaja voi vetäytyä suoraan kartalle tai haastaa Louhen, jolloin 3D käynnistää
+ * paikallisen yhteenoton. Valinnat eivät muuta kampanjatilaa: paluu tai kuolema nollaa keskeneräisen
+ * kohtaamisen, ja pysyvä eteneminen syntyy vasta Louhen onnistuneesta karkotuksesta.
+ */
+export const LOUHI_DIALOGUE: Dialogue = {
+  id: "louhi.cairnfield",
+  sceneId: "cairnfield",
+  npcId: "louhi",
+  intent: "Louhi käskee kalmistolle tullutta pelaajaa poistumaan; pelaaja voi vetäytyä heti kartalle tai haastaa Louhen, jolloin Louhi kutsuu Pohjan urhot yhteenottoon.",
+  entries: [{ node: "greet" }],
+  nodes: {
+    greet: {
+      text: lines("dialogue.louhi.greet"),
+      choices: [
+        { id: "retreat", text: lines("dialogue.louhi.retreat"), effects: [{ kind: "returnToMap" }] },
+        { id: "challenge", text: "dialogue.louhi.challenge", effects: [{ kind: "startEncounter", encounterId: "louhi" }] },
+      ],
+    },
+  },
+};
+
+/**
  * Kuppikivi kummallakin kalmistolla (sama kohtaus `cairnfield`): Louhen kalmistolla `kuppikivi`, toisella
  * kalmistolla `uhrikivi`. Ukon muistaminen antaa Ukon siunauksen (+20 kestävyyden yläraja 15 päiväksi)
  * kerran kuunkierrossa yhteensä molemmilla kivillä (omistaja 2026-11-22); saman kuun aikana kivi vain
@@ -584,5 +606,5 @@ export const GAME_WORLD: WorldData = {
   flags: FLAGS,
   counters: COUNTERS,
   rules: RULES,
-  dialogues: [SAGE_DIALOGUE, ARCHER_DIALOGUE, HOUSEWIFE_DIALOGUE, HOUSEWIFE_B_DIALOGUE, YOUNG_WARRIOR_DIALOGUE, CUPSTONE_DIALOGUE, OFFERING_STONE_DIALOGUE],
+  dialogues: [SAGE_DIALOGUE, ARCHER_DIALOGUE, HOUSEWIFE_DIALOGUE, HOUSEWIFE_B_DIALOGUE, YOUNG_WARRIOR_DIALOGUE, LOUHI_DIALOGUE, CUPSTONE_DIALOGUE, OFFERING_STONE_DIALOGUE],
 };
