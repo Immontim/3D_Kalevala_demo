@@ -60,6 +60,12 @@ Human Base Meshes -vartalo (CC0) ja Poly Havenin kankaat ja nahka (CC0). Itse te
 (skripti `assets-src/blender/char_smith.py`): sepän ja sällin nahkaesiliinat, otsanauha,
 käärityt hihat ja sepän vasara.
 
+## `smithfolk_child.glb`
+
+Sama pohja ja samat lähteet kuin tiedostossa `smithfolk.glb` (Human Base Meshes -vartalo CC0,
+Poly Havenin kankaat ja nahka CC0). Itse tehty (skripti `assets-src/blender/char_smith_child.py`):
+muunnos lapsen mittasuhteisiin, lapsen kasvot, polkkatukka ja luuranko.
+
 ## `villagers_f.glb`
 
 Vartalo, pää, kädet ja silmät: Human Base Meshes v1.4.1,
