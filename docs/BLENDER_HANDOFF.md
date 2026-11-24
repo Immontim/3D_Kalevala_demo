@@ -6,8 +6,20 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-24 (Claude, Windows; pohja main 5219713; lapsisälli B5 branchissa `claude/smithy-b5`,
-tarkista merge-tila `git merge-base --is-ancestor`)
+Päivitetty: 2026-11-24 (Claude, Windows; pohja main fc36128; Pohjan soturit ja kirveet branchissa
+`claude/pohja-warriors`, tarkista merge-tila `git merge-base --is-ancestor`)
+
+- **Pohjan uudet soturit ja kirveet** (ei vielä pelissä; toteutusohje, osien näyttösäännöt, kiinnityspisteet,
+  otekanavat ja mittaukset: `docs/POHJA_WARRIORS.md`). `char_pohja.py` lukee char_smith_child.py:n; ajo taustalla
+  characters.blendin kopiolla, ei rinnakkain (`img_from_px` jakaa välitiedoston).
+  - `pohja_tanakka.glb` (1,58 m, parrakas) ja `pohja_hoikka.glb` (1,86 m, parraton), kumpikin oma `RIG`.
+    Asu kootaan vakiomiehen mittoihin ja muunnetaan `BUILDS`-taulukon luukohtaisilla kertoimilla (`reshape`,
+    kuten `childify`). Osat: `_base`, `_nuttu_vaalea`, `_nuttu_tumma`, `_mail`, `_huotra`, `helmet_<h>`,
+    tyhjät `mount_huotra` ja `mount_kirves`. Vyö `BELT_Z0` 1,012 (7 mm sankaria ylempänä).
+  - `kirveet.glb`: `kirves_parta` ja `kirves_karjala` miekan kehyksessä (ote origossa, pää −Y, terä +X).
+  - Arvioija kävi kirveet ja hahmot läpi; korjattu mm. kaula, korvakkeet, upotus, ihonvärinen nuttu,
+    rengaspaidan rosoinen kaula-aukko ja kirveen asento vyöllä. Riski: ääri-kävelyssä reisi puskee
+    helman ja rengaspaidan läpi (sankarilla sama); kirveen terän puoli sivalluksessa tarkistamatta.
 
 - **Sepän pihapiiri B1–B5** (ei vielä pelissä; pelikoodi on Codexin). Sijoitus, törmäysohje (pajasta ei kiinteää
   laatikkoa), hahmojen paikat, kauppa, latausohjeet ja tyhjien pisteiden käyttö: `docs/SMITHY_INTEGRATION.md`.
@@ -40,23 +52,11 @@ tarkista merge-tila `git merge-base --is-ancestor`)
     juuret `M_Log`) ja +Y:hen laskeva runkotynkä kelon (`log`) tyveksi.
   - **Pelissä (v06.00.00):** valaisematon atlas tekee kaukopuista vaaleampia; peli korjaa sen (`world.ts`
     `LOD_TINT`, `M_BarkLOD` × 0,62). Erämaa piirtää raskaan juurakon vain alle 60 m:n päähän.
-- **Järvenrannan kohtaus** (`assets/lakeside.glb`, noin 0,9 Mt / 9 300
-  kolmiota; `assets-src/blender/lakeside.py`, ajetaan taustalla ja lukee
-  ensin `homestead.py`:n ja `household.py`:n; Blender on
-  `C:\Program Files (x86)\Blender 5.4.0\blender.exe`). Koordinaatit,
-  mitat ja törmäysehdotukset ovat skriptin alun kommentissa. Mallit:
-  `mokki` (pieni hirsimökki, 4 100 kolmiota, turve- ja tuohikatto, ovi
-  raollaan -Y, ikkuna +X-päädyssä, savuluukku katolla; sisus pimeä laatikko),
-  `keittopaikka` (kivikehä, hiillos, kalikat, kolmijalka, ketju ja savipata;
-  tyhjät pisteet `mount_tuli` ja `mount_pata` liekin, valon ja höyryn
-  paikaksi), `istuinhirsi`, `laituri` (kansi +0,30 m, paalut 1 m alas),
-  `vene` (tukkivene) ja `mela`, `ruoko_a`, `ruoko_b` ja `kaisla` (tupaat).
-  Tietäjä (`villagers.glb`), koira (`animals/koira.glb`), kuuset, kivet ja
-  kelo (`forest.glb`) käytetään sellaisenaan. Ei vettä, rantaviivaa eikä
-  liekkiä: ne ovat pelikoodin asia. Peli käyttää tiedostoa
-  paikassa `lakeside` (AGENT_HANDOFF); mallit on katsottu myös pelissä
-  (mökki, tuli, pata, tietäjä, laituri, vene ja ruoko toimivat). Koiralle
-  puuttuu kävelyleike, jotta se voisi käyskennellä.
+- **Järvenrannan kohtaus** (`assets/lakeside.glb`, 0,9 Mt / 9 300 kolmiota; `lakeside.py`, taustalla, lukee
+  `homestead.py`:n ja `household.py`:n; Blender `C:\Program Files (x86)\Blender 5.4.0\blender.exe`): `mokki`
+  (ovi −Y), `keittopaikka` (tyhjät `mount_tuli`, `mount_pata`), `istuinhirsi`, `laituri`, `vene`, `mela`,
+  `ruoko_a/b`, `kaisla`. Mitat ja törmäykset skriptin alussa. Vesi, rantaviiva ja liekki ovat pelikoodin
+  asia. Pelissä paikassa `lakeside`; koiralta puuttuu kävelyleike.
 - **Sankarin rauhan varustus** (`characters.glb`, `char_build.py`): huotra 0,80 m, painotettu vain lantioon
   (`SHEATH_*`). Tyhjät `mount_huotra` (`hips`-luun lapsi) ja `mount_kilpi_selka` (`chest`): ase tai kilpi pisteen
   lapseksi nollasijaintiin ja -kiertoon. `char_hero_hihna` (72 kolmiota) on kilven kantohihna; `char_`-alkuisena
@@ -152,15 +152,9 @@ tarkista merge-tila `git merge-base --is-ancestor`)
   `kukko` ja `kana_b`). Juurisolmu on eläimen nimi, origo jalkojen välissä, nokka -Y, koko metreinä. Omissa tiedostoissa
   (luiden nimet menevät päällekkäin), materiaali `M_AN_*`. `key_static_channels` kirjoittaa leikkeisiin luiden
   avaimettomat kanavat (muuten viikset ja varpaat siirtyvät viennissä). Uusi eläin = rivi `ANIMALS`-taulukkoon.
-- **Villisika** (`assets/animals/villisika.glb`, 0,53 Mt; `boar.py`, taustalla 1–2 min; itse mallinnettu, koska
-  CC0-villisikaa ei löytynyt; `assets-src/boar.blend` ei Gitissä): karju, 3 430 kolmiota, yksi materiaali,
-  verteksivärit (COLOR_0). Kärsä–peppu 1,52 m (hännän kanssa 1,58), säkä 0,865 m, harja 0,99 m, leveys 0,43 m.
-  Origo maassa jalkojen välissä, kärsä −Y (pelissä +z). Juurisolmu `villisika` (armature, 28 luuta) ja lapsena
-  `villisika_mesh`. Leikkeet 30 fps paikallaan: `idle` 2,0 s, `walk` 1,0 s (1,2 m/s), `run` 0,5 s (rynnäkkö,
-  6,5 m/s), `attack` 0,8 s (osumaikkuna 0,30–0,45 s), `hit` 0,4 s ja `death` 1,5 s (kyljelleen, pidä viimeinen
-  ruutu). `KALEVALA_PREVIEW=<kansio>` tekee kuvat uudelleen tuodusta GLB:stä. Arvioija hyväksyi iter. 5
-  (iter. 4: reisi pisti läpi, hammas kärsän kärjessä). Pelissä v08.04:stä (`engine/boars.ts`): kaikki leikkeet
-  käytössä, `run` nopeutettuna 9 m/s:iin; suunta ja mittakaava oikein kuvissa. Hammas jää profiilissa pään sisään.
+- **Villisika** (`assets/animals/villisika.glb`, 0,53 Mt; `boar.py`, taustalla; itse mallinnettu): karju 3 430
+  kolmiota, verteksivärit, 1,52 m, origo maassa, kärsä −Y. Juurisolmu `villisika` (28 luuta). Leikkeet 30 fps:
+  `idle`, `walk`, `run`, `attack` (osuma 0,30–0,45 s), `hit`, `death`. Pelissä v08.04:stä (`engine/boars.ts`).
 - **Tarkistuksen taso:** Blenderin kuvat; kyläläiset, eläimet, esineet ja rakennelmat myös pelin
   kuvakaappauksista, ei liikkeessä. Eläinten GLB:t on tuotu takaisin Blenderiin ja jokainen leike kuvattu.
 - **Blender-putket** (`assets-src/blender/`): metsä `build_all.py`,
