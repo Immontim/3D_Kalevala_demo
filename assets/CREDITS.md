@@ -53,6 +53,13 @@ Meshes -vartalo (CC0) ja Poly Havenin kankaat ja nahka (CC0). Itse tehty
 kudottu vyö, kanteleen tuohikotelo ja sauva. Tuohipunos on sama laskettu
 tekstuuri kuin tiedostossa `household.glb`.
 
+## `smithfolk.glb`
+
+Sama pohja ja samat lähteet kuin tiedostoissa `characters.glb` ja `villagers.glb`:
+Human Base Meshes -vartalo (CC0) ja Poly Havenin kankaat ja nahka (CC0). Itse tehty
+(skripti `assets-src/blender/char_smith.py`): sepän ja sällin nahkaesiliinat, otsanauha,
+käärityt hihat ja sepän vasara.
+
 ## `villagers_f.glb`
 
 Vartalo, pää, kädet ja silmät: Human Base Meshes v1.4.1,

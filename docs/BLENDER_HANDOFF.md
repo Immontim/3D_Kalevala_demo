@@ -6,26 +6,23 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-23 (Claude, Windows; pohja main 9329df9; sepän pihan sommittelu B3 branchissa
-`claude/smithy-b3`, tarkista merge-tila `git merge-base --is-ancestor`)
+Päivitetty: 2026-11-23 (Claude, Windows; pohja main ebd6a23; sepän väki B4 branchissa `claude/smithy-b4`,
+tarkista merge-tila `git merge-base --is-ancestor`)
 
-- **Sepän paja, vaiheet B1–B2** (`assets/smithy.glb`, 1,78 Mt / 15 450 kolmiota; `assets-src/blender/smithy.py`,
-  taustalla noin 15 s, lukee cairnfield.py:n → homestead.py, household.py; tekstuurit `tools/fetch-smithy.ps1`).
-  Koodi valmis, ei pelissä (pelikoodi on Codexin). **Kaikilla solmuilla sama origo** (pajan lattian keskikohta):
-  `paja`, `paja_katto` (oma solmu häivytystä varten), `ahjo` (`mount_ahjo`, `mount_kipinat`), `ahjo_hiillos`
-  (`M_Embers`, emissio 3), `palkeet` (muotoavaimet `palje_a`/`palje_b`), `paja_rekvisiitta` (alasimet,
-  kaukalo, kimpiastia, työkaluorsi, kanget, kuona- ja hiilikasa; `mount_alasin`, `mount_karkaisu`),
-  `keihasteline` (`mount_keihas_1..3` = `spear`in otteen muunnos; esikatselussa oikea keihäs istuu niissä) ja
-  `saarisuojat_myytavat`. Poikkeus: `poyta_aihiot`-solmun paikka on household.glb:n `pukkipoyta`n paikka.
-  Mitat, törmäykset ja seisomapaikat skriptin alun kommentissa. B2:n B1-verkot todettu tavu tavulta ennallaan.
-  `talo_seppa` (8,4 × 5,0 m) on `homestead.glb`:ssä. Arvioija tarkisti B1:n ja B2:n kuvat.
-  Riskit: smithy.glb monistaa homesteadin tekstuurit (noin 0,6 Mt), ellei peli jaa niitä nimellä; kaukalo
-  näyttää yhä hieman laatikolta; vesi on läpinäkymätön tumma pinta.
-- **Sepän pihan sommittelu B3** (`assets-src/blender/smithy_yard.py`, ei uutta GLB:tä): kokoaa pajan, `talo_seppa`n,
-  aitan, kuusi `pino`a, pölkyn, penkin, padan ja aidan pelin koordinaateissa `world.ts`:n kaavoilla ja piirtää
-  kuvat (`KALEVALA_PREVIEW`). Sijoitusehdotus, törmäysohje ja hahmojen paikat Codexille:
-  `docs/SMITHY_INTEGRATION.md` (ei kiinteää laatikkotörmäystä: seppä jäisi puhevälin ulkopuolelle).
-  Arvioija tarkisti.
+- **Sepän pihapiiri B1–B4** (ei vielä pelissä; pelikoodi on Codexin). Sijoitus, törmäysohje (pajasta ei kiinteää
+  laatikkoa), hahmojen paikat, kauppa ja tyhjien pisteiden käyttö: `docs/SMITHY_INTEGRATION.md` (luvut
+  `smithy_yard.py`:stä, ei uutta GLB:tä). Mallit:
+  - `assets/smithy.glb` (1,78 Mt / 15 450 kolmiota; `smithy.py`, taustalla ~15 s, lukee cairnfield.py:n →
+    homestead.py, household.py; tekstuurit `tools/fetch-smithy.ps1`): kaikilla solmuilla sama origo (pajan lattian
+    keskikohta), poikkeus `poyta_aihiot` = household.glb:n `pukkipoyta`n paikka. Mitat ja törmäykset skriptin alussa.
+    `talo_seppa` (8,4 × 5,0 m) on `homestead.glb`:ssä.
+  - `assets/smithfolk.glb` (3,25 Mt; `char_smith.py`, lukee char_folk.py:n): `char_seppa` (28 500 kolmiota),
+    `char_salli` (26 700) ja `sepan_vasara` (ote origossa, pää -Y) samalla `RIG`illä kuin tietäjä. Ajetaan
+    taustalla characters.blendin **kopiolla** (`run_smith(save=False)`); lähdetiedostoa ei muutettu. Esiliinan
+    painot kopioidaan tunikasta (`transfer_weights`); väli kankaaseen (`apron_clearance`, `SMITH_POSES`): lepo ja
+    kolme työasentoa ≥ 10 mm, ääri-kävely −7/−22 mm kuten helmat.
+  - Arvioija tarkisti jokaisen vaiheen. Riskit: smithy.glb monistaa homesteadin tekstuurit (~0,6 Mt), ellei peli
+    jaa niitä nimellä; kaukalo näyttää hieman laatikolta; vesi on läpinäkymätön tumma pinta.
 
 - **Metsän LOD- ja reuna-assetit** (`assets/forest_lod.glb`, 1,6 Mt; `assets-src/blender/forest_lod.py`;
   mainissa). Peli lataa tiedoston kaikissa 3D-kohtauksissa v06.00.00:sta alkaen (AGENT_HANDOFF). Skripti lukee
@@ -231,10 +228,10 @@ Päivitetty: 2026-11-23 (Claude, Windows; pohja main 9329df9; sepän pihan sommi
 
 ## Seuraava Blender-tehtävä
 
-**Sepän paja B4**: seppä (tavallinen kyläseppä: nahkaesiliina, parta, käärityt hihat) ja aikuinen sälli
-(`smithfolk.glb`, miesvartalo ja `RIG`, lepo + 3 testiasentoa ilman läpimenoa); seppä tarvitsee kädessä pidettävän
-vasaran, kun Codex lisää `prop.kind`in. Sitten B5 lapsisälli aikuisvartalon muunnoksena (omistaja hyväksyy
-mittasuhteet kuvasta). Sulatusuunia ei tehdä.
+**Sepän paja B5**: lapsisälli (~1,35 m) `char_salli`n asusta aikuisvartalon muunnoksena: verkko ja luut
+skaalataan yhdessä lapsen mittasuhteisiin (pää suhteessa noin ×1,25, lyhyempi vartalo ja raajat), painot
+säilyvät; oma tiedosto `smithfolk_child.glb` (luiden lepoasento eri). **Omistaja hyväksyy mittasuhteet kuvasta
+ennen viimeistelyä.** Sulatusuunia ei tehdä.
 
 Muut: metsäjänis, rautakautinen jousi, nuoli ja miehen nuoliviini (korvikkeiden mitat yllä); kaukopuiden
 valaistu atlas, jos vaihtoraja näkyy; legacy-hahmojen poisto käsisavutestin jälkeen (noin 1,7 Mt kummassakin);
