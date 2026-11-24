@@ -257,7 +257,7 @@ APRON = {}       # hahmo -> (ensimmäinen verteksi, määrä): esiliinan verteks
 
 
 # ---------- tarkistus ----------
-def apron_clearance(char, cloth=("wool", "hessian", "linen", "jersey")):
+def apron_clearance(char, cloth=("wool", "hessian", "linen", "jersey"), body="BODY"):
     """Esiliinan ja hahmon oman kankaan (tunika, housut, kääreet) väli samassa asennossa, mitattuna kuten
     char_modular_check.layer_margin: nahkaverteksin p ja lähimmän kangaspisteen q etäisyyksien erotus
     vartalosta. Negatiivinen = kangas tulee nahan läpi. lt5mm = alle 5 mm:n verteksit."""
@@ -271,7 +271,7 @@ def apron_clearance(char, cloth=("wool", "hessian", "linen", "jersey")):
     verts = [mw @ v.co for v in me.vertices]
     polys = [tuple(pl.vertices) for pl in me.polygons if pl.material_index in keep]
     bb = BVHTree.FromPolygons(verts, polys)
-    body = BVHTree.FromObject(bpy.data.objects["BODY"], dg)
+    body = BVHTree.FromObject(bpy.data.objects[body], dg)
     i0, n = APRON[char]
     worst, close, at = 1.0, 0, None
     for i in range(i0, i0 + n):

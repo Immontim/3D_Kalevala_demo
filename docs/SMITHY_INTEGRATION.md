@@ -16,6 +16,7 @@ Muutos kannattaa tehdä skriptiin ja ajaa uudelleen, ei laskea käsin.
 | `homestead.glb` | `talo_seppa`, `aitta`, `pino` ×6, `polkky`, `aita`, `portinpieli` |
 | `household.glb` | `pukkipoyta` (aihioiden alle), `penkki`, `pata` |
 | `smithfolk.glb` | `char_seppa`, `char_salli`, `sepan_vasara`, luuranko `RIG` (sama kuin `villagers.glb`:ssä) |
+| `smithfolk_child.glb` | `char_lapsi` ja oma lapsen luuranko, tiedostossa nimellä `RIG` |
 
 ## Pihan pohja
 
@@ -104,11 +105,10 @@ Ehdotus:
 | Seppä kauppapaikalla | 3.79 | -11.09 | 12.13 | pöydän takana pihalle päin |
 | Sälli palkeilla | 3.39 | -15.08 | 7.418 | pumppaa, kasvot ahjoon |
 | Sälli kivialasimella | 6.89 | -11.35 | 8.988 | vaihtoehto |
-| Lapsi hiilikorilla | 4.31 | -12.55 | 8.638 | 1,35 m |
+| Lapsi hiilikorilla | 4.31 | -12.55 | 8.638 | 1,29 m |
 | Sankari kauppapaikalla | 4.05 | -8.92 | kohti pajaa | pöydän ja telineen välissä |
 
-Katse on suunta (sin yaw, cos yaw), kuten `src/engine/ai.ts`:ssä. Lapsi tulee vaiheessa B5
-(`smithfolk_child.glb`); siihen asti sen paikka on varattu.
+Katse on suunta (sin yaw, cos yaw), kuten `src/engine/ai.ts`:ssä.
 
 ### Seppä ja sälli (`smithfolk.glb`)
 
@@ -136,6 +136,29 @@ Katse on suunta (sin yaw, cos yaw), kuten `src/engine/ai.ts`:ssä. Lapsi tulee v
   rad:iin, tai esiliinan läpimeno hyväksytään.
 - Vasen käsi on töissä tyhjä. Pihdit sen käteen ovat myöhempi lisä.
 
+### Lapsisälli (`smithfolk_child.glb`)
+
+- `char_lapsi` on noin 8–10-vuotias poika, 1,29 m (aikuiset 1,70 m). Hänellä on ruskeanpunainen
+  polkkatukka ja värjäämätön villatunika. Hänet on tehty aikuisen miesvartalosta muuntamalla
+  (`char_smith_child.py`).
+- Luurangossa on samat 23 luuta samoilla nimillä ja **samoilla lepokierroilla** kuin `RIG`issä,
+  mutta luut ovat lyhyempiä ja eri paikoissa. Siksi lapsella on oma tiedostonsa, ja luuranko on
+  siinä nimellä `RIG`. Lataa se kuten `villagers.glb`:n hahmo: oma klooni, omat luut.
+  - Älä liitä lasta aikuisten luurankoon äläkä kopioi luiden paikkoja (`position`) aikuisesta.
+  - Kvaternioilla annetut asennot ja `aimBone` toimivat sellaisinaan.
+- Älä skaalaa lasta `def.scale`lla: mittasuhteet ovat jo verkossa.
+- Lonkat ovat 0,73 m:n korkeudella (aikuisella 0,96 m), ja käsien ulottuma on noin 0,72 kertaa
+  aikuisen. Aikuisen mitoilla viritetyt arvot tarvitsevat lapselle omansa: palkeiden kahvan paikka,
+  katseen ja kameran kohteet sekä esineen paikka kädessä.
+- Tukka on painotettu kokonaan päähän. Jos pää kääntyy paljon tai nyökkää, niskan hiukset voivat
+  hipaista kaulusta. Tarkista pelissä.
+- Tiedostossa on myös tyhjät juurisolmut `RIG__tmp` ja `RIG_F`, kuten `smithfolk.glb`:ssä.
+  Villager-luokka poistaa ne jo nyt.
+- Testatut asennot ovat samat kuin sepällä. Esiliinan väli kankaaseen on lepoasennossa ja kolmessa
+  työasennossa vähintään 12 mm, ja ääri-kävelyssä −16 mm kuten aikuisilla. Lapselle sopii
+  parhaiten `palkeet` tai hiilikorin kantaminen. Vasaraa hänelle ei ole tarkoitettu:
+  otekanava `GRIP_P`/`GRIP_D` on mitattu aikuisen kädestä eikä päde lapsen pienempään käteen.
+
 Kauppa (omistajan päätös): keihäs ja säärisuojat otetaan telineestä **sepän luvalla**, kuten emännän
 ruoka (`putSceneItem`, `ownerId` seppä).
 - Keihäs: kloonaa `characters.glb`:n `spear` ja aseta se pisteen `mount_keihas_1` (tai 2 tai 3)
@@ -159,7 +182,9 @@ ruoka (`putSceneItem`, `ownerId` seppä).
 
 ## Kuorma ja riskit
 
-- `smithy.glb` 1,78 Mt / noin 15 450 kolmiota ja `smithfolk.glb` 3,25 Mt / noin 55 000 kolmiota.
+- `smithy.glb` 1,78 Mt / noin 15 450 kolmiota, `smithfolk.glb` 3,25 Mt / noin 55 000 kolmiota ja
+  `smithfolk_child.glb` 1,58 Mt / noin 26 700 kolmiota. Lapsen tiedosto toistaa vaatteiden
+  tekstuurit (noin 1,4 Mt), ellei peli jaa niitä nimellä.
   Pihan muut mallit ovat jo ladattavissa olevia tiedostoja.
 - `smithy.glb` sisältää homesteadin tekstuurien kopiot (noin 0,6 Mt), ellei peli jaa niitä nimellä.
 - Pajan lattialaikku on 1,2–1,8 cm maan yläpuolella, joten maaston pitää olla pajan alla tasainen

@@ -6,23 +6,24 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-23 (Claude, Windows; pohja main ebd6a23; sepän väki B4 branchissa `claude/smithy-b4`,
+Päivitetty: 2026-11-24 (Claude, Windows; pohja main 5219713; lapsisälli B5 branchissa `claude/smithy-b5`,
 tarkista merge-tila `git merge-base --is-ancestor`)
 
-- **Sepän pihapiiri B1–B4** (ei vielä pelissä; pelikoodi on Codexin). Sijoitus, törmäysohje (pajasta ei kiinteää
-  laatikkoa), hahmojen paikat, kauppa ja tyhjien pisteiden käyttö: `docs/SMITHY_INTEGRATION.md` (luvut
-  `smithy_yard.py`:stä, ei uutta GLB:tä). Mallit:
-  - `assets/smithy.glb` (1,78 Mt / 15 450 kolmiota; `smithy.py`, taustalla ~15 s, lukee cairnfield.py:n →
-    homestead.py, household.py; tekstuurit `tools/fetch-smithy.ps1`): kaikilla solmuilla sama origo (pajan lattian
-    keskikohta), poikkeus `poyta_aihiot` = household.glb:n `pukkipoyta`n paikka. Mitat ja törmäykset skriptin alussa.
-    `talo_seppa` (8,4 × 5,0 m) on `homestead.glb`:ssä.
-  - `assets/smithfolk.glb` (3,25 Mt; `char_smith.py`, lukee char_folk.py:n): `char_seppa` (28 500 kolmiota),
-    `char_salli` (26 700) ja `sepan_vasara` (ote origossa, pää -Y) samalla `RIG`illä kuin tietäjä. Ajetaan
-    taustalla characters.blendin **kopiolla** (`run_smith(save=False)`); lähdetiedostoa ei muutettu. Esiliinan
-    painot kopioidaan tunikasta (`transfer_weights`); väli kankaaseen (`apron_clearance`, `SMITH_POSES`): lepo ja
-    kolme työasentoa ≥ 10 mm, ääri-kävely −7/−22 mm kuten helmat.
-  - Arvioija tarkisti jokaisen vaiheen. Riskit: smithy.glb monistaa homesteadin tekstuurit (~0,6 Mt), ellei peli
-    jaa niitä nimellä; kaukalo näyttää hieman laatikolta; vesi on läpinäkymätön tumma pinta.
+- **Sepän pihapiiri B1–B5** (ei vielä pelissä; pelikoodi on Codexin). Sijoitus, törmäysohje (pajasta ei kiinteää
+  laatikkoa), hahmojen paikat, kauppa, latausohjeet ja tyhjien pisteiden käyttö: `docs/SMITHY_INTEGRATION.md`.
+  - `assets/smithy.glb` (1,78 Mt / 15 450 kolmiota; `smithy.py` lukee cairnfield.py → homestead.py,
+    household.py; tekstuurit `tools/fetch-smithy.ps1`): solmuilla sama origo (pajan lattian keskikohta), poikkeus
+    `poyta_aihiot`. Mitat ja törmäykset skriptin alussa. Pihan sommittelu `smithy_yard.py` (ei GLB:tä).
+  - `assets/smithfolk.glb` (3,25 Mt; `char_smith.py`): `char_seppa`, `char_salli`, `sepan_vasara` samalla
+    `RIG`illä kuin tietäjä. Esiliinan painot tunikasta (`transfer_weights`); väli kankaaseen
+    (`apron_clearance`, `SMITH_POSES`) lepo ja työasennot ≥ 10 mm, ääri-kävely −7/−22 mm kuten helmat.
+  - `assets/smithfolk_child.glb` (1,58 Mt / 26 700 kolmiota; `char_smith_child.py` lukee char_smith.py:n):
+    `char_lapsi` 1,29 m. Asu kootaan aikuisen mittoihin, sitten `child_face` + `childify` (luukohtainen
+    pituus/poikittaisskaalaus `CHILD_SCALE`, luiden kierrot ennallaan) → oma luuranko. Väli mitataan
+    lapseksi muunnetusta BODY-kopiosta (`child_body`): ≥ 12 mm, ääri-kävely −16 mm.
+  - Kaikki ajetaan taustalla characters.blendin **kopiolla** (`save=False`); lähdetiedostoa ei muutettu.
+    Arvioija tarkisti jokaisen vaiheen. Riskit: GLB:t monistavat tekstuureja, ellei peli jaa niitä nimellä;
+    kaukalo näyttää hieman laatikolta; vesi on läpinäkymätön tumma pinta.
 
 - **Metsän LOD- ja reuna-assetit** (`assets/forest_lod.glb`, 1,6 Mt; `assets-src/blender/forest_lod.py`;
   mainissa). Peli lataa tiedoston kaikissa 3D-kohtauksissa v06.00.00:sta alkaen (AGENT_HANDOFF). Skripti lukee
@@ -228,14 +229,12 @@ tarkista merge-tila `git merge-base --is-ancestor`)
 
 ## Seuraava Blender-tehtävä
 
-**Sepän paja B5**: lapsisälli (~1,35 m) `char_salli`n asusta aikuisvartalon muunnoksena: verkko ja luut
-skaalataan yhdessä lapsen mittasuhteisiin (pää suhteessa noin ×1,25, lyhyempi vartalo ja raajat), painot
-säilyvät; oma tiedosto `smithfolk_child.glb` (luiden lepoasento eri). **Omistaja hyväksyy mittasuhteet kuvasta
-ennen viimeistelyä.** Sulatusuunia ei tehdä.
+**Metsäjänis**: korvaa `src/hunt/models.ts`:n jäniksen samoilla mitoilla, origolla ja suunnilla (ks. yllä);
+loikka-, pako- ja kuolinasento tai luut. Sepän pihaan ei tehdä uutta ennen kuin Codex on integroinut sen.
 
-Muut: metsäjänis, rautakautinen jousi, nuoli ja miehen nuoliviini (korvikkeiden mitat yllä); kaukopuiden
+Muut: rautakautinen jousi, nuoli ja miehen nuoliviini (korvikkeiden mitat yllä); kaukopuiden
 valaistu atlas, jos vaihtoraja näkyy; legacy-hahmojen poisto käsisavutestin jälkeen (noin 1,7 Mt kummassakin);
-sormet, koiran kävely, istuva tietäjä ja loukkaantuneen jousineidon asento.
+sormet, koiran kävely, istuva tietäjä, loukkaantuneen jousineidon asento ja sepän pihdit (vasen käsi).
 
 ## Ei vielä aloiteta
 
