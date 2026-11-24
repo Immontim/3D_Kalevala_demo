@@ -129,12 +129,13 @@ export function simulate(realDt: number) {
     // Kopio listasta: kesken kierroksen kaatunut vastustaja poistuu elävien listalta.
     for (const e of [...g.enemies]) {
       if (e.state === "dead") continue;
-      updateAi(e, dt);
-      updateCombatant(e, dt);
+      const enemyDt = dt * (g.gameTime < e.tempoUntil ? e.tempoScale : 1);
+      updateAi(e, enemyDt);
+      updateCombatant(e, enemyDt);
     }
     keepApartAndInside([g.player, ...g.enemies]);
     updateHazards([g.player, ...g.enemies], dt);
-    g.encounter.update(dt);
+    g.encounter.update(dt, realDt);
     updateExit(realDt, toStartMenu);
     for (let i = g.corpses.length - 1; i >= 0; i--) {
       if (g.gameTime > g.corpses[i].removeAt) {
@@ -146,7 +147,7 @@ export function simulate(realDt: number) {
 
   // Laulaja liikkuu omassa ajassaan, vaikka maailma on hidastettu.
   syncVisual(g.player, (songState || choosing || talking) && !paused ? realDt : dt);
-  for (const e of g.enemies) syncVisual(e, dt);
+  for (const e of g.enemies) syncVisual(e, dt * (g.gameTime < e.tempoUntil ? e.tempoScale : 1));
   for (const c of g.corpses) syncVisual(c.actor, dt);
   updateShowcase(realDt);
   for (let i = g.debris.length - 1; i >= 0; i--) {
@@ -154,7 +155,10 @@ export function simulate(realDt: number) {
   }
 
   // Suo
-  bog.update(fx.bogDemo ? realDt : dt, fx.bogDemo ?? g.enemies.find((e) => e.state === "rooted")?.pos ?? null);
+  bog.update(
+    fx.bogDemo ? realDt : dt,
+    fx.bogDemo ?? (g.player.state === "rooted" ? g.player.pos : g.enemies.find((e) => e.state === "rooted")?.pos) ?? null,
+  );
 
 
   updateRing(realDt);

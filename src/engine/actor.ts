@@ -1,7 +1,7 @@
 // Taistelija pelitilanteessa: sankari tai vastustaja.
 import * as THREE from "three";
 import type { Ai } from "./ai";
-import { ActionState, AttackDef, AttackTiming, Loadout, SHIELDS, ShieldDef, StrikeStyle, WeaponDef, makeAttack, styleFor, weaponOf } from "../combat";
+import { ActionState, AttackDef, AttackTiming, COMBAT, Loadout, SHIELDS, ShieldDef, StrikeStyle, WeaponDef, makeAttack, styleFor, weaponOf } from "../combat";
 import { CharacterId, Fighter, FighterLook, SwordTrail } from "../fighter";
 import { Modifier, Stats, baseStats, effectiveStats } from "../stats";
 import { COLLISION } from "../collision";
@@ -43,6 +43,8 @@ export interface Actor {
   stats: Stats;
   blockStart: number;
   rootTime: number;
+  /** Aseiskujen vahinkokerroin suohon juuttuneena. */
+  rootedDamageMultiplier: number;
   /** Suon vahinko juuttumisen ajan (null = suo ei vahingoita). */
   bogDot: BogDot | null;
   /** Kasvaa jokaisesta suon vahinkotikistä: elämämittari sykähtää (hud.ts). */
@@ -70,6 +72,9 @@ export interface Actor {
   level: number;
   /** Tekoälyn tila; null sankarilla. */
   ai: Ai | null;
+  /** Henkilökohtainen toimintanopeus ja sen päättymisaika. */
+  tempoScale: number;
+  tempoUntil: number;
 }
 
 /** level = 0 sankarille; vastustajilla taso kasvattaa elämää ja voimaa. */
@@ -87,9 +92,10 @@ export function makeActor(look: FighterLook, pos: THREE.Vector3, level: number, 
     armour: { ringMail: !!look.ringMail, greaves: !!look.greaves }, stance: "slash", charging: false,
     fighter, trail, pos: pos.clone(), radius: COLLISION.actorRadius, yaw: 0, state: "idle", stateTime: 0, timing: { windup: 0.3, release: 0.1, recovery: 0.3 },
     attack: makeAttack(weapon, styleFor(weapon, "slash"), "light"), character: look.character, loadout: look.loadout, struck: false, hp: stats.maxHp,
-    blockStart: -99, rootTime: 0, bogDot: null, dotPulse: 0, dodgeDir: new THREE.Vector3(), dodgeCd: 0,
+    blockStart: -99, rootTime: 0, rootedDamageMultiplier: COMBAT.rootedDamage, bogDot: null, dotPulse: 0, dodgeDir: new THREE.Vector3(), dodgeCd: 0,
     bashPushDir: new THREE.Vector3(), bashPushLeft: 0, moveSpeed: 0, extraRecovery: 0,
     lunged: 0, stepFrom: pos.clone(), graceUntil: -1, graceFrom: null, graceDir: 0, staggerFreeUntil: -1, name: "", level, ai: null,
+    tempoScale: 1, tempoUntil: -1,
   };
 }
 

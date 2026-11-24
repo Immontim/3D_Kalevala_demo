@@ -28,6 +28,7 @@ import { huntPickables, initHunt } from "./engine/hunt";
 import { campaignStore, initCampaignStore, worldRuntime } from "./engine/store";
 import { initWorldConsole } from "./engine/worldConsole";
 import { initDialogue } from "./engine/dialogue";
+import { configureLouhiEncounter, louhiEncounter } from "./engine/louhi";
 
 export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   document.body.classList.add("mode-scene");
@@ -57,6 +58,7 @@ export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   // Louhi seisoo vain omalla kalmistollaan; suoraan avattu kalmisto (ei `site`-parametria) on hänen.
   cairnState.louhiHere = (route.site ?? LOUHI_CAIRN_ID) === LOUHI_CAIRN_ID;
   cairnState.louhiBanished = campaign.engine.flags["louhi.banished"] === true;
+  configureLouhiEncounter(cairnState.louhiHere && !cairnState.louhiBanished);
   yardState.archerHealed = campaign.engine.flags["archer.healed"] === true;
   yardState.archerDead = campaign.engine.flags["archer.dead"] === true;
   initView();
@@ -68,7 +70,12 @@ export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   campaignStore().subscribe(() => refreshLongEffects());
   initHunt();
   setPickableSource(huntPickables);
-  g.encounter = !ARENA_PEACEFUL ? skirmish : ARENA === "lakeside" ? lakesideVisit : ARENA === "lakeruin" ? lakeruinVisit : ARENA === "cairnfield" ? cairnfieldVisit : ARENA === "wilds" ? wildsVisit : visit;
+  g.encounter = !ARENA_PEACEFUL ? skirmish
+    : ARENA === "lakeside" ? lakesideVisit
+      : ARENA === "lakeruin" ? lakeruinVisit
+        : ARENA === "cairnfield" && cairnState.louhiHere && !cairnState.louhiBanished ? louhiEncounter
+          : ARENA === "cairnfield" ? cairnfieldVisit
+            : ARENA === "wilds" ? wildsVisit : visit;
   initInput();
   initDialogue();
   initPauseMenu();

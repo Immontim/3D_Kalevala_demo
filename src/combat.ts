@@ -560,13 +560,13 @@ export function shieldWear(a: AttackDef, res: HitResult, d: Defender): number {
   return res === "blocked" && d.shield ? a.shieldDamage : 0;
 }
 
-export function damageFor(base: number, defenderState: ActionState): number {
-  return defenderState === "rooted" ? base * COMBAT.rootedDamage : base;
+export function damageFor(base: number, defenderState: ActionState, rootedMultiplier = COMBAT.rootedDamage): number {
+  return defenderState === "rooted" ? base * rootedMultiplier : base;
 }
 
 /** Iskun vahinko: lyöjän voima × iskun ja aseen kerroin. Kilpityöntö tekee pienen vahingon myös murtaessaan suojan. */
-export function strikeDamage(power: number, a: AttackDef, res: HitResult, defenderState: ActionState): number {
-  return res === "hit" || (res === "guardbreak" && a.kind === "bash") ? damageFor(power * a.damage, defenderState) : 0;
+export function strikeDamage(power: number, a: AttackDef, res: HitResult, defenderState: ActionState, rootedMultiplier = COMBAT.rootedDamage): number {
+  return res === "hit" || (res === "guardbreak" && a.kind === "bash") ? damageFor(power * a.damage, defenderState, rootedMultiplier) : 0;
 }
 
 /** Tukiaskeleen eteneminen 0..1, kun iskuvaihetta on kulunut `inRelease` sekuntia. Askel on valmis osumahetkellä. */

@@ -86,6 +86,12 @@ export function applyEffects(state: CampaignState, effects: readonly Effect[], d
       case "setNpcState":
         actions.push({ kind: "npcState", npcId: effect.npcId, state: effect.state });
         break;
+      case "startEncounter":
+        actions.push({ kind: "startEncounter", encounterId: effect.encounterId });
+        break;
+      case "returnToMap":
+        actions.push({ kind: "returnToMap" });
+        break;
       case "markMoon": {
         if (!data.counters[effect.counter]) return fail(state, "unknown-counter", `tuntematon laskuri ${effect.counter}`);
         const engine = withCounterSet(current.engine, effect.counter, currentMoonMark(current), data.counters[effect.counter].max);

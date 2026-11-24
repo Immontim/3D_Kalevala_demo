@@ -74,6 +74,32 @@ const villagers = new Map<string, Villager>();
 /** Kesto, jonka kuluessa poistuva hahmo pienenee ja vaipuu maahan (s). */
 const VANISH_SECONDS = 2.2;
 
+/**
+ * Kevyen kyläläishahmon ajonaikainen toiminta. Tämä ei tee hahmosta taistelijaa eikä anna
+ * sille elämää tai tekoälyä: kohtaaminen päättää, milloin toiminta vaihtuu. Uusia Louhen
+ * kykyjä voidaan myöhemmin lisätä tähän rajapintaan ilman Fighter/Actor-kytkentää.
+ */
+export type VillagerAction = "idle" | "sing" | "hit";
+
+/** Vaihtaa tunnisteellisen kyläläisen toiminnan. `hit` on lyhyt säpsähdys, joka palaa edelliseen toimintaan. */
+export function setVillagerAction(id: string, action: VillagerAction): boolean {
+  const villager = villagers.get(id);
+  if (!villager || villager.vanishing) return false;
+  villager.setAction(action);
+  return true;
+}
+
+/** Nykyinen toiminta kohtaamisen tarkistuksia ja debuggausta varten. */
+export function villagerAction(id: string): VillagerAction | null {
+  return villagers.get(id)?.currentAction ?? null;
+}
+
+/** Hahmon juuren sijainti maailmassa. Palautettu vektori on kopio eikä sillä voi siirtää hahmoa. */
+export function villagerPosition(id: string, out = new THREE.Vector3()): THREE.Vector3 | null {
+  const villager = villagers.get(id);
+  return villager ? villager.root.getWorldPosition(out) : null;
+}
+
 /** Hahmo vaipuu näkyvistä hitaasti ja poistuu sitten kokonaan. Palauttaa false, jos tunnistetta ei ole. */
 export function vanishVillager(id: string, instant = false): boolean {
   const v = villagers.get(id);
@@ -97,11 +123,29 @@ class Villager implements Living {
   private spineRest = new THREE.Quaternion();
   private look = 0;
   private t = Math.random() * 50;
+  private action: VillagerAction = "idle";
+  private actionBeforeHit: Exclude<VillagerAction, "hit"> = "idle";
+  private actionTime = 0;
+  private actionBones = new Map<string, THREE.Object3D>();
+  private idleArms = new Map<string, THREE.Quaternion>();
+  private singArms = new Map<string, THREE.Quaternion>();
+  private hitArms = new Map<string, THREE.Quaternion>();
   vanishing = false;
   private vanishT = 0;
   private baseScale = 1;
   private baseY = 0;
   onGone: (() => void) | null = null;
+
+  get currentAction(): VillagerAction { return this.action; }
+
+  setAction(action: VillagerAction) {
+    if (this.def.lying) return;
+    if (action === "hit") {
+      if (this.action !== "hit") this.actionBeforeHit = this.action;
+    } else this.actionBeforeHit = action;
+    this.action = action;
+    this.actionTime = 0;
+  }
 
   startVanish() {
     this.vanishing = true;
@@ -206,10 +250,93 @@ class Villager implements Living {
     }
     this.spine = rig.getObjectByName("chest") ?? null;
     if (this.spine) this.spineRest.copy(this.spine.quaternion);
+    if (!def.lying) this.buildActionPoses(rig);
 
     this.root.position.set(def.x, def.y, def.z);
     this.root.rotation.y = def.yaw;
     this.root.scale.setScalar(def.scale ?? 1);
+  }
+
+  /**
+   * Tekee käsien tavoiteasennot nykyisestä lepoasennosta samalla luuohjauksella kuin hahmon
+   * alkuasento. Tavoitteet ovat paikallisia kvaternioita, joten niitä kohti voidaan liukua
+   * pehmeästi joka ruudulla. Malliin ei tarvita leivottuja animaatioleikkeitä.
+   */
+  private buildActionPoses(rig: THREE.Object3D) {
+    const names = ["upper_arm_L", "forearm_L", "upper_arm_R", "forearm_R"] as const;
+    for (const name of names) {
+      const bone = rig.getObjectByName(name);
+      if (!bone) continue;
+      this.actionBones.set(name, bone);
+      this.idleArms.set(name, bone.quaternion.clone());
+    }
+    const capture = (target: Map<string, THREE.Quaternion>, upper: Dir, fore: Dir) => {
+      for (const side of ["L", "R"] as const) {
+        const up = this.actionBones.get(`upper_arm_${side}`);
+        const fo = this.actionBones.get(`forearm_${side}`);
+        if (!up || !fo) continue;
+        const out = Math.sign(up.getWorldPosition(v1).x) || 1;
+        aimBone(up, new THREE.Vector3(upper[0] * out, upper[1], upper[2]));
+        aimBone(fo, new THREE.Vector3(fore[0] * out, fore[1], fore[2]));
+      }
+      for (const [name, bone] of this.actionBones) target.set(name, bone.quaternion.clone());
+      for (const [name, rest] of this.idleArms) this.actionBones.get(name)?.quaternion.copy(rest);
+      rig.updateMatrixWorld(true);
+    };
+    // Pelaajan lauluasennon tapaan kädet leviävät sivuille ja hieman ylöspäin.
+    capture(this.singArms, [0.96, 0.16, 0.08], [0.98, 0.08, 0.12]);
+    // Osuma ei vahingoita kyläläistä: ylävartalo ja kädet vain väistävät lyhyesti taakse.
+    capture(this.hitArms, [0.35, -0.72, -0.5], [0.38, -0.42, -0.62]);
+  }
+
+  private updateAction(dt: number, focus: THREE.Vector3 | null) {
+    this.actionTime += dt;
+    if (this.action === "hit" && this.actionTime >= 0.42) {
+      this.action = this.actionBeforeHit;
+      this.actionTime = 0;
+    }
+    const targetArms = this.action === "sing" ? this.singArms : this.action === "hit" ? this.hitArms : this.idleArms;
+    const rate = this.action === "hit" ? 18 : this.action === "sing" ? 5.5 : 7;
+    const blend = 1 - Math.exp(-rate * dt);
+    for (const [name, target] of targetArms) this.actionBones.get(name)?.quaternion.slerp(target, blend);
+
+    if (this.action === "idle") {
+      // Katse seuraa kulkijaa vain levossa. Laulaessa Louhi pitää pään ylhäällä eikä seuraa pelaajaa.
+      let want = 0;
+      if (focus) {
+        const dx = focus.x - this.root.position.x, dz = focus.z - this.root.position.z;
+        const d = Math.hypot(dx, dz);
+        let a = Math.atan2(dx, dz) - this.root.rotation.y;
+        a = Math.atan2(Math.sin(a), Math.cos(a));
+        if (d < 7 && d > 0.6 && Math.abs(a) < 1.9) want = THREE.MathUtils.clamp(a, -1.0, 1.0);
+      }
+      this.look += (want - this.look) * Math.min(1, dt * 2.2);
+      if (this.head) {
+        const sway = Math.sin(this.t * 0.37) * 0.05;
+        q1.setFromAxisAngle(UP, this.look * 0.85 + sway);
+        const target = q2.copy(this.headParent).invert().multiply(q1).multiply(this.headParent).multiply(this.headRest);
+        this.head.quaternion.slerp(target, blend);
+      }
+      if (this.spine) {
+        q1.setFromAxisAngle(v1.set(1, 0, 0), Math.sin(this.t * 1.25) * 0.012);
+        this.spine.quaternion.slerp(q2.copy(this.spineRest).multiply(q1), blend);
+      }
+      return;
+    }
+
+    this.look += (0 - this.look) * Math.min(1, dt * 4);
+    if (this.spine) {
+      const pitch = this.action === "sing" ? -0.12 : 0.22;
+      q1.setFromAxisAngle(v1.set(1, 0, 0), pitch);
+      this.spine.quaternion.slerp(q2.copy(this.spineRest).multiply(q1), blend);
+    }
+    if (this.head) {
+      const pitch = this.action === "sing" ? -0.28 : 0.18;
+      q1.setFromAxisAngle(v1.set(1, 0, 0), pitch);
+      const target = q2.copy(this.headRest).multiply(q1);
+      if (this.action === "hit") target.multiply(q1.setFromAxisAngle(v1.set(0, 0, 1), 0.18));
+      this.head.quaternion.slerp(target, blend);
+    }
   }
 
   update(dt: number, focus: THREE.Vector3 | null) {
@@ -225,27 +352,7 @@ class Villager implements Living {
     }
     if (this.def.lying) return;        // kuollut ei hengitä eikä katso
     this.t += dt;
-    // Katse seuraa kulkijaa, kun tämä on lähellä ja edessä; muuten pää palaa hitaasti eteen.
-    let want = 0;
-    if (focus) {
-      const dx = focus.x - this.def.x, dz = focus.z - this.def.z;
-      const d = Math.hypot(dx, dz);
-      let a = Math.atan2(dx, dz) - this.def.yaw;
-      a = Math.atan2(Math.sin(a), Math.cos(a));
-      if (d < 7 && d > 0.6 && Math.abs(a) < 1.9) want = THREE.MathUtils.clamp(a, -1.0, 1.0);
-    }
-    this.look += (want - this.look) * Math.min(1, dt * 2.2);
-    if (this.head) {
-      const sway = Math.sin(this.t * 0.37) * 0.05;
-      q1.setFromAxisAngle(UP, this.look * 0.85 + sway);
-      // Kierto hahmon pystyakselin ympäri, muunnettuna pään emoluun koordinaatistoon.
-      this.head.quaternion.copy(q2.copy(this.headParent).invert()).multiply(q1).multiply(this.headParent).multiply(this.headRest);
-    }
-    if (this.spine) {
-      // Hengitys: rintakehä kallistuu hieman.
-      q1.setFromAxisAngle(v1.set(1, 0, 0), Math.sin(this.t * 1.25) * 0.012);
-      this.spine.quaternion.copy(this.spineRest).multiply(q1);
-    }
+    this.updateAction(dt, focus);
   }
 }
 

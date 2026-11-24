@@ -73,7 +73,7 @@ export interface InventoryViewOptions {
   getState(): CampaignState;
   /** Tallentaa uuden tilan. false jättää näkymän ennalleen ja näyttää virheen. */
   commit(next: CampaignState): boolean;
-  editable: boolean;
+  editable: boolean | (() => boolean);
   onChange?(state: CampaignState): void;
 }
 
@@ -96,6 +96,7 @@ function itemIcon(itemId: ItemId) {
 export function mountInventoryView(root: HTMLElement, options: InventoryViewOptions): InventoryView {
   root.classList.add("inventory-view");
   root.style.setProperty("--inventory-atlas", `url(${JSON.stringify(inventoryAtlasUrl)})`);
+  const editable = () => typeof options.editable === "function" ? options.editable() : options.editable;
 
   const setNote = (key: Parameters<typeof t>[0]) => {
     const note = root.querySelector<HTMLElement>(".inventory-note");
@@ -110,7 +111,7 @@ export function mountInventoryView(root: HTMLElement, options: InventoryViewOpti
   };
 
   const equip = (itemId: EquipmentItemId) => {
-    if (!options.editable) return;
+    if (!editable()) return;
     const result = tryEquipItem(options.getState(), itemId);
     if (result.status === "inventory-full") { setNote("inventory.full"); return; }
     if (result.status === "incompatible") { setNote("map.shieldNeedsSword"); return; }
@@ -119,7 +120,7 @@ export function mountInventoryView(root: HTMLElement, options: InventoryViewOpti
   };
 
   const unequip = (slot: EquipmentSlot) => {
-    if (!options.editable) return;
+    if (!editable()) return;
     const result = tryUnequipItem(options.getState(), slot);
     if (result.status === "inventory-full") { setNote("inventory.full"); return; }
     if (result.status === "incompatible") { setNote("inventory.weaponRequired"); return; }
@@ -127,7 +128,7 @@ export function mountInventoryView(root: HTMLElement, options: InventoryViewOpti
   };
 
   const eat = (itemId: FoodId) => {
-    if (!options.editable) return;
+    if (!editable()) return;
     const result = consumeFood(options.getState(), itemId);
     if (result.consumed) commit(result.state);
   };
@@ -158,7 +159,7 @@ export function mountInventoryView(root: HTMLElement, options: InventoryViewOpti
         slot.append(label, itemIcon(entry.itemId));
         slot.title = itemName;
         slot.setAttribute("aria-label", `${t(SLOT_LABELS[entry.slot])}: ${itemName}`);
-        if (options.editable) slot.addEventListener("click", () => unequip(entry.slot));
+        if (editable()) slot.addEventListener("click", () => unequip(entry.slot));
       } else {
         const empty = element("span", "inventory-empty-mark");
         empty.textContent = "◇";
@@ -166,7 +167,7 @@ export function mountInventoryView(root: HTMLElement, options: InventoryViewOpti
         slot.setAttribute("aria-label", `${t(SLOT_LABELS[entry.slot])}: ${t("map.empty")}`);
         slot.disabled = true;
       }
-      if (!options.editable) slot.disabled = true;
+      if (!editable()) slot.disabled = true;
       target.append(slot);
     }
     content.append(armour, portrait, hands);
@@ -189,13 +190,13 @@ export function mountInventoryView(root: HTMLElement, options: InventoryViewOpti
         slot.append(count);
         slot.title = itemName;
         slot.setAttribute("aria-label", t("map.itemQuantity", { item: itemName, quantity: stack.quantity }));
-        if (options.editable && definition.satietyGain !== undefined) {
+        if (editable() && definition.satietyGain !== undefined) {
           slot.addEventListener("click", () => eat(stack.itemId as FoodId));
-        } else if (options.editable && definition.equipmentSlot) {
+        } else if (editable() && definition.equipmentSlot) {
           slot.addEventListener("click", () => equip(stack.itemId as EquipmentItemId));
         } else slot.disabled = true;
       }
-      if (!options.editable) slot.disabled = true;
+      if (!editable()) slot.disabled = true;
       return slot;
     };
 
@@ -262,7 +263,7 @@ export function mountInventoryView(root: HTMLElement, options: InventoryViewOpti
 
     const note = element("p", "inventory-note");
     note.setAttribute("role", "status");
-    note.textContent = options.editable ? t("inventory.hint") : t("inventory.readOnly");
+    note.textContent = editable() ? t("inventory.hint") : t("inventory.readOnly");
     root.append(title, content, itemsTitle, storage, effectsTitle, effects, note);
   }
 

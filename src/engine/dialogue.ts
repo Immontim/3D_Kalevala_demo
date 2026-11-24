@@ -9,17 +9,19 @@ import { setState } from "./actor";
 import { $ } from "./dom";
 import { showMsg } from "./hud";
 import { clearInputs, lockPointer } from "./input";
-import { paused } from "./loop";
+import { paused, toStartMenu } from "./loop";
 import { startLesson } from "./song";
 import { SONGS, type SongId } from "../songLogic";
 import { g } from "./state";
 import { worldRuntime } from "./store";
+import { provokeLouhi } from "./louhi";
 
 export let dialogueOpen = false;
 let active: ActiveDialogue | null = null;
 let speaker = "";
 /** Näytettävä muunnelma nykyisestä solmusta (arvotaan solmuun tullessa, ei joka piirrolla). */
 let shownText: TextKey | null = null;
+let shownChoices: TextKey[] = [];
 /** Viimeksi näytetty muunnelma solmua kohti: sama repliikki ei toistu kahdesti peräkkäin. */
 const lastVariant = new Map<string, TextKey>();
 
@@ -31,6 +33,17 @@ function pickVariant(view: ActiveDialogue["view"]): TextKey {
   const chosen = pool[Math.floor(Math.random() * pool.length)] ?? view.text;
   lastVariant.set(key, chosen);
   return chosen;
+}
+
+function pickChoiceVariants(view: ActiveDialogue["view"]): TextKey[] {
+  return view.choices.map((choice) => {
+    const key = `${view.dialogueId}/${view.nodeId}/choice/${choice.id}`;
+    const previous = lastVariant.get(key);
+    const pool = choice.variants.length > 1 ? choice.variants.filter((variant) => variant !== previous) : choice.variants;
+    const chosen = pool[Math.floor(Math.random() * pool.length)] ?? choice.text;
+    lastVariant.set(key, chosen);
+    return chosen;
+  });
 }
 
 function show(messages: readonly OutMessage[]) {
@@ -50,7 +63,7 @@ function render() {
     button.type = "button";
     const key = document.createElement("kbd");
     key.textContent = String(i + 1);
-    button.append(key, t(choice.text));
+    button.append(key, t(shownChoices[i] ?? choice.text));
     button.addEventListener("click", () => choose(i));
     box.appendChild(button);
   });
@@ -77,6 +90,7 @@ export function talkTo(npcId: string, name: string, runtime: WorldRuntime = worl
   }
   active = start;
   shownText = pickVariant(start.view);
+  shownChoices = pickChoiceVariants(start.view);
   speaker = name;
   dialogueOpen = true;
   clearInputs();
@@ -100,7 +114,18 @@ function choose(index: number) {
   show(outcome.messages);
   const lesson = outcome.actions.find((a) => a.kind === "songLesson");
   const npcId = active.view.npcId;
-  if (outcome.next) { active = outcome.next; shownText = pickVariant(active.view); render(); } else closeDialogue();
+  if (outcome.next) {
+    active = outcome.next;
+    shownText = pickVariant(active.view);
+    shownChoices = pickChoiceVariants(active.view);
+    render();
+  } else closeDialogue();
+  for (const action of outcome.actions) {
+    if (action.kind === "startEncounter") {
+      if (action.encounterId === "louhi") provokeLouhi();
+      else console.warn("Tuntematon kohtaaminen:", action.encounterId);
+    } else if (action.kind === "returnToMap") toStartMenu();
+  }
   // Opetus alkaa vasta, kun dialogi on suljettu ja valinnan tila tallennettu.
   if (lesson && Object.prototype.hasOwnProperty.call(SONGS, lesson.songId)) {
     startLesson(lesson.songId as SongId, { npcId, name: speaker });
@@ -112,6 +137,7 @@ export function closeDialogue(silent = false) {
   dialogueOpen = false;
   active = null;
   shownText = null;
+  shownChoices = [];
   $("dialogue").classList.add("hidden");
   $("dialogueChoices").replaceChildren();
   clearInputs();

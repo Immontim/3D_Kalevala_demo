@@ -15,12 +15,17 @@ export interface DialogueView {
   /** Repliikin samaa tarkoittavat muunnelmat; näkymä valitsee niistä yhden. */
   variants: readonly TextKey[];
   /** Vain ne valinnat, joiden ehto pitää. */
-  choices: { id: string; text: TextKey }[];
+  choices: { id: string; text: TextKey; variants: readonly TextKey[] }[];
 }
 
 /** Solmun repliikin muunnelmat listana (yksittäinen avain = yhden muunnelman lista). */
 export function nodeVariants(node: DialogueNode): readonly TextKey[] {
   return typeof node.text === "string" ? [node.text] : node.text;
+}
+
+/** Valinnan teksti samassa muodossa kuin solmun repliikkimuunnelmat. */
+export function choiceVariants(choice: DialogueChoice): readonly TextKey[] {
+  return typeof choice.text === "string" ? [choice.text] : choice.text;
 }
 
 export function findDialogue(data: WorldData, sceneId: string, npcId: string): Dialogue | null {
@@ -32,7 +37,10 @@ function viewOf(dialogue: Dialogue, nodeId: string, state: CampaignState, data: 
   if (!node) throw new Error(`Dialogi ${dialogue.id}: solmua ${nodeId} ei ole`);
   const choices = node.choices
     .filter((c) => !c.when || evaluate(c.when, state, data).pass)
-    .map((c) => ({ id: c.id, text: c.text }));
+    .map((c) => {
+      const variants = choiceVariants(c);
+      return { id: c.id, text: variants[0], variants };
+    });
   const variants = nodeVariants(node);
   return { dialogueId: dialogue.id, nodeId, npcId: dialogue.npcId, text: variants[0], variants, choices };
 }

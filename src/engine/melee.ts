@@ -135,7 +135,7 @@ export function resolveStrike(att: Actor, def: Actor) {
   const contact = att.pos.clone().lerp(def.pos, 0.55).setY(groundHeight(def.pos.x, def.pos.z) + 1.3);
   const isPlayer = att === g.player;
   const heavy = atk.weight === "heavy";
-  const unarmouredDamage = strikeDamage(att.stats.power, atk, res, defState) * def.stats.damageTaken;
+  const unarmouredDamage = strikeDamage(att.stats.power, atk, res, defState, def.rootedDamageMultiplier) * def.stats.damageTaken;
   const damage = damageAfterArmour(unarmouredDamage, def.armour.ringMail, def.armour.greaves);
   const helmetSaved = res === "hit" && helmetAbsorbsOverhead(
     atk.kind as StrikeStyle,
@@ -324,7 +324,8 @@ export function updateCombatant(a: Actor, dt: number) {
     if (lands && !a.struck) {
       const target = strikeTarget(a);
       a.struck = true;
-      if (a === g.player && creatureStrike?.(a)) { /* osui eläimeen (metsästys) */ }
+      if (a === g.player && g.encounter.onPlayerStrike?.(a, target)) { /* osui kohtauksen erikoiskohteeseen */ }
+      else if (a === g.player && creatureStrike?.(a)) { /* osui eläimeen (metsästys) */ }
       else if (!resolveEnvironmentStrike(a, target) && target) {
         resolveStrike(a, target);
         if ((a.state as ActionState) === "stagger") return; // täydellinen torjunta keskeytti
@@ -358,7 +359,10 @@ export function updateCombatant(a: Actor, dt: number) {
   } else if (a.state === "rooted") {
     if (a.bogDot && bogDamage(a, dt)) return;
     a.rootTime -= dt;
-    if (a.rootTime <= 0) setState(a, "idle");
+    if (a.rootTime <= 0) {
+      a.rootedDamageMultiplier = COMBAT.rootedDamage;
+      setState(a, "idle");
+    }
   }
   if (a.state !== "rooted") a.bogDot = null;
 }
