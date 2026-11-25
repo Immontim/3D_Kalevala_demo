@@ -6,12 +6,12 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-25 (Codex, Windows; pohja `origin/main` `fc36128`)
+Päivitetty: 2026-11-25 (Codex, Windows; pohja `origin/main` `6282aa2`)
 
-- **Koodiversio v08.06.00** branchissa `codex/smithy-playable-scene` (tarkista merge-tila
-  `git merge-base`illa). Koodi valmis, ei deployattu, omistaja ei vielä testannut. Codexin in-app-savutestissä
-  pajan työ- ja kauppakokoonpanot, vasara, työliikkeet, varkauskehote sekä sepän ja pikkusällin dialogit
-  toimivat; konsoli oli puhdas ja FPS 58–60. Tarkistukset: `bun run test` 533/533,
+- **Koodiversio v08.06.01** branchissa `codex/remove-starting-smithy-gear` (tarkista merge-tila
+  `git merge-base`illa). Koodi valmis, ei deployattu eikä omistajan testaama. Uusi matka ja v1–v7-migraatio
+  poistavat ilmaisen keihään ja säärisuojat; pajalta jo otettu tuote säilyy. In-app-savutestissä housupaikka
+  ja keihään tavarapaikka olivat tyhjät, konsoli puhdas. Tarkistukset: `bun run test` 537/537,
   `bunx tsc --noEmit`, `bun run lint`, `bun run build`, `git diff --check`.
 - **Sepän paja (v08.06, `smithyLife.ts`, `world.ts`, `world/content.ts`).** Kartalla on yksi pysyvä
   `smithy`-instanssi omalla `smithy`-satunnaisvirralla; vanhaan matkaan se täydennetään kerran. Kohtaus arpoo
@@ -74,10 +74,11 @@ Päivitetty: 2026-11-25 (Codex, Windows; pohja `origin/main` `fc36128`)
   kuljettava alue (monikulmio ±97 m), kolme polunsuuta. Maasto `wildsHeight` (suoniitty `bogMix`,
   paloaukea `burnMix`). ~4 900 puuta; kivet, kelot ja juurakot alle 60 m:n päähän, aluskasvillisuus
   `ScatterField`illa 34 m:n säteellä. Piirtokuorma alussa ~0,96 milj. kolmiota.
-- **Paperinukke ja inventaario.** Skeema 7 (`laulun-miekka.campaign.v7`): kuusi peruspaikkaa, reppupaikka ja
+- **Paperinukke ja inventaario.** Skeema 8 (`laulun-miekka.campaign.v8`): kuusi peruspaikkaa, reppupaikka ja
   repusta 0–12 lisäpaikkaa (`ItemDefinition.storageCapacity`; tuohikontti 6), seitsemän varustepaikkaa.
   Vanhan tallennuksen ylivuoto säilyy. Kartta ja 3D:n pause (`B`) käyttävät `ui/inventoryView.ts`:ää;
-  taistelussa vain luku. Ase- ja kilpivaihdot ovat atomisia; pääkättä ei voi jättää tyhjäksi.
+  taistelussa vain luku. Uusi matka alkaa ilman keihästä ja säärisuojia; v1–v7:stä ne poistetaan, paitsi
+  sepältä jo otettu kappale. Ase- ja kilpivaihdot ovat atomisia; pääkättä ei voi jättää tyhjäksi.
 - **3D-varusteet ja suoja.** Mies- ja naissankari käyttävät Clauden modulaarisia base/mail/greaves/
   shoes-solmuja ja Taivaanrautamiekka omaa `sword_sky_iron`-malliaan. Rengaspaita kertoo vahingon
   0,85:llä, säärisuojat 0,95:llä. Vain ylälyönti voi irrottaa kypärän; silloin koko isku torjutaan.
@@ -157,8 +158,8 @@ Päivitetty: 2026-11-25 (Codex, Windows; pohja `origin/main` `fc36128`)
   0,4 päivää. Kylläisyys vähenee 3,6 pistettä päivässä (niittyliike 0,6); 100 → 0 kestää noin 28
   päivää ilman ruokaa. Arvo ei tapa tai estä liikkumista. Kuun kuva näyttää kahdeksan vaihetta;
   tavallinen liike ei näytä kustannusta. Viisi numerotonta kasvokuvaa 20 pisteen portain.
-- **Kampanjatallennus** (`campaign.ts`, `storage.ts`) käyttää skeemaa 7 ja avainta
-  `laulun-miekka.campaign.v7`. V1–v6 migroidaan;
+- **Kampanjatallennus** (`campaign.ts`, `storage.ts`) käyttää skeemaa 8 ja avainta
+  `laulun-miekka.campaign.v8`. V1–v7 migroidaan;
   kelvollinen vanha tila palautetaan myös, jos migraation kirjoitus estyy. **Uusi aikakenttä tarkistetaan
   `validWorldTime`illa**, ei kokonaislukuna (kartan aika on murtolukuja).
 - **Matkan asetukset.** Esc-dialogissa ovat FI/GB-kieli, sukupuoli, vahvistettava uudelleenaloitus
@@ -254,8 +255,8 @@ Päivitetty: 2026-11-25 (Codex, Windows; pohja `origin/main` `fc36128`)
 
 ## Seuraava tehtävä
 
-Omistajan pelitesti sepän pajalla (v08.06): kartalta löytyminen ja poistuminen, molemmat kokoonpanot,
-8 lihan vaihto, keihään tai säärisuojien ottaminen sekä toisen tuotteen 30 päivän odotus.
+Omistajan pelitesti (v08.06.01): vanhan matkan automaattinen varustepoisto, uuden matkan tyhjä keihäs- ja
+säärisuojapaikka sekä sepän 8 lihan vaihdolla hankitun varusteen säilyminen latauksessa.
 
 ## Ei vielä aloiteta
 

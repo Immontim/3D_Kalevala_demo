@@ -24,6 +24,7 @@ import {
   type SceneItemDefinition,
 } from "./campaign";
 import { WORLD_MINUTES_PER_DAY } from "./uiState";
+import { ARMOUR, damageAfterArmour } from "../combat";
 
 function legacyPlayer(state: ReturnType<typeof createCampaign>) {
   return {
@@ -43,7 +44,7 @@ function legacyPlayer(state: ReturnType<typeof createCampaign>) {
 }
 
 describe("kampanjatila", () => {
-  it("luo 20 × 20 maailman, kuusi peruspaikkaa ja puetut aloitusvarusteet", () => {
+  it("luo 20 × 20 maailman ilman myöhemmin sepältä hankittavia varusteita", () => {
     const state = createCampaign();
     expect(state.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
     expect(state.world).toMatchObject({ width: 20, height: 20, worldMinutes: 0 });
@@ -54,18 +55,26 @@ describe("kampanjatila", () => {
     });
     expect(state.player.inventory.backpack).toBeNull();
     expect(inventoryCapacity(state.player.inventory)).toBe(6);
-    expect(state.player.inventory.stacks).toEqual([
-      { itemId: "barley_flatbread", quantity: 3 },
-      { itemId: "spear", quantity: 1 },
-    ]);
+    expect(state.player.inventory.stacks).toEqual([{ itemId: "barley_flatbread", quantity: 3 }]);
     expect(state.player.equipment).toEqual({
       head: "iron_helmet", torso: "ring_mail", hands: "leather_gloves",
-      legs: "iron_greaves", feet: "leather_shoes", mainHand: "sword", offHand: "round_shield",
+      legs: null, feet: "leather_shoes", mainHand: "sword", offHand: "round_shield",
     });
     expect(state.player.satiety).toBe(SATIETY_MAX);
     expect(state.player.gender).toBe("male");
     expect(ITEMS.barley_flatbread.satietyGain).toBeGreaterThan(0);
     expect(ITEMS.dried_fish.satietyGain).toBeGreaterThan(ITEMS.barley_flatbread.satietyGain!);
+  });
+
+  it("aloitussankari saa vain rengaspaidan vahingonvähennyksen ilman säärisuojia", () => {
+    const equipment = createCampaign().player.equipment;
+    const damage = damageAfterArmour(
+      100,
+      equipment.torso === "ring_mail",
+      equipment.legs === "iron_greaves",
+    );
+    expect(damage).toBeCloseTo(100 * ARMOUR.ringMailDamage);
+    expect(damage).not.toBeCloseTo(100 * ARMOUR.ringMailDamage * ARMOUR.greavesDamage);
   });
 
   it("syö yhden ruuan, kasvattaa kylläisyyttä ja poistaa tyhjän pinon", () => {
@@ -97,12 +106,9 @@ describe("kampanjatila", () => {
     const added = tryAddItem(inventory, "barley_flatbread", 8);
     expect(added?.stacks).toEqual([
       { itemId: "barley_flatbread", quantity: 6 },
-      { itemId: "spear", quantity: 1 },
       { itemId: "barley_flatbread", quantity: 5 },
     ]);
-    expect(inventory.stacks).toEqual([
-      { itemId: "barley_flatbread", quantity: 3 }, { itemId: "spear", quantity: 1 },
-    ]);
+    expect(inventory.stacks).toEqual([{ itemId: "barley_flatbread", quantity: 3 }]);
   });
 
   it("lisää vain koko määrän eikä muuta täyttä inventaariota", () => {
@@ -147,6 +153,7 @@ describe("kampanjatila", () => {
 
   it("vaihtaa inventaarioesineen atomisesti ja siirtää keihään tieltä miekan sekä kilven tavaroihin", () => {
     const state = createCampaign();
+    state.player.inventory = tryAddItem(state.player.inventory, "spear", 1)!;
     const result = tryEquipItem(state, "spear");
     expect(result.status).toBe("equipped");
     expect(result.state.player.equipment).toMatchObject({ mainHand: "spear", offHand: null });
@@ -323,11 +330,35 @@ describe("kampanjatallennus", () => {
     };
     const migrated = parseCampaign(legacy)!;
     expect(migrated.player.inventory.backpack).toBe("birch_bark_pack");
-    expect(migrated.player.inventory.stacks).toEqual([
-      { itemId: "barley_flatbread", quantity: 3 },
-      { itemId: "spear", quantity: 1 },
-    ]);
+    expect(migrated.player.inventory.stacks).toEqual([{ itemId: "barley_flatbread", quantity: 3 }]);
+    expect(migrated.player.equipment.legs).toBeNull();
     expect(inventoryCapacity(migrated.player.inventory)).toBe(12);
+  });
+
+  it("poistaa v7-aloituskeihään ja -säärisuojat vanhasta tallennuksesta", () => {
+    const legacy = JSON.parse(serializeCampaign(createCampaign()));
+    legacy.schemaVersion = 7;
+    legacy.player.inventory.stacks.push({ itemId: "spear", quantity: 1 });
+    legacy.player.equipment.legs = "iron_greaves";
+    const migrated = parseCampaign(legacy)!;
+    expect(migrated.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
+    expect(migrated.player.inventory.stacks.some((stack) => stack.itemId === "spear")).toBe(false);
+    expect(migrated.player.equipment.legs).toBeNull();
+  });
+
+  it("säilyttää yhden sepän pajalta jo ansaitun keihään ja säärisuojat", () => {
+    const legacy = JSON.parse(serializeCampaign(createCampaign()));
+    legacy.schemaVersion = 7;
+    legacy.world.sceneItems.takenInstanceIds = ["smithy.spear", "smithy.greaves"];
+    legacy.player.equipment = { ...legacy.player.equipment, mainHand: "spear", offHand: null, legs: "iron_greaves" };
+    legacy.player.inventory.stacks.push(
+      { itemId: "spear", quantity: 1 },
+      { itemId: "iron_greaves", quantity: 1 },
+    );
+    const migrated = parseCampaign(legacy)!;
+    expect(migrated.player.equipment).toMatchObject({ mainHand: "spear", offHand: null, legs: "iron_greaves" });
+    expect(migrated.player.inventory.stacks.some((stack) => stack.itemId === "spear")).toBe(false);
+    expect(migrated.player.inventory.stacks.some((stack) => stack.itemId === "iron_greaves")).toBe(false);
   });
 
   it("säilyttää v6-tallennuksen ylikapasiteetin overflowina mutta ei luo uutta pinoa", () => {
@@ -356,13 +387,13 @@ describe("kampanjatallennus", () => {
     legacy.player.inventory.stacks.push({ itemId: "sky_iron_sword", quantity: 1 });
     const migrated = parseCampaign(legacy)!;
     expect(migrated.player.equipment).toMatchObject({
-      head: "iron_helmet", torso: "ring_mail", legs: "iron_greaves",
+      head: "iron_helmet", torso: "ring_mail", legs: null,
       mainHand: "sky_iron_sword", offHand: "round_shield",
     });
     expect(inventoryCapacity(migrated.player.inventory)).toBe(6);
     expect(migrated.player.inventory.stacks.filter((stack) => stack.itemId === "sky_iron_sword")).toEqual([]);
     expect(migrated.player.inventory.stacks).toContainEqual({ itemId: "sword", quantity: 1 });
-    expect(migrated.player.inventory.stacks).toContainEqual({ itemId: "spear", quantity: 1 });
+    expect(migrated.player.inventory.stacks.some((stack) => stack.itemId === "spear")).toBe(false);
   });
 
   it("migroi version 1 nälän version 2 kylläisyydeksi ja säilyttää etenemisen", () => {
@@ -380,7 +411,7 @@ describe("kampanjatallennus", () => {
     expect(migrated!.schemaVersion).toBe(CAMPAIGN_SCHEMA_VERSION);
     expect(migrated!.player.satiety).toBe(27);
     expect(migrated!.world).toEqual(current.world);
-    expect(migrated!.player.inventory.stacks).toContainEqual({ itemId: "spear", quantity: 1 });
+    expect(migrated!.player.inventory.stacks.some((stack) => stack.itemId === "spear")).toBe(false);
     expect(migrated!.player.equipment).toEqual(current.player.equipment);
     expect(migrated!.player.gender).toBe("male");
   });
@@ -488,9 +519,7 @@ describe("moottoriosio (engine)", () => {
     const parsed = parseCampaign(raw);
     expect(parsed).not.toBeNull();
     expect(parsed?.engine).toEqual({ version: 1, flags: { "sage.robbed": true }, counters: { "thefts.noticed": 999 } });
-    expect(parsed?.player.inventory.stacks).toEqual([
-      { itemId: "barley_flatbread", quantity: 3 }, { itemId: "spear", quantity: 1 },
-    ]);
+    expect(parsed?.player.inventory.stacks).toEqual([{ itemId: "barley_flatbread", quantity: 3 }]);
   });
 
   it("puuttuva tai rikkinäinen lohko ei hylkää tallennusta (vanha v5 ennen moottoria)", () => {
