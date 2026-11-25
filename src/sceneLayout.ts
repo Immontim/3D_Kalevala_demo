@@ -1,6 +1,7 @@
 // Kohtausten kuljettava alue ja polunsuut (poistumiset) datana. Puhdas moduuli: ei Three.js:ää eikä DOM:ia,
 // joten geometria voidaan testata ilman 3D-maailmaa.
 import type { SceneId } from "./app/route";
+import { SMITHY_WALK_RADIUS } from "./smithyLayout";
 
 export interface Vec2 { x: number; z: number }
 /** Karttasuunta. Konventio 3D:ssä: -z = pohjoinen, +x = itä (data voi silti asettaa minkä tahansa). */
@@ -192,8 +193,8 @@ export function approachSpawns(layout: SceneLayout, player: Vec2, count: number,
 // ---------- Data ----------
 
 const R = 11;
-function circleScene(exit: SceneExit, approach?: number): SceneLayout {
-  return { bounds: circlePolygon(0, 0, R), arena: { x: 0, z: 0, radius: R }, exits: [exit], approach };
+function circleScene(exit: SceneExit, approach?: number, radius = R): SceneLayout {
+  return { bounds: circlePolygon(0, 0, radius), arena: { x: 0, z: 0, radius }, exits: [exit], approach };
 }
 
 /**
@@ -221,7 +222,7 @@ export const SCENE_LAYOUTS: Record<SceneId, SceneLayout> = {
   clearing: circleScene(ringExit("south", 200, 11.4, 2.6, "s"), 14.5),
   homestead: circleScene(ringExit("gate", 0, 13.4, 2.4, "s")),
   yard: circleScene(ringExit("gate", 0, 13.4, 2.4, "s")),
-  smithy: circleScene(ringExit("gate", 0, 13.4, 2.4, "s")),
+  smithy: circleScene(ringExit("gate", 0, 13.4, 2.4, "s"), undefined, SMITHY_WALK_RADIUS),
   // Ranta: polku tulee kaakosta mökin itäpuolelta, jotta saapuessa näkyy tuli ja järvi (mökki ei peitä).
   lakeside: circleScene(ringExit("path", 150, 11.4, 2.4, "n")),
   lakeruin: circleScene(ringExit("path", 150, 11.4, 2.4, "n")),

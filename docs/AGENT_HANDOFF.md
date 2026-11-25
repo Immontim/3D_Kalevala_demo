@@ -6,23 +6,22 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-25 (Codex, Windows; pohja `origin/main` `6282aa2`)
+Päivitetty: 2026-11-25 (Codex, Windows; pohja `origin/main` `428d55b`)
 
-- **Koodiversio v08.06.01** branchissa `codex/remove-starting-smithy-gear` (tarkista merge-tila
-  `git merge-base`illa). Koodi valmis, ei deployattu eikä omistajan testaama. Uusi matka ja v1–v7-migraatio
-  poistavat ilmaisen keihään ja säärisuojat; pajalta jo otettu tuote säilyy. In-app-savutestissä housupaikka
-  ja keihään tavarapaikka olivat tyhjät, konsoli puhdas. Tarkistukset: `bun run test` 537/537,
-  `bunx tsc --noEmit`, `bun run lint`, `bun run build`, `git diff --check`.
-- **Sepän paja (v08.06, `smithyLife.ts`, `world.ts`, `world/content.ts`).** Kartalla on yksi pysyvä
-  `smithy`-instanssi omalla `smithy`-satunnaisvirralla; vanhaan matkaan se täydennetään kerran. Kohtaus arpoo
+- **Koodiversio v08.06.02** branchissa `codex/smithy-access-bellows` (tarkista merge `git merge-base`illa).
+  Koodi valmis, ei deployattu. Agentti testasi käsin; omistaja ei. Paja ja työväki ovat aidan
+  sisällä, aihiopöytä pihan keskellä ja palkeet liikkuvat. Savutesti: katos saavutettava, 60 FPS,
+  konsoli puhdas. Tarkistukset:
+  `bun run test` 540/540, `bunx tsc --noEmit`, `bun run lint`, `bun run build`, `git diff --check`.
+- **Sepän paja (v08.06, `smithyLayout.ts`, `smithyLife.ts`, `world.ts`, `world/content.ts`).** Kohtaus arpoo
   käynnillä työn (seppä vasaroi, sälli palkeilla, pikkusälli karkaisuvadilla; ei koiraa) tai kaupan (seppä
   kojulla, pikkusälli + koira yhdessä neljästä pihapaikasta; ei aikuista sälliä). GLB-puun mountit ja palkeiden
   morphit säilytetään; assetit latautuvat vain pajassa. `smithy.spear` ja `.greaves` alkavat varkautena.
   Kahdeksan `meat`-tagin esinettä avaa yhden; jommankumman luvallinen otto sulkee molemmat. Lähdössä merkitty
   maailma-aika avaa toisen kaupan 30 pelipäivän jälkeen. Avoin maksettu lupa säilyy, kunnes tuote otetaan.
-  Sällin kertadialogi ratkaisee `@archerYard`-roolin ja paljastaa maatilan. Gauntlet hylkäsi pajan koko laatikon
-  törmäykseksi (avokatos pidettiin kuljettavana), korjasi pikkusällin pois kaukalon colliderista ja teki
-  loppuunmyyty-repliikeistä neutraalit myös varkauden jälkeen. Blender-muutoksia ei tarvittu.
+  Sällin kertadialogi paljastaa neidon maatilan. Avokatos on kuljettava osakohtaisin törmäyksin. Katoksen
+  säde on 10,9 m (takamuuri aidan 12,9 m:n kehällä), kävelyraja 12,35 m ja aihiopöydän paikallinen z=4,15.
+  Paljemorphit ajetaan kaikkien GLB-lapsiverkkojen kautta.
 - **Villisika (v08.04, `hunt/boar.ts` puhdas + `engine/boars.ts`).** `initBoars`: 0–2 sikaa (`boarCount`
   40/40/20 %, ≥ 45 m saapumisesta). Tilat root/walk/alert/threat/charge/recover/flinch/flee/bed/dead, luvut
   `BOAR` (aggressio 0,35, varoitus 0,7 s, rynnäkkö 9 m/s, käännös 1,1 rad/s, vahinko 22, elämä 3; pako terve
@@ -186,7 +185,8 @@ Päivitetty: 2026-11-25 (Codex, Windows; pohja `origin/main` `6282aa2`)
 ## Tunnetut rajoitteet ja riskit
 
 - Sepän pajalla ei ole vielä omaa karttakuvaketta, vaan se käyttää pihan merkkiä. Työliikkeet ovat koodilla
-  tehtyjä asentoja, eivät GLB-klippejä; koiran assetissa ei ole kävelyklippiä, joten koira pysyy pihapaikassaan.
+  tehtyjä asentoja, eivät GLB-klippejä; palkeet ja kisällin kädet tahdistuvat silmämääräisesti, eivät yhteisellä
+  animaatiokellolla. Koiran assetissa ei ole kävelyklippiä, joten koira pysyy pihapaikassaan.
   Uuden kauppatuotteen lisääminen vaatii toistaiseksi myös sepän kahden takeMode-efektilistan laajentamisen.
 - Karttavauhti, kylläisyys 3,6 pistettä/päivä ja uudet niityt kaipaavat pidempää pelitestiä.
   Pihaniitty voi liittyä valmiiseen aukeaan, jolloin aukea kokonaisuutena on yli yhdeksän ruutua.
@@ -255,8 +255,8 @@ Päivitetty: 2026-11-25 (Codex, Windows; pohja `origin/main` `6282aa2`)
 
 ## Seuraava tehtävä
 
-Omistajan pelitesti (v08.06.01): vanhan matkan automaattinen varustepoisto, uuden matkan tyhjä keihäs- ja
-säärisuojapaikka sekä sepän 8 lihan vaihdolla hankitun varusteen säilyminen latauksessa.
+Omistajan pelitesti (v08.06.02): kulje pajan molemmille sivuille ja jokaisen hahmon puhe-etäisyydelle;
+varmista lisäksi omalla kuvakulmalla palkeiden ja kisällin käsien osuminen yhteen koko pumppauskierrossa.
 
 ## Ei vielä aloiteta
 

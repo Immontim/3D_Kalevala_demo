@@ -38,6 +38,10 @@ import { createBirds, type BirdsView } from "./engine/birds";
 import { addFoliageFade } from "./engine/foliageFade";
 import { entrySpawn, sceneLayout, walkableDepth, type Vec2 } from "./sceneLayout";
 import { planSmithyLife, type SmithyLifePlan } from "./smithyLife";
+import {
+  SMITHY_ANGLE, SMITHY_RADIUS, SMITHY_TABLE_LOCAL, SMITHY_TRADE_SMITH_LOCAL,
+  SMITHY_WORK_LOCAL, smithyPoint,
+} from "./smithyLayout";
 
 // Taistelualueet kangasmetsässä: maasto, männyt, kuuset, koivut, varvut ja kivet
 // sekä alueen oma keskus (nuotioaukion kota tai pihapiirin rakennukset). Mallit
@@ -260,12 +264,12 @@ const GATE_HALF = 0.11;       // portin puolileveys radiaaneina (etelässä, +z)
 const PIT_HOLE = { half: 0.76, from: 2.05, to: 4.2 };
 
 // ---------- Sepän pihapiiri ----------
-// Samat luvut kuin assets-src/blender/smithy_yard.py:ssä ja docs/SMITHY_INTEGRATION.md:ssä.
-const SMITHY = onRing(155, 14.2, 3.4, 2.6, 2.3);
+// Assetin paikallismitat tulevat smithy.py:stä; pihasijoittelu on keskitetty smithyLayout.ts:ään.
+const SMITHY = onRing((SMITHY_ANGLE * 180) / Math.PI, SMITHY_RADIUS, 3.4, 2.6, 2.3);
 const SMITH_HOUSE = onRing(255, 16.0, 5.3, 3.4, 3.4);
 const SMITH_STOREHOUSE = onRing(-38, 15.6, 2.0, 3.0, 2.1);
 const SMITH_COOKFIRE = { x: -10.223, z: -5.120 };
-const SMITH_TABLE = { x: 3.453, z: -10.362, yaw: SMITHY.yaw };
+const SMITH_TABLE = { ...smithyPoint(SMITHY_TABLE_LOCAL), yaw: SMITHY.yaw };
 const SMITH_LOGS = [
   { x: -4.592, z: -11.087, yaw: 6.6759 }, { x: -6.623, z: -10.007, yaw: 6.8679 },
   { x: -8.411, z: -8.559, yaw: 7.0599 }, { x: -4.298, z: -10.505, yaw: 6.6715 },
@@ -1785,15 +1789,19 @@ function populateSmithyLife(scene: THREE.Scene, collision: CollisionWorld, plan 
   };
 
   if (plan.setup === "work") {
-    person("seppa", "seppa", smithfolkUrl, 6.15, -12.36, 8.988, "hammer", {
+    const smith = smithyPoint(SMITHY_WORK_LOCAL.smith);
+    const apprentice = smithyPoint(SMITHY_WORK_LOCAL.apprentice);
+    const child = smithyPoint(SMITHY_WORK_LOCAL.child);
+    person("seppa", "seppa", smithfolkUrl, smith.x, smith.z, SMITHY.yaw + Math.PI, "hammer", {
       name: "sepan_vasara", hand: "R", kind: "tool", grip: GRIP_MALE_R,
     });
-    person("salli", "salli", smithfolkUrl, 3.39, -15.08, 7.418, "bellows");
+    person("salli", "salli", smithfolkUrl, apprentice.x, apprentice.z, SMITHY.yaw + Math.PI / 2, "bellows");
     // Kaukalo on pajan oikeassa takaosassa; lapsi seisoo sen etupuolella paikallisessa pisteessä
     // (1,00; 0,55), vähintään 0,13 m oman törmäysympyränsä ulkopuolella kaukalosta.
-    person("pikkusalli", "lapsi", smithfolkChildUrl, 7.14, -12.95, 2.90, "quench");
+    person("pikkusalli", "lapsi", smithfolkChildUrl, child.x, child.z, SMITHY.yaw - 2.947, "quench");
   } else {
-    person("seppa", "seppa", smithfolkUrl, 3.79, -11.09, 12.13);
+    const smith = smithyPoint(SMITHY_TRADE_SMITH_LOCAL);
+    person("seppa", "seppa", smithfolkUrl, smith.x, smith.z, SMITHY.yaw + 2 * Math.PI);
     const spot = plan.yardSpot!;
     person("pikkusalli-koira", "lapsi", smithfolkChildUrl, spot.child.x, spot.child.z, spot.child.yaw, "idle", undefined, "pikkusalli-koira");
     jobs.push(spawnAnimal(scene, {
@@ -2183,6 +2191,13 @@ function installSmithyVisuals(
   root.position.set(SMITHY.x, groundHeight(SMITHY.x, SMITHY.z), SMITHY.z);
   root.rotation.y = SMITHY.yaw;
   prepareRawModel(root);
+  // Aihiopöytä kuuluu pihalle, ei pajan sisärajalle. Sen erillinen household-pöytä
+  // sijoitetaan samaan pisteeseen buildWorldissa.
+  const blanksTable = root.getObjectByName("poyta_aihiot");
+  if (blanksTable) {
+    blanksTable.position.x = SMITHY_TABLE_LOCAL.x;
+    blanksTable.position.z = SMITHY_TABLE_LOCAL.z;
+  }
   scene.add(root);
   root.updateMatrixWorld(true);
 
@@ -2214,8 +2229,19 @@ function installSmithyVisuals(
     registerSmithySceneItem(scene, sceneItems, taken, spearRoot, { id: "smithy.spear", itemId: "spear", focusRadius: 0.48 });
   } else console.warn("Sepän keihään mount tai spear-malli puuttuu");
 
-  const bellows = root.getObjectByName("palkeet") as THREE.Mesh | null;
-  if (bellows?.morphTargetInfluences) bellows.morphTargetInfluences.fill(0);
+  // Monimateriaalinen `palkeet` latautuu ryhmäksi, jonka lapsiverkoilla vasta ovat morphit.
+  // Kaikkien primitiivien pitää liikkua yhdessä, tai palkeet jäävät näennäisesti paikalleen.
+  const bellowsMorphs: { influences: number[]; a: number; b: number }[] = [];
+  root.getObjectByName("palkeet")?.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    const influences = mesh.morphTargetInfluences;
+    const dictionary = mesh.morphTargetDictionary;
+    if (!mesh.isMesh || !influences || !dictionary) return;
+    const a = dictionary.palje_a, b = dictionary.palje_b;
+    if (a === undefined || b === undefined) return;
+    influences.fill(0);
+    bellowsMorphs.push({ influences, a, b });
+  });
   const emberMaterials: THREE.MeshStandardMaterial[] = [];
   root.getObjectByName("ahjo_hiillos")?.traverse((o) => {
     const mesh = o as THREE.Mesh;
@@ -2244,9 +2270,9 @@ function installSmithyVisuals(
       time += dt;
       const working = plan.setup === "work";
       const phase = working ? 0.5 + 0.5 * Math.sin(time * Math.PI * 2) : 0;
-      if (bellows?.morphTargetInfluences) {
-        bellows.morphTargetInfluences[0] = phase;
-        bellows.morphTargetInfluences[1] = working ? 1 - phase : 0;
+      for (const morph of bellowsMorphs) {
+        morph.influences[morph.a] = phase;
+        morph.influences[morph.b] = working ? 1 - phase : 0;
       }
       const breath = 0.5 + 0.5 * Math.sin(time * (working ? Math.PI * 2 : 1.7));
       forgeLight.intensity = (working ? 2.3 : 1.65) + breath * 0.75 + Math.random() * 0.12;

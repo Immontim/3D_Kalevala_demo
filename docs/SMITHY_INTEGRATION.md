@@ -25,14 +25,14 @@ Sama kehämalli kuin `homestead`/`yard`-pihoilla: aita `FENCE_R = 12.9`, portti 
 
 | Kohde | `onRing(a°, d, hx, front, back)` | x | z | yaw |
 | --- | --- | --- | --- | --- |
-| Paja (`SMITHY`) | `onRing(155, 14.2, 3.4, 2.6, 2.3)` | 6.001 | -12.870 | 5.8469 |
+| Paja (`SMITHY`) | `onRing(155, 10.9, 3.4, 2.6, 2.3)` | 4.607 | -9.879 | 5.8469 |
 | `talo_seppa` (`HOUSE`) | `onRing(255, 16.0, 5.3, 3.4, 3.4)` | -15.455 | -4.141 | 7.5922 |
 | `aitta` (`STOREHOUSE`) | `onRing(-38, 15.6, 2.0, 3.0, 2.1)` | -9.604 | 12.293 | 2.4784 |
 
 Miksi näin:
 - Portista tuleva näkee pajan ja ahjon hehkun suoraan edessä noin 14° oikealla. Paja on lähes
   suoraan päin, ja kauppapaikka on pihan puolella.
-- Ahjosta on sepän taloon noin 23 m (paloriski).
+- Ahjosta on sepän taloon noin 20 m (paloriski).
 - Halkopinot ovat kahtena kolmen pinon rivinä aidan vieressä talon ja pajan välissä. Lähin puu on
   noin 5 m pajan räystäästä ja noin 10 m ahjosta.
 - Talon ja aitan etuseinät ovat yli 12,6 m:n säteellä, kuten tilan pihalla, joten kamera ei mene
@@ -40,12 +40,12 @@ Miksi näin:
 
 ### Pajan kaikki solmut samalla muunnoksella
 
-Jokainen `smithy.glb`:n solmu asetetaan kohtaan `SMITHY` (x 6.001, z -12.870, yaw 5.8469), kuten
+Jokainen `smithy.glb`:n solmu asetetaan kohtaan `SMITHY` (x 4.607, z -9.879, yaw 5.8469), kuten
 `place(key, SMITHY)`. Verkkojen koordinaatit ovat valmiiksi pajan origossa. Kaksi poikkeusta:
 
 - `poyta_aihiot` on `pukkipoyta`n omissa koordinaateissa. Pöytä ja aihiot menevät kumpikin kohtaan
-  `fromLocal(SMITHY, -1.25, 3.35)` = (3.453, -10.362), yaw `SMITHY.yaw`. Jos peli lukee solmun
-  glTF-siirtymän, se on jo (-1,25, 0, 3,35) pajan origosta.
+  `fromLocal(SMITHY, -1.25, 4.15)` = (1.720, -6.646), yaw `SMITHY.yaw`. Peli siirtää
+  glTF-solmun sen alkuperäisestä z=3,35-kohdasta 0,8 m pihan keskustaa kohti.
 - Pajan sisäinen piste Blenderissä (bx, by) on pelissä `fromLocal(SMITHY, bx, -by)`.
 
 ### Muut esineet (pelin koordinaatit)
@@ -93,7 +93,8 @@ Ehdotus:
   - keihästeline: x 0,6..2,9, y -3,7..-3,0;
   - pöytä: `pukkipoyta`n tavallinen törmäys.
 - Sivut voi jättää auki tai sulkea matalilla esteillä kohtiin lx ±3,7. Kamera rajautuu säteelle
-  12,2, joten syvällä pajassa se jää sankarin lähelle räystään alle. Siksi katto on oma solmunsa ja
+  12,2, joten syvällä pajassa se jää sankarin lähelle räystään alle. Sankarin oma kävelyraja pajassa
+  on 12,35 m. Siksi katto on oma solmunsa ja
   häivytetään.
 
 ## Hahmot ja kauppa
