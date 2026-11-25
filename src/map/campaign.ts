@@ -5,7 +5,7 @@ import type { TextKey } from "../i18n";
 import { createEngineState, parseEngineState, type EngineState } from "../world/state";
 import { parseLongEffects, type ActiveLongEffect } from "./longEffects";
 
-export const CAMPAIGN_SCHEMA_VERSION = 7 as const;
+export const CAMPAIGN_SCHEMA_VERSION = 8 as const;
 export const BASE_INVENTORY_CAPACITY = 6;
 export const MAX_BACKPACK_CAPACITY = 12;
 export const MAX_INVENTORY_CAPACITY = BASE_INVENTORY_CAPACITY + MAX_BACKPACK_CAPACITY;
@@ -259,7 +259,7 @@ export interface CampaignStart {
   huntCycle?: number;
 }
 
-/** Uusi kampanja alkaa kolmella rieskalla ja nykyistä 3D-oletusta vastaavilla varusteilla. */
+/** Uusi kampanja alkaa kolmella rieskalla. Keihäs ja säärisuojat hankitaan myöhemmin sepän pajalta. */
 export function createCampaign(start: CampaignStart = {}): CampaignState {
   const width = start.width ?? 20;
   const height = start.height ?? 20;
@@ -291,16 +291,13 @@ export function createCampaign(start: CampaignStart = {}): CampaignState {
       satiety: SATIETY_MAX,
       inventory: {
         backpack: null,
-        stacks: [
-          { itemId: "barley_flatbread", quantity: 3 },
-          { itemId: "spear", quantity: 1 },
-        ],
+        stacks: [{ itemId: "barley_flatbread", quantity: 3 }],
       },
       equipment: {
         head: "iron_helmet",
         torso: "ring_mail",
         hands: "leather_gloves",
-        legs: "iron_greaves",
+        legs: null,
         feet: "leather_shoes",
         mainHand: "sword",
         offHand: "round_shield",
@@ -594,62 +591,112 @@ export function parseCampaign(value: unknown): CampaignState | null {
     && validPlayer(data.player)) {
     return cloneCampaign(data as unknown as ParsedCampaign);
   }
+  if (data.schemaVersion === 7
+    && validKnownSiteIds(data.world.knownSiteIds)
+    && validSceneItemState(data.world.sceneItems)
+    && validPlayer(data.player)) {
+    return migrateLegacyStartingSmithyGear(cloneCampaign(data as unknown as ParsedCampaign));
+  }
   if (data.schemaVersion === 6
     && validKnownSiteIds(data.world.knownSiteIds)
     && validSceneItemState(data.world.sceneItems)
     && validVersion6Player(data.player)) {
-    return cloneCampaign({
+    return migrateLegacyStartingSmithyGear(cloneCampaign({
       schemaVersion: CAMPAIGN_SCHEMA_VERSION,
       world: data.world as unknown as CampaignWorld,
       player: migrateVersion6Player(data.player),
       engine: data.engine,
-    });
+    }));
   }
   if (data.schemaVersion === 5
     && validKnownSiteIds(data.world.knownSiteIds)
     && validSceneItemState(data.world.sceneItems)
     && validLegacyPlayer(data.player)) {
-    return cloneCampaign({
+    return migrateLegacyStartingSmithyGear(cloneCampaign({
       schemaVersion: CAMPAIGN_SCHEMA_VERSION,
       world: data.world as unknown as CampaignWorld,
       player: migrateLegacyPlayer(data.player),
       engine: data.engine,
-    });
+    }));
   }
   if (data.schemaVersion === 4
     && validKnownSiteIds(data.world.knownSiteIds)
     && validLegacyPlayer(data.player)) {
-    return cloneCampaign({
+    return migrateLegacyStartingSmithyGear(cloneCampaign({
       schemaVersion: CAMPAIGN_SCHEMA_VERSION,
       world: withEmptySceneItems(data.world as unknown as Version4CampaignWorld),
       player: migrateLegacyPlayer(data.player),
       engine: data.engine,
-    });
+    }));
   }
   if (data.schemaVersion === 3 && validLegacyPlayer(data.player)) {
-    return cloneCampaign({
+    return migrateLegacyStartingSmithyGear(cloneCampaign({
       schemaVersion: CAMPAIGN_SCHEMA_VERSION,
       world: withEmptySiteKnowledge(data.world as unknown as LegacyCampaignWorld),
       player: migrateLegacyPlayer(data.player),
-    });
+    }));
   }
   if (data.schemaVersion === 2 && validVersion2Player(data.player)) {
-    return cloneCampaign({
+    return migrateLegacyStartingSmithyGear(cloneCampaign({
       schemaVersion: CAMPAIGN_SCHEMA_VERSION,
       world: withEmptySiteKnowledge(data.world as unknown as LegacyCampaignWorld),
       player: migrateLegacyPlayer({ ...data.player, gender: "male" }),
-    });
+    }));
   }
   if (data.schemaVersion === 1 && validVersion1Player(data.player)) {
-    return cloneCampaign({
+    return migrateLegacyStartingSmithyGear(cloneCampaign({
       schemaVersion: CAMPAIGN_SCHEMA_VERSION,
       world: withEmptySiteKnowledge(data.world as unknown as LegacyCampaignWorld),
       player: {
         ...migrateLegacyPlayer({ ...data.player, gender: "male", satiety: SATIETY_MAX - data.player.hunger }),
       },
-    });
+    }));
   }
   return null;
+}
+
+/** Säilyttää enintään annetun määrän esinettä ja jättää muiden pinojen järjestyksen ennalleen. */
+function keepInventoryCopies(inventory: Inventory, itemId: ItemId, maximum: number): Inventory {
+  let remaining = maximum;
+  const stacks: ItemStack[] = [];
+  for (const stack of inventory.stacks) {
+    if (stack.itemId !== itemId) { stacks.push({ ...stack }); continue; }
+    const keep = Math.min(stack.quantity, remaining);
+    if (keep > 0) stacks.push({ ...stack, quantity: keep });
+    remaining -= keep;
+  }
+  return { backpack: inventory.backpack, stacks };
+}
+
+/**
+ * V1–V7 aloittivat keihään tavaroissa ja rautaiset säärisuojat puettuina. V8 poistaa nämä
+ * aloitusedut. Jos pelaaja on jo ottanut vastaavan maailmanesineen sepän pajalta, yksi oikeasti
+ * hankittu kappale säilytetään. Ilman ansaittua keihästä kädessä oleva vanha keihäs vaihtuu
+ * perusmiekkaan; mahdollinen tavaroissa ollut miekka siirtyy samalla takaisin käteen.
+ */
+function migrateLegacyStartingSmithyGear(state: CampaignState): CampaignState {
+  const taken = state.world.sceneItems.takenInstanceIds;
+  const earnedSpear = taken.includes("smithy.spear");
+  const earnedGreaves = taken.includes("smithy.greaves");
+  const equipment = { ...state.player.equipment };
+  let inventory: Inventory = {
+    backpack: state.player.inventory.backpack,
+    stacks: state.player.inventory.stacks.map((stack) => ({ ...stack })),
+  };
+
+  if (equipment.mainHand === "spear" && !earnedSpear) {
+    equipment.mainHand = "sword";
+    inventory = tryRemoveItem(inventory, "sword", 1) ?? inventory;
+  }
+  inventory = keepInventoryCopies(inventory, "spear", earnedSpear && equipment.mainHand !== "spear" ? 1 : 0);
+
+  if (equipment.legs === "iron_greaves" && !earnedGreaves) equipment.legs = null;
+  inventory = keepInventoryCopies(inventory, "iron_greaves", earnedGreaves && equipment.legs !== "iron_greaves" ? 1 : 0);
+
+  return {
+    ...state,
+    player: { ...state.player, inventory, equipment },
+  };
 }
 
 type SiteGenerationFields = "worldSeed" | "siteInstances" | "huntCycle";

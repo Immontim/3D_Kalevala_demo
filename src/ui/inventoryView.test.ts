@@ -12,7 +12,7 @@ describe("inventoryViewModel", () => {
     expect(model.baseStacks).toHaveLength(6);
     expect(model.extraStacks).toHaveLength(0);
     expect(model.baseStacks.slice(0, 2)).toEqual([
-      { itemId: "barley_flatbread", quantity: 3 }, { itemId: "spear", quantity: 1 },
+      { itemId: "barley_flatbread", quantity: 3 }, null,
     ]);
   });
 
@@ -26,7 +26,9 @@ describe("inventoryViewModel", () => {
   });
 
   it("heijastaa atomisen varustevaihdon malliin", () => {
-    const changed = tryEquipItem(createCampaign(), "spear").state;
+    const state = createCampaign();
+    state.player.inventory = tryAddItem(state.player.inventory, "spear", 1)!;
+    const changed = tryEquipItem(state, "spear").state;
     const model = inventoryViewModel(changed);
     expect(model.equipment.find((entry) => entry.slot === "mainHand")?.itemId).toBe("spear");
     expect(model.equipment.find((entry) => entry.slot === "offHand")?.itemId).toBeNull();
