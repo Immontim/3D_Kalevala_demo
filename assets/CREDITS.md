@@ -164,6 +164,28 @@ Sepän asuintalo `talo_seppa` on `homestead.glb`:ssä samoilla lähteillä kuin 
 
 Haku: `tools/fetch-smithy.ps1`.
 
+## `market_boat.glb`, `market.glb`, `market_goods.glb`
+
+Markkinapaikan kauppalaiva, kojut, telineet ja kauppatavarat. Geometria, turkisten, purjeen, villan,
+viljan, keramiikan, tuohen ja laudoituksen tekstuurit itse tehty Blenderissä numpylla (skriptit
+`assets-src/blender/market_boat.py`, `market.py`, `market_goods.py`). Laivan esikuva Saaremaan Salmen
+laivat (n. 700–750 jKr.); malli ei kopioi mitään rekonstruktiota.
+
+| Osa | Lähde (Poly Haven -tunniste, CC0) | Käyttö |
+| --- | --- | --- |
+| Nahkasäkit, nahkasuoja, hihnat | `brown_leather` | Sävytetty |
+| Pöytäliina, kangas | `rough_linen` | Sävytetty |
+| Hioinkivi, painokivi | `mossy_rock` | Sammal poistettu kuten kalmistossa |
+| Kuorelliset paalut ja telat | `pine_bark` (sama kuin `household.glb`:ssä) | Puun syy ja punos laskettu itse |
+
+## `marketfolk.glb`, `marketfolk_f.glb`
+
+Sama pohja ja samat lähteet kuin tiedostoissa `smithfolk.glb` ja `villagers_f.glb`: Human Base Meshes
+-vartalo (CC0) ja Poly Havenin kankaat ja nahka (CC0). Itse tehty (skriptit
+`assets-src/blender/char_market.py` ja `char_market_f.py`): kauppiaan nuttu, torques, helavyö ja saapikkaat,
+sepän ja sällin markkina-asut, emännän juhla-asu (hartiavaate, spiraalikoristeet, kupurasoljet ja helyketjut,
+huntu) ja arkisen naisen asu sekä lautanauha- ja spiraalitekstuurit.
+
 ## `map/cairn-site.png`
 
 Kalmiston karttaikoni (48 × 48). Johdettu omistajan ImageGen-kuvasta

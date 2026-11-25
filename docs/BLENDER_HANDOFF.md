@@ -6,36 +6,28 @@ Kanoninen Blender-mallien ja asset-putkien nykytila. Pidä tämä alle noin
 
 ## Nykytila
 
-Päivitetty: 2026-11-24 (Claude, Windows; pohja main fc36128; Pohjan soturit ja kirveet branchissa
-`claude/pohja-warriors`, tarkista merge-tila `git merge-base --is-ancestor`)
+Päivitetty: 2026-11-25 (Claude, Windows; pohja main 270a599; markkinapaikan assetit branchissa `claude/market`,
+tarkista merge-tila `git merge-base --is-ancestor`)
 
-- **Pohjan uudet soturit ja kirveet** (ei vielä pelissä; toteutusohje, osien näyttösäännöt, kiinnityspisteet,
-  otekanavat ja mittaukset: `docs/POHJA_WARRIORS.md`). `char_pohja.py` lukee char_smith_child.py:n; ajo taustalla
-  characters.blendin kopiolla, ei rinnakkain (`img_from_px` jakaa välitiedoston).
-  - `pohja_tanakka.glb` (1,58 m, parrakas) ja `pohja_hoikka.glb` (1,86 m, parraton), kumpikin oma `RIG`.
-    Asu kootaan vakiomiehen mittoihin ja muunnetaan `BUILDS`-taulukon luukohtaisilla kertoimilla (`reshape`,
-    kuten `childify`). Osat: `_base`, `_nuttu_vaalea`, `_nuttu_tumma`, `_mail`, `_huotra`, `helmet_<h>`,
-    tyhjät `mount_huotra` ja `mount_kirves`. Vyö `BELT_Z0` 1,012 (7 mm sankaria ylempänä).
-  - `kirveet.glb`: `kirves_parta` ja `kirves_karjala` miekan kehyksessä (ote origossa, pää −Y, terä +X).
-  - Arvioija kävi kirveet ja hahmot läpi; korjattu mm. kaula, korvakkeet, upotus, ihonvärinen nuttu,
-    rengaspaidan rosoinen kaula-aukko ja kirveen asento vyöllä. Riski: ääri-kävelyssä reisi puskee
-    helman ja rengaspaidan läpi (sankarilla sama); kirveen terän puoli sivalluksessa tarkistamatta.
-
-- **Sepän pihapiiri B1–B5** (ei vielä pelissä; pelikoodi on Codexin). Sijoitus, törmäysohje (pajasta ei kiinteää
-  laatikkoa), hahmojen paikat, kauppa, latausohjeet ja tyhjien pisteiden käyttö: `docs/SMITHY_INTEGRATION.md`.
-  - `assets/smithy.glb` (1,78 Mt / 15 450 kolmiota; `smithy.py` lukee cairnfield.py → homestead.py,
-    household.py; tekstuurit `tools/fetch-smithy.ps1`): solmuilla sama origo (pajan lattian keskikohta), poikkeus
-    `poyta_aihiot`. Mitat ja törmäykset skriptin alussa. Pihan sommittelu `smithy_yard.py` (ei GLB:tä).
-  - `assets/smithfolk.glb` (3,25 Mt; `char_smith.py`): `char_seppa`, `char_salli`, `sepan_vasara` samalla
-    `RIG`illä kuin tietäjä. Esiliinan painot tunikasta (`transfer_weights`); väli kankaaseen
-    (`apron_clearance`, `SMITH_POSES`) lepo ja työasennot ≥ 10 mm, ääri-kävely −7/−22 mm kuten helmat.
-  - `assets/smithfolk_child.glb` (1,58 Mt / 26 700 kolmiota; `char_smith_child.py` lukee char_smith.py:n):
-    `char_lapsi` 1,29 m. Asu kootaan aikuisen mittoihin, sitten `child_face` + `childify` (luukohtainen
-    pituus/poikittaisskaalaus `CHILD_SCALE`, luiden kierrot ennallaan) → oma luuranko. Väli mitataan
-    lapseksi muunnetusta BODY-kopiosta (`child_body`): ≥ 12 mm, ääri-kävely −16 mm.
-  - Kaikki ajetaan taustalla characters.blendin **kopiolla** (`save=False`); lähdetiedostoa ei muutettu.
-    Arvioija tarkisti jokaisen vaiheen. Riskit: GLB:t monistavat tekstuureja, ellei peli jaa niitä nimellä;
-    kaukalo näyttää hieman laatikolta; vesi on läpinäkymätön tumma pinta.
+- **Markkinapaikka** (ei vielä pelissä; toteutusohje, solmut, kiinnityspisteet, törmäykset ja hahmojen tiedot:
+  `docs/MARKET_INTEGRATION.md`). Viisi uutta skriptiä, kaikki taustalla; rakennelmat tyhjässä tiedostossa, hahmot
+  characters.blendin kopiolla. `KALEVALA_TEXDIR` ohjaa välitekstuurit omaan kansioon, jolloin ajot voi tehdä
+  rinnakkain (ilman muuttujaa `assets-src/textures`).
+  - `market_boat.py` → `market_boat.glb` (0,91 Mt / 10 300 kolmiota): Salmen laivojen tapainen 11,6 m:n
+    klinkkerilaiva hirvenpääkeulalla, `laiva_masto` / `laiva_masto_laskettu`, `laiva_lasti`, `laiva_telat`, `airo`.
+  - `market.py` → `market.glb` (0,99 Mt / 9 600): `katos_vaate`, `katos_tuohi`, `katos_nahka`, `myyntipoyta`,
+    `turkisteline` (turkit mallissa), `aseteline` (vain tyhjät `mount_keihas/kilpi/kirves_*`, aseet kloonataan).
+  - `market_goods.py` → `market_goods.glb` (0,95 Mt / 6 500): nassakat, tynnyrit, viljakorit, `maavaate`
+    tavaroineen, `kuivakala_nippu`. Vitsavanteet, ei rautaa.
+  - `char_market.py` → `marketfolk.glb` (4,6 Mt): `char_kauppias`, `char_seppa_markkina`, `char_salli_markkina`
+    (vakiomies, `RIG`). `char_market_f.py` → `marketfolk_f.glb` (3,3 Mt): `char_emanta_markkina`,
+    `char_nainen_arki` (`RIG_F` nimellä `RIG`). 25 000–29 000 kolmiota hahmoa kohti.
+  - Orkestroija tarkisti jokaisen mallin kuvista; hylätyt ja korjatut kohdat MARKET_INTEGRATION.md:ssä.
+- **Pohjan soturit ja kirveet** (`pohja_tanakka.glb`, `pohja_hoikka.glb`, `kirveet.glb`; `char_pohja.py`):
+  toteutusohje ja mittaukset `docs/POHJA_WARRIORS.md`. Riski: ääri-kävelyssä reisi puskee helman läpi.
+- **Sepän pihapiiri B1–B5** (`smithy.glb`, `smithfolk.glb`, `smithfolk_child.glb`; `smithy.py`, `char_smith.py`,
+  `char_smith_child.py`): pelissä v08.06:sta; sijoitus ja pisteet `docs/SMITHY_INTEGRATION.md`. Riskit: kaukalo
+  näyttää hieman laatikolta, vesi on läpinäkymätön tumma pinta.
 
 - **Metsän LOD- ja reuna-assetit** (`assets/forest_lod.glb`, 1,6 Mt; `assets-src/blender/forest_lod.py`;
   mainissa). Peli lataa tiedoston kaikissa 3D-kohtauksissa v06.00.00:sta alkaen (AGENT_HANDOFF). Skripti lukee
@@ -193,7 +185,12 @@ Päivitetty: 2026-11-24 (Claude, Windows; pohja main fc36128; Pohjan soturit ja 
   tekstuuri sama metallilevy kuin muissa osissa.
 - Tietäjän vasen käsi tulee levällään olevassa lepoasennossa viitan läpi;
   suunniteltu lepoasento pitää käden viitan alla.
-- Emännän pitkä helma ja jousineidon viitta pitää testata pelin animaatioilla.
+- Emännän pitkä helma ja jousineidon viitta pitää testata pelin animaatioilla. `char_emanta`n hihansuut ja vyö
+  saavat painot lähimmistä vartaloverteksistä (myös reisi ja kyynärvarsi), joten kädet alas laskettuina
+  hihansuut venyvät renkaiksi (`char_market_f.py` korjaa omissaan; vanhaa ei korjattu).
+- Markkinahahmot: lepoasennossa alas lasketut kädet menevät helman/vyön läpi (−14…−27 mm, sama kuin vanhoilla),
+  hartiavaate ja sepän viitta seuraavat vain rintaa (kädet läpi laulu- ja iskuasennoissa), kauppiaan
+  ääri-kävelyssä helmapusku −31 mm.
 - Eläinten tyyli ei ole yhtenäinen: kukko ja kanat ovat käsinmaalattuja,
   koira sileä ja ihmishahmoja lelumaisempi. Possu on porsaan mittasuhteissa.
   Koiran 191 luuta on yhdelle koiralle hyväksyttävä, ei laumalle.
@@ -224,7 +221,7 @@ Päivitetty: 2026-11-24 (Claude, Windows; pohja main fc36128; Pohjan soturit ja 
 ## Seuraava Blender-tehtävä
 
 **Metsäjänis**: korvaa `src/hunt/models.ts`:n jäniksen samoilla mitoilla, origolla ja suunnilla (ks. yllä);
-loikka-, pako- ja kuolinasento tai luut. Sepän pihaan ei tehdä uutta ennen kuin Codex on integroinut sen.
+loikka-, pako- ja kuolinasento tai luut.
 
 Muut: rautakautinen jousi, nuoli ja miehen nuoliviini (korvikkeiden mitat yllä); kaukopuiden
 valaistu atlas, jos vaihtoraja näkyy; legacy-hahmojen poisto käsisavutestin jälkeen (noin 1,7 Mt kummassakin);
