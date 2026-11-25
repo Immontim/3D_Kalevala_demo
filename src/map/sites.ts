@@ -59,6 +59,7 @@ export function instanceSiteDefinition(instance: SiteInstance): MapSiteDefinitio
     mapId: "kalevala-prototype",
     position: { x: instance.x, y: instance.y },
     sceneId: instance.kind === "camp" ? "clearing" : instance.kind === "hunt" ? "wilds"
+      : instance.kind === "smithy" ? "smithy"
       : instance.kind === "lakeside" ? "lakeside" : instance.kind === "cairn" ? "cairnfield" : "yard",
     movement: "fixed",
     lifetime: instance.kind === "hunt" ? "temporary" : "persistent",

@@ -72,7 +72,7 @@ describe("pihaniityt", () => {
       for (const sites of [newSites, migratedSites]) {
         const map = yardMeadowMap(PROTOTYPE_MAP, seed, sites);
         for (const site of sites) {
-          if (site.kind === "yard") {
+          if (site.kind === "yard" || site.kind === "smithy") {
             expect(connectedMeadows(map, site), `piha ${site.id} (${site.x},${site.y}), siemen ${seed}`).toBeGreaterThanOrEqual(3);
           }
         }

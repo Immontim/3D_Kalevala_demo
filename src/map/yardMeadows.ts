@@ -27,7 +27,7 @@ export function yardMeadowMap(
   let changed = false;
 
   for (const yard of instances) {
-    if (yard.kind !== "yard" || !meadowLand(mapCell(map, yard.x, yard.y))) continue;
+    if ((yard.kind !== "yard" && yard.kind !== "smithy") || !meadowLand(mapCell(map, yard.x, yard.y))) continue;
     const random = rngStream(seed, "yard-meadow:" + yard.id);
     const targetSize = MIN_TILES + Math.floor(random() * (MAX_TILES - MIN_TILES + 1));
     const patch = new Set([mapIndex(map, yard.x, yard.y)]);

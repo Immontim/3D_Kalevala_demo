@@ -6,14 +6,23 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-23 (Codex, Windows; pohja `origin/main` `ebd6a23`)
+Päivitetty: 2026-11-25 (Codex, Windows; pohja `origin/main` `fc36128`)
 
-- **Koodiversio v08.05.00** branchissa `codex/louhi-graveyard-encounter` (tarkista merge-tila
+- **Koodiversio v08.06.00** branchissa `codex/smithy-playable-scene` (tarkista merge-tila
   `git merge-base`illa). Koodi valmis, ei deployattu, omistaja ei vielä testannut. Codexin in-app-savutestissä
-  Louhen dialogi, haasteen kahden soturin aalto, soturien saapuminen Louhen takaa ja Louhen lauluasento
-  toimivat; FPS pysyi 60:ssä ja konsoli oli puhdas. Tarkistukset: `bun run test` 516/516,
-  `bunx tsc --noEmit`, `bun run lint`, `bun run build`. Vitest rajataan `src/**/*.test.ts`:ään, jotta
-  projektikansion sisäiset toisten agenttien työpuut eivät aja samoja testejä uudelleen.
+  pajan työ- ja kauppakokoonpanot, vasara, työliikkeet, varkauskehote sekä sepän ja pikkusällin dialogit
+  toimivat; konsoli oli puhdas ja FPS 58–60. Tarkistukset: `bun run test` 533/533,
+  `bunx tsc --noEmit`, `bun run lint`, `bun run build`, `git diff --check`.
+- **Sepän paja (v08.06, `smithyLife.ts`, `world.ts`, `world/content.ts`).** Kartalla on yksi pysyvä
+  `smithy`-instanssi omalla `smithy`-satunnaisvirralla; vanhaan matkaan se täydennetään kerran. Kohtaus arpoo
+  käynnillä työn (seppä vasaroi, sälli palkeilla, pikkusälli karkaisuvadilla; ei koiraa) tai kaupan (seppä
+  kojulla, pikkusälli + koira yhdessä neljästä pihapaikasta; ei aikuista sälliä). GLB-puun mountit ja palkeiden
+  morphit säilytetään; assetit latautuvat vain pajassa. `smithy.spear` ja `.greaves` alkavat varkautena.
+  Kahdeksan `meat`-tagin esinettä avaa yhden; jommankumman luvallinen otto sulkee molemmat. Lähdössä merkitty
+  maailma-aika avaa toisen kaupan 30 pelipäivän jälkeen. Avoin maksettu lupa säilyy, kunnes tuote otetaan.
+  Sällin kertadialogi ratkaisee `@archerYard`-roolin ja paljastaa maatilan. Gauntlet hylkäsi pajan koko laatikon
+  törmäykseksi (avokatos pidettiin kuljettavana), korjasi pikkusällin pois kaukalon colliderista ja teki
+  loppuunmyyty-repliikeistä neutraalit myös varkauden jälkeen. Blender-muutoksia ei tarvittu.
 - **Villisika (v08.04, `hunt/boar.ts` puhdas + `engine/boars.ts`).** `initBoars`: 0–2 sikaa (`boarCount`
   40/40/20 %, ≥ 45 m saapumisesta). Tilat root/walk/alert/threat/charge/recover/flinch/flee/bed/dead, luvut
   `BOAR` (aggressio 0,35, varoitus 0,7 s, rynnäkkö 9 m/s, käännös 1,1 rad/s, vahinko 22, elämä 3; pako terve
@@ -22,12 +31,6 @@ Päivitetty: 2026-11-23 (Codex, Windows; pohja `origin/main` `ebd6a23`)
   lyönnit `melee.setCreatureStrike` → `meleeBoarDamage`. `g.danger` (`boarDangerous` tai haavoittunut alle 9 m) kumoaa `heroAtPeace`n;
   `bowActive` sallii jousen vaarassa (miekka tupessa), X vaihtaa jousen ja aseen. Verijälki `InstancedMesh`
   400 tippaa. Kuolema erämaassa: `huntDeathReturn(toStartMenu)`. Ruho `boar_meat` 4–6. Lukitus ei tunne sikaa.
-- **Taustalinnut (v08.03, `fauna/birds.ts` puhdas + `engine/birds.ts`).** `Flock` (`perch`/`fly`/`ground`),
-  `planFlight` Bézier, istumapaikat `perchTemplate` puiden oikeista oksista; kytkentä `world.ts` `buildWorld`
-  (`WILDS`). 3 `InstancedMesh`iä, siivet varjostimessa. `__world.birds`. Eivät ole riistaa.
-- **Jousen kädet (v08.03, `Fighter.bowArms`).** `hunt.ts` → `setBowAim(aimBlend, elev, draw)`: rinta kiertyy
-  (`BOW_TORSO_TURN`), kahva ankkurista (`BOW_ANCHOR`) tähtäyslinjalle, oikea nyrkki jänteellä (`BOW_BRACE` →
-  ankkuri), `twoBone`. Kanto on `POSES.bowCarry`. Erämaassa `sceneLoadout` jättää kilven pois. Jänis 1–3 lihaa.
 - **Uhri ennen laulua (v08.02, `content.ts`).** `ASK_SONG` on kaksi valintaa: `ask-song` (ei uhria, ei
   pyydetty) → `sage.offeringAsked`, `revealSite cairn-b`, solmu `offeringDemand`; `ask-song-taught`
   (`offering.made`) → `songIntro`. Sääntö `sage.offering-awaited` (`npc.leftBehind` tietäjä) → lippu
@@ -56,16 +59,6 @@ Päivitetty: 2026-11-23 (Codex, Windows; pohja `origin/main` `ebd6a23`)
   (`meetingRules`: `<npc>.greeted` → lähtiessä `<npc>.met`); ruoka `householdFood`/`theftRule`
   (`<npc>.robbed`, `moonChance`, pöytäesineet roolilla `@archerYard.`/`@otherYard.`, `world/instances.ts`).
   Väen ja eläinten paikat arvotaan käynnittäin (`pickSpot`, `planYardAnimals`; `__world.yard`).
-- **Ryhmän hyökkäyskatto ja vihun reaktiot (v07.01 + v06.05, `engine/ai.ts`, `combat.ts`).** Isku alkaa, jos
-  muita windup/release-tilassa < `maxAttackers` 2 (`attackStartDelay`, `startSpacing`, `waitBack`/`waitHold`);
-  `hitStaggers`, `staggerImmunity` 0,4 s, `graceCovers` ±40°, `threatenedBy` + `blockReactionDelay`,
-  `rollsAdvance` 45 %. Mitattu 3 vihua: max 2 yhtä aikaa; hiljaiset jaksot = yhtäaikainen uupumus.
-- **Metsästysapajat (v06.06, v08.04.01, `map/huntGrounds.ts`).** Instanssi `kind: "hunt"` → `wilds`;
-  alussa 2–4, enintään 4 aktiivista (vanhat 5–6 apajan tallennukset rajataan heti), `huntCycle` (20 pv),
-  `ensureHuntGrounds`/`advanceHuntGrounds`, `huntCandidates`; ei tunnettu ennen 3 × 3 -näköä; `enterSite` kuluttaa.
-- **Metsästys (v06.04, `src/hunt/` puhdas + `engine/hunt.ts`).** Vain `HUNTING` = erämaa. `bow` (X), vasen
-  jännittää, oikea tähtää/poimii. `ARCHERY`, `traceSegment` (maa + `firstProjectileHit` + eläinpallot),
-  `SPECIES.hare`, `pickHareSpots` 7–9 jänistä. Viini ja saalis moduulin tilaa; mallit `hunt/models.ts`.
 - **Kohtausmalli (`src/sceneLayout.ts`, puhdas).** `SceneLayout`: kuljettava monikulmio `bounds`, `arena`
   ja polunsuut `exits` (`mapDir`); kuljettava = monikulmio tai polunsuun käytävä, rajaus `clampToWalkable`.
   Vanhat kohtaukset ovat 11 m:n ympyröitä. Konventio: 3D:n −z = pohjoinen, +x = itä.
@@ -191,6 +184,9 @@ Päivitetty: 2026-11-23 (Codex, Windows; pohja `origin/main` `ebd6a23`)
 
 ## Tunnetut rajoitteet ja riskit
 
+- Sepän pajalla ei ole vielä omaa karttakuvaketta, vaan se käyttää pihan merkkiä. Työliikkeet ovat koodilla
+  tehtyjä asentoja, eivät GLB-klippejä; koiran assetissa ei ole kävelyklippiä, joten koira pysyy pihapaikassaan.
+  Uuden kauppatuotteen lisääminen vaatii toistaiseksi myös sepän kahden takeMode-efektilistan laajentamisen.
 - Karttavauhti, kylläisyys 3,6 pistettä/päivä ja uudet niityt kaipaavat pidempää pelitestiä.
   Pihaniitty voi liittyä valmiiseen aukeaan, jolloin aukea kokonaisuutena on yli yhdeksän ruutua.
   Tallennetut pihat jäävät paikoilleen myös tulevissa maastomuutoksissa.
@@ -258,8 +254,8 @@ Päivitetty: 2026-11-23 (Codex, Windows; pohja `origin/main` `ebd6a23`)
 
 ## Seuraava tehtävä
 
-Omistajan pelitesti Louhen kalmistolla (v08.05): suora Pohjolan uni, dialogihaaste, vartijoiden vaikeus,
-Louhen suolaulun katkaisu, suohon joutuminen ja karkotus taistelun aikana sekä vartijoiden kaaduttua.
+Omistajan pelitesti sepän pajalla (v08.06): kartalta löytyminen ja poistuminen, molemmat kokoonpanot,
+8 lihan vaihto, keihään tai säärisuojien ottaminen sekä toisen tuotteen 30 päivän odotus.
 
 ## Ei vielä aloiteta
 
@@ -267,6 +263,7 @@ Louhen suolaulun katkaisu, suohon joutuminen ja karkotus taistelun aikana sekä 
 - Täysi karttaeditori, satunnaiset matkakohtaamiset ja sivujuonigeneraattori.
 - 3D-palkintojen tai ruokien lisääminen paluukuormasta inventaarioon.
 - Yleinen quest-editori, laaja dialogipuu, ajastimet, `unless` ja kyläläisten vapaa liikkuminen.
+- Sepän pajan uudet kauppatuotteet, koiran kävely tai uudet Blender-animaatiot ennen v08.06:n omistajatestiä.
 - Inventaarion pudotus-UI ja pudotettujen esineiden 3D-instanssit.
 - 3D-kohtausten mount/dispose ilman sivun uudelleenlatausta.
 - Git LFS (omistajan päätös 2026-11-10: ei vielä).

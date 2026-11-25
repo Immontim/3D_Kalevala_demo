@@ -4,15 +4,18 @@ import { mapCellTravel, mapCell } from "./domain";
 import {
   CAMP_PLACEMENT,
   SHORE_PLACEMENT,
+  SMITHY_PLACEMENT,
   YARD_PLACEMENT,
   chebyshev,
   isShoreCell,
   placeYardInstances,
   rngStream,
   placeCampInstance,
+  placeSmithyInstance,
   travelMinutes,
   validateCampPlacement,
   validateShorePlacement,
+  validateSmithyPlacement,
   validateYardPlacement,
 } from "./placement";
 import { PROTOTYPE_MAP, PROTOTYPE_START } from "./prototype";
@@ -102,6 +105,38 @@ describe("pihapiirien sijoittelu (V3)", () => {
   });
 });
 
+describe("sepän pajan sijoittelu", () => {
+  it("1000 siementä tuottaa yhden saavutettavan pajan vähintään kolmen ruudun päähän muista paikoista", () => {
+    const minutes = travelMinutes(PROTOTYPE_PLACEMENT.map, PROTOTYPE_START);
+    const spots = new Set<string>();
+    for (let seed = 1; seed <= 1000; seed++) {
+      const all = newSiteInstances(seed);
+      const smithies = all.filter((site) => site.kind === "smithy");
+      expect(smithies, `siemen ${seed}`).toHaveLength(1);
+      const smithy = smithies[0];
+      const others = all.filter((site) => site !== smithy);
+      expect(validateSmithyPlacement(smithy, PROTOTYPE_PLACEMENT, others), `siemen ${seed}`).toEqual([]);
+      expect(SMITHY_PLACEMENT.terrains).toContain(mapCell(PROTOTYPE_MAP, smithy.x, smithy.y)!.terrainId);
+      expect(minutes[smithy.y * 20 + smithy.x]).toBeLessThanOrEqual(SMITHY_PLACEMENT.maxStartMinutes);
+      expect(chebyshev(smithy, PROTOTYPE_START)).toBeGreaterThanOrEqual(SMITHY_PLACEMENT.minStartDistance);
+      for (const other of others) {
+        expect(chebyshev(smithy, other), `siemen ${seed}, ${other.id}`).toBeGreaterThanOrEqual(SMITHY_PLACEMENT.minOtherDistance);
+      }
+      spots.add(`${smithy.x},${smithy.y}`);
+    }
+    expect(spots.size).toBeGreaterThan(15);
+  });
+
+  it("on deterministinen ja validaattori hylkää väärän maaston sekä liian lähellä olevan paikan", () => {
+    const other: SiteInstance = { id: "yard", kind: "yard", x: 8, y: 9, archer: true };
+    const smithy = placeSmithyInstance(42, PROTOTYPE_PLACEMENT, [other]);
+    expect(placeSmithyInstance(42, PROTOTYPE_PLACEMENT, [other])).toEqual(smithy);
+    expect(validateSmithyPlacement({ ...smithy, x: 0, y: 0 }, PROTOTYPE_PLACEMENT, [other]).join()).toContain("maasto water");
+    expect(validateSmithyPlacement({ ...smithy, x: other.x, y: other.y }, PROTOTYPE_PLACEMENT, [other]).join()).toContain("liian lähellä paikkaa yard");
+    expect(validateSmithyPlacement({ ...smithy, x: 99 }, PROTOTYPE_PLACEMENT, [other]).join()).toContain("kartan ulkopuolella");
+  });
+});
+
 describe("paikkainstanssit kampanjassa", () => {
   it("uusi matka tallentaa siemenen ja konkretisoidut pihat, jotka säilyvät tallennuksen läpi", () => {
     const state = newCampaign(777);
@@ -109,7 +144,7 @@ describe("paikkainstanssit kampanjassa", () => {
     // Metsästysapajat (kind "hunt") testataan huntGrounds.test.ts:ssä.
     const fixed = state.world.siteInstances.filter((i) => i.kind !== "hunt");
     expect(fixed).toEqual(newSiteInstances(777));
-    expect(fixed.map((i) => i.id)).toEqual(["lakeside", "cairnfield", "cairn-b", "yard", "yard-b", "camp"]);
+    expect(fixed.map((i) => i.id)).toEqual(["lakeside", "cairnfield", "cairn-b", "yard", "yard-b", "smithy", "camp"]);
     expect(parseCampaign(serializeCampaign(state))?.world.siteInstances).toEqual(state.world.siteInstances);
     expect(parseCampaign(serializeCampaign(state))?.world.worldSeed).toBe(777);
   });
@@ -139,7 +174,7 @@ describe("paikkainstanssit kampanjassa", () => {
     const a = done.world.siteInstances.find((i) => i.id === "yard")!;
     const b = done.world.siteInstances.find((i) => i.id === "yard-b")!;
     expect(done.world.siteInstances.filter((i) => i.kind !== "hunt").map((i) => i.id))
-      .toEqual(["yard", "lakeside", "cairnfield", "yard-b", "camp", "cairn-b"]);
+      .toEqual(["yard", "lakeside", "cairnfield", "yard-b", "smithy", "camp", "cairn-b"]);
     // Ennen v08:aa kiinteät paikat säilyvät entisillä ruuduillaan.
     expect(done.world.siteInstances.find((i) => i.id === "lakeside")).toMatchObject({ kind: "lakeside", ...LEGACY_SHORE_POSITIONS.lakeside });
     expect(done.world.siteInstances.find((i) => i.id === "cairnfield")).toMatchObject({ kind: "cairn", ...LEGACY_SHORE_POSITIONS.cairnfield });
@@ -147,6 +182,7 @@ describe("paikkainstanssit kampanjassa", () => {
     expect(validateShorePlacement(cairnB, PROTOTYPE_PLACEMENT, done.world.siteInstances)).toEqual([]);
     expect(a).toEqual({ id: "yard", kind: "yard", x: LEGACY_YARD_POSITION.x, y: LEGACY_YARD_POSITION.y, archer: true });
     expect(b).toMatchObject({ id: "yard-b", archer: false });
+    expect(done.world.siteInstances.filter((i) => i.kind === "smithy")).toHaveLength(1);
     expect(done.world.worldSeed).toBe(4242);
     expect(validateYardPlacement([b], placementWith(done.world.siteInstances.filter((i) => i.kind === "lakeside" || i.kind === "cairn"))).filter((p) => !p.includes("kahdesti"))).toEqual([]);
     expect(chebyshev(a, b)).toBeGreaterThanOrEqual(YARD_PLACEMENT.minMutualDistance);
@@ -159,7 +195,7 @@ describe("paikkainstanssit kampanjassa", () => {
     const done = completeSiteInstances(partial, 1);
     expect(done.world.worldSeed).toBe(31);
     expect(done.world.siteInstances.filter((i) => i.kind !== "hunt").map((i) => i.id).sort())
-      .toEqual(["cairn-b", "cairnfield", "camp", "lakeside", "yard", "yard-b"]);
+      .toEqual(["cairn-b", "cairnfield", "camp", "lakeside", "smithy", "yard", "yard-b"]);
     expect(done.world.siteInstances.find((i) => i.id === "yard-b")).toEqual({ id: "yard-b", kind: "yard", x: 8, y: 9, archer: true });
     expect(done.world.siteInstances.filter((i) => i.archer)).toHaveLength(1);
     expect(PROTOTYPE_START).toBeDefined();
@@ -173,7 +209,7 @@ describe("vainolaisten leirin sijoittelu", () => {
       const all = newSiteInstances(seed);
       const camp = all.find((i) => i.kind === "camp")!;
       const shore = all.filter((i) => i.kind === "lakeside" || i.kind === "cairn");
-      expect(all).toHaveLength(6);
+      expect(all).toHaveLength(7);
       expect(validateCampPlacement(camp, placementWith(shore), all), `siemen ${seed}`).toEqual([]);
       expect(validateYardPlacement(all.filter((i) => i.kind === "yard"), placementWith(shore)), `siemen ${seed}`).toEqual([]);
       expect(chebyshev(camp, PROTOTYPE_START)).toBeGreaterThanOrEqual(CAMP_PLACEMENT.minStartDistance);

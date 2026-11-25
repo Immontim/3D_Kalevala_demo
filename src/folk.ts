@@ -44,15 +44,20 @@ export interface VillagerDef {
   armL?: ArmPose; armR?: ArmPose;
   /** Makaa selällään maassa (kuollut): käsivarret asetetaan ensin pystyasennossa, sitten koko hahmo kaadetaan. Jalkaterien kohta on juuri, vartalo ulottuu juuren -z-suuntaan. */
   lying?: boolean;
+  /** Kohtaukseen tullessa alkava paikallaan tehtävä toiminta. `hit` on vain hetkellinen reaktio,
+   *  joten sitä ei käytetä alkuarvona. */
+  action?: Exclude<VillagerAction, "hit">;
   /** Kädessä pidettävä esine. Varsi kulkee pystyssä nyrkin otekanavan läpi: sauva nojaa maahan,
-   *  jousi on kädessä kahvastaan. grip = kanavan piste ja suunta lepoasennossa (mallin
+   *  jousi on kädessä kahvastaan; tool seuraa otekanavaa origostaan (esim. sepän vasara).
+   *  grip = kanavan piste ja suunta lepoasennossa (mallin
    *  koordinaatit, ks. docs/BLENDER_HANDOFF.md "Otekanavat"). */
-  prop?: { name: string; hand: "L" | "R"; kind: "staff" | "bow"; grip: { p: Dir; d: Dir } };
+  prop?: { name: string; hand: "L" | "R"; kind: "staff" | "bow" | "tool"; grip: { p: Dir; d: Dir } };
 }
 
 const q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion(), q3 = new THREE.Quaternion();
 const v1 = new THREE.Vector3(), v2 = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
+const AXIS_X = new THREE.Vector3(1, 0, 0);
 const AXIS_Z = new THREE.Vector3(0, 0, 1);
 /** Sormiluiden täysi avaus (rad) nyrkistä suoriksi: rystys-, keski- ja kärkinivel (Blender: FINGER_ANG). Lepoasento on nyrkki. */
 export const FINGER_OPEN = [1.25, 1.5, 0.9] as const;
@@ -68,6 +73,35 @@ function aimBone(bone: THREE.Object3D, dir: THREE.Vector3, axis?: THREE.Vector3)
   bone.updateMatrixWorld(true);
 }
 
+/** `char_smith.py` testaa nämä asennot Blenderissä maailman X-akselin kiertoina. Three.js:n
+ *  X-akseli on sama, joten kierrot voidaan toistaa suoraan ilman akselimuunnosta. */
+const WORK_BONES = [
+  "spine", "chest", "upper_arm_L", "forearm_L", "upper_arm_R", "forearm_R",
+  "thigh_L", "shin_L", "thigh_R", "shin_R",
+] as const;
+type WorkBone = typeof WORK_BONES[number];
+type SmithPose = readonly (readonly [WorkBone, number])[];
+const HAMMER_UP: SmithPose = [
+  ["spine", 0.18], ["upper_arm_R", -2.3], ["forearm_R", -1.2],
+  ["upper_arm_L", -0.75], ["forearm_L", -0.9], ["thigh_L", -0.3], ["shin_L", 0.25],
+];
+const HAMMER_DOWN: SmithPose = [
+  ["spine", 0.32], ["chest", 0.12], ["upper_arm_R", -0.75], ["forearm_R", -0.35],
+  ["upper_arm_L", -0.7], ["forearm_L", -0.9], ["thigh_L", -0.3], ["shin_L", 0.25],
+];
+const BELLOWS: SmithPose = [
+  ["spine", 0.22], ["upper_arm_L", -0.95], ["forearm_L", -0.55],
+  ["upper_arm_R", -0.6], ["forearm_R", -0.75], ["thigh_L", -0.25],
+  ["shin_L", 0.35], ["thigh_R", -0.15], ["shin_R", 0.25],
+];
+
+function rotateBoneWorldX(bone: THREE.Object3D, angle: number) {
+  const parentWorld = bone.parent!.getWorldQuaternion(q1);
+  const world = bone.getWorldQuaternion(q2).premultiply(q3.setFromAxisAngle(AXIS_X, angle));
+  bone.quaternion.copy(parentWorld.invert().multiply(world));
+  bone.updateMatrixWorld(true);
+}
+
 interface Living { update(dt: number, focus: THREE.Vector3 | null): void; }
 const living: Living[] = [];
 const villagers = new Map<string, Villager>();
@@ -79,7 +113,11 @@ const VANISH_SECONDS = 2.2;
  * sille elämää tai tekoälyä: kohtaaminen päättää, milloin toiminta vaihtuu. Uusia Louhen
  * kykyjä voidaan myöhemmin lisätä tähän rajapintaan ilman Fighter/Actor-kytkentää.
  */
-export type VillagerAction = "idle" | "sing" | "hit";
+export type VillagerAction = "idle" | "sing" | "hit" | "hammer" | "bellows" | "quench";
+
+function isWorkAction(action: VillagerAction): action is "hammer" | "bellows" | "quench" {
+  return action === "hammer" || action === "bellows" || action === "quench";
+}
 
 /** Vaihtaa tunnisteellisen kyläläisen toiminnan. `hit` on lyhyt säpsähdys, joka palaa edelliseen toimintaan. */
 export function setVillagerAction(id: string, action: VillagerAction): boolean {
@@ -130,6 +168,13 @@ class Villager implements Living {
   private idleArms = new Map<string, THREE.Quaternion>();
   private singArms = new Map<string, THREE.Quaternion>();
   private hitArms = new Map<string, THREE.Quaternion>();
+  private workBones = new Map<WorkBone, THREE.Object3D>();
+  private modelRest = new Map<WorkBone, THREE.Quaternion>();
+  private idleWork = new Map<WorkBone, THREE.Quaternion>();
+  private hammerUp = new Map<WorkBone, THREE.Quaternion>();
+  private hammerDown = new Map<WorkBone, THREE.Quaternion>();
+  private bellows = new Map<WorkBone, THREE.Quaternion>();
+  private returningFromWork = false;
   vanishing = false;
   private vanishT = 0;
   private baseScale = 1;
@@ -142,7 +187,10 @@ class Villager implements Living {
     if (this.def.lying) return;
     if (action === "hit") {
       if (this.action !== "hit") this.actionBeforeHit = this.action;
-    } else this.actionBeforeHit = action;
+    } else {
+      this.returningFromWork = isWorkAction(this.action) && !isWorkAction(action);
+      this.actionBeforeHit = action;
+    }
     this.action = action;
     this.actionTime = 0;
   }
@@ -175,6 +223,12 @@ class Villager implements Living {
     if (hand && def.prop) {
       hand.worldToLocal(gripP.set(...def.prop.grip.p));
       gripD.set(...def.prop.grip.d).normalize().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion()).invert());
+    }
+
+    // Työasennot on testattu mallin varsinaisesta lepoasennosta, ei pelin rennosta ARM_DOWN-asennosta.
+    for (const name of WORK_BONES) {
+      const bone = rig.getObjectByName(name);
+      if (bone) this.modelRest.set(name, bone.quaternion.clone());
     }
 
     // Kädet levällään olevasta lepoasennosta alas tai esineen pitoon. Juuri on vielä origossa
@@ -210,10 +264,11 @@ class Villager implements Living {
       prop.position.set(0.8, 0.02 - box.min.y, -0.55);
       prop.rotation.y = 0.14;
     } else if (prop && def.prop && hand) {
-      // Ranne käännetään niin, että nyrkin kanava on pystyssä (lähempään pystysuuntaan, ettei
-      // ranne kierry ympäri); varsi asetetaan kanavan kohdalle.
-      const up = gripD.clone().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion())).y >= 0 ? 1 : -1;
-      aimBone(hand, new THREE.Vector3(0, up, 0), gripD);
+      // Vasara seuraa nyrkin omaa otekanavaa. Sauvalle ja jouselle säilyy niiden vanha pystysuora ote.
+      if (def.prop.kind !== "tool") {
+        const up = gripD.clone().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion())).y >= 0 ? 1 : -1;
+        aimBone(hand, new THREE.Vector3(0, up, 0), gripD);
+      }
       const h = hand.localToWorld(gripP.clone());
       const out = Math.sign(h.x) || 1;
       prop.position.set(0, 0, 0);
@@ -221,14 +276,20 @@ class Villager implements Living {
       if (def.prop.kind === "staff") {
         // Sauvan varsi on mallissa +z-suuntaan ja linnun nokka +y: pystyyn, nokka eteen.
         prop.quaternion.setFromAxisAngle(UP, Math.PI).multiply(q1.setFromAxisAngle(v1.set(1, 0, 0), -Math.PI / 2));
-      } else {
+      } else if (def.prop.kind === "bow") {
         // Jousen lavat ovat pystyssä ja jänne -z: jänne käännetään vartaloon päin.
         prop.quaternion.setFromAxisAngle(UP, out > 0 ? Math.PI / 2 : -Math.PI / 2);
+      } else {
+        // `sepan_vasara`: ote on origossa ja paikallinen -Y kulkee varren suuntaan kohti päätä.
+        const gripWorld = gripD.clone().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion())).normalize();
+        prop.quaternion.setFromUnitVectors(v1.set(0, -1, 0), gripWorld);
       }
       prop.updateMatrixWorld(true);
-      const box = new THREE.Box3().setFromObject(prop);
       // Sauva seisoo maassa ja käsi on varrella siinä, mihin se osuu; jousi on kädessä kahvastaan.
-      prop.position.set(h.x, def.prop.kind === "staff" ? -box.min.y + 0.01 : h.y, h.z);
+      if (def.prop.kind === "staff") {
+        const box = new THREE.Box3().setFromObject(prop);
+        prop.position.set(h.x, -box.min.y + 0.01, h.z);
+      } else prop.position.copy(h);
       prepareMeshes(prop);
       this.root.add(prop);
       this.root.updateMatrixWorld(true);
@@ -251,6 +312,8 @@ class Villager implements Living {
     this.spine = rig.getObjectByName("chest") ?? null;
     if (this.spine) this.spineRest.copy(this.spine.quaternion);
     if (!def.lying) this.buildActionPoses(rig);
+    this.action = def.action ?? "idle";
+    this.actionBeforeHit = this.action;
 
     this.root.position.set(def.x, def.y, def.z);
     this.root.rotation.y = def.yaw;
@@ -287,6 +350,70 @@ class Villager implements Living {
     capture(this.singArms, [0.96, 0.16, 0.08], [0.98, 0.08, 0.12]);
     // Osuma ei vahingoita kyläläistä: ylävartalo ja kädet vain väistävät lyhyesti taakse.
     capture(this.hitArms, [0.35, -0.72, -0.5], [0.38, -0.42, -0.62]);
+
+    for (const name of WORK_BONES) {
+      const bone = rig.getObjectByName(name);
+      if (!bone) continue;
+      this.workBones.set(name, bone);
+      this.idleWork.set(name, bone.quaternion.clone());
+    }
+    const captureSmith = (target: Map<WorkBone, THREE.Quaternion>, pose: SmithPose) => {
+      for (const [name, rest] of this.modelRest) this.workBones.get(name)?.quaternion.copy(rest);
+      rig.updateMatrixWorld(true);
+      for (const [name, angle] of pose) {
+        const bone = this.workBones.get(name);
+        if (bone) rotateBoneWorldX(bone, angle);
+      }
+      for (const [name, bone] of this.workBones) target.set(name, bone.quaternion.clone());
+      for (const [name, rest] of this.idleWork) this.workBones.get(name)?.quaternion.copy(rest);
+      rig.updateMatrixWorld(true);
+    };
+    captureSmith(this.hammerUp, HAMMER_UP);
+    captureSmith(this.hammerDown, HAMMER_DOWN);
+    captureSmith(this.bellows, BELLOWS);
+  }
+
+  private updateWork(dt: number) {
+    const action = this.action;
+    if (!isWorkAction(action)) return;
+    const rate = action === "hammer" ? 15 : action === "bellows" ? 8 : 5;
+    const blend = 1 - Math.exp(-rate * dt);
+    const hammerPhase = (this.actionTime % 1.2) / 1.2;
+    // Hidas nosto, nopea isku, lyhyt kosketus ja paluu ylös.
+    const hammerMix = hammerPhase < 0.46 ? 0
+      : hammerPhase < 0.62 ? THREE.MathUtils.smoothstep(hammerPhase, 0.46, 0.62)
+        : hammerPhase < 0.74 ? 1
+          : 1 - THREE.MathUtils.smoothstep(hammerPhase, 0.74, 1);
+    const bellowsWave = Math.sin(this.actionTime * Math.PI * 2);       // noin 1 Hz
+    const quenchWave = Math.sin(this.actionTime * Math.PI / 1.2);     // rauhallinen 2,4 s kierros
+
+    for (const [name, bone] of this.workBones) {
+      if (action === "hammer") {
+        const up = this.hammerUp.get(name), down = this.hammerDown.get(name);
+        if (!up || !down) continue;
+        q1.copy(up).slerp(down, hammerMix);
+      } else {
+        const base = this.bellows.get(name);
+        if (!base) continue;
+        q1.copy(base);
+        if (name.startsWith("upper_arm_") || name.startsWith("forearm_")) {
+          const side = name.endsWith("_L") ? 1 : -1;
+          const amount = action === "bellows" ? bellowsWave * 0.07 * side : quenchWave * 0.035;
+          q1.multiply(q2.setFromAxisAngle(AXIS_X, amount));
+        } else if (name === "chest") {
+          const amount = action === "bellows" ? bellowsWave * 0.025 : quenchWave * 0.018;
+          q1.multiply(q2.setFromAxisAngle(AXIS_X, amount));
+        }
+      }
+      bone.quaternion.slerp(q1, blend);
+    }
+
+    this.look += (0 - this.look) * Math.min(1, dt * 4);
+    if (this.head) {
+      const pitch = action === "hammer" ? 0.08 : action === "bellows" ? 0.12 : 0.18 + quenchWave * 0.025;
+      q1.setFromAxisAngle(AXIS_X, pitch);
+      this.head.quaternion.slerp(q2.copy(this.headRest).multiply(q1), blend);
+    }
   }
 
   private updateAction(dt: number, focus: THREE.Vector3 | null) {
@@ -295,10 +422,22 @@ class Villager implements Living {
       this.action = this.actionBeforeHit;
       this.actionTime = 0;
     }
+    if (isWorkAction(this.action)) {
+      this.returningFromWork = false;
+      this.updateWork(dt);
+      return;
+    }
     const targetArms = this.action === "sing" ? this.singArms : this.action === "hit" ? this.hitArms : this.idleArms;
     const rate = this.action === "hit" ? 18 : this.action === "sing" ? 5.5 : 7;
     const blend = 1 - Math.exp(-rate * dt);
     for (const [name, target] of targetArms) this.actionBones.get(name)?.quaternion.slerp(target, blend);
+    if (this.returningFromWork) {
+      for (const [name, target] of this.idleWork) {
+        if (this.actionBones.has(name)) continue; // käsivarret palautuvat yllä valittuun idle/sing-asentoon
+        this.workBones.get(name)?.quaternion.slerp(target, blend);
+      }
+      if (this.actionTime > 0.7) this.returningFromWork = false;
+    }
 
     if (this.action === "idle") {
       // Katse seuraa kulkijaa vain levossa. Laulaessa Louhi pitää pään ylhäällä eikä seuraa pelaajaa.

@@ -105,7 +105,7 @@ describe("kampanjan selainvarasto", () => {
     // Mökki ja Louhen kalmisto jäävät entisille paikoilleen, uhrikalmisto arvotaan.
     // Samalla arvotaan metsästysapajat kerran (huntCycle asettuu nykyiseen jaksoon).
     expect(migrated.world.siteInstances.filter((i) => i.kind !== "hunt").map((i) => i.id))
-      .toEqual(["yard", "lakeside", "cairnfield", "yard-b", "camp", "cairn-b"]);
+      .toEqual(["yard", "lakeside", "cairnfield", "yard-b", "smithy", "camp", "cairn-b"]);
     expect(migrated.world.siteInstances.filter((i) => i.kind === "hunt").length).toBeGreaterThanOrEqual(HUNT_RULES.initial[0]);
     expect(migrated.world.siteInstances[0]).toMatchObject({ x: LEGACY_YARD_POSITION.x, y: LEGACY_YARD_POSITION.y, archer: true });
     expect(migrated.world.worldSeed).toBeGreaterThan(0);

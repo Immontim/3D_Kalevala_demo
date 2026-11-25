@@ -9,6 +9,7 @@ import { g, sfx } from "../engine/state";
 import { ARENA, ARENAS, ArenaId, saveArena } from "../world";
 import { Language, getLanguage, setLanguage, t } from "../i18n";
 import { sceneKind, sceneUrl, type SceneId } from "../app/route";
+import { friendlySceneSubtitleKey } from "./startMenuText";
 
 export function initStartMenu(options: { returnToMap?: boolean; scene?: SceneId } = {}) {
   if (options.returnToMap) {
@@ -16,7 +17,7 @@ export function initStartMenu(options: { returnToMap?: boolean; scene?: SceneId 
     const friendly = options.scene !== undefined && sceneKind(options.scene) === "friendly";
     const tag = document.querySelector<HTMLElement>("#start .tag");
     if (tag) {
-      tag.textContent = friendly ? t(options.scene === "lakeside" ? "lakeside.sub" : options.scene === "lakeruin" ? "lakeruin.sub" : options.scene === "cairnfield" ? "cairnfield.sub" : options.scene === "wilds" ? "wilds.sub" : "yard.sub")
+      tag.textContent = friendly && options.scene ? t(friendlySceneSubtitleKey(options.scene))
         : options.scene ? t(`arena.${options.scene}.desc`) : t("start.subtitle");
       tag.removeAttribute("data-i18n");
     }

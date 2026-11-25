@@ -29,7 +29,7 @@ import { drawBridge } from "./bridgeArt";
 const TILE = 48;
 const VIEW_COLS = 17;
 const VIEW_ROWS = 13;
-const SCENE_SHORTCUTS = ["yard", "lakeside", "lakeruin", "cairnfield", "clearing", "homestead", "wilds"] as const satisfies readonly SceneId[];
+const SCENE_SHORTCUTS = ["yard", "smithy", "lakeside", "lakeruin", "cairnfield", "clearing", "homestead", "wilds"] as const satisfies readonly SceneId[];
 
 const HERO_FRAME: Record<MapDirection, [number, number]> = {
   up: [0, 2], right: [1, 2], down: [2, 2], left: [3, 2],
@@ -198,6 +198,7 @@ function move(direction: MapDirection) {
 function siteMessage(siteId: string | undefined, fallback: string) {
   const scene = sceneForMapSite(siteId, campaign.world.siteInstances, campaign.engine.flags);
   if (scene === "yard") return t("map.yardFound");
+  if (scene === "smithy") return t("map.smithyFound");
   if (scene === "lakeside") return t("map.lakesideFound");
   if (scene === "clearing") return t("map.campfireFound");
   if (scene === "cairnfield") return t("map.cairnfieldFound");
@@ -560,7 +561,7 @@ function renderMap() {
       }, campaign.world.siteInstances, campaign.engine.flags);
       if (siteDisplay !== "hidden") {
         const sceneId = mapSiteDefinition(siteId, campaign.world.siteInstances)?.sceneId;
-        if (sceneId === "yard") sprite(ctx, [2, 1], vx * TILE, vy * TILE);
+        if (sceneId === "yard" || sceneId === "smithy") sprite(ctx, [2, 1], vx * TILE, vy * TILE);
         if (sceneId === "lakeside") sprite(ctx, [3, 1], vx * TILE, vy * TILE);
         if (sceneId === "clearing") drawRedHand(ctx, vx * TILE, vy * TILE);
         if (sceneId === "cairnfield") drawCairnSite(ctx, vx * TILE, vy * TILE, siteId === LOUHI_CAIRN_ID);

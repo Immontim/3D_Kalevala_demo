@@ -4,7 +4,7 @@ import { taggedItemCount, type CampaignState, type ItemId } from "../map/campaig
 import { nearestUnknownHuntGround } from "../map/huntGrounds";
 import { mapCalendarTime } from "../map/uiState";
 import { counterValue, flagValue } from "./state";
-import { resolveInstanceId } from "./instances";
+import { resolveInstanceId, resolveSiteId } from "./instances";
 import { MOON_PHASE_NAMES, SCENE_ITEM_LABELS } from "./registry";
 import type { Condition, CounterOp, WorldData } from "./types";
 
@@ -12,6 +12,14 @@ export interface ConditionResult {
   pass: boolean;
   /** Suomenkielinen selitys, joka kuvaa ehdon tilan nyt. */
   reason: string;
+}
+
+/** Moottorin laskurit ovat kokonaislukuja, joten maailma-ajan murto-osat tallennetaan miljoonasosina. */
+export const WORLD_TIME_COUNTER_SCALE = 1_000_000;
+
+/** Nolla merkitsee laskureissa "ei koskaan", joten aikaleimaan lisätään yksi. */
+export function worldTimeCounterMark(worldMinutes: number): number {
+  return Math.round(worldMinutes * WORLD_TIME_COUNTER_SCALE) + 1;
 }
 
 const OP_TEXT: Record<CounterOp, string> = {
@@ -89,6 +97,19 @@ export function evaluate(cond: Condition, state: CampaignState, data: WorldData)
         reason: `${counterLabel(data, cond.counter)} on ${value}; vaadittiin ${OP_TEXT[cond.op]} ${cond.value}${pass ? "" : " (ei täyty)"}`,
       };
     }
+    case "elapsedWorldMinutes": {
+      const mark = counterValue(state.engine, cond.counter);
+      const elapsed = mark > 0
+        ? (worldTimeCounterMark(state.world.worldMinutes) - mark) / WORLD_TIME_COUNTER_SCALE
+        : 0;
+      const pass = mark > 0 && elapsed + 1 / WORLD_TIME_COUNTER_SCALE >= cond.minutes;
+      return {
+        pass,
+        reason: mark > 0
+          ? `${counterLabel(data, cond.counter)}: aikaa on kulunut ${elapsed.toFixed(2)} minuuttia; vaadittiin vähintään ${cond.minutes}${pass ? "" : " (ei täyty)"}`
+          : `${counterLabel(data, cond.counter)}: aikaleimaa ei ole vielä kirjattu (ei täyty)`,
+      };
+    }
     case "moonPhase": {
       const phase = mapCalendarTime(state.world.worldMinutes).phase;
       const pass = cond.phases.includes(phase);
@@ -138,6 +159,16 @@ export function evaluate(cond: Condition, state: CampaignState, data: WorldData)
         reason: `${counterLabel(data, cond.counter)} on ${value}; nyt on kuunkierto ${moon}${pass ? " (sama kuu)" : " (eri kuu, ei täyty)"}`,
       };
     }
+    case "siteKnown": {
+      const id = resolveSiteId(state, cond.siteId);
+      const pass = id !== null && state.world.knownSiteIds.includes(id);
+      return {
+        pass,
+        reason: id === null
+          ? `karttapaikan roolia ${cond.siteId} ei löydy (ei täyty)`
+          : `karttapaikka ${id} on${pass ? "" : " ei ole"} pelaajan tiedossa${pass ? "" : " (ei täyty)"}`,
+      };
+    }
     case "unknownHuntGround": {
       const ground = nearestUnknownHuntGround(state);
       return {
@@ -180,12 +211,14 @@ export function conditionRefs(cond: Condition, out: { flags: string[]; counters:
     case "not": conditionRefs(cond.of, out); break;
     case "flag": out.flags.push(cond.flag); break;
     case "counter":
+    case "elapsedWorldMinutes":
     case "sameMoon": out.counters.push(cond.counter); break;
     case "itemTaken": out.instances.push(cond.instanceId); break;
     case "moonPhase":
     case "hasItem":
     case "hasTagged":
     case "moonChance":
+    case "siteKnown":
     case "unknownHuntGround": break;
   }
   return out;

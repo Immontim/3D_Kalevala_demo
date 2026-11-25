@@ -213,5 +213,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isSceneId(value: unknown): value is SceneId {
-  return value === "clearing" || value === "homestead" || value === "yard" || value === "lakeside" || value === "lakeruin" || value === "cairnfield" || value === "wilds";
+  return value === "clearing" || value === "homestead" || value === "yard" || value === "smithy"
+    || value === "lakeside" || value === "lakeruin" || value === "cairnfield" || value === "wilds";
 }

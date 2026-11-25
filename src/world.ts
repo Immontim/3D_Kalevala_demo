@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { Loadout } from "./combat";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import forestUrl from "../assets/forest.glb?url";
 import forestLodUrl from "../assets/forest_lod.glb?url";
 import homesteadUrl from "../assets/homestead.glb?url";
@@ -9,6 +9,9 @@ import yardUrl from "../assets/yard.glb?url";
 import lakesideUrl from "../assets/lakeside.glb?url";
 import lakeruinUrl from "../assets/lakeruin.glb?url";
 import cairnfieldUrl from "../assets/cairnfield.glb?url";
+import smithyUrl from "../assets/smithy.glb?url";
+import smithfolkUrl from "../assets/smithfolk.glb?url";
+import smithfolkChildUrl from "../assets/smithfolk_child.glb?url";
 import louhiUrl from "../assets/louhi.glb?url";
 import villagersUrl from "../assets/villagers.glb?url";
 import villagersFUrl from "../assets/villagers_f.glb?url";
@@ -34,6 +37,7 @@ import { Forest, ScatterField, placeForestWall, type ScatterItem, type TreeSpot 
 import { createBirds, type BirdsView } from "./engine/birds";
 import { addFoliageFade } from "./engine/foliageFade";
 import { entrySpawn, sceneLayout, walkableDepth, type Vec2 } from "./sceneLayout";
+import { planSmithyLife, type SmithyLifePlan } from "./smithyLife";
 
 // Taistelualueet kangasmetsässä: maasto, männyt, kuuset, koivut, varvut ja kivet
 // sekä alueen oma keskus (nuotioaukion kota tai pihapiirin rakennukset). Mallit
@@ -51,6 +55,7 @@ export const ARENAS: Record<ArenaId, { name: string; desc: string }> = {
   lakeside: { name: t("arena.lakeside.name"), desc: t("arena.lakeside.desc") },
   lakeruin: { name: t("arena.lakeruin.name"), desc: t("arena.lakeruin.desc") },
   cairnfield: { name: t("arena.cairnfield.name"), desc: t("arena.cairnfield.desc") },
+  smithy: { name: t("arena.smithy.name"), desc: t("arena.smithy.desc") },
   wilds: { name: t("arena.wilds.name"), desc: t("arena.wilds.desc") },
 };
 const ARENA_STORE = "laulun-miekka.arena.v1";
@@ -173,9 +178,11 @@ export function removeNpcFromScene(npcId: string, collision: CollisionWorld): bo
 
 /** Rauhallinen paikka: kohtaus alkaa ilman vastustajia. Paikka voi silti muuttua vihamieliseksi,
  *  koska vastustajat tuo kohtaus (Encounter), ei paikka. */
-export const ARENA_PEACEFUL = ARENA === "yard" || ARENA === "lakeside" || ARENA === "lakeruin" || ARENA === "cairnfield" || ARENA === "wilds";
+export const ARENA_PEACEFUL = ARENA === "yard" || ARENA === "lakeside" || ARENA === "lakeruin" || ARENA === "cairnfield" || ARENA === "smithy" || ARENA === "wilds";
 /** Pihan rakennukset, aita ja portti ovat yhteiset taistelupihalle ja rauhalliselle pihalle. */
 const HAS_YARD = ARENA === "homestead" || ARENA === "yard";
+/** Sepän aidattu pihapiiri: oma sommittelu, paja ja työväki. */
+const SMITHY_SITE = ARENA === "smithy";
 /** Järven ranta: mökki, laituri ja vesi (lakeside.glb). */
 const LAKESIDE = ARENA === "lakeside" || ARENA === "lakeruin";
 /** Kalmisto: kalliokumpu järven rannalla (cairnfield.glb), ei mökkiä, laituria eikä tulta. */
@@ -251,6 +258,19 @@ const GATE_HALF = 0.11;       // portin puolileveys radiaaneina (etelässä, +z)
 /** Kuoppatalon kulkukuilu, joka leikataan maastoon: puolileveys sekä alku ja loppu etusuuntaan
  *  (homestead.py: dw + 0.34, L/2 - 0.25, L/2 + RAMP). */
 const PIT_HOLE = { half: 0.76, from: 2.05, to: 4.2 };
+
+// ---------- Sepän pihapiiri ----------
+// Samat luvut kuin assets-src/blender/smithy_yard.py:ssä ja docs/SMITHY_INTEGRATION.md:ssä.
+const SMITHY = onRing(155, 14.2, 3.4, 2.6, 2.3);
+const SMITH_HOUSE = onRing(255, 16.0, 5.3, 3.4, 3.4);
+const SMITH_STOREHOUSE = onRing(-38, 15.6, 2.0, 3.0, 2.1);
+const SMITH_COOKFIRE = { x: -10.223, z: -5.120 };
+const SMITH_TABLE = { x: 3.453, z: -10.362, yaw: SMITHY.yaw };
+const SMITH_LOGS = [
+  { x: -4.592, z: -11.087, yaw: 6.6759 }, { x: -6.623, z: -10.007, yaw: 6.8679 },
+  { x: -8.411, z: -8.559, yaw: 7.0599 }, { x: -4.298, z: -10.505, yaw: 6.6715 },
+  { x: -6.306, z: -9.437, yaw: 6.8722 }, { x: -8.061, z: -7.991, yaw: 7.0729 },
+] as const;
 
 // ---------- Järven ranta ----------
 /** Vesipinnan korkeus; maasto painuu sen alle rannasta järveen päin (+z). */
@@ -357,6 +377,17 @@ const SITES: Record<ArenaId, Site> = {
       ...CAIRNS_AT.map((c) => ({ x: c.x, z: c.z, r: (c.key === "roykkio_b" ? 2.4 : c.key === "roykkio_d" ? 1.5 : 2.0) * c.s })),
       { x: KARSIKKO.x, z: KARSIKKO.z, r: 1.2 },
       { x: LOUHI_AT.x, z: LOUHI_AT.z, r: 1.0 },
+    ],
+  },
+  smithy: {
+    fire: SMITH_COOKFIRE, fireScale: 0.58, flat0: 20, flat1: 34, rough: 0.03,
+    treeMin: 25, shrub0: 17, shrub1: 24, dirtR: 15, camMaxR: 12.2,
+    // SMITHY on mukana maaston tasauksessa sekä puiden ja aidan karsinnassa. Sen törmäys tehdään
+    // osista buildWorldissa, jotta avoimeen pajakatokseen pääsee sisään.
+    footprints: [SMITH_HOUSE, SMITH_STOREHOUSE, SMITHY],
+    circles: [
+      { x: SMITH_COOKFIRE.x, z: SMITH_COOKFIRE.z, r: 1.55 },
+      { x: SMITH_TABLE.x, z: SMITH_TABLE.z, r: 1.35 },
     ],
   },
   wilds: {
@@ -467,6 +498,33 @@ function toLocal(f: Footprint, x: number, z: number): [number, number] {
 function fromLocal(f: Footprint, lx: number, lz: number): [number, number] {
   const s = Math.sin(f.yaw), c = Math.cos(f.yaw);
   return [f.x + lx * c + lz * s, f.z - lx * s + lz * c];
+}
+
+/** Avoimen pajakatoksen koneet ja paalut erillisinä esteinä; koko katosta ei suljeta laatikoksi. */
+function addSmithyColliders(collision: CollisionWorld) {
+  const circle = (id: string, bx: number, by: number, radius: number) => {
+    const [x, z] = fromLocal(SMITHY, bx, -by);
+    collision.add({ id: `smithy:${id}`, kind: "circle", x, z, radius, blocksMovement: true, blocksMelee: true, blocksCamera: true });
+  };
+  const box = (id: string, x0: number, x1: number, y0: number, y1: number, blocksCamera = true) => {
+    const [x, z] = fromLocal(SMITHY, (x0 + x1) / 2, -(y0 + y1) / 2);
+    collision.add({
+      id: `smithy:${id}`, kind: "box", x, z, yaw: SMITHY.yaw,
+      halfX: (x1 - x0) / 2, halfZ: (y1 - y0) / 2,
+      blocksMovement: true, blocksMelee: true, blocksCamera,
+    });
+  };
+  for (const x of [-3, 3]) for (const y of [-2, 0, 2]) circle(`post:${x}:${y}`, x, y, 0.13);
+  box("stone-wall", -3.2, 3.2, 1.7, 2.3);
+  box("forge", -1.85, -0.1, 0.2, 1.6);
+  box("bellows", -3.0, -1.8, 0.4, 1.4, false);
+  circle("anvil", 0.35, 0.3, 0.32);
+  circle("stone-anvil", 1.45, -0.4, 0.4);
+  box("quench-trough", 0.2, 1.5, 0.98, 1.66, false);
+  circle("water-tub", 2.3, 1.22, 0.33);
+  circle("charcoal", -2.35, -0.95, 0.55);
+  circle("slag", 3.8, 1.15, 0.7);
+  box("spear-rack", 0.6, 2.9, -3.7, -3.0, false);
 }
 
 /** Onko piste rakennuksen, nuotion tai muun kiinteän kohteen alla (pad laajentaa aluetta). */
@@ -975,6 +1033,44 @@ function makeSmoke(parent: THREE.Object3D, count: number, life: number, y0: numb
   };
 }
 
+/** Pieni paikallinen kipinäallas ahjolle ja alasimelle. */
+function makeSmithySparks(parent: THREE.Object3D, color: number, count = 32) {
+  const pos = new Float32Array(count * 3);
+  const vel = new Float32Array(count * 3);
+  const life = new Float32Array(count);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  const points = new THREE.Points(geo, new THREE.PointsMaterial({
+    map: softDot("rgba(255,255,255,1)", "rgba(255,255,255,0)"), color, size: 0.075,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  }));
+  points.frustumCulled = false;
+  parent.add(points);
+  let cursor = 0;
+  return {
+    emit(n: number, speed: number) {
+      for (let i = 0; i < n; i++) {
+        const k = cursor++ % count;
+        pos.set([0, 0, 0], k * 3);
+        vel.set([(Math.random() - 0.5) * speed, (0.55 + Math.random() * 0.8) * speed, (Math.random() - 0.5) * speed], k * 3);
+        life[k] = 0.3 + Math.random() * 0.4;
+      }
+    },
+    update(dt: number) {
+      for (let i = 0; i < count; i++) {
+        if (life[i] <= 0) continue;
+        life[i] -= dt;
+        pos[i * 3] += vel[i * 3] * dt;
+        pos[i * 3 + 1] += vel[i * 3 + 1] * dt;
+        pos[i * 3 + 2] += vel[i * 3 + 2] * dt;
+        vel[i * 3 + 1] -= 2.4 * dt;
+        if (life[i] <= 0) pos[i * 3 + 1] = -100;
+      }
+      geo.attributes.position.needsUpdate = true;
+    },
+  };
+}
+
 function buildFire(scene: THREE.Scene) {
   const fy = groundHeight(FIRE.x, FIRE.z);
   const group = new THREE.Group();
@@ -1375,6 +1471,23 @@ function populate(
         put("verilammikko_pieni@near", px, pz, 0.8 + 0.2 * (i % 2), i * 1.9, -0.03);
       });
     }
+  } else if (SMITHY_SITE) {
+    place("talo_seppa@near", SMITH_HOUSE);
+    place("aitta@near", SMITH_STOREHOUSE);
+    put("pukkipoyta@near", SMITH_TABLE.x, SMITH_TABLE.z, 1, SMITH_TABLE.yaw, 0.01);
+    for (const log of SMITH_LOGS) put("pino@near", log.x, log.z, 1, log.yaw, 0.02);
+    put("polkky@near", -5.253, -8.743, 1, 0.8, 0.02);
+    put("penkki@near", -12.904, -1.491, 1, 7.5922, 0.01);
+    put("pata@near", SMITH_COOKFIRE.x, SMITH_COOKFIRE.z, 1, 8.1922, 0.01);
+    // Sama aidattu kehämalli kuin muilla pihoilla. Paja, talo ja aitta leikkaavat omat aukkonsa.
+    const step = 2.0 / FENCE_R;
+    for (let a = GATE_HALF + step / 2; a < Math.PI * 2 - GATE_HALF - step / 2 + 1e-6; a += step) {
+      const rr = FENCE_R + Math.sin(a * 3.1) * 0.25;
+      const x = Math.sin(a) * rr, z = Math.cos(a) * rr;
+      if (blocked(x, z, 0.9)) continue;
+      put("aita@near", x, z, 1, a + Math.sin(a * 7) * 0.06, 0.02);
+    }
+    for (const s of [-1, 1]) put("portinpieli@near", Math.sin(s * GATE_HALF) * FENCE_R, Math.cos(s * GATE_HALF) * FENCE_R, 1, s, 0);
   } else {
     place("talo@near", HOUSE);
     if (ARENA === "homestead") place("kuoppatalo@near", PITHOUSE, 0);
@@ -1648,6 +1761,51 @@ const GRIP_FEMALE_L = { p: [0.385, 0.769, 0.058] as [number, number, number], d:
 
 /** Pihan väen nimi tunnisteesta: "kana_2", "kana_b" ja "emanta_b" ovat kanoja ja emäntiä. */
 const folkName = (id: string) => t(`folk.${id.replace(/_[a-z0-9]+$/, "")}` as TextKey);
+
+/** Savutesteille: tämän käynnin arvottu sepän pihan kokoonpano. */
+export const smithyDebug: { plan: SmithyLifePlan | null; people: Record<string, { x: number; z: number }> } = {
+  plan: null,
+  people: {},
+};
+
+function populateSmithyLife(scene: THREE.Scene, collision: CollisionWorld, plan = planSmithyLife()) {
+  smithyDebug.plan = plan;
+  smithyDebug.people = {};
+  const jobs: Promise<void>[] = [];
+  const person = (
+    id: string, character: string, url: string, x: number, z: number, yaw: number,
+    action: "idle" | "hammer" | "bellows" | "quench" = "idle",
+    prop?: { name: string; hand: "R"; kind: "tool"; grip: typeof GRIP_MALE_R },
+    talkId = id,
+  ) => {
+    jobs.push(spawnVillager(scene, { id, url, character, x, y: groundHeight(x, z), z, yaw, action, ...(prop ? { prop } : {}) }));
+    collision.add({ id: `folk:${id}`, kind: "circle", x, z, radius: character === "lapsi" ? 0.3 : 0.38, blocksMovement: true, blocksMelee: false });
+    addTalkable({ id: talkId, x, z, name: t(character === "lapsi" ? "folk.pikkusalli" : `folk.${id}` as TextKey) });
+    smithyDebug.people[id] = { x, z };
+  };
+
+  if (plan.setup === "work") {
+    person("seppa", "seppa", smithfolkUrl, 6.15, -12.36, 8.988, "hammer", {
+      name: "sepan_vasara", hand: "R", kind: "tool", grip: GRIP_MALE_R,
+    });
+    person("salli", "salli", smithfolkUrl, 3.39, -15.08, 7.418, "bellows");
+    // Kaukalo on pajan oikeassa takaosassa; lapsi seisoo sen etupuolella paikallisessa pisteessä
+    // (1,00; 0,55), vähintään 0,13 m oman törmäysympyränsä ulkopuolella kaukalosta.
+    person("pikkusalli", "lapsi", smithfolkChildUrl, 7.14, -12.95, 2.90, "quench");
+  } else {
+    person("seppa", "seppa", smithfolkUrl, 3.79, -11.09, 12.13);
+    const spot = plan.yardSpot!;
+    person("pikkusalli-koira", "lapsi", smithfolkChildUrl, spot.child.x, spot.child.z, spot.child.yaw, "idle", undefined, "pikkusalli-koira");
+    jobs.push(spawnAnimal(scene, {
+      url: dogUrl, x: spot.dog.x, y: groundHeight(spot.dog.x, spot.dog.z), z: spot.dog.z,
+      yaw: spot.dog.yaw, behavior: "dog", ground: groundHeight,
+    }));
+    collision.add({ id: "folk:smithy-dog", kind: "circle", x: spot.dog.x, z: spot.dog.z, radius: 0.32, blocksMovement: true, blocksMelee: false });
+  }
+  const host = window as unknown as { __world?: object };
+  Object.assign(host.__world ??= {}, { smithy: smithyDebug });
+  return Promise.all(jobs).then(() => undefined);
+}
 
 /** Kanakopin orsi (kyljessä 0,6 m) ja olkikaton keskikohta (yard.py `build_coop`): sivulle, eteen, korkeus. */
 const COOP_ROOST = { perch: { lx: 1.15, lz: 0, y: 0.6 }, roof: { lx: -0.1, lz: 0, y: 1.44 } } as const;
@@ -1978,6 +2136,138 @@ function addLakeColliders(collision: CollisionWorld) {
   return id;
 }
 
+interface SmithyVisuals { update(dt: number): void }
+
+function prepareRawModel(root: THREE.Object3D) {
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
+  });
+}
+
+function registerSmithySceneItem(
+  scene: THREE.Scene,
+  sceneItems: Map<string, RuntimeSceneItem>,
+  taken: ReadonlySet<string>,
+  object: THREE.Object3D,
+  def: { id: string; itemId: string; focusRadius: number },
+) {
+  const root = new THREE.Group();
+  root.name = `scene-item:${def.id}`;
+  scene.add(root);
+  root.attach(object); // säilyttää mountin tai GLB-solmun maailmamuunnoksen
+  if (taken.has(def.id)) { root.removeFromParent(); return; }
+  root.userData.sceneItemId = def.id;
+  root.updateMatrixWorld(true);
+  const focusWorldPosition = new THREE.Box3().setFromObject(root).getCenter(new THREE.Vector3());
+  sceneItems.set(def.id, {
+    id: def.id, siteId: "smithy", itemId: def.itemId, quantity: 1,
+    takeMode: "theft", ownerId: "seppa", root, focusWorldPosition, focusRadius: def.focusRadius,
+  });
+}
+
+/** Säilyttää pajan GLB-puun, jotta mountit ja palkeiden morph targetit eivät huku prototyyppilitistykseen. */
+function installSmithyVisuals(
+  scene: THREE.Scene,
+  smithyGltf: GLTF,
+  charactersGltf: GLTF,
+  sceneItems: Map<string, RuntimeSceneItem>,
+  taken: ReadonlySet<string>,
+  plan: SmithyLifePlan,
+): SmithyVisuals {
+  const root = smithyGltf.scene;
+  root.name = "smithy-yard-model";
+  root.position.set(SMITHY.x, groundHeight(SMITHY.x, SMITHY.z), SMITHY.z);
+  root.rotation.y = SMITHY.yaw;
+  prepareRawModel(root);
+  scene.add(root);
+  root.updateMatrixWorld(true);
+
+  // Katto käyttää samaa seulahäivytystä kuin kameran eteen osuva lehvästö, mutta omilla
+  // materiaaliklooneilla, jotta pajan muut tuohi- ja turvepinnat eivät katoa mukana.
+  root.getObjectByName("paja_katto")?.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const materials = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).map((m) => m.clone());
+    materials.forEach(addFoliageFade);
+    mesh.material = Array.isArray(mesh.material) ? materials : materials[0];
+  });
+
+  const greaves = root.getObjectByName("saarisuojat_myytavat");
+  if (greaves) registerSmithySceneItem(scene, sceneItems, taken, greaves, { id: "smithy.greaves", itemId: "iron_greaves", focusRadius: 0.52 });
+  else console.warn("Sepän myytävät säärisuojat puuttuvat mallista");
+
+  const mountSpear = root.getObjectByName("mount_keihas_1");
+  const spearSource = charactersGltf.scene.getObjectByName("spear");
+  if (mountSpear && spearSource) {
+    mountSpear.updateWorldMatrix(true, false);
+    const spearRoot = new THREE.Group();
+    spearRoot.matrix.copy(mountSpear.matrixWorld);
+    spearRoot.matrix.decompose(spearRoot.position, spearRoot.quaternion, spearRoot.scale);
+    const spear = spearSource.clone(true);
+    prepareRawModel(spear);
+    spearRoot.add(spear);
+    scene.add(spearRoot);
+    registerSmithySceneItem(scene, sceneItems, taken, spearRoot, { id: "smithy.spear", itemId: "spear", focusRadius: 0.48 });
+  } else console.warn("Sepän keihään mount tai spear-malli puuttuu");
+
+  const bellows = root.getObjectByName("palkeet") as THREE.Mesh | null;
+  if (bellows?.morphTargetInfluences) bellows.morphTargetInfluences.fill(0);
+  const emberMaterials: THREE.MeshStandardMaterial[] = [];
+  root.getObjectByName("ahjo_hiillos")?.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      const standard = m as THREE.MeshStandardMaterial;
+      if (standard.emissive) emberMaterials.push(standard);
+    }
+  });
+
+  const forgeMount = root.getObjectByName("mount_ahjo") ?? root;
+  const forgeLight = new THREE.PointLight(0xff6f2d, 2.4, 6, 1.6);
+  forgeLight.castShadow = false;
+  forgeMount.add(forgeLight);
+  const forgeSparkMount = root.getObjectByName("mount_kipinat") ?? forgeMount;
+  const forgeSparks = makeSmithySparks(forgeSparkMount, 0xff9a42, 40);
+  const forgeSmoke = makeSmoke(forgeSparkMount, 10, 5.5, 0.05, 0.55, 0.08, [0.28, 0.25, 0.22]);
+  const anvilMount = root.getObjectByName("mount_alasin") ?? root;
+  const anvilSparks = makeSmithySparks(anvilMount, 0xffc066, 28);
+  const quenchMount = root.getObjectByName("mount_karkaisu") ?? root;
+  const steam = makeSmoke(quenchMount, 7, 2.4, 0.02, 0.32, 0.09, [0.72, 0.75, 0.76]);
+  let time = 0, forgeEmit = 0, hammerCycle = -1;
+
+  return {
+    update(dt: number) {
+      time += dt;
+      const working = plan.setup === "work";
+      const phase = working ? 0.5 + 0.5 * Math.sin(time * Math.PI * 2) : 0;
+      if (bellows?.morphTargetInfluences) {
+        bellows.morphTargetInfluences[0] = phase;
+        bellows.morphTargetInfluences[1] = working ? 1 - phase : 0;
+      }
+      const breath = 0.5 + 0.5 * Math.sin(time * (working ? Math.PI * 2 : 1.7));
+      forgeLight.intensity = (working ? 2.3 : 1.65) + breath * 0.75 + Math.random() * 0.12;
+      for (const material of emberMaterials) material.emissiveIntensity = (working ? 2.6 : 2.1) + breath * 1.25;
+      forgeEmit -= dt;
+      if (forgeEmit <= 0) {
+        forgeSparks.emit(working ? 3 : 1, working ? 0.85 : 0.45);
+        forgeEmit = working ? 0.24 : 0.62;
+      }
+      if (working) {
+        const cycle = Math.floor(time / 1.2);
+        if (cycle !== hammerCycle) { hammerCycle = cycle; if (cycle > 0) anvilSparks.emit(8, 1.7); }
+      }
+      forgeSparks.update(dt);
+      anvilSparks.update(dt);
+      forgeSmoke(dt);
+      if (working) steam(dt);
+    },
+  };
+}
+
 export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): World {
   const maxAniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
@@ -2019,6 +2309,8 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   };
   let forest: Forest | null = null, scatter: ScatterField | null = null, props: Forest | null = null;
   let birds: BirdsView | null = null;
+  let smithyVisuals: SmithyVisuals | null = null;
+  const smithyPlan = SMITHY_SITE ? planSmithyLife() : null;
 
   const groundTex = buildGround(scene, maxAniso);
   const water = LAKE ? buildWater(scene, envMap) : null;
@@ -2051,7 +2343,9 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     id: "campfire", kind: "circle", x: FIRE.x, z: FIRE.z, radius: LAKE ? COLLISION.fireHazardRadius * 0.45 : COLLISION.fireHazardRadius,
     damagePerSecond: COLLISION.fireDamagePerSecond,
   });
-  SITE.footprints.forEach((f, i) => addFootprintCollider(collision, `building:${i}`, f));
+  const buildingFootprints = SMITHY_SITE ? [SMITH_HOUSE, SMITH_STOREHOUSE] : SITE.footprints;
+  buildingFootprints.forEach((f, i) => addFootprintCollider(collision, `building:${i}`, f));
+  if (SMITHY_SITE) addSmithyColliders(collision);
   if (LAKE) addLakeColliders(collision);
 
   // Talon savu nousee päädyn savuaukosta (pihapiiri) tai mökin kattoluukusta (ranta).
@@ -2063,8 +2357,9 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     scene.add(g);
     // Tuhon jälkeen raunio kytee: hidas, tumma savupatsas hiiltyneiden hirsien keskeltä.
     houseSmoke = RUIN ? makeSmoke(g, 20, 11, 0.8, 3.2, 0.2, [0.3, 0.29, 0.28]) : makeSmoke(g, 12, 7, 3.5, 1.8, 0.09);
-  } else if (HAS_YARD) {
-    const [sx, sz] = fromLocal(HOUSE, 5.0, 0);
+  } else if (HAS_YARD || SMITHY_SITE) {
+    const house = SMITHY_SITE ? SMITH_HOUSE : HOUSE;
+    const [sx, sz] = fromLocal(house, 5.0, 0);
     const g = new THREE.Group();
     g.position.set(sx, groundHeight(sx, sz), sz);
     scene.add(g);
@@ -2073,6 +2368,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
 
   const loader = new GLTFLoader();
   const files = [forestLodUrl, ...(ARENA === "yard" ? [forestUrl, homesteadUrl, householdUrl, yardUrl]
+    : SMITHY_SITE ? [forestUrl, homesteadUrl, householdUrl, smithyUrl, charactersUrl]
     : CAIRN ? [forestUrl, cairnfieldUrl]
     : LAKESIDE ? [forestUrl, homesteadUrl, householdUrl, lakesideUrl, ...(RUIN ? [lakeruinUrl] : [])]
       : HAS_YARD ? [forestUrl, homesteadUrl] : [forestUrl])];
@@ -2088,6 +2384,12 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
       }
     }
     prepareMaterials(protos, maxAniso);
+    if (SMITHY_SITE) {
+      const smithyGltf = gltfs[files.indexOf(smithyUrl)];
+      const charactersGltf = gltfs[files.indexOf(charactersUrl)];
+      if (!smithyGltf || !charactersGltf || !smithyPlan) throw new Error("Sepän pajan mallit tai kokoonpano puuttuvat");
+      smithyVisuals = installSmithyVisuals(scene, smithyGltf, charactersGltf, runtimeSceneItems, takenSceneItemIds, smithyPlan);
+    }
     const built = populate(scene, protos, collision, runtimeSceneItems, takenSceneItemIds);
     forest = built.forest;
     scatter = built.scatter;
@@ -2110,6 +2412,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     // Savutesteihin: metsän lähisäteen säätö (vertailukuvat täysi/kaukopuu).
     Object.assign(host.__world, { forestNear: (r: number, band?: number) => forest?.setNear(r, band) });
     if (ARENA === "yard") return populateYardLife(scene, collision);
+    if (SMITHY_SITE) return populateSmithyLife(scene, collision, smithyPlan!);
     if (CAIRN) return populateCairnLife(scene, collision);
     if (LAKESIDE) return populateLakeLife(scene, collision);
   });
@@ -2140,6 +2443,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
       // kameran kantaman (300 m) taakse ja taustaväri näkyisi puiden välistä.
       sky.position.copy(camera.position);
       fire.update(dt, camera);
+      smithyVisuals?.update(dt);
       houseSmoke?.(dt);
       water?.update(dt);
       loon?.(dt);
