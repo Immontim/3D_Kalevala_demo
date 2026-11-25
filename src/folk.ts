@@ -90,8 +90,8 @@ const HAMMER_DOWN: SmithPose = [
   ["upper_arm_L", -0.7], ["forearm_L", -0.9], ["thigh_L", -0.3], ["shin_L", 0.25],
 ];
 const BELLOWS: SmithPose = [
-  ["spine", 0.22], ["upper_arm_L", -0.95], ["forearm_L", -0.55],
-  ["upper_arm_R", -0.6], ["forearm_R", -0.75], ["thigh_L", -0.25],
+  ["spine", 0.28], ["upper_arm_L", -0.78], ["forearm_L", -0.48],
+  ["upper_arm_R", -0.72], ["forearm_R", -0.52], ["thigh_L", -0.25],
   ["shin_L", 0.35], ["thigh_R", -0.15], ["shin_R", 0.25],
 ];
 
@@ -398,7 +398,7 @@ class Villager implements Living {
         q1.copy(base);
         if (name.startsWith("upper_arm_") || name.startsWith("forearm_")) {
           const side = name.endsWith("_L") ? 1 : -1;
-          const amount = action === "bellows" ? bellowsWave * 0.07 * side : quenchWave * 0.035;
+          const amount = action === "bellows" ? bellowsWave * 0.11 * side : quenchWave * 0.035;
           q1.multiply(q2.setFromAxisAngle(AXIS_X, amount));
         } else if (name === "chest") {
           const amount = action === "bellows" ? bellowsWave * 0.025 : quenchWave * 0.018;
