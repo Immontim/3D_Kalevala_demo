@@ -30,9 +30,11 @@ export function describeCondition(cond: Condition, data: WorldData): string {
       const ops = { "<": "alle", "<=": "enintään", "=": "täsmälleen", ">=": "vähintään", ">": "yli" } as const;
       return `${label}: ${ops[cond.op]} ${cond.value}`;
     }
+    case "elapsedWorldMinutes": return `${data.counters[cond.counter]?.label ?? cond.counter} -aikaleimasta on kulunut vähintään ${cond.minutes} minuuttia`;
     case "moonPhase": return `kuu on vaiheessa: ${moonPhaseNames(cond.phases)}`;
     case "itemTaken": return `${itemLabel(cond.instanceId)} on otettu`;
     case "sameMoon": return `${data.counters[cond.counter]?.label ?? cond.counter} on tämä kuunkierto`;
+    case "siteKnown": return `karttapaikka "${cond.siteId}" on pelaajan tiedossa`;
     case "hasItem": return `pelaajalla on mukana vähintään ${cond.quantity} × ${cond.itemId}`;
     case "hasTagged": return `pelaajalla on mukana vähintään ${cond.quantity} × ${TAG_TEXT[cond.tag]} (mitä tahansa lajia)`;
     case "moonChance": return `tämän kuunkierron arpa "${cond.salt}" osuu (${Math.round(cond.chance * 100)} %)`;
@@ -63,6 +65,7 @@ export function describeEffect(effect: Effect, data: WorldData, text: TextLookup
     case "returnToMap": return "palataan heti 2D-kartalle";
     case "startSongLesson": return `aloitetaan laulun "${effect.songId}" opettelu (rytmiharjoitus)`;
     case "markMoon": return `kirjataan laskuriin "${data.counters[effect.counter]?.label ?? effect.counter}" nykyinen kuunkierto`;
+    case "markWorldTime": return `kirjataan laskuriin "${data.counters[effect.counter]?.label ?? effect.counter}" nykyinen maailma-aika`;
     case "revealHuntGround": return "sankaria lähin tuntematon metsästysapaja paljastuu kartalle";
     case "addLongEffect": {
       const def = LONG_EFFECTS[effect.effectId];

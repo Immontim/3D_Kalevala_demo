@@ -6,7 +6,9 @@ import { createCampaignStore } from "../map/campaignStore";
 import { PROTOTYPE_MAP_ID } from "../map/prototype";
 import { newSiteInstances } from "../map/siteInstances";
 import { conditionRefs, itemCount, moonRoll } from "./conditions";
-import { FISH_RUN_CHANCE, GAME_WORLD } from "./content";
+import {
+  FISH_RUN_CHANCE, GAME_WORLD, SMITHY_GREAVES, SMITHY_MEAT_PRICE, SMITHY_SPEAR, SMITHY_TRADE_COOLDOWN,
+} from "./content";
 import { resolveInstanceId } from "./instances";
 import { effectRefs } from "./effects";
 import { createWorldRuntime } from "./runtime";
@@ -14,7 +16,7 @@ import { SCENE_ITEM_LABELS } from "./registry";
 import { takeSceneItemWithEvents } from "./take";
 import type { Condition, Effect, GameEvent } from "./types";
 import { nodeVariants } from "./dialogue";
-import { WORLD_MINUTES_PER_MOON } from "../map/uiState";
+import { WORLD_MINUTES_PER_DAY, WORLD_MINUTES_PER_MOON } from "../map/uiState";
 
 
 const PACK: SceneItemDefinition = {
@@ -534,6 +536,132 @@ describe("huhun jälkeen kumpi tahansa emäntä neuvoo metsästysapajan kerran k
       world: { ...s.world, siteInstances: s.world.siteInstances.filter((i) => i.kind !== "hunt") },
     }));
     expect(ask(runtime).next?.view.nodeId).toBe("noNews");
+  });
+});
+
+describe("sepän pajan dialogit ja lihavaihto", () => {
+  type Store = ReturnType<typeof setup>["store"];
+  const spear: SceneItemDefinition = {
+    instanceId: SMITHY_SPEAR, siteId: "smithy", itemId: "spear", quantity: 1, takeMode: "theft", ownerId: "seppa",
+  };
+  const greaves: SceneItemDefinition = {
+    instanceId: SMITHY_GREAVES, siteId: "smithy", itemId: "iron_greaves", quantity: 1, takeMode: "theft", ownerId: "seppa",
+  };
+  const ids = (talk: { view: { choices: { id: string }[] } }) => talk.view.choices.map((c) => c.id);
+  const giveMeat = (store: Store, hare: number, boar = 0) => store.update((s) => {
+    let inventory = s.player.inventory;
+    if (hare) inventory = tryAddItem(inventory, "hare_meat", hare)!;
+    if (boar) inventory = tryAddItem(inventory, "boar_meat", boar)!;
+    return { ...s, player: { ...s.player, inventory } };
+  });
+  const smith = (runtime: ReturnType<typeof setup>["runtime"]) => runtime.startDialogue("smithy", "seppa")!;
+  const trade = (runtime: ReturnType<typeof setup>["runtime"]) => runtime.choose(smith(runtime), "trade-meat");
+  const leave = (runtime: ReturnType<typeof setup>["runtime"]) =>
+    runtime.post({ type: "npc.leftBehind", npcId: "seppa", sceneId: "smithy" });
+  function take(store: Store, item: SceneItemDefinition) {
+    let out: ReturnType<typeof takeSceneItemWithEvents> | null = null;
+    store.update((s) => { const r = takeSceneItemWithEvents(s, item, "smithy", GAME_WORLD); out = r; return r.state; });
+    return out!;
+  }
+
+  it("vaihtovalinta vaatii yhteensä kahdeksan lihaa ja ottaa tasan kahdeksan atomisesti", () => {
+    const seven = setup();
+    giveMeat(seven.store, 4, 3);
+    expect(ids(smith(seven.runtime))).not.toContain("trade-meat");
+
+    const eight = setup();
+    giveMeat(eight.store, 4, 4);
+    expect(ids(smith(eight.runtime))).toContain("trade-meat");
+    expect(trade(eight.runtime).saved).toBe(true);
+    expect(itemCount(eight.store.get(), "hare_meat") + itemCount(eight.store.get(), "boar_meat")).toBe(0);
+
+    const sixteen = setup();
+    giveMeat(sixteen.store, 8, 8);
+    expect(trade(sixteen.runtime).saved).toBe(true);
+    expect(itemCount(sixteen.store.get(), "hare_meat") + itemCount(sixteen.store.get(), "boar_meat")).toBe(8);
+    expect(smith(sixteen.runtime).view.nodeId).toBe("chooseWare");
+  });
+
+  it("lihan jälkeen molemmat tuotteet ovat luvallisia, mutta yhden otto palauttaa molemmat varkaustasolle", () => {
+    const { store, runtime } = setup();
+    giveMeat(store, SMITHY_MEAT_PRICE);
+    expect(sceneItemTakeMode(store.get(), spear)).toBe("theft");
+    trade(runtime);
+    expect(sceneItemTakeMode(store.get(), spear)).toBe("allowed");
+    expect(sceneItemTakeMode(store.get(), greaves)).toBe("allowed");
+    expect(take(store, spear).take).toMatchObject({ status: "taken", takeMode: "allowed" });
+    expect(sceneItemTakeMode(store.get(), spear)).toBe("theft");
+    expect(sceneItemTakeMode(store.get(), greaves)).toBe("theft");
+    expect(store.get().engine.flags["smithy.exchangeOpen"]).toBeUndefined();
+    expect(store.get().engine.flags["smithy.tradeThisVisit"]).toBe(true);
+  });
+
+  it("pelkkä käynti ei käynnistä aikaa, mutta vaihdon jälkeinen lähtö käynnistää", () => {
+    const empty = setup();
+    leave(empty.runtime);
+    expect(empty.store.get().engine.counters["smithy.lastTradeAt"]).toBeUndefined();
+
+    const paid = setup();
+    giveMeat(paid.store, SMITHY_MEAT_PRICE);
+    trade(paid.runtime);
+    expect(paid.store.get().engine.counters["smithy.lastTradeAt"]).toBeUndefined();
+    leave(paid.runtime);
+    expect(paid.store.get().engine.counters["smithy.lastTradeAt"]).toBe(1);
+    expect(paid.store.get().engine.flags["smithy.tradePendingDeparture"]).toBeUndefined();
+    expect(paid.store.get().engine.flags["smithy.tradeThisVisit"]).toBeUndefined();
+  });
+
+  it("toinen vaihto on lukossa 29 päivää ja avautuu 30 päivän kohdalla", () => {
+    const { store, runtime } = setup();
+    giveMeat(store, 8, 8);
+    trade(runtime);
+    take(store, spear);
+    leave(runtime);
+    store.update((s) => ({ ...s, world: { ...s.world, worldMinutes: 29 * WORLD_MINUTES_PER_DAY } }));
+    expect(smith(runtime).view.nodeId).toBe("busy");
+    store.update((s) => ({ ...s, world: { ...s.world, worldMinutes: SMITHY_TRADE_COOLDOWN } }));
+    expect(smith(runtime).view.nodeId).toBe("greet");
+    expect(ids(smith(runtime))).toContain("trade-meat");
+  });
+
+  it("avoin aiempi lupa ohittaa odotuksen ja yhdellä käynnillä saa silti vain yhden tuotteen", () => {
+    const { store, runtime } = setup();
+    giveMeat(store, 8, 8);
+    trade(runtime);
+    leave(runtime); // odotus alkaa, vaikka tavaraa ei vielä valittu
+    expect(smith(runtime).view.nodeId).toBe("chooseWare");
+    take(store, greaves);
+    expect(smith(runtime).view.nodeId).toBe("onePerVisit");
+    expect(ids(smith(runtime))).not.toContain("trade-meat");
+    expect(itemCount(store.get(), "hare_meat") + itemCount(store.get(), "boar_meat")).toBe(8);
+  });
+
+  it("uudelleenlatauksen scene.entered varmistaa odottavan vaihdon aikaleiman", () => {
+    const { store, runtime } = setup();
+    giveMeat(store, SMITHY_MEAT_PRICE);
+    trade(runtime);
+    runtime.post({ type: "scene.entered", sceneId: "smithy" });
+    expect(store.get().engine.counters["smithy.lastTradeAt"]).toBe(1);
+    expect(store.get().engine.flags["smithy.tradePendingDeparture"]).toBeUndefined();
+    expect(store.get().engine.flags["smithy.exchangeOpen"]).toBe(true);
+  });
+
+  it("pikkusälli kysyy koirasta vain työasetelmassa", () => {
+    const { runtime } = setup();
+    expect(ids(runtime.startDialogue("smithy", "pikkusalli")!)).toContain("ask-dog");
+    expect(ids(runtime.startDialogue("smithy", "pikkusalli-koira")!)).not.toContain("ask-dog");
+  });
+
+  it("sälli paljastaa jousineidon satunnaistetun maatilan vain kerran", () => {
+    const { store, runtime } = setup();
+    const archerYard = store.get().world.siteInstances.find((site) => site.kind === "yard" && site.archer)!.id;
+    const first = runtime.startDialogue("smithy", "salli")!;
+    expect(ids(first)).toContain("ask-sweetheart");
+    const told = runtime.choose(first, "ask-sweetheart");
+    expect(told.saved && told.next?.view.nodeId).toBe("sweetheart");
+    expect(store.get().world.knownSiteIds).toContain(archerYard);
+    expect(store.get().engine.flags["smithy.salliToldArcherYard"]).toBe(true);
+    expect(ids(runtime.startDialogue("smithy", "salli")!)).not.toContain("ask-sweetheart");
   });
 });
 

@@ -16,6 +16,8 @@ export type Condition =
   /** Lippu on asetettu (value oletuksena true) tai asettamatta (value false). */
   | { kind: "flag"; flag: string; value?: boolean }
   | { kind: "counter"; counter: string; op: CounterOp; value: number }
+  /** Laskuriin merkitystä maailma-ajasta on kulunut vähintään annettu minuuttimäärä. */
+  | { kind: "elapsedWorldMinutes"; counter: string; minutes: number }
   /** Kuun vaihe (0–7, kartan kalenterin mukaan) on jokin annetuista. */
   | { kind: "moonPhase"; phases: number[] }
   /**
@@ -34,6 +36,8 @@ export type Condition =
   | { kind: "moonChance"; salt: string; chance: number }
   /** Laskuriin on kirjattu tämä kuunkierto (`markMoon`): esim. emäntä on jo neuvonut tällä kuulla. */
   | { kind: "sameMoon"; counter: string }
+  /** Karttapaikka tai rooli (`@archerYard`) on pelaajan tiedossa. */
+  | { kind: "siteKnown"; siteId: string }
   /** Kartalla on metsästysapaja, jota pelaaja ei vielä tunne. */
   | { kind: "unknownHuntGround" };
 
@@ -66,6 +70,8 @@ export type Effect =
   | { kind: "recordVictory" }
   /** Kirjaa laskuriin nykyisen kuunkierron (numero + 1), jota `sameMoon` vertaa. */
   | { kind: "markMoon"; counter: string }
+  /** Kirjaa laskuriin nykyisen maailma-ajan aikaleimaksi. */
+  | { kind: "markWorldTime"; counter: string }
   /** Paljastaa kartalle sankaria lähimmän apajan, jota pelaaja ei tunne. Epäonnistuu, jos sellaista ei ole. */
   | { kind: "revealHuntGround" }
   /**

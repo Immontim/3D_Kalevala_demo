@@ -1,6 +1,7 @@
 // Pelin varsinainen maailmadata: säännöt ja dialogit. Tyypitettyä dataa, ei skriptiä.
 // NPC:iden repliikeillä on vähintään kolme samaa tarkoittavaa muunnelmaa (`lines`), joista näytetään yksi.
 import type { TextKey } from "../i18n";
+import { WORLD_MINUTES_PER_DAY } from "../map/uiState";
 import { COUNTERS, FLAGS } from "./registry";
 import type { Condition, Dialogue, DialogueChoice, DialogueEntry, DialogueNode, Rule, WorldData } from "./types";
 
@@ -28,6 +29,10 @@ const NO_NEWS: readonly TextKey[] = [
 export const APPEASE_HARES = 2;
 /** Todennäköisyys, että kalaa on kuunkierrolla noussut niin hyvin, että emäntä antaa sitä pyytämättä vastalahjaa. */
 export const FISH_RUN_CHANCE = 0.5;
+export const SMITHY_MEAT_PRICE = 8;
+export const SMITHY_TRADE_COOLDOWN = WORLD_MINUTES_PER_DAY * 30;
+export const SMITHY_SPEAR = "smithy.spear";
+export const SMITHY_GREAVES = "smithy.greaves";
 
 type HousewifeId = "emanta" | "emanta_b";
 const HOUSEHOLD = {
@@ -135,7 +140,58 @@ function householdFood(npc: HousewifeId, greetChoices: DialogueChoice[]): {
   };
 }
 
+const SMITHY_ITEMS = [SMITHY_SPEAR, SMITHY_GREAVES] as const;
+
+function smithyProductTakenRule(instanceId: (typeof SMITHY_ITEMS)[number]): Rule {
+  return {
+    id: `smithy.${instanceId === SMITHY_SPEAR ? "spear" : "greaves"}-taken`,
+    intent: "Kun pelaaja ottaa lihavaihdolla valitsemansa tuotteen, toisen tuotteen lupa sulkeutuu heti eikä samalla käynnillä voi tehdä toista kauppaa.",
+    on: { type: "item.taken", instanceId, takeMode: "allowed", sceneId: "smithy", ownerId: "seppa" },
+    when: { kind: "flag", flag: "smithy.exchangeOpen" },
+    then: [
+      { kind: "setSceneItemTakeMode", instanceId: SMITHY_SPEAR, takeMode: "theft" },
+      { kind: "setSceneItemTakeMode", instanceId: SMITHY_GREAVES, takeMode: "theft" },
+      { kind: "setFlag", flag: "smithy.exchangeOpen", value: false },
+      { kind: "setFlag", flag: "smithy.tradeThisVisit" },
+    ],
+  };
+}
+
+const SMITHY_RULES: Rule[] = [
+  ...SMITHY_ITEMS.map(smithyProductTakenRule),
+  {
+    id: "smithy.trade-departure",
+    intent: "Sepän 30 päivän odotus alkaa vasta, kun pelaaja lähtee pihasta tehdyn lihavaihdon jälkeen; pelkkä vierailu ei käynnistä aikaa.",
+    on: { type: "npc.leftBehind", npcId: "seppa", sceneId: "smithy" },
+    when: { kind: "flag", flag: "smithy.tradePendingDeparture" },
+    then: [
+      { kind: "markWorldTime", counter: "smithy.lastTradeAt" },
+      { kind: "setFlag", flag: "smithy.tradePendingDeparture", value: false },
+      { kind: "setFlag", flag: "smithy.tradeThisVisit", value: false },
+    ],
+  },
+  {
+    id: "smithy.trade-visit-cleared",
+    intent: "Kun pelaaja lähtee sepän pihasta ilman uutta odottavaa aikaleimaa, saman käynnin yhden kaupan esto nollautuu seuraavaa käyntiä varten.",
+    on: { type: "npc.leftBehind", npcId: "seppa", sceneId: "smithy" },
+    when: { kind: "flag", flag: "smithy.tradeThisVisit" },
+    then: [{ kind: "setFlag", flag: "smithy.tradeThisVisit", value: false }],
+  },
+  {
+    id: "smithy.trade-reload-departure",
+    intent: "Jos peli ladataan uudelleen kesken maksetun sepänkaupan, uusi sisääntulo tulkitaan lähdöksi ja odotuksen aikaleima kirjataan turvallisesti.",
+    on: { type: "scene.entered", sceneId: "smithy" },
+    when: { kind: "flag", flag: "smithy.tradePendingDeparture" },
+    then: [
+      { kind: "markWorldTime", counter: "smithy.lastTradeAt" },
+      { kind: "setFlag", flag: "smithy.tradePendingDeparture", value: false },
+      { kind: "setFlag", flag: "smithy.tradeThisVisit", value: false },
+    ],
+  },
+];
+
 export const RULES: Rule[] = [
+  ...SMITHY_RULES,
   theftRule("emanta"),
   theftRule("emanta_b"),
   ...meetingRules("emanta"),
@@ -517,6 +573,148 @@ export const YOUNG_WARRIOR_DIALOGUE: Dialogue = {
   nodes: { greet: { text: lines("dialogue.urho.greet"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] } },
 };
 
+const SMITHY_SOLD_OUT: Condition = {
+  kind: "all",
+  of: SMITHY_ITEMS.map((instanceId) => ({ kind: "itemTaken", instanceId })),
+};
+const SMITHY_COOLDOWN_DONE: Condition = {
+  kind: "elapsedWorldMinutes",
+  counter: "smithy.lastTradeAt",
+  minutes: SMITHY_TRADE_COOLDOWN,
+};
+
+/** Seppä: kahdeksan mitä tahansa lihaa avaa yhden tuotteen, ja seuraava vaihto odottaa 30 pelipäivää. */
+export const SMITH_DIALOGUE: Dialogue = {
+  id: "seppa.smithy",
+  sceneId: "smithy",
+  npcId: "seppa",
+  intent: "Seppä vaihtaa kahdeksan mitä tahansa lihaa keihääseen tai säärisuojiin, vain yhden tuotteen käyntiä kohti ja toisen aikaisintaan 30 pelipäivän kuluttua.",
+  entries: [
+    { when: SMITHY_SOLD_OUT, node: "soldOut" },
+    { when: { kind: "flag", flag: "smithy.exchangeOpen" }, node: "chooseWare" },
+    { when: { kind: "flag", flag: "smithy.tradeThisVisit" }, node: "onePerVisit" },
+    {
+      when: {
+        kind: "all",
+        of: [
+          { kind: "flag", flag: "smithy.tradeMade" },
+          { kind: "not", of: SMITHY_COOLDOWN_DONE },
+        ],
+      },
+      node: "busy",
+    },
+    { node: "greet" },
+  ],
+  nodes: {
+    greet: {
+      text: lines("dialogue.smithy.smith.request"),
+      choices: [
+        {
+          id: "trade-meat",
+          text: "dialogue.smithy.smith.offerMeat",
+          when: { kind: "hasTagged", tag: "meat", quantity: SMITHY_MEAT_PRICE },
+          effects: [
+            { kind: "takeTagged", tag: "meat", quantity: SMITHY_MEAT_PRICE },
+            { kind: "setSceneItemTakeMode", instanceId: SMITHY_SPEAR, takeMode: "allowed" },
+            { kind: "setSceneItemTakeMode", instanceId: SMITHY_GREAVES, takeMode: "allowed" },
+            { kind: "setFlag", flag: "smithy.exchangeOpen" },
+            { kind: "setFlag", flag: "smithy.tradeMade" },
+            { kind: "setFlag", flag: "smithy.tradePendingDeparture" },
+            { kind: "setFlag", flag: "smithy.tradeThisVisit" },
+            { kind: "message", text: "world.smithy.tradeOpened", sub: "world.smithy.tradeOpenedSub" },
+          ],
+          next: "traded",
+        },
+        { id: "leave", text: "dialogue.sage.leave" },
+      ],
+    },
+    traded: { text: lines("dialogue.smithy.smith.traded"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
+    chooseWare: { text: lines("dialogue.smithy.smith.chooseWare"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
+    onePerVisit: { text: lines("dialogue.smithy.smith.onePerVisit"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
+    busy: { text: lines("dialogue.smithy.smith.busy"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
+    soldOut: { text: lines("dialogue.smithy.smith.soldOut"), choices: [{ id: "leave", text: "dialogue.sage.leave" }] },
+  },
+};
+
+function smithyChildDialogue(npcId: "pikkusalli" | "pikkusalli-koira", dogAbsent: boolean): Dialogue {
+  const returnChoices: DialogueChoice[] = [
+    { id: "ask-another", text: "dialogue.smithy.askAnother", next: "greet" },
+    { id: "leave", text: "dialogue.sage.leave" },
+  ];
+  return {
+    id: `${npcId}.smithy`,
+    sceneId: "smithy",
+    npcId,
+    intent: `Pikkusälli kertoo pajatyöstään ja oppimisestaan${dogAbsent ? " sekä sisällä olevasta koirasta" : "; koira on hänen vierellään"}.`,
+    entries: [{ node: "greet" }],
+    nodes: {
+      greet: {
+        text: dogAbsent ? lines("dialogue.smithy.child.greetWork") : lines("dialogue.smithy.child.greetDog"),
+        choices: [
+          ...(dogAbsent ? [{ id: "ask-dog", text: "dialogue.smithy.child.askDog" as TextKey, next: "dog" }] : []),
+          { id: "ask-water", text: "dialogue.smithy.child.askWater", next: "water" },
+          { id: "ask-learning", text: "dialogue.smithy.child.askLearning", next: "learning" },
+          { id: "leave", text: "dialogue.sage.leave" },
+        ],
+      },
+      ...(dogAbsent ? { dog: { text: lines("dialogue.smithy.child.dog"), choices: returnChoices } } : {}),
+      water: { text: lines("dialogue.smithy.child.water"), choices: returnChoices },
+      learning: { text: lines("dialogue.smithy.child.learning"), choices: returnChoices },
+    },
+  };
+}
+
+export const SMITHY_CHILD_DIALOGUE = smithyChildDialogue("pikkusalli", true);
+export const SMITHY_CHILD_DOG_DIALOGUE = smithyChildDialogue("pikkusalli-koira", false);
+
+/** Aikuinen sälli: maatilahuhu on kertakäyttöinen, pajatyöstä voi kysellä aina. */
+export const SMITHY_APPRENTICE_DIALOGUE: Dialogue = {
+  id: "salli.smithy",
+  sceneId: "smithy",
+  npcId: "salli",
+  intent: "Sepän aikuinen sälli paljastaa kerran jousineidon maatilan, jos se ei ole vielä tiedossa, ja kertoo muuten sepäntyön oppimisesta.",
+  entries: [{ node: "greet" }],
+  nodes: {
+    greet: {
+      text: lines("dialogue.smithy.apprentice.greet"),
+      choices: [
+        {
+          id: "ask-sweetheart",
+          text: "dialogue.smithy.apprentice.askSweetheart",
+          when: {
+            kind: "all",
+            of: [
+              { kind: "flag", flag: "smithy.salliToldArcherYard", value: false },
+              { kind: "not", of: { kind: "siteKnown", siteId: "@archerYard" } },
+            ],
+          },
+          effects: [
+            { kind: "setFlag", flag: "smithy.salliToldArcherYard" },
+            { kind: "revealSite", siteId: "@archerYard" },
+          ],
+          next: "sweetheart",
+        },
+        { id: "ask-craft", text: "dialogue.smithy.apprentice.askCraft", next: "craft" },
+        { id: "leave", text: "dialogue.sage.leave" },
+      ],
+    },
+    sweetheart: {
+      text: lines("dialogue.smithy.apprentice.sweetheart"),
+      choices: [
+        { id: "ask-another", text: "dialogue.smithy.askAnother", next: "greet" },
+        { id: "leave", text: "dialogue.sage.leave" },
+      ],
+    },
+    craft: {
+      text: lines("dialogue.smithy.apprentice.craft"),
+      choices: [
+        { id: "ask-another", text: "dialogue.smithy.askAnother", next: "greet" },
+        { id: "leave", text: "dialogue.sage.leave" },
+      ],
+    },
+  },
+};
+
 /**
  * Louhen kalmisto: pelaaja voi vetäytyä suoraan kartalle tai haastaa Louhen, jolloin 3D käynnistää
  * paikallisen yhteenoton. Valinnat eivät muuta kampanjatilaa: paluu tai kuolema nollaa keskeneräisen
@@ -606,5 +804,9 @@ export const GAME_WORLD: WorldData = {
   flags: FLAGS,
   counters: COUNTERS,
   rules: RULES,
-  dialogues: [SAGE_DIALOGUE, ARCHER_DIALOGUE, HOUSEWIFE_DIALOGUE, HOUSEWIFE_B_DIALOGUE, YOUNG_WARRIOR_DIALOGUE, LOUHI_DIALOGUE, CUPSTONE_DIALOGUE, OFFERING_STONE_DIALOGUE],
+  dialogues: [
+    SAGE_DIALOGUE, ARCHER_DIALOGUE, HOUSEWIFE_DIALOGUE, HOUSEWIFE_B_DIALOGUE, YOUNG_WARRIOR_DIALOGUE,
+    SMITH_DIALOGUE, SMITHY_CHILD_DIALOGUE, SMITHY_CHILD_DOG_DIALOGUE, SMITHY_APPRENTICE_DIALOGUE,
+    LOUHI_DIALOGUE, CUPSTONE_DIALOGUE, OFFERING_STONE_DIALOGUE,
+  ],
 };

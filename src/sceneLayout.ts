@@ -221,6 +221,7 @@ export const SCENE_LAYOUTS: Record<SceneId, SceneLayout> = {
   clearing: circleScene(ringExit("south", 200, 11.4, 2.6, "s"), 14.5),
   homestead: circleScene(ringExit("gate", 0, 13.4, 2.4, "s")),
   yard: circleScene(ringExit("gate", 0, 13.4, 2.4, "s")),
+  smithy: circleScene(ringExit("gate", 0, 13.4, 2.4, "s")),
   // Ranta: polku tulee kaakosta mökin itäpuolelta, jotta saapuessa näkyy tuli ja järvi (mökki ei peitä).
   lakeside: circleScene(ringExit("path", 150, 11.4, 2.4, "n")),
   lakeruin: circleScene(ringExit("path", 150, 11.4, 2.4, "n")),

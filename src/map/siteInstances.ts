@@ -3,7 +3,8 @@
 import type { CampaignState, SiteInstance } from "./campaign";
 import { ensureHuntGrounds } from "./huntGrounds";
 import {
-  CAMP_INSTANCE_ID, YARD_INSTANCE_IDS, placeCampInstance, placeShoreSites, placeYardInstances, type PlacementContext,
+  CAMP_INSTANCE_ID, SMITHY_INSTANCE_ID, YARD_INSTANCE_IDS, placeCampInstance, placeShoreSites,
+  placeSmithyInstance, placeYardInstances, type PlacementContext,
 } from "./placement";
 import { PROTOTYPE_MAP, PROTOTYPE_START } from "./prototype";
 import { LEGACY_SHORE_POSITIONS, LEGACY_YARD_POSITION, SHORE_SITE_IDS } from "./sites";
@@ -32,12 +33,13 @@ export function newShoreInstances(seed: number): SiteInstance[] {
 
 /**
  * Uuden matkan kaikki arvotut paikat: ensin tietäjän mökki ja kalmistot rannoille (niillä on tiukimmat
- * maastoehdot), sitten kaksi pihaa ja lopuksi vainolaisten leiri kartan reunalla.
+ * maastoehdot), sitten kaksi pihaa, sepän paja ja lopuksi vainolaisten leiri kartan reunalla.
  */
 export function newSiteInstances(seed: number): SiteInstance[] {
   const shore = newShoreInstances(seed);
   const yards = newYardInstances(seed, shore);
-  return [...shore, ...yards, placeCampInstance(seed, placementWith(shore), yards)];
+  const smithy = placeSmithyInstance(seed, placementWith(shore), [...shore, ...yards]);
+  return [...shore, ...yards, smithy, placeCampInstance(seed, placementWith(shore), [...yards, smithy])];
 }
 
 /**
@@ -56,7 +58,7 @@ export function completeSiteInstances(state: CampaignState, freshSeed: number): 
 
 function completeFixedInstances(state: CampaignState, freshSeed: number): CampaignState {
   const have = new Set(state.world.siteInstances.map((instance) => instance.id));
-  const required = [...SHORE_SITE_IDS, ...YARD_INSTANCE_IDS, CAMP_INSTANCE_ID];
+  const required = [...SHORE_SITE_IDS, ...YARD_INSTANCE_IDS, SMITHY_INSTANCE_ID, CAMP_INSTANCE_ID];
   if (required.every((id) => have.has(id))) return state;
   const seed = state.world.worldSeed || freshSeed;
   let existing = state.world.siteInstances;
@@ -76,8 +78,14 @@ function completeFixedInstances(state: CampaignState, freshSeed: number): Campai
     : [];
   const withYards = [...withLegacy, ...placedYards];
   const yards = withYards.filter((site) => site.kind === "yard");
-  const camp = have.has(CAMP_INSTANCE_ID) ? [] : [placeCampInstance(seed, placementWith(shoreAll), yards)];
-  const withCamp = [...withYards, ...camp];
+  const smithy = have.has(SMITHY_INSTANCE_ID)
+    ? []
+    : [placeSmithyInstance(seed, placementWith(shoreAll), withYards)];
+  const withSmithy = [...withYards, ...smithy];
+  const camp = have.has(CAMP_INSTANCE_ID)
+    ? []
+    : [placeCampInstance(seed, placementWith(shoreAll), [...yards, ...withSmithy.filter((site) => site.kind === "smithy")])];
+  const withCamp = [...withSmithy, ...camp];
   const missingShore = SHORE_SITE_IDS.filter((id) => !withCamp.some((site) => site.id === id));
   const shore = missingShore.length > 0 ? placeShoreSites(seed, PROTOTYPE_PLACEMENT, missingShore, withCamp) : [];
   return {

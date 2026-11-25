@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BASE_INVENTORY_CAPACITY, createCampaign, type CampaignState } from "../map/campaign";
 import { createCampaignStore } from "../map/campaignStore";
-import { WORLD_MINUTES_PER_MOON } from "../map/uiState";
+import { WORLD_MINUTES_PER_DAY, WORLD_MINUTES_PER_MOON } from "../map/uiState";
 import { evaluate } from "./conditions";
 import { applyEffects } from "./effects";
 import { explainRule, matchesPattern, postEvent } from "./engine";
@@ -23,7 +23,7 @@ const RUMOR: Rule = {
 
 const TEST_WORLD: WorldData = {
   flags: { "rumor.heard": { label: "emäntä on kertonut huhun" }, "a": { label: "lippu A" }, "b": { label: "lippu B" } },
-  counters: { "n": { label: "laskuri N", max: 5 } },
+  counters: { "n": { label: "laskuri N", max: 5 }, "time": { label: "aikaleima", max: Number.MAX_SAFE_INTEGER } },
   rules: [RUMOR],
   dialogues: [],
 };
@@ -124,6 +124,19 @@ describe("ehdot", () => {
     expect(pass(full, at(0))).toBe(false);                       // uusikuu
     expect(pass(full, at(WORLD_MINUTES_PER_MOON / 2))).toBe(true); // täysikuu kierron puolivälissä
     expect(evaluate(full, at(0), TEST_WORLD).reason).toContain("uusikuu");
+  });
+
+  it("maailma-aikaleima säilyttää päivän murto-osat ja täyttää rajan vasta ajan kuluttua", () => {
+    const started: CampaignState = { ...state, world: { ...state.world, worldMinutes: 1.25 } };
+    const marked = applyEffects(started, [{ kind: "markWorldTime", counter: "time" }], TEST_WORLD);
+    if (!marked.ok) throw new Error("aikaleiman kirjaus epäonnistui");
+    const elapsed: Condition = { kind: "elapsedWorldMinutes", counter: "time", minutes: 30 * WORLD_MINUTES_PER_DAY };
+    const at = (days: number): CampaignState => ({
+      ...marked.state,
+      world: { ...marked.state.world, worldMinutes: 1.25 + days * WORLD_MINUTES_PER_DAY },
+    });
+    expect(pass(elapsed, at(29))).toBe(false);
+    expect(pass(elapsed, at(30))).toBe(true);
   });
 
   it("itemTaken katsoo otettujen esineiden listaa", () => {

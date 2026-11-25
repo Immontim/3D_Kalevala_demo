@@ -32,8 +32,9 @@ describe("2D-kohtaamisrekisteri", () => {
     { id: "cairnfield", kind: "cairn", x: 11, y: 11, archer: false },
     { id: "cairn-b", kind: "cairn", x: 2, y: 2, archer: false },
   ];
+  const smithy: SiteInstance = { id: "smithy", kind: "smithy", x: 7, y: 12, archer: false };
 
-  it("luokittelee mökin, kalmistot ja pihainstanssit kiinteiksi ja pysyviksi", () => {
+  it("luokittelee mökin, kalmistot, pihat ja sepän pajan kiinteiksi ja pysyviksi", () => {
     for (const id of ["lakeside", "cairnfield", "cairn-b"]) {
       expect(mapSiteDefinition(id, shore)).toMatchObject({ movement: "fixed", lifetime: "persistent" });
     }
@@ -45,6 +46,8 @@ describe("2D-kohtaamisrekisteri", () => {
     expect(sceneForMapSite("yard", instances)).toBe("yard");
     expect(sceneForMapSite("yard-b", instances)).toBe("yard");
     expect(sceneForMapSite("yard-c", instances)).toBeNull();
+    expect(sceneForMapSite("smithy", [smithy])).toBe("smithy");
+    expect(mapSiteDefinition("smithy", [smithy])).toMatchObject({ movement: "fixed", lifetime: "persistent" });
     const camp: SiteInstance = { id: "camp", kind: "camp", x: 3, y: 4, archer: false };
     expect(sceneForMapSite("camp", [camp])).toBeNull();                   // leiri on lukossa, kunnes Louhi on karkotettu
     expect(sceneForMapSite("camp", [camp], { "louhi.banished": true })).toBe("clearing");

@@ -39,6 +39,11 @@ export const FLAGS: Record<string, FlagDef> = {
   "emanta_b.robbed": { label: "toisen talon emäntä tietää, että hänen pöydältään vietiin ruokaa kysymättä" },
   "emanta.foodShared": { label: "jousineidon talon emäntä antoi jänislihasta luvan ottaa pöydän rieskat ja kalat" },
   "emanta_b.foodShared": { label: "toisen talon emäntä antoi jänislihasta luvan ottaa pöydän rieskat ja kalat" },
+  "smithy.exchangeOpen": { label: "sepän lihavaihto on maksettu ja toinen kauppatavara on luvallinen ottaa" },
+  "smithy.tradeMade": { label: "pelaaja on tehnyt sepän kanssa ainakin yhden lihavaihtokaupan" },
+  "smithy.tradePendingDeparture": { label: "sepän viimeisin lihavaihto odottaa pihasta lähtöä ennen aikaleimaa" },
+  "smithy.tradeThisVisit": { label: "pelaaja on tehnyt sepän kanssa vaihtokaupan tällä käynnillä" },
+  "smithy.salliToldArcherYard": { label: "sepän sälli on kertonut jousineidon maatilasta" },
 };
 
 export const COUNTERS: Record<string, CounterDef> = {
@@ -52,6 +57,8 @@ export const COUNTERS: Record<string, CounterDef> = {
   "emanta.huntTipMoon": { label: "kuunkierto, jolla jompikumpi emäntä viimeksi neuvoi metsästysapajan", max: 9999 },
   /** Kuunkierto + 1, jolla Ukkoa viimeksi muistettiin kummalla tahansa kuppikivellä (0 = ei koskaan). */
   "ukko.rememberedMoon": { label: "kuunkierto, jolla pelaaja viimeksi muisti Ukkoa kuppikivellä", max: 9999 },
+  /** Maailma-aika miljoonasosaminuutteina + 1 (0 = ei koskaan), ks. conditions.ts. */
+  "smithy.lastTradeAt": { label: "maailma-aika, jolloin sepän viimeisimmän lihavaihdon jälkeen lähdettiin", max: Number.MAX_SAFE_INTEGER },
 };
 
 /** Maailmanesineiden instanssitunnisteet ihmisen luettavina nimina (yhteenvetoa varten). */
@@ -61,6 +68,8 @@ export const SCENE_ITEM_LABELS: Record<string, string> = {
   "@archerYard.table-dried-fish": "jousineidon talon pöydän kuivatut kalat",
   "@otherYard.table-flatbread": "toisen talon pöydän rieskat",
   "@otherYard.table-dried-fish": "toisen talon pöydän kuivatut kalat",
+  "smithy.spear": "sepän kauppatelineen keihäs",
+  "smithy.greaves": "sepän kauppatelineen säärisuojat",
 };
 
 /** Kuun vaiheet 0–7 samassa järjestyksessä kuin kartan kalenteri (0 = uusikuu, 4 = täysikuu). */

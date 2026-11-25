@@ -110,6 +110,11 @@ describe("2D- ja 3D-kohtauksen siirtymä", () => {
 });
 
 describe("poistumissuunta paluukuoressa", () => {
+  it("hyväksyy sepän pajan paluun kartalle", () => {
+    expect(parseSceneReturn({ schemaVersion: 1, scene: "smithy", rewards: [], exitDir: "s" }))
+      .toEqual({ schemaVersion: 1, scene: "smithy", rewards: [], exitDir: "s" });
+  });
+
   it("säilyttää kelvollisen exitDirin ja pudottaa tuntemattoman", () => {
     expect(createEmptySceneReturn("wilds", "e")).toEqual({ schemaVersion: 1, scene: "wilds", rewards: [], exitDir: "e" });
     expect(parseSceneReturn({ schemaVersion: 1, scene: "wilds", rewards: [], exitDir: "n" })?.exitDir).toBe("n");

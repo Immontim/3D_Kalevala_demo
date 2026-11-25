@@ -6,6 +6,7 @@ describe("sovelluksen reitit", () => {
     expect(sceneKind("clearing")).toBe("battle");
     expect(sceneKind("homestead")).toBe("battle");
     expect(sceneKind("yard")).toBe("friendly");
+    expect(sceneKind("smithy")).toBe("friendly");
     expect(sceneKind("lakeside")).toBe("friendly");
     expect(sceneKind("lakeruin")).toBe("friendly");
     expect(sceneKind("cairnfield")).toBe("friendly");
@@ -26,6 +27,9 @@ describe("sovelluksen reitit", () => {
     });
     expect(parseAppRoute("https://example.test/game/?scene=cairnfield&return=map")).toEqual({
       mode: "scene", scene: "cairnfield", returnToMap: true, site: null,
+    });
+    expect(parseAppRoute("https://example.test/game/?scene=smithy&return=map&site=smithy")).toEqual({
+      mode: "scene", scene: "smithy", returnToMap: true, site: "smithy",
     });
     expect(parseAppRoute("https://example.test/game/?scene=unknown&return=map")).toEqual({ mode: "map" });
     expect(parseAppRoute("https://example.test/game/?return=map")).toEqual({ mode: "map" });

@@ -5,8 +5,8 @@ import { setSceneItemTakeMode, tryAddItem, tryRemoveItem, tryRemoveTagged, type 
 import { nearestUnknownHuntGround } from "../map/huntGrounds";
 import { tryAddLongEffect } from "../map/longEffects";
 import { revealSiteOnMap } from "../map/reveal";
-import { currentMoonMark } from "./conditions";
-import { resolveInstanceId } from "./instances";
+import { currentMoonMark, worldTimeCounterMark } from "./conditions";
+import { resolveInstanceId, resolveSiteId } from "./instances";
 import { totalDays } from "../map/uiState";
 import { withCounterAdded, withCounterSet, withFlag } from "./state";
 import type { Effect, OutAction, OutMessage, WorldData } from "./types";
@@ -66,7 +66,8 @@ export function applyEffects(state: CampaignState, effects: readonly Effect[], d
         actions.push({ kind: "songLesson", songId: effect.songId });
         break;
       case "revealSite": {
-        const revealed = revealSiteOnMap(current, effect.siteId);
+        const siteId = resolveSiteId(current, effect.siteId);
+        const revealed = siteId ? revealSiteOnMap(current, siteId) : null;
         if (!revealed) return fail(state, "unknown-site", `tuntematon karttapaikka ${effect.siteId}`);
         current = revealed;
         break;
@@ -98,6 +99,17 @@ export function applyEffects(state: CampaignState, effects: readonly Effect[], d
         if (engine !== current.engine) current = { ...current, engine };
         break;
       }
+      case "markWorldTime": {
+        if (!data.counters[effect.counter]) return fail(state, "unknown-counter", `tuntematon laskuri ${effect.counter}`);
+        const engine = withCounterSet(
+          current.engine,
+          effect.counter,
+          worldTimeCounterMark(current.world.worldMinutes),
+          data.counters[effect.counter].max,
+        );
+        if (engine !== current.engine) current = { ...current, engine };
+        break;
+      }
       case "revealHuntGround": {
         const ground = nearestUnknownHuntGround(current);
         const revealed = ground ? revealSiteOnMap(current, ground.id) : null;
@@ -124,7 +136,7 @@ function fail(state: CampaignState, reason: EffectFailure, detail: string): Appl
 export function effectRefs(effects: readonly Effect[], out: { flags: string[]; counters: string[]; instances: string[] } = { flags: [], counters: [], instances: [] }) {
   for (const e of effects) {
     if (e.kind === "setFlag") out.flags.push(e.flag);
-    else if (e.kind === "addCounter" || e.kind === "markMoon") out.counters.push(e.counter);
+    else if (e.kind === "addCounter" || e.kind === "markMoon" || e.kind === "markWorldTime") out.counters.push(e.counter);
     else if (e.kind === "setSceneItemTakeMode") out.instances.push(e.instanceId);
   }
   return out;

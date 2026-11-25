@@ -24,7 +24,20 @@ export const YARD_PLACEMENT = {
 } as const;
 
 export const YARD_INSTANCE_IDS = ["yard", "yard-b"] as const;
+export const SMITHY_INSTANCE_ID = "smithy";
 export const CAMP_INSTANCE_ID = "camp";
+
+/**
+ * Sepän paja on tavallisella kulkukelpoisella pihamaalla, kohtuullisen matkan päässä alusta ja
+ * erillään muista pysyvistä paikoista. Oma satunnaisvirta pitää sen paikan vakaana, vaikka pihojen
+ * tai rantapaikkojen sijoittelua myöhemmin säädetään.
+ */
+export const SMITHY_PLACEMENT = {
+  terrains: ["meadow", "forest"] as readonly TerrainId[],
+  minStartDistance: 3,
+  maxStartMinutes: 180,
+  minOtherDistance: 3,
+} as const;
 
 /**
  * Vainolaisten leirin sijoittelusäännöt: kartan reunalla, kaukana aloituksesta. Kartan uloin
@@ -189,6 +202,54 @@ export function placeYardInstances(
     placed[Math.floor(rngStream(seed, "archer")() * placed.length)].archer = true;
   }
   return placed;
+}
+
+/** Sepän pajan sijoittelun rikkomukset (tyhjä = kelpaa). */
+export function validateSmithyPlacement(
+  smithy: SiteInstance,
+  context: PlacementContext,
+  others: readonly SiteInstance[],
+): string[] {
+  const rules = SMITHY_PLACEMENT;
+  const problems: string[] = [];
+  const label = `sepän paja ${smithy.id} (${smithy.x},${smithy.y})`;
+  const cell = mapCell(context.map, smithy.x, smithy.y);
+  if (!cell) return [`${label}: ruutu on kartan ulkopuolella`];
+  if (!(rules.terrains as readonly string[]).includes(cell.terrainId) || cell.crossingId) {
+    problems.push(`${label}: maasto ${cell.terrainId} ei kelpaa pajalle`);
+  }
+  if (cell.siteId) problems.push(`${label}: ruudussa on jo paikka ${cell.siteId}`);
+  if (chebyshev(smithy, context.start) < rules.minStartDistance) problems.push(`${label}: liian lähellä aloitusta`);
+  const cost = travelMinutes(context.map, context.start)[mapIndex(context.map, smithy.x, smithy.y)];
+  if (!Number.isFinite(cost)) problems.push(`${label}: ei saavuteta aloituksesta`);
+  else if (cost > rules.maxStartMinutes) problems.push(`${label}: matka ${cost} min ylittää rajan ${rules.maxStartMinutes}`);
+  for (const fixed of context.fixedSites) {
+    if (chebyshev(smithy, fixed) < rules.minOtherDistance) problems.push(`${label}: liian lähellä kiinteää paikkaa (${fixed.x},${fixed.y})`);
+  }
+  for (const other of others) {
+    if (other.id !== smithy.id && chebyshev(smithy, other) < rules.minOtherDistance) {
+      problems.push(`${label}: liian lähellä paikkaa ${other.id}`);
+    }
+  }
+  return problems;
+}
+
+/** Arpoo yhden pysyvän sepän pajan omasta `smithy`-satunnaisvirrastaan. */
+export function placeSmithyInstance(
+  seed: number,
+  context: PlacementContext,
+  others: readonly SiteInstance[],
+): SiteInstance {
+  const candidates: MapPosition[] = [];
+  for (let y = 0; y < context.map.height; y++) {
+    for (let x = 0; x < context.map.width; x++) {
+      const candidate: SiteInstance = { id: SMITHY_INSTANCE_ID, kind: "smithy", x, y, archer: false };
+      if (validateSmithyPlacement(candidate, context, others).length === 0) candidates.push({ x, y });
+    }
+  }
+  if (candidates.length === 0) throw new Error(`Sepän pajalle ei löydy kelvollista ruutua siemenellä ${seed}`);
+  const pick = candidates[Math.floor(rngStream(seed, "smithy")() * candidates.length)];
+  return { id: SMITHY_INSTANCE_ID, kind: "smithy", x: pick.x, y: pick.y, archer: false };
 }
 
 function edgeDistance(map: WorldMapDefinition, x: number, y: number): number {
