@@ -392,6 +392,8 @@ export class Fighter {
   private weaponModel: THREE.Object3D | null = null;
   private mountSheath: THREE.Object3D | null = null;
   private mountBack: THREE.Object3D | null = null;
+  /** Kilven kevyt joustava kantoliike; varsinainen Blender-kiinnityspiste säilyy muuttumattomana. */
+  private shieldBackCarrier: THREE.Group | null = null;
   private strap: THREE.Object3D | null = null;
   private shieldHolder: THREE.Group | null = null;
   /** Kilven asento kyynärvarteen nähden torjunnassa (pinta kyynärvarren suuntaan). */
@@ -543,6 +545,11 @@ export class Fighter {
     const sfx = female ? "_f" : "";
     this.mountSheath = rig.getObjectByName(`mount_huotra${sfx}`) ?? null;
     this.mountBack = rig.getObjectByName(`mount_kilpi_selka${sfx}`) ?? null;
+    if (this.mountBack) {
+      this.shieldBackCarrier = new THREE.Group();
+      this.shieldBackCarrier.name = "shield-back-carrier";
+      this.mountBack.add(this.shieldBackCarrier);
+    }
     clone.updateMatrixWorld(true);
 
     // Lepoasennot hahmon omassa koordinaatistossa (klooni on vielä origossa).
@@ -728,8 +735,8 @@ export class Fighter {
     if (!this.rig) return;
     const s = this.sheathed;
     if (this.weaponModel && this.mountSheath && this.look.loadout !== "spear") (s ? this.mountSheath : this.weapon).add(this.weaponModel);
-    const carried = !!(this.shieldModel && this.shieldHolder && this.mountBack);
-    if (carried) (s ? this.mountBack! : this.shieldHolder!).add(this.shieldModel!);
+    const carried = !!(this.shieldModel && this.shieldHolder && this.shieldBackCarrier);
+    if (carried) (s ? this.shieldBackCarrier! : this.shieldHolder!).add(this.shieldModel!);
     if (this.strap) this.strap.visible = s && carried && this.hasShield;
     if (this.helmet) this.helmet.visible = !s;
   }
@@ -1147,9 +1154,15 @@ export class Fighter {
     const swingAmp = THREE.MathUtils.lerp(G.armSwing, G.armSwingRun, THREE.MathUtils.smoothstep(speed, G.walkSpeed, G.runSpeed));
     const aw = this.relax * life;
     const swing = leftLead * swingAmp * dir.y * w * aw; // + = vasen käsi taakse, oikea eteen
+    const backShield = this.sheathed && this.hasShield && this.shieldModel?.parent === this.shieldBackCarrier;
+    // Selkäkilven kanssa vain taakse kulkeva puolikas rajoitetaan. Käsi saa yhä heilahtaa
+    // eteen, mutta ei leikkaa kilven suuren kiekon läpi kummallakaan puolella.
+    const rearLimit = 0.065;
+    const swingR = backShield ? Math.max(swing, -rearLimit) : swing;
+    const swingL = backShield ? Math.min(swing, rearLimit) : swing;
     const sway = idle * G.armSway * calm * aw;
     const fwdR = Math.max(0, swing) / Math.max(swingAmp, 1e-3), fwdL = Math.max(0, -swing) / Math.max(swingAmp, 1e-3);
-    arm("R", p.rShX - swing + sway, p.rShZ - sway * 0.6, p.rEl - G.armElbow * fwdR * w * aw, qB.setFromEuler(eul.set(p.rHandX, p.rHandY, 0, "YXZ")).clone());
+    arm("R", p.rShX - swingR + sway, p.rShZ - sway * 0.6, p.rEl - G.armElbow * fwdR * w * aw, qB.setFromEuler(eul.set(p.rHandX, p.rHandY, 0, "YXZ")).clone());
     // Yhden käden miekalla vapaa vasen käsi ei kanna kilpeä: se saa hengityksen ja
     // askelen mukana pienen oman vastaliikkeen sekä rennomman ranteen. Varsinaiset
     // lyöntikohtaiset vastapainoasennot tulevat SWORD_FREE_ARM-taulukosta.
@@ -1165,8 +1178,13 @@ export class Fighter {
       ).clone()
       : null;
     const ls = freeSwing * (1 - aw);
-    arm("L", p.lShX + ls + swing - sway, p.lShZ - ls * 0.35 + sway * 0.6, p.lEl - Math.abs(ls) * 0.3 - G.armElbow * fwdL * w * aw, freeHand);
+    arm("L", p.lShX + ls + swingL - sway, p.lShZ - ls * 0.35 + sway * 0.6, p.lEl - Math.abs(ls) * 0.3 - G.armElbow * fwdL * w * aw, freeHand);
     eul.order = "XYZ";
+    if (this.shieldBackCarrier) {
+      const step = backShield ? leftLead * w * life : 0;
+      this.shieldBackCarrier.position.set(step * 0.028, Math.abs(step) * 0.007, 0);
+      this.shieldBackCarrier.quaternion.setFromEuler(eul.set(0, -step * 0.12, step * 0.05));
+    }
     if (this.shieldHolder) {
       // Levossa ranne antaa periksi ja kilpi roikkuu kahvastaan pystyssä kyljellä, pinta ulospäin
       // ja hieman eteen. Torjunnassa se kääntyy takaisin kyynärvarren eteen.

@@ -6,6 +6,7 @@
 import * as THREE from "three";
 import { GLTF, GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
+import { bellowsMotion, hammerMotion } from "./smithyMotion";
 
 const loader = new GLTFLoader();
 const cache = new Map<string, Promise<GLTF>>();
@@ -132,6 +133,12 @@ export function villagerAction(id: string): VillagerAction | null {
   return villagers.get(id)?.currentAction ?? null;
 }
 
+/** Työliikkeen yksi, hahmon omasta kellosta luettu tilanne. Tätä käyttää sekä pajamalli että savutesti. */
+export function villagerWorkState(id: string) {
+  const villager = villagers.get(id);
+  return villager ? villager.workState() : null;
+}
+
 /** Hahmon juuren sijainti maailmassa. Palautettu vektori on kopio eikä sillä voi siirtää hahmoa. */
 export function villagerPosition(id: string, out = new THREE.Vector3()): THREE.Vector3 | null {
   const villager = villagers.get(id);
@@ -174,6 +181,11 @@ class Villager implements Living {
   private hammerUp = new Map<WorkBone, THREE.Quaternion>();
   private hammerDown = new Map<WorkBone, THREE.Quaternion>();
   private bellows = new Map<WorkBone, THREE.Quaternion>();
+  private bellowsArms = new Map<"L" | "R", {
+    upper: THREE.Object3D; fore: THREE.Object3D; hand: THREE.Object3D;
+    upperLen: number; foreLen: number; gripP: THREE.Vector3; gripD: THREE.Vector3;
+  }>();
+  private bellowsGripError = { L: 0, R: 0 };
   private returningFromWork = false;
   vanishing = false;
   private vanishT = 0;
@@ -182,6 +194,14 @@ class Villager implements Living {
   onGone: (() => void) | null = null;
 
   get currentAction(): VillagerAction { return this.action; }
+
+  workState() {
+    return {
+      action: this.action,
+      time: this.actionTime,
+      bellowsGripError: { ...this.bellowsGripError },
+    };
+  }
 
   setAction(action: VillagerAction) {
     if (this.def.lying) return;
@@ -217,6 +237,33 @@ class Villager implements Living {
     this.root.add(clone);
     this.root.updateMatrixWorld(true);
 
+    // Palkeiden kahva kulkee nyrkin saman otekanavan läpi kuin miehen oikean käden esineet.
+    // Kanavat mitataan mallin nolla-asennossa ennen kuin työasentoja rakennetaan.
+    if (def.action === "bellows") {
+      const grips = {
+        L: { p: [0.383, 0.795, 0.112] as Dir, d: [-0.31, -0.06, 0.95] as Dir },
+        R: { p: [-0.383, 0.795, 0.112] as Dir, d: [0.31, -0.06, 0.95] as Dir },
+      };
+      for (const side of ["L", "R"] as const) {
+        const upper = rig.getObjectByName(`upper_arm_${side}`);
+        const fore = rig.getObjectByName(`forearm_${side}`);
+        const handBone = rig.getObjectByName(`hand_${side}`);
+        if (!upper || !fore || !handBone) continue;
+        const upperP = upper.getWorldPosition(new THREE.Vector3());
+        const foreP = fore.getWorldPosition(new THREE.Vector3());
+        const handP = handBone.getWorldPosition(new THREE.Vector3());
+        const channel = grips[side];
+        const localP = handBone.worldToLocal(new THREE.Vector3(...channel.p));
+        const localD = new THREE.Vector3(...channel.d).normalize()
+          .applyQuaternion(handBone.getWorldQuaternion(new THREE.Quaternion()).invert());
+        this.bellowsArms.set(side, {
+          upper, fore, hand: handBone,
+          upperLen: upperP.distanceTo(foreP), foreLen: foreP.distanceTo(handP),
+          gripP: localP, gripD: localD,
+        });
+      }
+    }
+
     // Otekanava käden luun omassa koordinaatistossa, mitattuna ennen kuin käsiä käännetään.
     const hand = def.prop ? rig.getObjectByName(`hand_${def.prop.hand}`) ?? null : null;
     const gripP = new THREE.Vector3(), gripD = new THREE.Vector3();
@@ -245,7 +292,7 @@ class Villager implements Living {
 
     // Sormet: nyrkki on lepoasento. Vapaa käsi on rennosti auki, esinettä pitävä käsi pysyy nyrkissä.
     for (const side of ["L", "R"] as const) {
-      if (def.prop?.hand === side) continue;
+      if (def.prop?.hand === side || def.action === "bellows") continue;
       [1, 2, 3].forEach((i) => {
         const f = rig.getObjectByName(`finger${i}_${side}`);
         if (f) f.quaternion.multiply(q1.setFromAxisAngle(AXIS_Z, FINGER_OPEN[i - 1] * 0.7));
@@ -280,9 +327,14 @@ class Villager implements Living {
         // Jousen lavat ovat pystyssä ja jänne -z: jänne käännetään vartaloon päin.
         prop.quaternion.setFromAxisAngle(UP, out > 0 ? Math.PI / 2 : -Math.PI / 2);
       } else {
-        // `sepan_vasara`: ote on origossa ja paikallinen -Y kulkee varren suuntaan kohti päätä.
+        // `sepan_vasara`: ote on origossa ja paikallinen +Z kulkee varren suuntaan kohti päätä.
+        // Y-akseli pidetään mahdollisimman lähellä pystysuuntaa, jotta vasaran pää ei kierry
+        // sattumanvaraisesti varren ympäri animaation aikana.
         const gripWorld = gripD.clone().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion())).normalize();
-        prop.quaternion.setFromUnitVectors(v1.set(0, -1, 0), gripWorld);
+        const y = UP.clone().addScaledVector(gripWorld, -UP.dot(gripWorld)).normalize();
+        const x = y.clone().cross(gripWorld).normalize();
+        y.crossVectors(gripWorld, x).normalize();
+        prop.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, gripWorld));
       }
       prop.updateMatrixWorld(true);
       // Sauva seisoo maassa ja käsi on varrella siinä, mihin se osuu; jousi on kädessä kahvastaan.
@@ -378,13 +430,7 @@ class Villager implements Living {
     if (!isWorkAction(action)) return;
     const rate = action === "hammer" ? 15 : action === "bellows" ? 8 : 5;
     const blend = 1 - Math.exp(-rate * dt);
-    const hammerPhase = (this.actionTime % 1.2) / 1.2;
-    // Hidas nosto, nopea isku, lyhyt kosketus ja paluu ylös.
-    const hammerMix = hammerPhase < 0.46 ? 0
-      : hammerPhase < 0.62 ? THREE.MathUtils.smoothstep(hammerPhase, 0.46, 0.62)
-        : hammerPhase < 0.74 ? 1
-          : 1 - THREE.MathUtils.smoothstep(hammerPhase, 0.74, 1);
-    const bellowsWave = Math.sin(this.actionTime * Math.PI * 2);       // noin 1 Hz
+    const hammerMix = hammerMotion(this.actionTime).mix;
     const quenchWave = Math.sin(this.actionTime * Math.PI / 1.2);     // rauhallinen 2,4 s kierros
 
     for (const [name, bone] of this.workBones) {
@@ -396,23 +442,65 @@ class Villager implements Living {
         const base = this.bellows.get(name);
         if (!base) continue;
         q1.copy(base);
-        if (name.startsWith("upper_arm_") || name.startsWith("forearm_")) {
-          const side = name.endsWith("_L") ? 1 : -1;
-          const amount = action === "bellows" ? bellowsWave * 0.11 * side : quenchWave * 0.035;
+        if ((name.startsWith("upper_arm_") || name.startsWith("forearm_")) && action !== "bellows") {
+          const amount = quenchWave * 0.035;
           q1.multiply(q2.setFromAxisAngle(AXIS_X, amount));
         } else if (name === "chest") {
-          const amount = action === "bellows" ? bellowsWave * 0.025 : quenchWave * 0.018;
+          const amount = action === "bellows" ? Math.sin(this.actionTime * Math.PI * 2) * 0.025 : quenchWave * 0.018;
           q1.multiply(q2.setFromAxisAngle(AXIS_X, amount));
         }
       }
       bone.quaternion.slerp(q1, blend);
     }
 
+    if (action === "bellows") this.solveBellowsArms();
+
     this.look += (0 - this.look) * Math.min(1, dt * 4);
     if (this.head) {
       const pitch = action === "hammer" ? 0.08 : action === "bellows" ? 0.12 : 0.18 + quenchWave * 0.025;
       q1.setFromAxisAngle(AXIS_X, pitch);
       this.head.quaternion.slerp(q2.copy(this.headRest).multiply(q1), blend);
+    }
+  }
+
+  /**
+   * Kahden nivelen IK palkeiden todellisiin, morph-targetien kanssa yhteisiin kahvapisteisiin.
+   * Näin kädet eivät vain jäljittele liikettä, vaan palkeet seuraavat täsmälleen samaa kelloa.
+   */
+  private solveBellowsArms() {
+    const motion = bellowsMotion(this.actionTime);
+    this.root.updateMatrixWorld(true);
+    for (const side of ["L", "R"] as const) {
+      const arm = this.bellowsArms.get(side);
+      if (!arm) continue;
+      const point = side === "L" ? motion.left : motion.right;
+      const targetGrip = this.root.localToWorld(new THREE.Vector3(point.x, point.y, point.z));
+      const targetAxis = new THREE.Vector3(side === "L" ? -1 : 1, 0, 0)
+        .applyQuaternion(this.root.getWorldQuaternion(new THREE.Quaternion())).normalize();
+
+      // Säilytä ranteen nykyinen kierto varren ympäri, mutta käännä otekanava kahvan suuntaiseksi.
+      const handWorld = arm.hand.getWorldQuaternion(new THREE.Quaternion());
+      const currentAxis = arm.gripD.clone().applyQuaternion(handWorld).normalize();
+      const desiredHand = new THREE.Quaternion().setFromUnitVectors(currentAxis, targetAxis).multiply(handWorld);
+      const wristTarget = targetGrip.clone().sub(arm.gripP.clone().applyQuaternion(desiredHand));
+
+      const shoulder = arm.upper.getWorldPosition(new THREE.Vector3());
+      const toward = wristTarget.clone().sub(shoulder);
+      const distance = THREE.MathUtils.clamp(toward.length(), 0.001, (arm.upperLen + arm.foreLen) * 0.999);
+      toward.normalize();
+      const poleLocal = side === "L" ? new THREE.Vector3(0.7, -1, -0.2) : new THREE.Vector3(-0.7, -1, -0.2);
+      const pole = poleLocal.applyQuaternion(this.root.getWorldQuaternion(new THREE.Quaternion()));
+      pole.addScaledVector(toward, -pole.dot(toward)).normalize();
+      const along = (arm.upperLen * arm.upperLen - arm.foreLen * arm.foreLen + distance * distance) / (2 * distance);
+      const height = Math.sqrt(Math.max(0, arm.upperLen * arm.upperLen - along * along));
+      const elbow = shoulder.clone().addScaledVector(toward, along).addScaledVector(pole, height);
+
+      aimBone(arm.upper, elbow.sub(shoulder));
+      aimBone(arm.fore, wristTarget.clone().sub(arm.fore.getWorldPosition(new THREE.Vector3())));
+      const parentWorld = arm.hand.parent!.getWorldQuaternion(new THREE.Quaternion());
+      arm.hand.quaternion.copy(parentWorld.invert().multiply(desiredHand));
+      arm.hand.updateMatrixWorld(true);
+      this.bellowsGripError[side] = arm.hand.localToWorld(arm.gripP.clone()).distanceTo(targetGrip);
     }
   }
 
