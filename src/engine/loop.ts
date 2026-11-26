@@ -37,6 +37,8 @@ export function onPlayerDeath() {
   worldRuntime().post({ type: "player.died", sceneId: ARENA });
   // Metsästysapajalla kuolema palauttaa kartalle; inventaarioon jo otettu saalis säilyy (omistaja 2026-11-22).
   if (huntDeathReturn(toStartMenu)) { showMsg(t("hunt.deathTitle"), t("hunt.deathSub"), 9999); return; }
+  // Väijytys: ruoat viedään ja paluu kartalle tapahtuu viiveellä (engine/ambush.ts).
+  if (g.encounter.onPlayerDeath?.(toStartMenu)) return;
   showMsg(t("death.title"), isTouch ? t("death.touch") : t("death.keyboard"), 9999);
 }
 /** Tyhjentää kentän ja luo sankarin uudelleen aloituspaikalleen. */
@@ -62,7 +64,7 @@ function resetField() {
 /** Uusi yritys samalla paikalla ja samoilla varusteilla. */
 export function restart() {
   // Metsästysapajalla kaatunut palaa kartalle, ei aloita kohtausta alusta.
-  if (huntDeathPending()) return;
+  if (huntDeathPending() || g.encounter.deathPending?.()) return;
   resetField();
   g.encounter.start();
   lockPointer();

@@ -29,6 +29,8 @@ import { campaignStore, initCampaignStore, worldRuntime } from "./engine/store";
 import { initWorldConsole } from "./engine/worldConsole";
 import { initDialogue } from "./engine/dialogue";
 import { configureLouhiEncounter, louhiEncounter } from "./engine/louhi";
+import { ambush, ambushExitMapDir, configureAmbush } from "./engine/ambush";
+import { setExitMapDir } from "./engine/exit";
 
 export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   document.body.classList.add("mode-scene");
@@ -61,6 +63,11 @@ export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   configureLouhiEncounter(cairnState.louhiHere && !cairnState.louhiBanished);
   yardState.archerHealed = campaign.engine.flags["archer.healed"] === true;
   yardState.archerDead = campaign.engine.flags["archer.dead"] === true;
+  // Väijytys: siemen ja kulkusuunta tunnisteesta; polunsuiden karttasuunta kulkusuunnasta.
+  if (route.scene === "ambush") {
+    configureAmbush(route.site);
+    setExitMapDir(ambushExitMapDir);
+  }
   initView();
   initCampaignStore(campaign);
   configureSceneItems();
@@ -70,7 +77,8 @@ export function initScene3d(route: Extract<AppRoute, { mode: "scene" }>) {
   campaignStore().subscribe(() => refreshLongEffects());
   initHunt();
   setPickableSource(huntPickables);
-  g.encounter = !ARENA_PEACEFUL ? skirmish
+  g.encounter = ARENA === "ambush" ? ambush
+    : !ARENA_PEACEFUL ? skirmish
     : ARENA === "lakeside" ? lakesideVisit
       : ARENA === "lakeruin" ? lakeruinVisit
         : ARENA === "cairnfield" && cairnState.louhiHere && !cairnState.louhiBanished ? louhiEncounter

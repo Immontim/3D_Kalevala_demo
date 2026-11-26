@@ -40,7 +40,7 @@ export function addEnemy(def: EnemyDef, pos: THREE.Vector3): Actor {
 export function enemyDown(e: Actor) {
   const i = g.enemies.indexOf(e);
   if (i >= 0) g.enemies.splice(i, 1);
-  g.corpses.push({ actor: e, removeAt: g.gameTime + WAVES.corpseTime });
+  g.corpses.push({ actor: e, removeAt: g.encounter.keepCorpses ? Infinity : g.gameTime + WAVES.corpseTime });
   g.encounter.onEnemyDown(e);
 }
 

@@ -1,6 +1,6 @@
 /** Sovelluksen kevyet kartta- ja 3D-reitit. Tämä moduuli ei riipu 3D-moottorista. */
 
-export const SCENE_IDS = ["clearing", "homestead", "yard", "smithy", "lakeside", "lakeruin", "cairnfield", "wilds"] as const;
+export const SCENE_IDS = ["clearing", "homestead", "yard", "smithy", "lakeside", "lakeruin", "cairnfield", "wilds", "ambush"] as const;
 export type SceneId = (typeof SCENE_IDS)[number];
 export type SceneKind = "battle" | "friendly";
 
@@ -14,6 +14,7 @@ export const SCENE_KINDS: Record<SceneId, SceneKind> = {
   lakeruin: "friendly",
   cairnfield: "friendly",
   wilds: "friendly",
+  ambush: "battle",
 };
 
 export function sceneKind(scene: SceneId): SceneKind {
@@ -35,7 +36,7 @@ function isSceneId(value: string | null): value is SceneId {
   return value !== null && (SCENE_IDS as readonly string[]).includes(value);
 }
 
-const SITE_PATTERN = /^[a-z][a-z0-9-]{0,39}$/;
+export const SITE_PATTERN = /^[a-z][a-z0-9-]{0,39}$/;
 
 /** Tuntematon tai puuttuva scene-parametri vie turvallisesti kartalle. */
 export function parseAppRoute(value: URL | string): AppRoute {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { baseStats } from "../stats";
+import { SCENE_IDS } from "../app/route";
 import {
   applyMapToSceneTransition,
   campaignSatiety,
@@ -113,6 +114,12 @@ describe("poistumissuunta paluukuoressa", () => {
   it("hyväksyy sepän pajan paluun kartalle", () => {
     expect(parseSceneReturn({ schemaVersion: 1, scene: "smithy", rewards: [], exitDir: "s" }))
       .toEqual({ schemaVersion: 1, scene: "smithy", rewards: [], exitDir: "s" });
+  });
+
+  it("hyväksyy jokaisen reitin kohtauksen, myös väijytyksen (paon suunta ei saa pudota)", () => {
+    for (const scene of SCENE_IDS) expect(parseSceneReturn({ schemaVersion: 1, scene, rewards: [] })?.scene).toBe(scene);
+    expect(parseSceneReturn({ schemaVersion: 1, scene: "ambush", rewards: [], exitDir: "s" })?.exitDir).toBe("s");
+    expect(parseSceneReturn({ schemaVersion: 1, scene: "nowhere", rewards: [] })).toBeNull();
   });
 
   it("säilyttää kelvollisen exitDirin ja pudottaa tuntemattoman", () => {

@@ -1,6 +1,6 @@
 // Kartan ja 3D-kohtausten välinen tyypitetty silta. Moduuli ei riipu DOM:sta tai Three.js:stä,
 // joten siirtymän tasapaino ja rajatapaukset voidaan testata ilman 3D-maailman lataamista.
-import type { SceneId, SceneKind } from "../app/route";
+import { SCENE_IDS, type SceneId, type SceneKind } from "../app/route";
 import { MAP_DIRS, type MapDir } from "../sceneLayout";
 import { effectiveStats, withModifier, type Modifier, type Stats } from "../stats";
 import { LONG_EFFECT_MOD_PREFIX, longEffectModifiers } from "./longEffects";
@@ -212,7 +212,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** Sama lista kuin reitillä (SCENE_IDS), jotta uusi kohtaus (esim. väijytys) ei pudota paluukuormaa. */
 function isSceneId(value: unknown): value is SceneId {
-  return value === "clearing" || value === "homestead" || value === "yard" || value === "smithy"
-    || value === "lakeside" || value === "lakeruin" || value === "cairnfield" || value === "wilds";
+  return typeof value === "string" && (SCENE_IDS as readonly string[]).includes(value);
 }

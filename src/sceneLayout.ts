@@ -217,6 +217,30 @@ const WILDS_BOUNDS: Vec2[] = [
   { x: -93, z: 70 }, { x: -96, z: 45 }, { x: -94, z: 20 }, { x: -97, z: 0 }, { x: -95, z: -30 }, { x: -96, z: -60 },
 ];
 
+/** Väijytyksen metsäpolku: polun suuntainen soikea aukio (puoliakselit, m). Polku kulkee z-akselia pitkin. */
+export const AMBUSH_RX = 9;
+export const AMBUSH_RZ = 15;
+
+/**
+ * Väijytys: soikio, jonka päissä on polunsuu. Sankari saapuu takaa (+z, "back") ja polku jatkuu eteen
+ * (−z, "forward"). Karttasuunta ratkaistaan kulkusuunnasta (ambush.ts `ambushExitDir`), joten mapDir on null.
+ */
+function ambushScene(): SceneLayout {
+  const bounds: Vec2[] = [];
+  for (let i = 0; i < 48; i++) {
+    const a = (i / 48) * Math.PI * 2;
+    bounds.push({ x: Math.sin(a) * AMBUSH_RX, z: Math.cos(a) * AMBUSH_RZ });
+  }
+  return {
+    bounds,
+    arena: { x: 0, z: 0, radius: AMBUSH_RX },
+    exits: [
+      { id: "back", x: 0, z: AMBUSH_RZ, yaw: 0, width: 2.8, mapDir: null },
+      { id: "forward", x: 0, z: -AMBUSH_RZ, yaw: Math.PI, width: 2.8, mapDir: null },
+    ],
+  };
+}
+
 export const SCENE_LAYOUTS: Record<SceneId, SceneLayout> = {
   // Aukion puut alkavat 13,2 m:stä (world.ts treeMin): vastustajat tulevat puiden välistä.
   clearing: circleScene(ringExit("south", 200, 11.4, 2.6, "s"), 14.5),
@@ -236,6 +260,7 @@ export const SCENE_LAYOUTS: Record<SceneId, SceneLayout> = {
       { id: "south", x: -36, z: 97, yaw: 0, width: 3, mapDir: "s" },
     ],
   },
+  ambush: ambushScene(),
 };
 
 export function sceneLayout(id: SceneId): SceneLayout {
