@@ -15,7 +15,8 @@ import { choosing, slotEls, songState } from "./engine/song";
 import { songArcsDebug } from "./engine/songArcs";
 import { aim, fx, g, inputs } from "./engine/state";
 import { composer, renderer, scene, world } from "./engine/view";
-import { FALLEN, POSES } from "./fighter";
+import { FALLEN, FighterLook, POSES } from "./fighter";
+import { t } from "./i18n";
 import { Modifier, withModifier } from "./stats";
 import { changedValues } from "./tuning";
 import { meterOff } from "./ui/pauseMenu";
@@ -136,10 +137,19 @@ export function initDebug() {
       const def = ENEMIES[i % ENEMIES.length];
       addEnemy({ name: def.name, look: def.look, level }, new THREE.Vector3(x, groundHeight(x, z), z));
     },
+    /** Tuo kentälle vapaasti kootun vastustajan, esim. Pohjan uuden vartalon kirveellä:
+     *  `addWarrior({ character: "pohja", build: "hoikka", tunic: "vaalea", loadout: "sword_shield", axe: "parta", helmet: true }, 0, -4)`. */
+    addWarrior(look: FighterLook, x: number, z: number, level = 1) {
+      const shield = look.loadout === "sword_shield";
+      const name = look.loadout === "spear" ? t("enemy.pohjaSpear")
+        : look.axe ? t(shield ? "enemy.pohjaAxeShield" : "enemy.pohjaAxe")
+          : t(shield ? "enemy.pohjaShield" : "enemy.pohja");
+      return addEnemy({ name, look, level }, new THREE.Vector3(x, groundHeight(x, z), z)).name;
+    },
     /** Elossa olevat vastustajat: nimi, tila, elämä ja paikka. */
     get enemies() { return g.enemies.map((e) => ({ name: e.name, state: e.state, hp: e.hp, pos: [+e.pos.x.toFixed(2), +e.pos.z.toFixed(2)] })); },
-    /** Hahmorivi: kaikki hahmot ja varustukset näkyviin aukion keskelle. */
-    showcase(on = true, pose?: string) { setShowcase(on, pose); },
+    /** Hahmorivi: kaikki hahmot ja varustukset näkyviin aukion keskelle. set "pohja" = Pohjan uudet vartalot ja kirveet. */
+    showcase(on = true, pose?: string, set: "all" | "pohja" = "all") { setShowcase(on, pose, set); },
     /** Kaataa hahmorivin annettuun makuuasentoon (0..n-1) kuvakaappauksia varten; drop = pudota varusteet. */
     fallShowcase(variant = 0, drop = true) {
       for (const s of showcase) {

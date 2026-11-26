@@ -5,11 +5,22 @@ import { scene } from "./view";
 // ---------- Hahmorivi (kehityskäyttöön) ----------
 // Kaikki hahmot ja varustukset rivissä eri asennoissa kuvakaappauksia ja arviointia varten.
 export const showcase: { fighter: Fighter; pose: keyof typeof POSES }[] = [];
-export function setShowcase(on: boolean, allPose?: string) {
+/** Pohjan uudet vartalot (tanakka, hoikka), molemmat nutut, kirveet, kilpi ja keihäs. */
+const POHJA_ROW: [FighterLook, keyof typeof POSES][] = [
+  [{ character: "pohja", loadout: "sword", helmet: true, ringMail: true, greaves: true }, "guard"],
+  [{ character: "pohja", build: "tanakka", tunic: "tumma", loadout: "sword", helmet: true, ringMail: true }, "guard"],
+  [{ character: "pohja", build: "tanakka", tunic: "vaalea", loadout: "sword_shield", axe: "parta", helmet: true }, "guard"],
+  [{ character: "pohja", build: "tanakka", tunic: "tumma", loadout: "spear", helmet: false }, "guard"],
+  [{ character: "pohja", build: "hoikka", tunic: "vaalea", loadout: "sword", axe: "karjala", helmet: true, ringMail: true }, "strike"],
+  [{ character: "pohja", build: "hoikka", tunic: "tumma", loadout: "sword_shield", helmet: true }, "block"],
+  [{ character: "pohja", build: "hoikka", tunic: "vaalea", loadout: "spear", helmet: true, ringMail: true }, "windup"],
+];
+
+export function setShowcase(on: boolean, allPose?: string, set: "all" | "pohja" = "all") {
   for (const s of showcase) { scene.remove(s.fighter.root); s.fighter.dispose(); }
   showcase.length = 0;
   if (!on) return;
-  const row: [FighterLook, keyof typeof POSES][] = [
+  const row: [FighterLook, keyof typeof POSES][] = set === "pohja" ? POHJA_ROW : [
     [{ character: "hero", loadout: "sword_shield" }, "guard"],
     [{ character: "urho", loadout: "sword" }, "guard"],
     [{ character: "urho", loadout: "sword_shield" }, "block"],

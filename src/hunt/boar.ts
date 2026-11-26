@@ -390,11 +390,12 @@ export function arrowDamage(draw: number): number {
   return 0.5 + 0.5 * Math.min(1, Math.max(0, draw));
 }
 
-/** Lähitaistelun vahinko sialle: keihäs on sianmetsästyksen ase, raskas isku tekee enemmän. */
-export function meleeBoarDamage(weapon: "sword" | "spear" | "sky_iron_sword", heavy: boolean, bash = false): number {
+/** Lähitaistelun vahinko sialle: keihäs on sianmetsästyksen ase, raskas isku tekee enemmän. Kirves lyö
+ *  raskaammin kuin miekka (sama kuin taivaanrautamiekalla). */
+export function meleeBoarDamage(weapon: "sword" | "spear" | "sky_iron_sword" | "axe", heavy: boolean, bash = false): number {
   // Kilpityöntö (jos kilpi joskus on mukana) vain tönäisee: puolet aseen kevyestä iskusta.
   if (bash) return 0.5;
-  const base = weapon === "spear" ? 1.25 : weapon === "sky_iron_sword" ? 1.2 : 1;
+  const base = weapon === "spear" ? 1.25 : weapon === "sky_iron_sword" || weapon === "axe" ? 1.2 : 1;
   return base * (heavy ? 1.5 : 1);
 }
 
