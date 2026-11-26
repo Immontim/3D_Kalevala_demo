@@ -27,7 +27,7 @@ import mossNorUrl from "../assets/ground/moss_nor.webp";
 import dirtDiffUrl from "../assets/ground/dirt_diff.webp";
 import dirtNorUrl from "../assets/ground/dirt_nor.webp";
 import { COLLISION, CollisionWorld } from "./collision";
-import { spawnAnimal, spawnVillager, updateFolk, vanishVillager } from "./folk";
+import { spawnAnimal, spawnVillager, updateFolk, vanishVillager, villagerWorkState } from "./folk";
 import { t, type TextKey } from "./i18n";
 import { addTalkable, removeTalkable } from "./interact";
 import { pickSpot, planYardAnimals, type Circle, type Point, type Spot, type YardAnimals } from "./yardLife";
@@ -38,6 +38,7 @@ import { createBirds, type BirdsView } from "./engine/birds";
 import { addFoliageFade } from "./engine/foliageFade";
 import { entrySpawn, sceneLayout, walkableDepth, type Vec2 } from "./sceneLayout";
 import { planSmithyLife, type SmithyLifePlan } from "./smithyLife";
+import { bellowsMotion, hammerMotion } from "./smithyMotion";
 import {
   SMITHY_ANGLE, SMITHY_RADIUS, SMITHY_TABLE_LOCAL, SMITHY_TRADE_SMITH_LOCAL,
   SMITHY_WORK_LOCAL, smithyPoint,
@@ -1767,9 +1768,17 @@ const GRIP_FEMALE_L = { p: [0.385, 0.769, 0.058] as [number, number, number], d:
 const folkName = (id: string) => t(`folk.${id.replace(/_[a-z0-9]+$/, "")}` as TextKey);
 
 /** Savutesteille: tämän käynnin arvottu sepän pihan kokoonpano. */
-export const smithyDebug: { plan: SmithyLifePlan | null; people: Record<string, { x: number; z: number }> } = {
+export const smithyDebug: {
+  plan: SmithyLifePlan | null;
+  people: Record<string, { x: number; z: number }>;
+  motion: null | {
+    bellows: ReturnType<typeof bellowsMotion> & { gripError: { L: number; R: number } };
+    hammer: ReturnType<typeof hammerMotion>;
+  };
+} = {
   plan: null,
   people: {},
+  motion: null,
 };
 
 function populateSmithyLife(scene: THREE.Scene, collision: CollisionWorld, plan = planSmithyLife()) {
@@ -2269,11 +2278,18 @@ function installSmithyVisuals(
     update(dt: number) {
       time += dt;
       const working = plan.setup === "work";
-      const phase = working ? 0.5 + 0.5 * Math.sin(time * Math.PI * 2) : 0;
+      const apprentice = working ? villagerWorkState("salli") : null;
+      const smith = working ? villagerWorkState("seppa") : null;
+      const bellows = apprentice?.action === "bellows" ? bellowsMotion(apprentice.time) : null;
+      const hammer = smith?.action === "hammer" ? hammerMotion(smith.time) : null;
       for (const morph of bellowsMorphs) {
-        morph.influences[morph.a] = phase;
-        morph.influences[morph.b] = working ? 1 - phase : 0;
+        morph.influences[morph.a] = bellows?.leftWeight ?? 0;
+        morph.influences[morph.b] = bellows?.rightWeight ?? 0;
       }
+      smithyDebug.motion = bellows && hammer ? {
+        bellows: { ...bellows, gripError: apprentice!.bellowsGripError },
+        hammer,
+      } : null;
       const breath = 0.5 + 0.5 * Math.sin(time * (working ? Math.PI * 2 : 1.7));
       forgeLight.intensity = (working ? 2.3 : 1.65) + breath * 0.75 + Math.random() * 0.12;
       for (const material of emberMaterials) material.emissiveIntensity = (working ? 2.6 : 2.1) + breath * 1.25;
@@ -2282,9 +2298,9 @@ function installSmithyVisuals(
         forgeSparks.emit(working ? 3 : 1, working ? 0.85 : 0.45);
         forgeEmit = working ? 0.24 : 0.62;
       }
-      if (working) {
-        const cycle = Math.floor(time / 1.2);
-        if (cycle !== hammerCycle) { hammerCycle = cycle; if (cycle > 0) anvilSparks.emit(8, 1.7); }
+      if (hammer?.impact && hammer.cycle !== hammerCycle) {
+        hammerCycle = hammer.cycle;
+        if (hammer.cycle > 0) anvilSparks.emit(8, 1.7);
       }
       forgeSparks.update(dt);
       anvilSparks.update(dt);
@@ -2469,11 +2485,12 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
       // kameran kantaman (300 m) taakse ja taustaväri näkyisi puiden välistä.
       sky.position.copy(camera.position);
       fire.update(dt, camera);
+      // Työväki päivitetään ensin: palkeet ja kipinät lukevat saman ruudun hahmokelloa.
+      updateFolk(dt, focus ?? null);
       smithyVisuals?.update(dt);
       houseSmoke?.(dt);
       water?.update(dt);
       loon?.(dt);
-      updateFolk(dt, focus ?? null);
       if (focus) {
         followShadow(focus);
         forest?.update(focus);

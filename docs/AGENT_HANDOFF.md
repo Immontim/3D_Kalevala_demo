@@ -6,13 +6,15 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-25 (Codex, Windows; pohja `origin/main` `428d55b`)
+Päivitetty: 2026-11-26 (Codex, Windows; pohja `origin/main` `0d969b1`)
 
-- **Koodiversio v08.06.02** branchissa `codex/smithy-access-bellows` (tarkista merge `git merge-base`illa).
-  Koodi valmis, ei deployattu. Agentti testasi käsin; omistaja ei. Paja ja työväki ovat aidan
-  sisällä, aihiopöytä pihan keskellä ja palkeet liikkuvat. Savutesti: katos saavutettava, 60 FPS,
-  konsoli puhdas. Tarkistukset:
-  `bun run test` 540/540, `bunx tsc --noEmit`, `bun run lint`, `bun run build`, `git diff --check`.
+- **Koodiversio v08.06.03** branchissa `codex/smithy-animation-polish` (tarkista merge `git merge-base`illa).
+  Koodi valmis, ei deployattu. Agentti testasi käsin; omistaja ei. Vasara pysyy sepän otteessa,
+  kisällin molemmat kädet seuraavat palkeiden kahvoja yhteisellä kellolla ja sankarin selkäkilpi joustaa
+  askelten mukana ilman käsien läpileikkausta. Riippumaton gauntlet-arvio hyväksyi kaikki kolme.
+  Savutesti: naissankarin kaksi askelvaihetta ja 7/6 kuvan työjaksot, 60 FPS, konsoli puhdas.
+  Tarkistukset: `bun run test` 543/543, `bunx tsc --noEmit`, `bun run lint`, `bun run build`,
+  `git diff --check`. Mieshahmon kiinnityspolku tarkistettiin koodista mutta ei erillisellä lähikuvalla.
 - **Sepän paja (v08.06, `smithyLayout.ts`, `smithyLife.ts`, `world.ts`, `world/content.ts`).** Kohtaus arpoo
   käynnillä työn (seppä vasaroi, sälli palkeilla, pikkusälli karkaisuvadilla; ei koiraa) tai kaupan (seppä
   kojulla, pikkusälli + koira yhdessä neljästä pihapaikasta; ei aikuista sälliä). GLB-puun mountit ja palkeiden
@@ -21,7 +23,9 @@ Päivitetty: 2026-11-25 (Codex, Windows; pohja `origin/main` `428d55b`)
   maailma-aika avaa toisen kaupan 30 pelipäivän jälkeen. Avoin maksettu lupa säilyy, kunnes tuote otetaan.
   Sällin kertadialogi paljastaa neidon maatilan. Avokatos on kuljettava osakohtaisin törmäyksin. Katoksen
   säde on 10,9 m (takamuuri aidan 12,9 m:n kehällä), kävelyraja 12,35 m ja aihiopöydän paikallinen z=4,15.
-  Paljemorphit ajetaan kaikkien GLB-lapsiverkkojen kautta.
+  Paljemorphit ajetaan kaikkien GLB-lapsiverkkojen kautta ja lukevat kisällin samaa `actionTime`-kelloa.
+  Kisällin kahden nivelen IK seuraa GLB:n todellisia kahvapisteitä; vasaran paikallinen +Z-varsi seuraa
+  nyrkin otekanavaa. Uusia Blender-assetteja ei tarvittu.
 - **Villisika (v08.04, `hunt/boar.ts` puhdas + `engine/boars.ts`).** `initBoars`: 0–2 sikaa (`boarCount`
   40/40/20 %, ≥ 45 m saapumisesta). Tilat root/walk/alert/threat/charge/recover/flinch/flee/bed/dead, luvut
   `BOAR` (aggressio 0,35, varoitus 0,7 s, rynnäkkö 9 m/s, käännös 1,1 rad/s, vahinko 22, elämä 3; pako terve
@@ -174,9 +178,6 @@ Päivitetty: 2026-11-25 (Codex, Windows; pohja `origin/main` `428d55b`)
   torjunta 4 ja torjunta-asento 1,5/s. Tavallisella 1/s palautumisella
   torjunta kuluttaa nettomääräisesti 0,5/s. Keihään vahinkokerroin on 1,1.
   Samat stamina- ja asearvot koskevat sankaria ja vihollisia.
-- **UI ja kielituki.** Kartan pellavapohja, kirjontakehykset, paperinukke,
-  kasvot ja dialogi ovat `src/style.css`:ssä. Kaikki näkyvät tekstit ovat
-  tyypitetyissä FI/EN-sanakirjoissa.
 - **Riippuvuustarkistus:** 2026-11-20: ei mitään odottamassa. `bun audit` on puhdas ja
   `bun outdated --no-cache` ei listaa paketteja.
 - Debug: kartalla `window.__map` (tila, `move`, `enterSite`, paluukuorma),
@@ -185,15 +186,13 @@ Päivitetty: 2026-11-25 (Codex, Windows; pohja `origin/main` `428d55b`)
 ## Tunnetut rajoitteet ja riskit
 
 - Sepän pajalla ei ole vielä omaa karttakuvaketta, vaan se käyttää pihan merkkiä. Työliikkeet ovat koodilla
-  tehtyjä asentoja, eivät GLB-klippejä; palkeet ja kisällin kädet tahdistuvat silmämääräisesti, eivät yhteisellä
-  animaatiokellolla. Koiran assetissa ei ole kävelyklippiä, joten koira pysyy pihapaikassaan.
+  tehtyjä asentoja, eivät GLB-klippejä. Koiran assetissa ei ole kävelyklippiä, joten koira pysyy pihapaikassaan.
   Uuden kauppatuotteen lisääminen vaatii toistaiseksi myös sepän kahden takeMode-efektilistan laajentamisen.
 - Karttavauhti, kylläisyys 3,6 pistettä/päivä ja uudet niityt kaipaavat pidempää pelitestiä.
   Pihaniitty voi liittyä valmiiseen aukeaan, jolloin aukea kokonaisuutena on yli yhdeksän ruutua.
   Tallennetut pihat jäävät paikoilleen myös tulevissa maastomuutoksissa.
 - Liikkuvien ja väliaikaisten kohtaamisten luokitus on valmis; instanssilista, liikeradat ja poistumistilat puuttuvat.
 - Jokigrafiikassa ei vielä haaroja, useita siltoja, koskia, venettä eikä vesianimaatiota.
-- Vanha v3-tallennus voi asettaa sankarin jokiruutuun; hän pääsee viereiseen maahan, lataus ei siirrä.
 - Keskushahmon paperinukkekuva ei kerrostu vaatekappale kerrallaan; toimiva varustetila näkyy
   sitä ympäröivissä ikonislotteissa. Hansikkailla ei vielä ole erillistä 3D-mesh-versiota eikä
   kengillä tai hansikkailla pelivaikutusta. Rauhassa kypärä on edelleen tarkoituksella pois päästä.
@@ -255,8 +254,8 @@ Päivitetty: 2026-11-25 (Codex, Windows; pohja `origin/main` `428d55b`)
 
 ## Seuraava tehtävä
 
-Omistajan pelitesti (v08.06.02): kulje pajan molemmille sivuille ja jokaisen hahmon puhe-etäisyydelle;
-varmista lisäksi omalla kuvakulmalla palkeiden ja kisällin käsien osuminen yhteen koko pumppauskierrossa.
+Omistajan pelitesti (v08.06.03): tarkista mies- ja naissankarin selkäkilpi kävellen sekä sepän vasara ja
+kisällin paljeote koko työjakson ajan omalla kuvakulmalla.
 
 ## Ei vielä aloiteta
 
