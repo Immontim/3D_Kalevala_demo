@@ -3,6 +3,9 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import charactersUrl from "../assets/characters.glb?url";
 import villagersFUrl from "../assets/villagers_f.glb?url";
+import pohjaTanakkaUrl from "../assets/pohja_tanakka.glb?url";
+import pohjaHoikkaUrl from "../assets/pohja_hoikka.glb?url";
+import kirveetUrl from "../assets/kirveet.glb?url";
 import { FINGER_OPEN, loadGltf } from "./folk";
 import type { Loadout } from "./combat";
 import { SIDESTEP, sidestepPose } from "./sidestep";
@@ -288,10 +291,26 @@ function mirrorArms(p: Pose): Pose {
 
 export type CharacterId = "hero" | "urho" | "pohja";
 export type { Loadout };
+/** Pohjan soturin vartalo omasta tiedostostaan (docs/POHJA_WARRIORS.md): tanakka 1,58 m, hoikka 1,86 m. */
+export type PohjaBuild = "tanakka" | "hoikka";
+export const POHJA_BUILDS: readonly PohjaBuild[] = ["tanakka", "hoikka"];
+/** Nutun väri uusilla Pohjan vartaloilla. */
+export type PohjaTunic = "vaalea" | "tumma";
+export const POHJA_TUNICS: readonly PohjaTunic[] = ["vaalea", "tumma"];
+/** Kirves (assets/kirveet.glb): parrakas ja karjalainen leviäväterä. */
+export type AxeModel = "parta" | "karjala";
+export const AXE_MODELS: readonly AxeModel[] = ["parta", "karjala"];
+const POHJA_URLS: Record<PohjaBuild, string> = { tanakka: pohjaTanakkaUrl, hoikka: pohjaHoikkaUrl };
 
 export interface FighterLook {
   character: CharacterId;
   loadout: Loadout;
+  /** Vain `pohja`: vartalo tiedostosta pohja_<build>.glb; puuttuva = characters.glb:n char_pohja. */
+  build?: PohjaBuild;
+  /** Uuden Pohjan vartalon nuttu (oletus tumma). Vanhalla char_pohjalla asu on kiinteä. */
+  tunic?: PohjaTunic;
+  /** Yhden käden ase on kirves miekan sijaan (varustus "sword" tai "sword_shield"); keihään kanssa ei vaikuta. */
+  axe?: AxeModel;
   /** Naissankari: vartalo on jousineito (assets/villagers_f.glb) ilman jousta; aseet ja kypärä tulevat characters.glb:stä. */
   female?: boolean;
   /** Miekka on taivaanrautamiekka: oma Blender-malli, vanhoilla asseteilla värjätty varamalli. */
@@ -390,6 +409,9 @@ export class Fighter {
   /** Rauhan varustus: miekka huotrassa, kilpi selässä kantohihnassa, kypärä poissa. */
   private sheathed = false;
   private weaponModel: THREE.Object3D | null = null;
+  /** Kirveen ranteenkierto varren ympäri (rad) ja sen ryhmä; null muilla aseilla. */
+  private axeRoll: THREE.Group | null = null;
+  private axeRollAngle = 0;
   private mountSheath: THREE.Object3D | null = null;
   private mountBack: THREE.Object3D | null = null;
   /** Kilven kevyt joustava kantoliike; varsinainen Blender-kiinnityspiste säilyy muuttumattomana. */
@@ -464,11 +486,16 @@ export class Fighter {
     this.weapon.position.set(-0.3, 1.0, 0.2);
     this.body.add(this.weapon);
     const spear = look.loadout === "spear";
-    this.bladeBase.position.z = spear ? 1.22 + SPEAR_SLIDE : 0.12;
-    this.bladeTip.position.z = spear ? 1.52 + SPEAR_SLIDE : 0.8;
+    const axe = !spear && !!look.axe;
+    // Iskun vana: miekalla koko terä, kirveellä vain pää (0,6 m otteesta), keihäällä kärki.
+    this.bladeBase.position.z = spear ? 1.22 + SPEAR_SLIDE : axe ? 0.45 : 0.12;
+    this.bladeTip.position.z = spear ? 1.52 + SPEAR_SLIDE : axe ? 0.69 : 0.8;
     this.weapon.add(this.bladeBase, this.bladeTip);
-    Promise.all([characterAssets, look.female ? loadGltf(villagersFUrl) : null])
-      .then(([male, female]) => { if (!this.disposed) this.build(male.scene, female?.scene); })
+    // Vartalo voi tulla omasta tiedostostaan (naissankari, Pohjan tanakka ja hoikka); aseet ja kilvet
+    // tulevat aina characters.glb:stä ja kirveet kirveet.glb:stä.
+    const bodyUrl = look.female ? villagersFUrl : look.character === "pohja" && look.build ? POHJA_URLS[look.build] : null;
+    Promise.all([characterAssets, bodyUrl ? loadGltf(bodyUrl) : null, axe ? loadGltf(kirveetUrl) : null])
+      .then(([male, body, axes]) => { if (!this.disposed) this.build(male.scene, body?.scene, axes?.scene); })
       .catch((e) => console.error("Hahmomallin lataus epäonnistui", e));
     if (spear) debugSpearFighters.add(this);
   }
@@ -487,42 +514,52 @@ export class Fighter {
     });
   }
 
-  private build(source: THREE.Object3D, femaleSource?: THREE.Object3D) {
-    // Naissankarilla vartalo tulee jousineidon tiedostosta, varusteet ja kiinnityspisteet miehen tiedostosta.
-    const female = !!(this.look.female && femaleSource);
-    const clone = SkeletonUtils.clone(female ? femaleSource! : source);
-    const gear = female ? SkeletonUtils.clone(source) : clone;
+  private build(source: THREE.Object3D, bodySource?: THREE.Object3D, axeSource?: THREE.Object3D) {
+    // Naissankarilla ja Pohjan tanakalla/hoikalla vartalo tulee omasta tiedostostaan, varusteet
+    // (aseet, kilvet) miehen tiedostosta. Naisen kypärä tulee miehen tiedostosta, Pohjan vartaloiden omastaan.
+    const female = !!(this.look.female && bodySource);
+    const build = !female && this.look.character === "pohja" && this.look.build && bodySource ? this.look.build : null;
+    const separate = female || build !== null;
+    const clone = SkeletonUtils.clone(separate ? bodySource! : source);
+    const gear = separate ? SkeletonUtils.clone(source) : clone;
     const rig = clone.getObjectByName("RIG") ?? clone;
     // Kantohihna (char_<hahmo>_hihna) on oma kappaleensa samassa luurangossa; näkyy vain rauhan varustuksessa.
-    const bodyPrefix = female ? "char_jousineito" : `char_${this.look.character}`;
+    const bodyPrefix = female ? "char_jousineito" : build ? `char_${build}` : `char_${this.look.character}`;
     const modularBase = `${bodyPrefix}_base`;
-    const useModularHero = this.look.character === "hero" && !!clone.getObjectByName(modularBase);
-    const bodyName = useModularHero ? modularBase : bodyPrefix;
+    const useModular = (this.look.character === "hero" || build !== null) && !!clone.getObjectByName(modularBase);
+    const bodyName = useModular ? modularBase : bodyPrefix;
     const strapName = `${bodyPrefix}_hihna`;
+    const helmetName = build ? `helmet_${build}` : `helmet_${this.look.character}`;
+    const axe = this.look.loadout !== "spear" && !!this.look.axe;
+    const keep = new Set<string>([bodyName, strapName]);
     // Naissankarin huotra (char_jousineito_huotra) on oma kappale kuten kantohihna: aina näkyvissä.
-    const keep = new Set<string>([bodyName, strapName, `${bodyPrefix}_huotra`]);
-    if (useModularHero) {
+    // Pohjan vartaloilla huotra näkyy vain miekkamiehellä (kirves roikkuu vyöllä ilman huotraa).
+    if (!build || (this.look.loadout !== "spear" && !axe)) keep.add(`${bodyPrefix}_huotra`);
+    if (useModular) {
       if (this.look.ringMail) keep.add(`${bodyPrefix}_mail`);
-      if (this.look.greaves) keep.add(`${bodyPrefix}_greaves`);
-      if (this.look.shoes !== false) keep.add(`${bodyPrefix}_shoes`);
+      if (build) keep.add(`${bodyPrefix}_nuttu_${this.look.tunic ?? "tumma"}`);
+      else {
+        if (this.look.greaves) keep.add(`${bodyPrefix}_greaves`);
+        if (this.look.shoes !== false) keep.add(`${bodyPrefix}_shoes`);
+      }
     }
     const equip: Record<string, THREE.Object3D> = {};
     const gearRig = gear.getObjectByName("RIG") ?? gear;
     let gearHelmet: THREE.Object3D | null = null;
-    for (const child of [...clone.children, ...rig.children, ...(female ? [...gear.children, ...gearRig.children] : [])]) {
+    for (const child of [...clone.children, ...rig.children, ...(separate ? [...gear.children, ...gearRig.children] : [])]) {
       const n = child.name;
-      if (n === "jousi" || n === "RIG__tmp") child.removeFromParent();
-      if (female && (child.parent === gear || child.parent === gearRig)) {
+      if (n === "jousi" || n === "RIG__tmp" || n === "RIG_F") child.removeFromParent();
+      if (separate && (child.parent === gear || child.parent === gearRig)) {
         // Miehen tiedostosta otetaan vain varusteet; miehen vartalo jätetään pois.
         if (/^(sword|spear|shield_)/.test(n)) equip[n] = child;
-        if (n === "helmet_hero") gearHelmet = child;
+        if (female && n === "helmet_hero") gearHelmet = child;
         // Luut ja kiinnityspisteet jäävät: niiden asennoista lasketaan siirtymä naisen luurankoon.
         if (/^(sword|spear|shield_|helmet_|char_)/.test(n)) child.removeFromParent();
         continue;
       }
       if (n.startsWith("char_") && !keep.has(n)) child.removeFromParent();
       if (/^(sword|spear|shield_)/.test(n)) { equip[n] = child; child.removeFromParent(); }
-      if (n.startsWith("helmet_") && n !== `helmet_${this.look.character}`) child.removeFromParent();
+      if (n.startsWith("helmet_") && n !== helmetName) child.removeFromParent();
     }
     // Naissankarin kypärä tuodaan luurankoon ennen kuin klooni liitetään pelimaailmaan: silloin molemmat
     // kloonit ovat origossa, siirtymä lasketaan puhtaasti mallin koordinaateissa (ei riipu hahmon paikasta),
@@ -543,7 +580,8 @@ export class Fighter {
     // Kiinnityspisteet luiden lapsina (Blender: build_mounts): lapsi nolla-asennossa on huotrassa tai selässä.
     // Naisen luurangolla pisteet ovat mount_huotra_f ja mount_kilpi_selka_f (char_folk.py: build_hero_f_gear).
     const sfx = female ? "_f" : "";
-    this.mountSheath = rig.getObjectByName(`mount_huotra${sfx}`) ?? null;
+    // Kirves roikkuu rauhassa vyöllä (mount_kirves, vain Pohjan uusilla vartaloilla); ilman pistettä se pysyy kädessä.
+    this.mountSheath = rig.getObjectByName(axe ? "mount_kirves" : `mount_huotra${sfx}`) ?? null;
     this.mountBack = rig.getObjectByName(`mount_kilpi_selka${sfx}`) ?? null;
     if (this.mountBack) {
       this.shieldBackCarrier = new THREE.Group();
@@ -590,9 +628,21 @@ export class Fighter {
     const cInv = hand.canon.clone().invert();
     this.weapon.quaternion.copy(cInv).multiply(qA.setFromEuler(eul.set(0, HAND_TWIST, 0)));
     this.weapon.position.copy(vTmp.set(GRIP.x, GRIP.y, GRIP.z).applyQuaternion(cInv));
-    if (this.look.loadout === "spear") this.prepareSpearGrip(clone);
+    if (this.look.loadout === "spear") this.prepareSpearGrip(clone, build);
     const weaponName = this.look.loadout === "spear" ? "spear" : this.look.skyIron ? "sword_sky_iron" : "sword";
-    const weaponModel = equip[weaponName] ?? equip[this.look.loadout === "spear" ? "spear" : "sword"];
+    // Kirveellä on sama kehys kuin miekalla (ote origossa, varsi +z, terä +x), joten se vaihtuu suoraan
+    // miekan tilalle. Ladattu kirvesnäkymä on yhteinen kaikille: kloonataan (geometria ja materiaali jaetaan).
+    const axeHead = axe ? axeSource?.getObjectByName(`kirves_${this.look.axe}`)?.clone(true) : undefined;
+    let axeModel: THREE.Group | undefined;
+    if (axeHead) {
+      // Kierto varren ympäri (ks. AXE_CHOP_POSES): oma ryhmä, jotta huotra- ja pudotuslogiikka käsittelee yhtä kappaletta.
+      axeHead.position.set(0, 0, 0);
+      axeModel = new THREE.Group();
+      axeModel.name = `kirves_${this.look.axe}`;
+      axeModel.add(axeHead);
+      this.axeRoll = axeModel;
+    }
+    const weaponModel = axeModel ?? equip[weaponName] ?? equip[this.look.loadout === "spear" ? "spear" : "sword"];
     const skyIronFallback = this.look.skyIron && weaponName !== weaponModel?.name;
     if (weaponModel) {
       weaponModel.position.set(0, 0, this.look.loadout === "spear" ? SPEAR_SLIDE : 0);
@@ -636,7 +686,7 @@ export class Fighter {
     }
     // Kypärä on oma kappaleensa: se kiinnitetään pääluuhun lepoasennossa, jolloin se istuu
     // kuten Blenderissä ja voidaan myöhemmin irrottaa lentämään.
-    const helmet = clone.getObjectByName(`helmet_${this.look.character}`);
+    const helmet = clone.getObjectByName(helmetName);
     if (helmet && this.look.helmet !== false) {
       this.root.updateMatrixWorld(true);
       const headBone = this.bones.get("head")!.bone;
@@ -831,12 +881,12 @@ export class Fighter {
    * Keihään ote: varsi kulkee nyrkin otekanavan (GRIP_CHANNEL) läpi. Kanava muunnetaan
    * kummankin käden virtuaalikehykseen, ja keihään tyviote asetetaan oikean käden kanavaan.
    */
-  private prepareSpearGrip(clone: THREE.Object3D) {
+  private prepareSpearGrip(clone: THREE.Object3D, build: PohjaBuild | null) {
     const bodyInv = new THREE.Quaternion().copy(this.body.getWorldQuaternion(new THREE.Quaternion())).invert();
     for (const side of ["R", "L"] as const) {
       const s = side === "R" ? 1 : -1;
       const b = this.bones.get(`hand_${side}`)!;
-      const ch = this.look.female ? GRIP_CHANNEL_F : GRIP_CHANNEL;
+      const ch = this.look.female ? GRIP_CHANNEL_F : build ? GRIP_CHANNEL_POHJA[build] : GRIP_CHANNEL;
       const pW = clone.localToWorld(ch.p.clone().setX(ch.p.x * s));
       const dW = ch.d.clone().setX(ch.d.x * s).transformDirection(clone.matrixWorld);
       const rest = b.bone.getWorldQuaternion(new THREE.Quaternion()).premultiply(bodyInv);
@@ -1311,6 +1361,13 @@ export class Fighter {
       : this.look.loadout === "spear" ? SPEAR.get(target) ?? null
         : this.look.loadout === "sword" ? SWORD_FREE_ARM.get(target) ?? null : null;
     this.shieldHang += ((SHIELD_FRONT.has(target) ? 0 : 1) - this.shieldHang) * k;
+    if (this.axeRoll) {
+      // Ylälyönnissä miekan kehys liikkuu lappeen suuntaan; kirves kääntyy ranteesta neljänneskierroksen,
+      // jotta terä (+x) johtaa. Sivalluksessa terä johtaa jo valmiiksi (mitattu pelissä 2026-11-26).
+      const goal = this.fall > 0 ? 0 : AXE_CHOP_POSES.has(target) ? AXE_CHOP_ROLL : 0;
+      this.axeRollAngle += (goal - this.axeRollAngle) * (1 - Math.exp(-14 * dt));
+      this.axeRoll.rotation.z = this.axeRollAngle;
+    }
     const strideWas = this.pose.stride;
     // Rauhan lepoasennossa kädet ovat vapaat ja heiluvat; eleet ja taisteluasennot hallitsevat käsiä itse.
     this.relax += ((target === POSES.rest || target === POSES.restSpear ? 1 : 0) - this.relax) * k;
@@ -1508,6 +1565,14 @@ const SPEAR_SLIDE = 0.3;
 /** Naisen otekanava (oikea käsi): arvio, ks. BLENDER_HANDOFF "Otekanavat"; nyrkkiä ei ole koverrettu. */
 const GRIP_CHANNEL_F = { p: new THREE.Vector3(-0.385, 0.769, 0.058), d: new THREE.Vector3(0.283, -0.537, 0.795).normalize() };
 const GRIP_CHANNEL = { p: new THREE.Vector3(-0.383, 0.795, 0.112), d: new THREE.Vector3(0.31, -0.06, 0.95).normalize() };
+/** Ylälyönnin asennot, joissa kirves kierretään varren ympäri (AXE_CHOP_ROLL: terä +x kehyksen −y:hen). */
+const AXE_CHOP_POSES = new Set<Pose>([POSES.windup, POSES.strike, POSES.heavyWindup, POSES.heavyStrike]);
+const AXE_CHOP_ROLL = -Math.PI / 2;
+/** Pohjan uusien vartaloiden otekanavat (docs/POHJA_WARRIORS.md, mitattu Blenderissä, pelin koordinaatit). */
+const GRIP_CHANNEL_POHJA: Record<PohjaBuild, { p: THREE.Vector3; d: THREE.Vector3 }> = {
+  tanakka: { p: new THREE.Vector3(-0.4026, 0.7364, 0.0981), d: new THREE.Vector3(0.3324, -0.0135, 0.9431).normalize() },
+  hoikka: { p: new THREE.Vector3(-0.3855, 0.884, 0.1277), d: new THREE.Vector3(0.2781, -0.1217, 0.9528).normalize() },
+};
 
 // Aseen paikka kädessä virtuaalisessa käsikehyksessä (käsi suorana alas: y alas rannetta pitkin).
 const GRIP = { x: 0, y: -0.085, z: 0.0 };

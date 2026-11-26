@@ -54,7 +54,10 @@ export function pickEnemyAttack(e: Actor, dist: number, quick = false): { kind: 
   if (shouldShieldBash(e.character === "pohja", !!e.shield, dist, off, playerTurtles(), quick, Math.random())) {
     return { kind: "bash", weight: "light" };
   }
-  const kind = styleFor(e.weapon, STYLES[Math.floor(Math.random() * STYLES.length)]);
+  // Arvotaan aseen omista iskuista: kirveellä ei ole pistoa, joten puuttuva suunta ei saa
+  // kasata todennäköisyyttä ensimmäiselle osaamalle (styleFor) eli ylälyönnille.
+  const own = STYLES.filter((s) => e.weapon.styles[s]);
+  const kind = styleFor(e.weapon, own[Math.floor(Math.random() * own.length)] ?? "slash");
   // Pelkällä miekalla taisteleva lyö usein raskaasti, kilpimies harvoin.
   // Kilven takana seisovaa pelaajaa vastaan kaikki lyövät raskaasti: kilpi kuluu nopeammin.
   let heavy = e.loadout === "sword" ? ENEMY_AI.heavySword : e.loadout === "spear" ? ENEMY_AI.heavySpear : ENEMY_AI.heavyShield;

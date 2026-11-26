@@ -260,7 +260,7 @@ export const ENEMY_AI = {
 };
 
 export type Loadout = "sword" | "sword_shield" | "spear";
-export type WeaponId = "sword" | "spear" | "sky_iron_sword";
+export type WeaponId = "sword" | "spear" | "sky_iron_sword" | "axe";
 /** Iskun suunta: ylälyönti, sivallus sivulta tai pisto suoraan eteen. */
 export type StrikeStyle = "overhead" | "slash" | "thrust";
 export type StrikeWeight = "light" | "heavy";
@@ -321,24 +321,33 @@ export interface WeaponDef {
   styles: Partial<Record<StrikeStyle, number>>;
   /** Puolikulma, jonka sisältä tuleva isku voidaan torjua aseella (radiaaneina; PI / 4 = ±45° edestä). */
   blockArc: number;
+  /** Kilven kulutuksen kerroin, kun isku osuu kilpeen (1 = perus). */
+  shieldWear: number;
 }
 
 export const WEAPONS: Record<WeaponId, WeaponDef> = {
   sword: {
     id: "sword", name: t("weapon.sword"), damage: 1, reach: 0, lunge: 0, minRange: 0, slowness: 1,
-    styles: { overhead: 1, slash: 1, thrust: 1 }, blockArc: Math.PI / 4,
+    styles: { overhead: 1, slash: 1, thrust: 1 }, blockArc: Math.PI / 4, shieldWear: 1,
   },
   // Kantama on mitattu mallista: pistossa keihään kärki on 1,91 m hahmon keskeltä ja miekan
   // 1,25 m, ja syöksy on 0,3 m pidempi. Samalla pelivaralla kuin miekalla ero on 1,0 m.
   spear: {
     id: "spear", name: t("weapon.spear"), damage: 1.1, reach: 1.0, lunge: 0.3, minRange: 1.3, slowness: 1.35,
-    styles: { thrust: 1.3 }, blockArc: Math.PI / 4,
+    styles: { thrust: 1.3 }, blockArc: Math.PI / 4, shieldWear: 1,
   },
   // Taivaanrautamiekka: sama miekka (sama malli, iskut ja kantama), mutta taivaan raudasta takoen
   // 30 % tehokkaampi. Mitattava ero perusmiekkaan on vain vahingossa (ks. combat.test.ts).
   sky_iron_sword: {
     id: "sky_iron_sword", name: t("weapon.skyIronSword"), damage: 1.3, reach: 0, lunge: 0, minRange: 0, slowness: 1,
-    styles: { overhead: 1, slash: 1, thrust: 1 }, blockArc: Math.PI / 4,
+    styles: { overhead: 1, slash: 1, thrust: 1 }, blockArc: Math.PI / 4, shieldWear: 1,
+  },
+  // Kirves (kirveet.glb: parrakas ja karjalainen) on miekkaa halvempi sotakalu. Pää on 0,6 m otteesta, kun
+  // miekan kärki on 0,8 m, joten ulottuma on lyhyempi. Isku on raskaampi ja hitaampi, pistoa ei ole, ja
+  // terä koukkaa kilpeä: kilpeen osuva isku kuluttaa sitä puolitoistakertaisesti (omistaja 2026-11-26).
+  axe: {
+    id: "axe", name: t("weapon.axe"), damage: 1.2, reach: -0.15, lunge: 0, minRange: 0, slowness: 1.15,
+    styles: { overhead: 1.1, slash: 1 }, blockArc: Math.PI / 4, shieldWear: 1.5,
   },
 };
 
@@ -356,9 +365,13 @@ export const SHIELDS: Record<"round", ShieldDef> = {
   round: { durability: 10, blockArc: Math.PI / 3, notchAt: 0.5 },
 };
 
-/** Aseen määrittely varustuksesta. `skyIron` vaihtaa miekan taivaanrautamiekaksi (keihäs ei muutu). */
-export function weaponOf(loadout: Loadout, skyIron = false): WeaponDef {
+/**
+ * Aseen määrittely varustuksesta. `skyIron` vaihtaa miekan taivaanrautamiekaksi ja `axe` kirveeksi.
+ * Kirves on yhden käden ase kuten miekka, joten varustus on silloin "sword" tai "sword_shield". Keihäs ei muutu.
+ */
+export function weaponOf(loadout: Loadout, skyIron = false, axe = false): WeaponDef {
   if (loadout === "spear") return WEAPONS.spear;
+  if (axe) return WEAPONS.axe;
   return skyIron ? WEAPONS.sky_iron_sword : WEAPONS.sword;
 }
 
@@ -392,7 +405,7 @@ export function makeAttack(w: WeaponDef, style: StrikeStyle, weight: StrikeWeigh
     arc: s.arc,
     damage: s.damage * w.damage * (w.styles[style] ?? 0),
     lunge: s.lunge + w.lunge,
-    shieldDamage: s.shieldDamage,
+    shieldDamage: s.shieldDamage * w.shieldWear,
   };
 }
 

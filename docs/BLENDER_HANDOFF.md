@@ -24,7 +24,9 @@ tarkista merge-tila `git merge-base --is-ancestor`)
     `char_nainen_arki` (`RIG_F` nimellä `RIG`). 25 000–29 000 kolmiota hahmoa kohti.
   - Orkestroija tarkisti jokaisen mallin kuvista; hylätyt ja korjatut kohdat MARKET_INTEGRATION.md:ssä.
 - **Pohjan soturit ja kirveet** (`pohja_tanakka.glb`, `pohja_hoikka.glb`, `kirveet.glb`; `char_pohja.py`):
-  toteutusohje ja mittaukset `docs/POHJA_WARRIORS.md`. Riski: ääri-kävelyssä reisi puskee helman läpi.
+  toteutusohje ja mittaukset `docs/POHJA_WARRIORS.md`. Pelissä v08.07:stä (taistelijoina; integraatio
+  AGENT_HANDOFF). Osat, kypärät ja keihään otekanavat toimivat sellaisinaan; kirves kierretään pelissä
+  ylälyönnissä, joten mallia ei tarvinnut kääntää. Riski: ääri-kävelyssä reisi puskee helman läpi (ei nähty).
 - **Sepän pihapiiri B1–B5** (`smithy.glb`, `smithfolk.glb`, `smithfolk_child.glb`; `smithy.py`, `char_smith.py`,
   `char_smith_child.py`): pelissä v08.06:sta; sijoitus ja pisteet `docs/SMITHY_INTEGRATION.md`. Riskit: kaukalo
   näyttää hieman laatikolta, vesi on läpinäkymätön tumma pinta.

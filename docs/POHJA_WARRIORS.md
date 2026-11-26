@@ -1,7 +1,8 @@
 # Pohjan uudet soturit ja kirveet: toteutusohje pelikoodille
 
 Claude, 2026-11-24 (pohja main fc36128). Tämä muistio on Codexille tai sille, joka vie mallit peliin.
-Mallit ovat valmiita assetteja, mutta peli ei vielä lataa niitä. Mallien sisältö ja putki on kirjattu
+Mallit ovat pelissä v08.07.00:sta alkaen (`FighterLook.build`, `.tunic`, `.axe`; ks. `AGENT_HANDOFF.md`).
+Kirveen iskusuunta ratkaistiin pelissä ranteen kierrolla ylälyönnissä, ei mallia kääntämällä. Mallien sisältö ja putki on kirjattu
 `BLENDER_HANDOFF.md`:hen ja `assets-src/blender/char_pohja.py`:n alkuun. Pelikoodin päätökset kirjataan
 `AGENT_HANDOFF.md`:hen.
 

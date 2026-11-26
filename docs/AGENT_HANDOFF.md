@@ -6,15 +6,24 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-26 (Codex, Windows; pohja `origin/main` `0d969b1`)
+Päivitetty: 2026-11-26 (Claude, Windows; pohja `origin/main` `b06a767`)
 
-- **Koodiversio v08.06.03** branchissa `codex/smithy-animation-polish` (tarkista merge `git merge-base`illa).
-  Koodi valmis, ei deployattu. Agentti testasi käsin; omistaja ei. Vasara pysyy sepän otteessa,
-  kisällin molemmat kädet seuraavat palkeiden kahvoja yhteisellä kellolla ja sankarin selkäkilpi joustaa
-  askelten mukana ilman käsien läpileikkausta. Riippumaton gauntlet-arvio hyväksyi kaikki kolme.
-  Savutesti: naissankarin kaksi askelvaihetta ja 7/6 kuvan työjaksot, 60 FPS, konsoli puhdas.
-  Tarkistukset: `bun run test` 543/543, `bunx tsc --noEmit`, `bun run lint`, `bun run build`,
-  `git diff --check`. Mieshahmon kiinnityspolku tarkistettiin koodista mutta ei erillisellä lähikuvalla.
+- **Koodiversio v08.07.00** branchissa `claude/pohja-warriors-axe` (tarkista merge `git merge-base`illa).
+  Koodi valmis, ei deployattu. Agentti testasi käsin (leiri, `?scene=clearing`); omistaja ei. Väijytyksen
+  vaihe 1/2. Tarkistukset ja tulokset: ks. commit-viesti. v08.06.03:n (seppä, selkäkilpi) omistajatesti puuttuu yhä.
+- **Pohjan uudet soturit ja kirves (v08.07, `fighter.ts`, `combat.ts`).** `FighterLook`: `build`
+  (`tanakka`|`hoikka`, vain `character: "pohja"`; vartalo `pohja_<build>.glb`:stä kuten naissankarin
+  `villagers_f.glb`), `tunic` (`vaalea`|`tumma`, oletus tumma), `axe` (`parta`|`karjala`, `kirveet.glb`;
+  varustus pysyy `sword`/`sword_shield`). Osat: `_base` + yksi nuttu + `_mail` jos `ringMail` + `_huotra` vain
+  miekalla; kypärä `helmet_<build>`; kilpi/miekka/keihäs `characters.glb`:stä; keihäs `GRIP_CHANNEL_POHJA`.
+  Uusilla vartaloilla ei ole säärisuojaosaa (`greaves` vaikuttaa vain laskentaan). Kirves = `WEAPONS.axe`:
+  reach −0,15, slowness 1,15, damage 1,2, overhead 1,1 / slash 1, ei pistoa, `shieldWear` 1,5 (uusi
+  `WeaponDef`-kenttä, kertoo `shieldDamage`n). Kirves kiertyy varren ympäri −90° ylälyönnin asennoissa
+  (`AXE_CHOP_POSES`), muuten 0: mitattuna terä johtaa ylälyönnissä 0,84–0,93 ja sivalluksessa 0,45–0,75
+  (ilman kiertoa ylälyönti meni lappeella). `ai.ts` arpoo vain aseen omista iskuista. Rauhassa kirves menisi
+  `mount_kirves`iin (vain uudet vartalot). Konsoli: `__game.showcase(true, undefined, "pohja")`,
+  `__game.addWarrior(look, x, z)`. Kolme soturia + sankari leirissä: `renderBench` 7,8 ms/ruutu (2,24 milj.
+  kolmiota, 212 kutsua), näkyvä mittari 60 FPS; konsoli puhdas.
 - **Sepän paja (v08.06, `smithyLayout.ts`, `smithyLife.ts`, `world.ts`, `world/content.ts`).** Kohtaus arpoo
   käynnillä työn (seppä vasaroi, sälli palkeilla, pikkusälli karkaisuvadilla; ei koiraa) tai kaupan (seppä
   kojulla, pikkusälli + koira yhdessä neljästä pihapaikasta; ei aikuista sälliä). GLB-puun mountit ja palkeiden
@@ -22,39 +31,21 @@ Päivitetty: 2026-11-26 (Codex, Windows; pohja `origin/main` `0d969b1`)
   Kahdeksan `meat`-tagin esinettä avaa yhden; jommankumman luvallinen otto sulkee molemmat. Lähdössä merkitty
   maailma-aika avaa toisen kaupan 30 pelipäivän jälkeen. Avoin maksettu lupa säilyy, kunnes tuote otetaan.
   Sällin kertadialogi paljastaa neidon maatilan. Avokatos on kuljettava osakohtaisin törmäyksin. Katoksen
-  säde on 10,9 m (takamuuri aidan 12,9 m:n kehällä), kävelyraja 12,35 m ja aihiopöydän paikallinen z=4,15.
-  Paljemorphit ajetaan kaikkien GLB-lapsiverkkojen kautta ja lukevat kisällin samaa `actionTime`-kelloa.
-  Kisällin kahden nivelen IK seuraa GLB:n todellisia kahvapisteitä; vasaran paikallinen +Z-varsi seuraa
-  nyrkin otekanavaa. Uusia Blender-assetteja ei tarvittu.
-- **Villisika (v08.04, `hunt/boar.ts` puhdas + `engine/boars.ts`).** `initBoars`: 0–2 sikaa (`boarCount`
-  40/40/20 %, ≥ 45 m saapumisesta). Tilat root/walk/alert/threat/charge/recover/flinch/flee/bed/dead, luvut
-  `BOAR` (aggressio 0,35, varoitus 0,7 s, rynnäkkö 9 m/s, käännös 1,1 rad/s, vahinko 22, elämä 3; pako terve
-  34 m, haavoittunut 70–100 m → `bed`; paon todennäköisyys kasvaa vahingosta). `updateBoar` palauttaa
-  tapahtumat (`contact`, `blood`…). Nuolet: `boarBodies` (`boar-N#i`) `traceWorld`iin, `arrowDamage(draw)`;
-  lyönnit `melee.setCreatureStrike` → `meleeBoarDamage`. `g.danger` (`boarDangerous` tai haavoittunut alle 9 m) kumoaa `heroAtPeace`n;
-  `bowActive` sallii jousen vaarassa (miekka tupessa), X vaihtaa jousen ja aseen. Verijälki `InstancedMesh`
-  400 tippaa. Kuolema erämaassa: `huntDeathReturn(toStartMenu)`. Ruho `boar_meat` 4–6. Lukitus ei tunne sikaa.
-- **Uhri ennen laulua (v08.02, `content.ts`).** `ASK_SONG` on kaksi valintaa: `ask-song` (ei uhria, ei
-  pyydetty) → `sage.offeringAsked`, `revealSite cairn-b`, solmu `offeringDemand`; `ask-song-taught`
-  (`offering.made`) → `songIntro`. Sääntö `sage.offering-awaited` (`npc.leftBehind` tietäjä) → lippu
-  `sage.offeringAwaited`, jolloin seuraavalla käynnillä solmu `askOffering` ("Toki toimitin…" →
-  `sage.offeringConfirmed`, `offeringThanks` + opetus; "Ei ole apajaa…" → `offeringPending`). Uhrin voi
-  antaa myös ennen pyyntöä. Esineillä `tags` (`ItemTag` `"meat"`, nyt `hare_meat`); ehto `hasTagged`, efekti
-  `takeTagged` (`tryRemoveTagged`). Tuohikontti on ovensuussa ("Onko tuohikontti ovensuussa joutilas?").
+  säde 10,9 m, kävelyraja 12,35 m. Paljemorphit ja kisällin IK lukevat samaa `actionTime`-kelloa.
+- **Villisika (v08.04, `hunt/boar.ts` puhdas + `engine/boars.ts`).** 0–2 sikaa (`boarCount`), tilakone ja
+  luvut `BOAR`-vakiossa. Nuolet `boarBodies` → `traceWorld`, lyönnit `melee.setCreatureStrike` →
+  `meleeBoarDamage`. `g.danger` kumoaa `heroAtPeace`n; X vaihtaa vaarassa jousen ja aseen. Kuolema
+  erämaassa: `huntDeathReturn(toStartMenu)` (väijytyksen kuoleman malli). Lukitus ei tunne sikaa.
+- **Uhri ennen laulua (v08.02, `content.ts`).** `ASK_SONG`: `ask-song` → `sage.offeringAsked` + `revealSite
+  cairn-b`; `ask-song-taught` (`offering.made`) → `songIntro`; odotus `sage.offeringAwaited` → `askOffering`.
+  Esineillä `tags` (`ItemTag` `"meat"`); ehto `hasTagged`, efekti `takeTagged` (`tryRemoveTagged`).
 - **Pitkäkestoiset efektit (v08.01, `map/longEffects.ts`).** `CampaignPlayer.effects` = `{ id, until }`
-  (maailma-aika); luetaan sallivasti (`parseLongEffects`), puuttuva = tyhjä, joten skeemaversio pysyi 7:nä.
-  Kolme paikkaa (`LONG_EFFECT_SLOTS`), sama efekti uudelleen alkaa alusta, neljäs eri efekti epäonnistuu
-  (`effects-full`). Moottorin efekti `addLongEffect`. 3D: `transition.applyLongEffects` (muunnin
-  `long-effect:<id>:<stat>`, summautuu nälän rangaistukseen) `spawnHero`ssa ja `campaignStore`-muutoksissa
-  (`refreshLongEffects`). UI: `inventoryView` paperinuken alla, kuvake `effect-ukko-blessing.png` (generoitu).
+  (maailma-aika, salliva luku). Kolme paikkaa; sama efekti alkaa alusta, neljäs eri epäonnistuu. Moottorin
+  efekti `addLongEffect`; 3D `transition.applyLongEffects` (muunnin `long-effect:<id>:<stat>`).
 - **Kuppikivi (v08.01–02, `cupstoneDialogue`).** Louhen kalmistolla puhuteltava `kuppikivi`, `cairn-b`:llä
-  `uhrikivi` (`populateCairnLife`, `cairnState.louhiHere`); vain uhrikivellä "Ota uhrit…" (2 lihaa, kerran,
-  myös `silent`-solmussa). "Ukon muistan…" → `ukko_blessing` + `markMoon` `ukko.rememberedMoon`; saman kuun
-  aikana `silent` ja tyhjä muistelu. Pohjolan unella `peaceTargets: ["louhi"]` (kivi ei vie kuulijaa).
-- **Mökki ja kalmistot ovat instansseja (v08.00, `map/sites.ts`).** `lakeside` (`SAGE_SITE_ID`), `cairnfield`
-  (Louhi) ja `cairn-b` (`OFFERING_CAIRN_ID`); ei kiinteitä karttapaikkoja. `placeShoreSites` (`SHORE_PLACEMENT`:
-  rantaruutu = avovesi vieressä, kalmisto ≥ 5 mökistä ja toisesta) ennen pihoja (`placementWith`). Vanha
-  tallennus: `completeSiteInstances` + `LEGACY_SHORE_POSITIONS`. `cairn-b`:n merkki `cairn-site-empty.png`.
+  `uhrikivi`; vain uhrikivellä "Ota uhrit…". "Ukon muistan…" → `ukko_blessing` + `markMoon`.
+- **Mökki ja kalmistot ovat instansseja (v08.00, `map/sites.ts`).** `lakeside`, `cairnfield` ja `cairn-b`
+  arvotaan rannoille (`placeShoreSites`) ennen pihoja; vanha tallennus `completeSiteInstances`.
 - **Piha (v07.02–v07.04, `content.ts`, `world.ts`, `yardLife.ts`).** Neito `vuode`lla; `archer.healed` (`minHits`
   6), `archer.died-song`, `archer.died-left` (`npc.leftBehind`, `engine/leave.ts`). `housewifeDialogue(npc)`
   (`emanta` neidon talossa, `emanta_b` toisessa): huhu kerran kummalta tahansa (`rumor.heard`), sitten apaja
@@ -254,13 +245,22 @@ Päivitetty: 2026-11-26 (Codex, Windows; pohja `origin/main` `0d969b1`)
 
 ## Seuraava tehtävä
 
-Omistajan pelitesti (v08.06.03): tarkista mies- ja naissankarin selkäkilpi kävellen sekä sepän vasara ja
-kisällin paljeote koko työjakson ajan omalla kuvakulmalla.
+**Väijytys, vaihe 2** (säännöt alla kohdassa Pysyvät päätökset): uusi taistelukohtaus `ambush` (`route.ts`
+`SCENE_IDS`, `sceneLayout.ts`, `world.ts` `SITES`); polun suuntainen soikea aukio noin 30 × 18 m, metsä
+ympärillä, 3–5 isoa puuta polun lähellä, `rock_3` noin 2,2-kertaisena lohkareena (kuten leirin uhrikivi),
+polku läpi päästä päähän ja polunsuu kummassakin päässä; sankari saapuu tulosuunnan päästä. Kartalla
+(`map/app.ts` `move`) arvonta tehdään vain onnistuneeseen siirtoon ilman `siteIdAt`-paikkaa; paluun
+automaattinen askel ei arvo. Siemen kulkee tunnisteessa (`?site=ambush-<siemen>`), joten tallennusmuotoa ei
+muuteta ja 3D:n uudelleenlataus tuo samat soturit. Joukon arvonta puhtaaksi moduuliksi testeineen
+(`FighterLook`: `build`, `tunic`, `axe`, `ringMail`, `helmet`). Kohtaus ilman aaltoja (`skirmish.ts` mallina),
+ruumiit eivät poistu (`WAVES.corpseTime`), kuolema kuten `huntDeathReturn` + ruokien menetys
+(`ItemTag`/ruoat: lihat, kalat, rieskat). Omistajan v08.06.03-testi (selkäkilpi, seppä) on yhä tekemättä.
 
 ## Ei vielä aloiteta
 
 - Louhen lumihiutalekarkotus, liikkuminen tai uudet kyvyt ennen v08.05:n omistajatestiä.
-- Täysi karttaeditori, satunnaiset matkakohtaamiset ja sivujuonigeneraattori.
+- Täysi karttaeditori ja sivujuonigeneraattori. Väijytyksen rantaversio vasta metsäpolun pelitestin jälkeen.
+- Kaatuneiden soturien saalis ja pelaajan kirves (tulevat väijytyksen jälkeen).
 - 3D-palkintojen tai ruokien lisääminen paluukuormasta inventaarioon.
 - Yleinen quest-editori, laaja dialogipuu, ajastimet, `unless` ja kyläläisten vapaa liikkuminen.
 - Sepän pajan uudet kauppatuotteet, koiran kävely tai uudet Blender-animaatiot ennen v08.06:n omistajatestiä.
@@ -327,3 +327,10 @@ kisällin paljeote koko työjakson ajan omalla kuvakulmalla.
   Saalis poimitaan kaadetusta eläimestä lihana, joka on toistaiseksi syötävää (2026-11-21).
 - Vertailukone on vanha peliläppäri (i5, 8 Gt, GTX 16 -sarja), mutta se on vain referenssi: omistaja
   pelaa ja kehittää tehokkaammalla koneella (2026-11-21).
+- Väijytys (2026-11-26): 5 % jokaisella karttasiirrolla, joka ei pääty 3D-paikkaan; aluksi aina metsäpolku
+  (myöhemmin ranta vesialueen laidalla). 1–3 Pohjan soturia (45/35/20 %) kerralla, ei aaltoja; vartalot vanha,
+  tanakka ja hoikka, aseet miekka, kaksi kirvestä ja keihäs; ryhmässä enintään yksi kilpi ja yksi keihäs.
+  Pako kumpaa tahansa polkua: eteenpäin jää kohderuutuun, taaksepäin palaa lähtöruutuun (aika kuluu, ei
+  uutta arvontaa); väijytykseen ei voi palata. Kuolema palauttaa kartalle ja vie kaikki ruoat (lihat, kalat,
+  rieskat). Kaatuneet pysyvät vain kohtauksen ajan; poistuessa niiden tuleva saalis katoaa.
+- Kirves (2026-11-26): miekkaa lyhyempi, hitaampi ja raskaampi, ei pistoa, kuluttaa kilpeä enemmän.

@@ -82,7 +82,7 @@ export function makeActor(look: FighterLook, pos: THREE.Vector3, level: number, 
   const fighter = new Fighter(look);
   const trail = new SwordTrail(trailColor);
   scene.add(fighter.root, trail.mesh);
-  const weapon = weaponOf(look.loadout, !!look.skyIron);
+  const weapon = weaponOf(look.loadout, !!look.skyIron, !!look.axe);
   const shield = look.loadout === "sword_shield" ? SHIELDS.round : null;
   const base = baseStats(look.character, level);
   const stats = effectiveStats(base, [], 0);

@@ -221,6 +221,24 @@ describe("aseet ja iskut parametreina", () => {
     expect(weaponOf("spear")).toBe(spear);
     expect(weaponOf("sword_shield")).toBe(sword);
   });
+  it("kirves: lyhyempi, hitaampi ja raskaampi kuin miekka, ei pistoa, kuluttaa kilpeä enemmän", () => {
+    const axe = WEAPONS.axe;
+    expect(weaponOf("sword", false, true)).toBe(axe);
+    expect(weaponOf("sword_shield", true, true)).toBe(axe);
+    expect(weaponOf("spear", false, true)).toBe(spear);
+    expect(axe.styles.thrust).toBeUndefined();
+    expect(styleFor(axe, "thrust")).not.toBe("thrust");
+    for (const style of ["overhead", "slash"] as const) {
+      for (const weight of ["light", "heavy"] as const) {
+        const a = makeAttack(axe, style, weight), s = makeAttack(sword, style, weight);
+        expect(a.range).toBeLessThan(s.range);
+        expect(a.timing.windup).toBeGreaterThan(s.timing.windup);
+        expect(a.timing.recovery).toBeGreaterThan(s.timing.recovery);
+        expect(a.damage).toBeGreaterThan(s.damage);
+        expect(a.shieldDamage).toBeCloseTo(s.shieldDamage * 1.5);
+      }
+    }
+  });
   it("vahinko on lyöjän voima × ase × isku", () => {
     expect(strikeDamage(20, slash, "hit", "idle")).toBeCloseTo(20);
     expect(strikeDamage(20, heavySlash, "hit", "idle")).toBeCloseTo(34);
