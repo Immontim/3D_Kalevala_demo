@@ -4,7 +4,7 @@
 import { mapUrl, parseAppRoute } from "../app/route";
 import { t } from "../i18n";
 import { createEmptySceneReturn, saveSceneReturn } from "../map/transition";
-import { exitCrossed, nearestExit, sceneLayout, type SceneExit } from "../sceneLayout";
+import { exitCrossed, nearestExit, sceneLayout, type MapDir, type SceneExit } from "../sceneLayout";
 import { ARENA } from "../world";
 import { showMsg } from "./hud";
 import { postLeftBehind } from "./leave";
@@ -15,6 +15,9 @@ const HINT_NEAR = 6;
 const HINT_RESET = 10;
 
 const LAYOUT = sceneLayout(ARENA);
+/** Polunsuun karttasuunta. Oletuksena layoutin `mapDir`; väijytys ratkaisee sen kulkusuunnasta (scene3d.ts). */
+let resolveMapDir: (exit: SceneExit) => MapDir | null = (exit) => exit.mapDir;
+export function setExitMapDir(fn: (exit: SceneExit) => MapDir | null) { resolveMapDir = fn; }
 let fade = 0;
 let active: SceneExit | null = null;
 let finished = false;
@@ -67,7 +70,7 @@ export function updateExit(realDt: number, fallback: () => void) {
   const route = parseAppRoute(location.href);
   if (route.mode === "scene" && route.returnToMap) {
     postLeftBehind();
-    saveSceneReturn(createEmptySceneReturn(route.scene, hit.mapDir));
+    saveSceneReturn(createEmptySceneReturn(route.scene, resolveMapDir(hit)));
     location.href = mapUrl(location.href).href;
   } else {
     finished = false;

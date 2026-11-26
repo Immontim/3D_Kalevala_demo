@@ -366,6 +366,17 @@ export function tryRemoveTagged(inventory: Inventory, tag: ItemTag, quantity: nu
   return remaining === 0 ? current : null;
 }
 
+/** Ruoka on esine, joka ravitsee (`satietyGain`): lihat, kalat ja rieskat. */
+export function isFood(itemId: ItemId): boolean {
+  return (ITEMS[itemId].satietyGain ?? 0) > 0;
+}
+
+/** Inventaario ilman ainuttakaan ruokaa (väijytyksessä kaatuneelta viedään ruoat). Muut pinot säilyvät
+ *  järjestyksessään; säilytysesine (tuohikontti) jää paikalleen. */
+export function withoutFood(inventory: Inventory): Inventory {
+  return { backpack: inventory.backpack, stacks: inventory.stacks.filter((stack) => !isFood(stack.itemId)).map((stack) => ({ ...stack })) };
+}
+
 /** Ottaa määrän pois inventaariosta atomisesti. null tarkoittaa, ettei sitä ole tarpeeksi. */
 export function tryRemoveItem(inventory: Inventory, itemId: ItemId, quantity: number): Inventory | null {
   if (!Number.isInteger(quantity) || quantity < 1) return null;

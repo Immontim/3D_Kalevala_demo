@@ -26,6 +26,12 @@ export interface Encounter {
   onNpcRemoved?(npcId: string): void;
   /** Rauhallinen kohtaus: niin kauan kuin kentällä ei ole vastustajia, sankarin ase on huotrassa. */
   peaceful?: boolean;
+  /** Kaatuneet jäävät maahan koko kohtauksen ajaksi (muuten ne poistuvat WAVES.corpseTime-ajan jälkeen). */
+  keepCorpses?: boolean;
+  /** Sankari kaatui. true = kohtaus hoitaa kuoleman itse (oma viesti ja paluu `goToMap`illa viiveellä). */
+  onPlayerDeath?(goToMap: () => void): boolean;
+  /** Kohtauksen oma kuolemanjälkeinen paluu on kesken: uutta yritystä (R) ei sallita. */
+  deathPending?(): boolean;
 }
 
 /** Rauhallinen kohtaus: kentällä ei ole vastustajia, sankari voi liikkua vapaasti. */

@@ -36,7 +36,7 @@ import { SCENE_IDS, type SceneId } from "./app/route";
 import { Forest, ScatterField, placeForestWall, type ScatterItem, type TreeSpot } from "./forest";
 import { createBirds, type BirdsView } from "./engine/birds";
 import { addFoliageFade } from "./engine/foliageFade";
-import { entrySpawn, sceneLayout, walkableDepth, type Vec2 } from "./sceneLayout";
+import { AMBUSH_RX, AMBUSH_RZ, entrySpawn, sceneLayout, walkableDepth, type Vec2 } from "./sceneLayout";
 import { planSmithyLife, type SmithyLifePlan } from "./smithyLife";
 import { bellowsMotion, hammerMotion } from "./smithyMotion";
 import {
@@ -62,6 +62,7 @@ export const ARENAS: Record<ArenaId, { name: string; desc: string }> = {
   cairnfield: { name: t("arena.cairnfield.name"), desc: t("arena.cairnfield.desc") },
   smithy: { name: t("arena.smithy.name"), desc: t("arena.smithy.desc") },
   wilds: { name: t("arena.wilds.name"), desc: t("arena.wilds.desc") },
+  ambush: { name: t("arena.ambush.name"), desc: t("arena.ambush.desc") },
 };
 const ARENA_STORE = "laulun-miekka.arena.v1";
 
@@ -198,6 +199,24 @@ const LAKE = LAKESIDE || CAIRN;
 const RUIN = ARENA === "lakeruin";
 /** Erämaa: laaja (200 x 200 m) metsä, jonka keskellä suoniitty ja reunalla paloaukea; ei rakennuksia eikä tulta. */
 const WILDS = ARENA === "wilds";
+/** Väijytys: metsäpolku polun suuntaisella soikealla aukiolla (AMBUSH_RX × AMBUSH_RZ); ei rakennuksia eikä tulta. */
+const AMBUSH = ARENA === "ambush";
+/** Väijytyksen keskiviiva: loiva mutka aukion läpi päästä päähän (polunsuut z = ±AMBUSH_RZ, x = 0). */
+const AMBUSH_PATH: Vec2[] = [
+  { x: 0, z: AMBUSH_RZ + 2 }, { x: 0.6, z: 9 }, { x: -0.8, z: 2 }, { x: 0.7, z: -5 }, { x: -0.4, z: -11 }, { x: 0, z: -AMBUSH_RZ - 2 },
+];
+/** Väijytyksen sommittelu: isot puut polun lähellä ja siirtolohkare, jonka voi kiertää molemmin puolin. */
+const AMBUSH_PROPS = [
+  { key: "pine_b", x: -3.4, z: 6.5, s: 1.25, yaw: 0.4, clear: 1.4 },
+  { key: "birch_b", x: 2.9, z: 10.6, s: 1.15, yaw: 2.1, clear: 1.2 },
+  { key: "spruce_a", x: 3.7, z: -1.6, s: 1.2, yaw: 1.3, clear: 1.6 },
+  { key: "pine_a", x: -3.1, z: -8.6, s: 1.3, yaw: 5.0, clear: 1.4 },
+  { key: "rock_3", x: 4.3, z: 4.4, s: 2.3, yaw: 0.9, clear: 2.2 },
+] as const;
+/** Onko piste väijytyksen soikean aukion sisällä (pad laajentaa). */
+function insideAmbush(x: number, z: number, pad: number) {
+  return (x / (AMBUSH_RX + pad)) ** 2 + (z / (AMBUSH_RZ + pad)) ** 2 < 1;
+}
 /**
  * Kohtauksen varustus kampanjan varusteista: metsästysapajalla (erämaa) kilpi jää leiriin, joten
  * miekka ja kilpi -yhdistelmä on siellä pelkkä miekka (omistajan päätös 2026-11-22). Kampanjan
@@ -402,6 +421,14 @@ const SITES: Record<ArenaId, Site> = {
     footprints: [],
     circles: [],
   },
+  ambush: {
+    // Metsäpolku: ei nuotiota. Puut pysyvät soikion ulkopuolella (insideAmbush), paitsi käsin sijoitetut
+    // isot puut ja lohkare (AMBUSH_PROPS), joiden ympärys pidetään vapaana muusta metsästä.
+    fire: { x: -380, z: -380 }, flat0: AMBUSH_RZ + 2, flat1: AMBUSH_RZ + 18, rough: 0.1,
+    treeMin: AMBUSH_RX, shrub0: 3.5, shrub1: AMBUSH_RX + 1, dirtR: 2, camMaxR: Infinity,
+    footprints: [],
+    circles: AMBUSH_PROPS.map((p) => ({ x: p.x, z: p.z, r: p.clear })),
+  },
 };
 const SITE = SITES[ARENA];
 /** Sumun väri; sama väri sekoitetaan kaukorannan siluetteihin. Hävitetyllä rannalla utuisempi, kalmistolla vaalea ja kostea. */
@@ -599,10 +626,14 @@ const PATHS: Vec2[][] = WILDS
     // Paloaukealle haarautuva polku.
     wigglePath([{ x: 18, z: -16 }, { x: 34, z: -28 }, { x: 46, z: -36 }], 2.9),
   ]
-  : LAYOUT.exits.map((e, i) => {
-    const dx = Math.sin(e.yaw), dz = Math.cos(e.yaw);
-    return wigglePath([{ x: e.x - dx * 4, z: e.z - dz * 4 }, { x: e.x + dx * 70, z: e.z + dz * 70 }], 3.3 + i);
-  });
+  : [
+    // Väijytyksessä polku kulkee aukion läpi polunsuulta toiselle.
+    ...(AMBUSH ? [AMBUSH_PATH] : []),
+    ...LAYOUT.exits.map((e, i) => {
+      const dx = Math.sin(e.yaw), dz = Math.cos(e.yaw);
+      return wigglePath([{ x: e.x - dx * 4, z: e.z - dz * 4 }, { x: e.x + dx * 70, z: e.z + dz * 70 }], 3.3 + i);
+    }),
+  ];
 
 /** Lyhin etäisyys polun keskiviivaan (m). */
 function pathDist(x: number, z: number): number {
@@ -1083,7 +1114,7 @@ function buildFire(scene: THREE.Scene) {
   group.position.set(FIRE.x, fy, FIRE.z);
   group.scale.setScalar(fs);
   scene.add(group);
-  if (RUIN || CAIRN || WILDS) {
+  if (RUIN || CAIRN || WILDS || AMBUSH) {
     // Tuhon jälkeen tuli on sammunut (tuhka on mallissa); kalmistolla ei ole tulta lainkaan: ei liekkiä, hehkua, kipinöitä, savua eikä valoa.
     const dead = new THREE.PointLight(0xff8a3c, 0, 16, 1.5);
     dead.visible = false;
@@ -1344,7 +1375,7 @@ function populate(
   const trees: { x: number; z: number }[] = [];
   const tryTree = (x: number, z: number) => {
     const d = Math.hypot(x, z);
-    if (d < SITE.treeMin || blocked(x, z, 1.5) || pathDist(x, z) < 2.2) return;
+    if ((AMBUSH ? insideAmbush(x, z, 0.4) : d < SITE.treeMin) || blocked(x, z, 1.5) || pathDist(x, z) < 2.2) return;
     if (trees.some((t) => Math.hypot(t.x - x, t.z - z) < 2.6)) return;
     // Kalmisto: näkymä järvelle jää auki, mäntymetsä on harvaa ja kumpareen ympärillä on tilaa.
     if (CAIRN && ((z > 7 && Math.abs(x) < 14) || Math.hypot(x - 1, z - 3) < 13 || r() < 0.4)) return;
@@ -1361,9 +1392,12 @@ function populate(
   };
   // Erämaa sijoittelee omat puunsa, kivensä ja kelonsa; alla olevat aukion kehät ohitetaan (0 kierrosta).
   if (WILDS) placeWilds(put, protos);
-  for (let i = 0; i < (WILDS ? 0 : 26); i++) {
-    const a = (i / 26) * Math.PI * 2 + r() * 0.2, d = SITE.treeMin + 0.4 + r() * 3.5;
-    tryTree(Math.cos(a) * d, Math.sin(a) * d);
+  // Väijytyksessä kehä kiertää soikiota (pidempi kehä, enemmän puita).
+  const ringCount = WILDS ? 0 : AMBUSH ? 36 : 26;
+  for (let i = 0; i < ringCount; i++) {
+    const a = (i / ringCount) * Math.PI * 2 + r() * 0.2, d = SITE.treeMin + 0.4 + r() * 3.5;
+    if (AMBUSH) tryTree(Math.cos(a) * AMBUSH_RX * (d / SITE.treeMin), Math.sin(a) * AMBUSH_RZ * (d / SITE.treeMin));
+    else tryTree(Math.cos(a) * d, Math.sin(a) * d);
   }
   for (let i = 0; i < (WILDS ? 0 : 520); i++) {
     const a = r() * Math.PI * 2, d = SITE.treeMin + 1.8 + Math.pow(r(), 0.8) * 62;
@@ -1380,11 +1414,15 @@ function populate(
     put(`rock_${1 + Math.floor(r() * 6)}@near`, x, z, s, r() * 6.28, 0.05, 0.3);
   }
   if (ARENA === "clearing") put("rock_3@near", OFFERING.x, OFFERING.z, 1.3, 0.7, 0.62);   // uhrikivi: sammaloitunut siirtolohkare
+  // Väijytys: isot puut polun varrella ja noin 1,6 m korkea siirtolohkare (rock_3 2,3-kertaisena, 0,7 m maassa).
+  if (AMBUSH) for (const p of AMBUSH_PROPS) put(`${p.key}@near`, p.x, p.z, p.s, p.yaw, p.key === "rock_3" ? 0.7 : 0.05);
   if (LAKESIDE) put("istuinhirsi@near", FIRE.x - 1.75, FIRE.z + 0.35, 1, Math.PI / 2 + 0.2, 0.02);     // istuinhirsi keittotulella
-  else if (!CAIRN && !WILDS) put("log@near", FIRE.x + 1.9, FIRE.z + 1.3, 0.75, 2.2, 0.02);       // istuinpuu nuotiolla
+  else if (!CAIRN && !WILDS && !AMBUSH) put("log@near", FIRE.x + 1.9, FIRE.z + 1.3, 0.75, 2.2, 0.02);       // istuinpuu nuotiolla
   for (let i = 0; i < (WILDS ? 0 : 7); i++) {
     const a = r() * 6.28, d = SITE.treeMin + 0.8 + r() * 26;
-    put("log@near", Math.cos(a) * d, Math.sin(a) * d, 0.7 + r() * 0.5, r() * 6.28, 0.04, 0.1);
+    const x = Math.cos(a) * d, z = Math.sin(a) * d;
+    if (AMBUSH && (insideAmbush(x, z, 0.5) || pathDist(x, z) < 1.5)) continue;
+    put("log@near", x, z, 0.7 + r() * 0.5, r() * 6.28, 0.04, 0.1);
   }
   for (let i = 0; i < (WILDS ? 0 : 110); i++) {
     const a = r() * 6.28, d = 6 + r() * 34;
@@ -1423,7 +1461,7 @@ function populate(
     put(r() < 0.5 ? "fern_a" : "fern_b", x, z, 0.9 + r() * 0.8, r() * 6.28, 0.01);
   }
 
-  if (!CAIRN && !WILDS) put(LAKESIDE ? (RUIN ? "keittopaikka_sammunut@near" : "keittopaikka@near") : "campfire@near", FIRE.x, FIRE.z, 1, LAKESIDE ? 0 : 0.4, 0.02);
+  if (!CAIRN && !WILDS && !AMBUSH) put(LAKESIDE ? (RUIN ? "keittopaikka_sammunut@near" : "keittopaikka@near") : "campfire@near", FIRE.x, FIRE.z, 1, LAKESIDE ? 0 : 0.4, 0.02);
   if (ARENA === "clearing") {
     put("kota@near", KOTA.x, KOTA.z, 1, 2.45, 0.05);     // oviaukko aukiolle päin
   } else if (CAIRN) {
@@ -2376,11 +2414,11 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   };
   const fire = buildFire(scene);
   const collision = new CollisionWorld();
-  if (!CAIRN && !WILDS) collision.add({
+  if (!CAIRN && !WILDS && !AMBUSH) collision.add({
     id: "campfire", kind: "circle", x: FIRE.x, z: FIRE.z, radius: COLLISION.fireCoreRadius,
     blocksMovement: true, blocksMelee: true,
   });
-  if (!RUIN && !CAIRN && !WILDS) collision.addHazard({
+  if (!RUIN && !CAIRN && !WILDS && !AMBUSH) collision.addHazard({
     // Rantakohtauksen keittotuli on pieni ja rauhallinen: kivikehän vierestä ei pala.
     id: "campfire", kind: "circle", x: FIRE.x, z: FIRE.z, radius: LAKE ? COLLISION.fireHazardRadius * 0.45 : COLLISION.fireHazardRadius,
     damagePerSecond: COLLISION.fireDamagePerSecond,

@@ -6,11 +6,22 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-26 (Claude, Windows; pohja `origin/main` `b06a767`)
+Päivitetty: 2026-11-26 (Claude, Windows; pohja `origin/main` `c716869`)
 
-- **Koodiversio v08.07.00** branchissa `claude/pohja-warriors-axe` (tarkista merge `git merge-base`illa).
-  Koodi valmis, ei deployattu. Agentti testasi käsin (leiri, `?scene=clearing`); omistaja ei. Väijytyksen
-  vaihe 1/2. Tarkistukset ja tulokset: ks. commit-viesti. v08.06.03:n (seppä, selkäkilpi) omistajatesti puuttuu yhä.
+- **Koodiversio v08.08.00** branchissa `claude/ambush-forest-path` (tarkista merge `git merge-base`illa).
+  Koodi valmis, ei deployattu. Agentti testasi käsin kartalta asti; omistaja ei. Tarkistukset: ks. commit-viesti.
+  Omistajatestit puuttuvat: v08.06.03 (seppä, selkäkilpi), v08.07 (uudet soturit), v08.08 (väijytys).
+- **Väijytys (v08.08; puhdas `ambush.ts`, `engine/ambush.ts`, `map/app.ts` `move`).** Kartta: onnistunut
+  siirto ilman `siteIdAt`-paikkaa ja ei paluuaskel (`move(dir, true)`) → `rollsAmbush` (5 %) → `openScene
+  ("ambush", "ambush-<siemen>-<n|e|s|w>")`; mitään ei tallenneta kartalle. `__map.setAmbushChance(1)` testeihin.
+  3D: `configureAmbush(route.site)` + `setExitMapDir(ambushExitMapDir)` (`exit.ts`): polunsuu `back` → vastakkainen
+  suunta (kartta astuu lähtöruutuun), `forward` → null (jää). `ambushRoster(seed)` (mulberry32) ja
+  `ambushSpawns`; soturit kerralla tasolla 0 / taito 0. `Encounter`-koukut: `keepCorpses` (ruumis `removeAt`
+  Infinity), `onPlayerDeath(goToMap)` (ruoat pois `withoutFood`, paluu 3,5 s), `deathPending` (estää R:n);
+  `peaceful`-getteri tosi voiton jälkeen. Kohtaus `world.ts` `AMBUSH`: soikio `AMBUSH_RX` 9 × `AMBUSH_RZ` 15
+  (`sceneLayout.ts`), `insideAmbush` pitää metsän ulkona, `AMBUSH_PROPS` (4 isoa puuta, `rock_3` ×2,3, 0,7 m
+  maassa), `AMBUSH_PATH` läpi, ei tulta. `transition.ts` hyväksyy nyt kaikki `SCENE_IDS` (ennen käsin kirjoitettu
+  lista pudotti uuden kohtauksen paluukuorman). Kahden soturin taistelu: `renderBench` 4,7 ms (2,18 milj. kolmiota).
 - **Pohjan uudet soturit ja kirves (v08.07, `fighter.ts`, `combat.ts`).** `FighterLook`: `build`
   (`tanakka`|`hoikka`, vain `character: "pohja"`; vartalo `pohja_<build>.glb`:stä kuten naissankarin
   `villagers_f.glb`), `tunic` (`vaalea`|`tumma`, oletus tumma), `axe` (`parta`|`karjala`, `kirveet.glb`;
@@ -20,18 +31,12 @@ Päivitetty: 2026-11-26 (Claude, Windows; pohja `origin/main` `b06a767`)
   reach −0,15, slowness 1,15, damage 1,2, overhead 1,1 / slash 1, ei pistoa, `shieldWear` 1,5 (uusi
   `WeaponDef`-kenttä, kertoo `shieldDamage`n). Kirves kiertyy varren ympäri −90° ylälyönnin asennoissa
   (`AXE_CHOP_POSES`), muuten 0: mitattuna terä johtaa ylälyönnissä 0,84–0,93 ja sivalluksessa 0,45–0,75
-  (ilman kiertoa ylälyönti meni lappeella). `ai.ts` arpoo vain aseen omista iskuista. Rauhassa kirves menisi
-  `mount_kirves`iin (vain uudet vartalot). Konsoli: `__game.showcase(true, undefined, "pohja")`,
-  `__game.addWarrior(look, x, z)`. Kolme soturia + sankari leirissä: `renderBench` 7,8 ms/ruutu (2,24 milj.
-  kolmiota, 212 kutsua), näkyvä mittari 60 FPS; konsoli puhdas.
-- **Sepän paja (v08.06, `smithyLayout.ts`, `smithyLife.ts`, `world.ts`, `world/content.ts`).** Kohtaus arpoo
-  käynnillä työn (seppä vasaroi, sälli palkeilla, pikkusälli karkaisuvadilla; ei koiraa) tai kaupan (seppä
-  kojulla, pikkusälli + koira yhdessä neljästä pihapaikasta; ei aikuista sälliä). GLB-puun mountit ja palkeiden
-  morphit säilytetään; assetit latautuvat vain pajassa. `smithy.spear` ja `.greaves` alkavat varkautena.
-  Kahdeksan `meat`-tagin esinettä avaa yhden; jommankumman luvallinen otto sulkee molemmat. Lähdössä merkitty
-  maailma-aika avaa toisen kaupan 30 pelipäivän jälkeen. Avoin maksettu lupa säilyy, kunnes tuote otetaan.
-  Sällin kertadialogi paljastaa neidon maatilan. Avokatos on kuljettava osakohtaisin törmäyksin. Katoksen
-  säde 10,9 m, kävelyraja 12,35 m. Paljemorphit ja kisällin IK lukevat samaa `actionTime`-kelloa.
+  (ilman kiertoa ylälyönti meni lappeella). `ai.ts` arpoo vain aseen omista iskuista. Konsoli:
+  `__game.showcase(true, undefined, "pohja")`, `__game.addWarrior(look, x, z)`.
+- **Sepän paja (v08.06, `smithyLayout.ts`, `smithyLife.ts`, `world.ts`, `world/content.ts`).** Käynti arpoo
+  työn tai kaupan kokoonpanon; assetit latautuvat vain pajassa. `smithy.spear` ja `.greaves` alkavat
+  varkautena; kahdeksan `meat`-esinettä avaa yhden, toinen kauppa 30 pelipäivän päästä lähdöstä. Sällin
+  kertadialogi paljastaa neidon maatilan. Paljemorphit ja kisällin IK lukevat samaa `actionTime`-kelloa.
 - **Villisika (v08.04, `hunt/boar.ts` puhdas + `engine/boars.ts`).** 0–2 sikaa (`boarCount`), tilakone ja
   luvut `BOAR`-vakiossa. Nuolet `boarBodies` → `traceWorld`, lyönnit `melee.setCreatureStrike` →
   `meleeBoarDamage`. `g.danger` kumoaa `heroAtPeace`n; X vaihtaa vaarassa jousen ja aseen. Kuolema
@@ -46,12 +51,9 @@ Päivitetty: 2026-11-26 (Claude, Windows; pohja `origin/main` `b06a767`)
   `uhrikivi`; vain uhrikivellä "Ota uhrit…". "Ukon muistan…" → `ukko_blessing` + `markMoon`.
 - **Mökki ja kalmistot ovat instansseja (v08.00, `map/sites.ts`).** `lakeside`, `cairnfield` ja `cairn-b`
   arvotaan rannoille (`placeShoreSites`) ennen pihoja; vanha tallennus `completeSiteInstances`.
-- **Piha (v07.02–v07.04, `content.ts`, `world.ts`, `yardLife.ts`).** Neito `vuode`lla; `archer.healed` (`minHits`
-  6), `archer.died-song`, `archer.died-left` (`npc.leftBehind`, `engine/leave.ts`). `housewifeDialogue(npc)`
-  (`emanta` neidon talossa, `emanta_b` toisessa): huhu kerran kummalta tahansa (`rumor.heard`), sitten apaja
-  kerran kuussa (`emanta.huntTipMoon`); tervehdykset `greetWounded`/`greet`/`greetAgain`/`greetHealer`
-  (`meetingRules`: `<npc>.greeted` → lähtiessä `<npc>.met`); ruoka `householdFood`/`theftRule`
-  (`<npc>.robbed`, `moonChance`, pöytäesineet roolilla `@archerYard.`/`@otherYard.`, `world/instances.ts`).
+- **Piha (v07.02–v07.04, `content.ts`, `world.ts`, `yardLife.ts`).** Neito `vuode`lla (`archer.healed`,
+  `archer.died-*`, `engine/leave.ts`). `housewifeDialogue(npc)` (`emanta`, `emanta_b`): huhu, kuukausittainen
+  apaja, tervehdykset `meetingRules`; ruoka `householdFood`/`theftRule` (`world/instances.ts`).
   Väen ja eläinten paikat arvotaan käynnittäin (`pickSpot`, `planYardAnimals`; `__world.yard`).
 - **Kohtausmalli (`src/sceneLayout.ts`, puhdas).** `SceneLayout`: kuljettava monikulmio `bounds`, `arena`
   ja polunsuut `exits` (`mapDir`); kuljettava = monikulmio tai polunsuun käytävä, rajaus `clampToWalkable`.
@@ -233,6 +235,8 @@ Päivitetty: 2026-11-26 (Claude, Windows; pohja `origin/main` `b06a767`)
   piirretty vain maaston väriin. Aloitus on aina ensimmäisellä polunsuulla, ei sillä, jonka suunnasta
   kartalta tultiin. Metsästä tuleva vihollinen voi juuttua runkoon (12 s:n jälkeen hyppäys aukiolle).
   Viholliset eivät pakene polunsuista; sankarin pako ei muuta kampanjaa (aallot alkavat alusta).
+- Väijytys: kartalta tultaessa 3D vaatii yhä "Aloita"-painalluksen, jonka jälkeen soturit syntyvät. Aukio on aina
+  saman muotoinen ja suuntainen (vain kulkusuunta vaihtuu). Monisoturiväijytys on tasapainottamatta.
 - Metsästys: täydellä jännityksellä nuolen perä on vasemman korvan kohdalla; naissankarin kilpi peittää
   tähdätessä vasemman alakulman. Nuolet puissa yli 2,2 m:ssä menetetään. Jousi ei ole inventaarion esine,
   ruoanlaittoa ei ole. 3D-sivun uudelleenlataus toistaa apajan täydellä viinillä. Tiheällä kartalla apaja
@@ -245,16 +249,9 @@ Päivitetty: 2026-11-26 (Claude, Windows; pohja `origin/main` `b06a767`)
 
 ## Seuraava tehtävä
 
-**Väijytys, vaihe 2** (säännöt alla kohdassa Pysyvät päätökset): uusi taistelukohtaus `ambush` (`route.ts`
-`SCENE_IDS`, `sceneLayout.ts`, `world.ts` `SITES`); polun suuntainen soikea aukio noin 30 × 18 m, metsä
-ympärillä, 3–5 isoa puuta polun lähellä, `rock_3` noin 2,2-kertaisena lohkareena (kuten leirin uhrikivi),
-polku läpi päästä päähän ja polunsuu kummassakin päässä; sankari saapuu tulosuunnan päästä. Kartalla
-(`map/app.ts` `move`) arvonta tehdään vain onnistuneeseen siirtoon ilman `siteIdAt`-paikkaa; paluun
-automaattinen askel ei arvo. Siemen kulkee tunnisteessa (`?site=ambush-<siemen>`), joten tallennusmuotoa ei
-muuteta ja 3D:n uudelleenlataus tuo samat soturit. Joukon arvonta puhtaaksi moduuliksi testeineen
-(`FighterLook`: `build`, `tunic`, `axe`, `ringMail`, `helmet`). Kohtaus ilman aaltoja (`skirmish.ts` mallina),
-ruumiit eivät poistu (`WAVES.corpseTime`), kuolema kuten `huntDeathReturn` + ruokien menetys
-(`ItemTag`/ruoat: lihat, kalat, rieskat). Omistajan v08.06.03-testi (selkäkilpi, seppä) on yhä tekemättä.
+Omistajan pelitesti (v08.08.00): väijytyksen tiheys (5 %), 1–3 soturin vaikeus, kirveen tuntuma ja metsäpolun
+ilme; samalla uudet soturit liikkeessä (helman läpimeno pitkässä askeleessa) ja v08.06.03:n seppä ja selkäkilpi.
+Palautteen jälkeen: rannan väijytys (tietäjän rannan mukaelma) tai kaatuneiden saalis.
 
 ## Ei vielä aloiteta
 

@@ -20,6 +20,7 @@ import { clearCampaign, loadCampaignReport, newCampaign, saveCampaign } from "./
 import { riverTile, shoreEdgeTurns, terrainFrame, waterShoreMask, type AtlasFrame } from "./tiles";
 import { consumeSceneReturn } from "./transition";
 import type { MapDir } from "../sceneLayout";
+import { ambushCanHappen, ambushSiteId, rollsAmbush } from "../ambush";
 import { endingSummary, isWon, shouldShowEnding } from "./ending";
 import { withFlag } from "../world/state";
 import { mapCalendarTime, mapCellVisibility, satietyBand } from "./uiState";
@@ -29,7 +30,7 @@ import { drawBridge } from "./bridgeArt";
 const TILE = 48;
 const VIEW_COLS = 17;
 const VIEW_ROWS = 13;
-const SCENE_SHORTCUTS = ["yard", "smithy", "lakeside", "lakeruin", "cairnfield", "clearing", "homestead", "wilds"] as const satisfies readonly SceneId[];
+const SCENE_SHORTCUTS = ["yard", "smithy", "lakeside", "lakeruin", "cairnfield", "clearing", "homestead", "wilds", "ambush"] as const satisfies readonly SceneId[];
 
 const HERO_FRAME: Record<MapDirection, [number, number]> = {
   up: [0, 2], right: [1, 2], down: [2, 2], left: [3, 2],
@@ -161,7 +162,11 @@ function currentMapState() {
   });
 }
 
-function move(direction: MapDirection) {
+let ambushChanceOverride: number | null = null;
+const MAP_TO_EXIT_DIR ={ up: "n", right: "e", down: "s", left: "w" } as const satisfies Record<MapDirection, MapDir>;
+
+/** `returnStep`: kohtauksen polunsuusta tultaessa otettu automaattinen askel; se ei arvo väijytystä. */
+function move(direction: MapDirection, returnStep = false) {
   facing = direction;
   const result = moveOnMap(journeyMap, currentMapState(), direction);
   if (!result.moved) {
@@ -190,8 +195,15 @@ function move(direction: MapDirection) {
   };
   // Aika kului: 20 päivän välein uusi (piilossa oleva) metsästysapaja.
   campaign = advanceHuntGrounds(campaign, journeyMap);
-  setMessage(siteMessage(siteIdAt(journeyMap, campaign.world.siteInstances, result.state.x, result.state.y), ""));
+  const targetSite = siteIdAt(journeyMap, campaign.world.siteInstances, result.state.x, result.state.y);
+  setMessage(siteMessage(targetSite, ""));
   persistAndRender();
+  // Väijytys (5 %): vain 3D-paikattomaan ruutuun. Siemen ja kulkusuunta kulkevat tunnisteessa; sankari on jo
+  // kohderuudussa ja aika on kulunut. Väijytys on kertakäyttöinen, joten sitä ei tallenneta kartalle.
+  if (ambushCanHappen(targetSite, returnStep) && rollsAmbush(Math.random(), ambushChanceOverride ?? undefined)) {
+    const seed = Math.floor(Math.random() * 4294967296);
+    if (!openScene("ambush", ambushSiteId(seed, MAP_TO_EXIT_DIR[direction]))) renderMap();
+  }
 }
 
 /** Paikan ilmoitus kartan alareunassa; kaikki pihainstanssit ovat "pihapiiri". */
@@ -632,7 +644,7 @@ export function initMap() {
   // Poistuttiin polunsuusta: sankari astuu yhden ruudun polun suuntaan. Tukittu suunta ei tee mitään.
   if (sceneReturn?.exitDir) {
     const dir = EXIT_TO_MAP_DIR[sceneReturn.exitDir];
-    if (moveOnMap(journeyMap, currentMapState(), dir).moved) move(dir);
+    if (moveOnMap(journeyMap, currentMapState(), dir).moved) move(dir, true);
   }
   window.addEventListener("keydown", onKeyDown);
   if (shouldShowEnding(campaign)) openEnding();
@@ -642,5 +654,7 @@ export function initMap() {
     enterSite,
     sceneReturn,
     get route() { return mapUrl(location.href); },
+    /** Savutestit: väijytyksen todennäköisyys tälle sivulataukselle (0..1); null palauttaa 5 %:n. */
+    setAmbushChance(chance: number | null) { ambushChanceOverride = chance; },
   };
 }
