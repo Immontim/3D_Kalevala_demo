@@ -217,9 +217,26 @@ const WILDS_BOUNDS: Vec2[] = [
   { x: -93, z: 70 }, { x: -96, z: 45 }, { x: -94, z: 20 }, { x: -97, z: 0 }, { x: -95, z: -30 }, { x: -96, z: -60 },
 ];
 
-/** Väijytyksen metsäpolku: polun suuntainen soikea aukio (puoliakselit, m). Polku kulkee z-akselia pitkin. */
-export const AMBUSH_RX = 9;
-export const AMBUSH_RZ = 15;
+/**
+ * Väijytyksen metsäpolku: polun suuntainen soikea aukio (puoliakselit, m), polku z-akselia pitkin. Muoto on
+ * superellipsi (eksponentti AMBUSH_EXP > 2), jotta aukio pysyy leveänä myös päissä, joista sankari saapuu:
+ * keskellä 22 m, aloituskohdassa noin 16 m (v08.08.01; v08.08.00:n 18 × 30 m:n ellipsi tuntui kapealta).
+ */
+export const AMBUSH_RX = 11;
+export const AMBUSH_RZ = 17;
+export const AMBUSH_EXP = 2.5;
+
+/** Superellipsin arvo pisteessä: alle 1 = aukion sisällä (pad laajentaa aukiota metreinä). */
+export function ambushShape(x: number, z: number, pad = 0): number {
+  return Math.pow(Math.abs(x) / (AMBUSH_RX + pad), AMBUSH_EXP) + Math.pow(Math.abs(z) / (AMBUSH_RZ + pad), AMBUSH_EXP);
+}
+
+/** Superellipsin kehäpiste kulmassa a (0 = +z, π/2 = +x), kerrottuna k:lla. */
+export function ambushRim(a: number, k = 1): Vec2 {
+  const e = 2 / AMBUSH_EXP;
+  const s = Math.sin(a), c = Math.cos(a);
+  return { x: Math.sign(s) * Math.pow(Math.abs(s), e) * AMBUSH_RX * k, z: Math.sign(c) * Math.pow(Math.abs(c), e) * AMBUSH_RZ * k };
+}
 
 /**
  * Väijytys: soikio, jonka päissä on polunsuu. Sankari saapuu takaa (+z, "back") ja polku jatkuu eteen
@@ -227,10 +244,7 @@ export const AMBUSH_RZ = 15;
  */
 function ambushScene(): SceneLayout {
   const bounds: Vec2[] = [];
-  for (let i = 0; i < 48; i++) {
-    const a = (i / 48) * Math.PI * 2;
-    bounds.push({ x: Math.sin(a) * AMBUSH_RX, z: Math.cos(a) * AMBUSH_RZ });
-  }
+  for (let i = 0; i < 64; i++) bounds.push(ambushRim((i / 64) * Math.PI * 2));
   return {
     bounds,
     arena: { x: 0, z: 0, radius: AMBUSH_RX },

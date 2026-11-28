@@ -132,8 +132,8 @@ export function warriorNameKey(look: FighterLook): TextKey {
  */
 export function ambushSpawns(count: number, seed: number): { x: number; z: number }[] {
   const rnd = seededRandom(seed ^ 0x9e3779b9);
-  const spots = [{ x: 0.4, z: -7 }];
-  const others = [{ x: -6.0, z: -2.5 }, { x: 6.0, z: -4.0 }, { x: -0.4, z: -10.5 }];
+  const spots = [{ x: 0.4, z: -8 }];
+  const others = [{ x: -8.0, z: -3.0 }, { x: 8.0, z: -5.0 }, { x: -0.4, z: -12.0 }];
   for (let i = others.length - 1; i > 0; i--) {
     const j = Math.floor(rnd() * (i + 1));
     [others[i], others[j]] = [others[j], others[i]];

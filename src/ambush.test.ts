@@ -104,7 +104,10 @@ describe("metsäpolun kohtaus", () => {
     expect(walkableDepth(layout, 0, 13)).toBeGreaterThan(0);
     expect(walkableDepth(layout, 0, -13)).toBeGreaterThan(0);
     expect(walkableDepth(layout, 8, 0)).toBeGreaterThan(0);
-    expect(walkableDepth(layout, 11, 0)).toBeLessThan(0);
+    expect(walkableDepth(layout, 10.5, 0)).toBeGreaterThan(0);
+    expect(walkableDepth(layout, 12, 0)).toBeLessThan(0);
+    // Aloituskohdassa (z 13,5) aukio on yhä noin 16 m leveä.
+    expect(walkableDepth(layout, 7.5, 13.5)).toBeGreaterThan(0);
   });
   it("sankari saapuu takaa (+z) ja katsoo polkua pitkin eteen", () => {
     const s = entrySpawn(layout);
