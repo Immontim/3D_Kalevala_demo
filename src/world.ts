@@ -36,7 +36,7 @@ import { SCENE_IDS, type SceneId } from "./app/route";
 import { Forest, ScatterField, placeForestWall, type ScatterItem, type TreeSpot } from "./forest";
 import { createBirds, type BirdsView } from "./engine/birds";
 import { addFoliageFade } from "./engine/foliageFade";
-import { AMBUSH_RX, AMBUSH_RZ, entrySpawn, sceneLayout, walkableDepth, type Vec2 } from "./sceneLayout";
+import { AMBUSH_RX, AMBUSH_RZ, ambushRim, ambushShape, entrySpawn, sceneLayout, walkableDepth, type Vec2 } from "./sceneLayout";
 import { planSmithyLife, type SmithyLifePlan } from "./smithyLife";
 import { bellowsMotion, hammerMotion } from "./smithyMotion";
 import {
@@ -203,19 +203,20 @@ const WILDS = ARENA === "wilds";
 const AMBUSH = ARENA === "ambush";
 /** Väijytyksen keskiviiva: loiva mutka aukion läpi päästä päähän (polunsuut z = ±AMBUSH_RZ, x = 0). */
 const AMBUSH_PATH: Vec2[] = [
-  { x: 0, z: AMBUSH_RZ + 2 }, { x: 0.6, z: 9 }, { x: -0.8, z: 2 }, { x: 0.7, z: -5 }, { x: -0.4, z: -11 }, { x: 0, z: -AMBUSH_RZ - 2 },
+  { x: 0, z: AMBUSH_RZ + 2 }, { x: 0.6, z: 11 }, { x: -0.8, z: 3 }, { x: 0.7, z: -5 }, { x: -0.4, z: -12 }, { x: 0, z: -AMBUSH_RZ - 2 },
 ];
-/** Väijytyksen sommittelu: isot puut polun lähellä ja siirtolohkare, jonka voi kiertää molemmin puolin. */
+/** Väijytyksen sommittelu: isot puut polun lähellä ja siirtolohkare, jonka voi kiertää molemmin puolin
+ *  (polun puolelle jää noin 3 m, metsän puolelle noin 4 m). */
 const AMBUSH_PROPS = [
-  { key: "pine_b", x: -3.4, z: 6.5, s: 1.25, yaw: 0.4, clear: 1.4 },
-  { key: "birch_b", x: 2.9, z: 10.6, s: 1.15, yaw: 2.1, clear: 1.2 },
-  { key: "spruce_a", x: 3.7, z: -1.6, s: 1.2, yaw: 1.3, clear: 1.6 },
-  { key: "pine_a", x: -3.1, z: -8.6, s: 1.3, yaw: 5.0, clear: 1.4 },
-  { key: "rock_3", x: 4.3, z: 4.4, s: 2.3, yaw: 0.9, clear: 2.2 },
+  { key: "pine_b", x: -3.6, z: 7.5, s: 1.25, yaw: 0.4, clear: 1.4 },
+  { key: "birch_b", x: 3.2, z: 12.2, s: 1.15, yaw: 2.1, clear: 1.2 },
+  { key: "spruce_a", x: 4.2, z: -2.0, s: 1.2, yaw: 1.3, clear: 1.6 },
+  { key: "pine_a", x: -3.4, z: -9.5, s: 1.3, yaw: 5.0, clear: 1.4 },
+  { key: "rock_3", x: 4.8, z: 4.5, s: 2.3, yaw: 0.9, clear: 2.2 },
 ] as const;
-/** Onko piste väijytyksen soikean aukion sisällä (pad laajentaa). */
+/** Onko piste väijytyksen aukion sisällä (pad laajentaa). */
 function insideAmbush(x: number, z: number, pad: number) {
-  return (x / (AMBUSH_RX + pad)) ** 2 + (z / (AMBUSH_RZ + pad)) ** 2 < 1;
+  return ambushShape(x, z, pad) < 1;
 }
 /**
  * Kohtauksen varustus kampanjan varusteista: metsästysapajalla (erämaa) kilpi jää leiriin, joten
@@ -1393,10 +1394,10 @@ function populate(
   // Erämaa sijoittelee omat puunsa, kivensä ja kelonsa; alla olevat aukion kehät ohitetaan (0 kierrosta).
   if (WILDS) placeWilds(put, protos);
   // Väijytyksessä kehä kiertää soikiota (pidempi kehä, enemmän puita).
-  const ringCount = WILDS ? 0 : AMBUSH ? 36 : 26;
+  const ringCount = WILDS ? 0 : AMBUSH ? 40 : 26;
   for (let i = 0; i < ringCount; i++) {
     const a = (i / ringCount) * Math.PI * 2 + r() * 0.2, d = SITE.treeMin + 0.4 + r() * 3.5;
-    if (AMBUSH) tryTree(Math.cos(a) * AMBUSH_RX * (d / SITE.treeMin), Math.sin(a) * AMBUSH_RZ * (d / SITE.treeMin));
+    if (AMBUSH) { const p = ambushRim(a, d / SITE.treeMin); tryTree(p.x, p.z); }
     else tryTree(Math.cos(a) * d, Math.sin(a) * d);
   }
   for (let i = 0; i < (WILDS ? 0 : 520); i++) {
@@ -1410,6 +1411,8 @@ function populate(
     const d = SITE.treeMin - 2.2 + (i < 9 ? 0.6 + r() * 2 : 3 + r() * 38);      // treeMin - 2,2 = aukion reuna
     const x = Math.cos(a) * d, z = Math.sin(a) * d;
     if (blocked(x, z, 0.5)) continue;
+    // Metsäpolulla aukion keskiosa pysyy vapaana: kiviä vain metsän reunassa (alle 1,5 m reunasta).
+    if (AMBUSH && insideAmbush(x, z, -1.5)) continue;
     const s = i < 9 ? 0.35 + r() * 0.35 : 0.25 + r() * 0.75;
     put(`rock_${1 + Math.floor(r() * 6)}@near`, x, z, s, r() * 6.28, 0.05, 0.3);
   }
@@ -1469,8 +1472,9 @@ function populate(
     put("kuppikivi@near", CUPSTONE.x, CUPSTONE.z, 1, CUPSTONE.yaw, 0.12);
     for (const c of CAIRNS_AT) put(`${c.key}@near`, c.x, c.z, c.s, c.yaw, 0.03);
     put("karsikko@near", KARSIKKO.x, KARSIKKO.z, 1, 0.6, 0.15);
-  } else if (WILDS) {
-    // Erämaassa ei rakennuksia (placeWilds).
+  } else if (WILDS || AMBUSH) {
+    // Erämaassa ja metsäpolulla ei rakennuksia (placeWilds, AMBUSH_PROPS). Ilman tätä haaraa metsäpolulle
+    // rakentui viimeisen haaran piha, jonka aita jäi näkymättömäksi seinäksi (pihan malleja ei ladata).
   } else if (LAKESIDE) {
     // Mökki oven kanssa rantaan päin, laituri, vene ja ruovikko; pihalla halkopino, pölkky, penkki ja kuivausteline.
     place(RUIN ? "mokki_palanut@near" : "mokki@near", CABIN, 0.04);

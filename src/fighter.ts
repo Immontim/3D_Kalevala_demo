@@ -635,7 +635,7 @@ export class Fighter {
     const axeHead = axe ? axeSource?.getObjectByName(`kirves_${this.look.axe}`)?.clone(true) : undefined;
     let axeModel: THREE.Group | undefined;
     if (axeHead) {
-      // Kierto varren ympäri (ks. AXE_CHOP_POSES): oma ryhmä, jotta huotra- ja pudotuslogiikka käsittelee yhtä kappaletta.
+      // Kierto varren ympäri (ks. AXE_ROLL): oma ryhmä, jotta huotra- ja pudotuslogiikka käsittelee yhtä kappaletta.
       axeHead.position.set(0, 0, 0);
       axeModel = new THREE.Group();
       axeModel.name = `kirves_${this.look.axe}`;
@@ -1364,7 +1364,7 @@ export class Fighter {
     if (this.axeRoll) {
       // Ylälyönnissä miekan kehys liikkuu lappeen suuntaan; kirves kääntyy ranteesta neljänneskierroksen,
       // jotta terä (+x) johtaa. Sivalluksessa terä johtaa jo valmiiksi (mitattu pelissä 2026-11-26).
-      const goal = this.fall > 0 ? 0 : AXE_CHOP_POSES.has(target) ? AXE_CHOP_ROLL : 0;
+      const goal = this.fall > 0 ? 0 : AXE_ROLL.get(target) ?? 0;
       this.axeRollAngle += (goal - this.axeRollAngle) * (1 - Math.exp(-14 * dt));
       this.axeRoll.rotation.z = this.axeRollAngle;
     }
@@ -1380,8 +1380,11 @@ export class Fighter {
     const kh = 1 - Math.exp(-9 * dt);
     this.handOpen.R += (goalR - this.handOpen.R) * kh;
     this.handOpen.L += (goalL - this.handOpen.L) * kh;
+    // Kirveellä on oma valmiusasento (AXE_ARM): käsi koukussa lähempänä vartaloa, ei miekan ojennusta.
+    const axeArm = this.axeRoll ? AXE_ARM.get(target) : undefined;
     for (const key of KEYS) {
-      const goal = over && key in over ? over[key as keyof typeof over]! : target[key];
+      const goal = axeArm && key in axeArm ? axeArm[key]!
+        : over && key in over ? over[key as keyof typeof over]! : target[key];
       this.pose[key] += (goal - this.pose[key]) * k;
     }
     if (dt > 1e-6) this.strideVel += ((this.pose.stride - strideWas) / dt - this.strideVel) * (1 - Math.exp(-30 * dt));
@@ -1565,9 +1568,22 @@ const SPEAR_SLIDE = 0.3;
 /** Naisen otekanava (oikea käsi): arvio, ks. BLENDER_HANDOFF "Otekanavat"; nyrkkiä ei ole koverrettu. */
 const GRIP_CHANNEL_F = { p: new THREE.Vector3(-0.385, 0.769, 0.058), d: new THREE.Vector3(0.283, -0.537, 0.795).normalize() };
 const GRIP_CHANNEL = { p: new THREE.Vector3(-0.383, 0.795, 0.112), d: new THREE.Vector3(0.31, -0.06, 0.95).normalize() };
-/** Ylälyönnin asennot, joissa kirves kierretään varren ympäri (AXE_CHOP_ROLL: terä +x kehyksen −y:hen). */
-const AXE_CHOP_POSES = new Set<Pose>([POSES.windup, POSES.strike, POSES.heavyWindup, POSES.heavyStrike]);
-const AXE_CHOP_ROLL = -Math.PI / 2;
+/**
+ * Kirveen kierto varren ympäri asennoittain (rad; puuttuva = 0). Ylälyönnissä miekan kehys liikkuu lappeen
+ * suuntaan, joten kirves kääntyy neljänneskierroksen (terä +x kehyksen −y:hen); sivalluksessa terä johtaa jo.
+ * Valmiusasennossa terä käännetään osoittamaan eteen vastustajaa kohti.
+ */
+export const AXE_ROLL = new Map<Pose, number>([
+  [POSES.windup, -Math.PI / 2], [POSES.strike, -Math.PI / 2], [POSES.heavyWindup, -Math.PI / 2], [POSES.heavyStrike, -Math.PI / 2],
+  // Mitattu pelissä 2026-11-28 molemmilla vartaloilla: terä 0,89 eteen, kun varsi on 27° eteen kallellaan.
+  [POSES.guard, -1.35],
+]);
+/** Kirveen oikean käden asennot (korvaavat miekan arvot): valmiusasennossa olkavarsi lähellä kylkeä ja
+ *  kyynärpää koukussa, nyrkki rinnan korkeudella noin 0,3 m vartalon edessä ja varsi 27° eteen kallellaan,
+ *  eikä käsi sojota eteen kuten miekalla (omistajan palaute 2026-11-28). */
+export const AXE_ARM = new Map<Pose, Partial<Pose>>([
+  [POSES.guard, { rShX: -0.4, rShZ: -0.15, rEl: -1.95, rHandX: 1.15, rHandY: 0 }],
+]);
 /** Pohjan uusien vartaloiden otekanavat (docs/POHJA_WARRIORS.md, mitattu Blenderissä, pelin koordinaatit). */
 const GRIP_CHANNEL_POHJA: Record<PohjaBuild, { p: THREE.Vector3; d: THREE.Vector3 }> = {
   tanakka: { p: new THREE.Vector3(-0.4026, 0.7364, 0.0981), d: new THREE.Vector3(0.3324, -0.0135, 0.9431).normalize() },

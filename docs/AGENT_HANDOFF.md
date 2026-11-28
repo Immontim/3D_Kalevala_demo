@@ -6,11 +6,17 @@ Säännöt: `AGENTS.md`, kohta "Handoff: kontekstiin mahtuva, ei hautausmaa".
 
 ## Nykytila
 
-Päivitetty: 2026-11-26 (Claude, Windows; pohja `origin/main` `c716869`)
+Päivitetty: 2026-11-28 (Claude, Windows; pohja `origin/main` `598d9eb`)
 
-- **Koodiversio v08.08.00** branchissa `claude/ambush-forest-path` (tarkista merge `git merge-base`illa).
-  Koodi valmis, ei deployattu. Agentti testasi käsin kartalta asti; omistaja ei. Tarkistukset: ks. commit-viesti.
-  Omistajatestit puuttuvat: v08.06.03 (seppä, selkäkilpi), v08.07 (uudet soturit), v08.08 (väijytys).
+- **Koodiversio v08.08.01** branchissa `claude/ambush-polish` (tarkista merge `git merge-base`illa).
+  Koodi valmis, ei deployattu. Agentti testasi käsin (`?scene=ambush&site=ambush-4-n`); omistaja ei.
+  Omistaja pelasi v08.08.00:n: kirveen valmiusasento ja kapea polku korjattiin tässä. Omistajatestit
+  puuttuvat yhä: v08.06.03 (seppä, selkäkilpi) ja väijytyksen tasapaino.
+- **Väijytyksen korjaukset (v08.08.01).** `world.ts`:n kohtausketjun viimeinen `else` rakensi pihan
+  kaikille tunnistamattomille kohtauksille; väijytys saa nyt oman haaran (`WILDS || AMBUSH`). **Uusi kohtaus
+  tarvitsee oman haaran tähän ketjuun**, muuten pihan näkymätön aita tulee mukaan. Aukio on superellipsi
+  (`ambushShape`/`ambushRim`, `AMBUSH_RX` 11, `AMBUSH_RZ` 17, `AMBUSH_EXP` 2,5). Kirveen valmiusasento:
+  `AXE_ARM` (oikea käsi) ja `AXE_ROLL` (kierto asennoittain, `guard` −1,35) `fighter.ts`:ssä.
 - **Väijytys (v08.08; puhdas `ambush.ts`, `engine/ambush.ts`, `map/app.ts` `move`).** Kartta: onnistunut
   siirto ilman `siteIdAt`-paikkaa ja ei paluuaskel (`move(dir, true)`) → `rollsAmbush` (5 %) → `openScene
   ("ambush", "ambush-<siemen>-<n|e|s|w>")`; mitään ei tallenneta kartalle. `__map.setAmbushChance(1)` testeihin.
@@ -18,10 +24,9 @@ Päivitetty: 2026-11-26 (Claude, Windows; pohja `origin/main` `c716869`)
   suunta (kartta astuu lähtöruutuun), `forward` → null (jää). `ambushRoster(seed)` (mulberry32) ja
   `ambushSpawns`; soturit kerralla tasolla 0 / taito 0. `Encounter`-koukut: `keepCorpses` (ruumis `removeAt`
   Infinity), `onPlayerDeath(goToMap)` (ruoat pois `withoutFood`, paluu 3,5 s), `deathPending` (estää R:n);
-  `peaceful`-getteri tosi voiton jälkeen. Kohtaus `world.ts` `AMBUSH`: soikio `AMBUSH_RX` 9 × `AMBUSH_RZ` 15
-  (`sceneLayout.ts`), `insideAmbush` pitää metsän ulkona, `AMBUSH_PROPS` (4 isoa puuta, `rock_3` ×2,3, 0,7 m
-  maassa), `AMBUSH_PATH` läpi, ei tulta. `transition.ts` hyväksyy nyt kaikki `SCENE_IDS` (ennen käsin kirjoitettu
-  lista pudotti uuden kohtauksen paluukuorman). Kahden soturin taistelu: `renderBench` 4,7 ms (2,18 milj. kolmiota).
+  `peaceful`-getteri tosi voiton jälkeen. Kohtaus `world.ts` `AMBUSH`: `insideAmbush` pitää metsän ja kivet
+  ulkona, `AMBUSH_PROPS` (4 isoa puuta, `rock_3` ×2,3, 0,7 m maassa), `AMBUSH_PATH` läpi, ei tulta.
+  `transition.ts` hyväksyy kaikki `SCENE_IDS`. Kolmen soturin taistelu: `renderBench` 6,2 ms (2,14 milj. kolmiota).
 - **Pohjan uudet soturit ja kirves (v08.07, `fighter.ts`, `combat.ts`).** `FighterLook`: `build`
   (`tanakka`|`hoikka`, vain `character: "pohja"`; vartalo `pohja_<build>.glb`:stä kuten naissankarin
   `villagers_f.glb`), `tunic` (`vaalea`|`tumma`, oletus tumma), `axe` (`parta`|`karjala`, `kirveet.glb`;
@@ -30,7 +35,7 @@ Päivitetty: 2026-11-26 (Claude, Windows; pohja `origin/main` `c716869`)
   Uusilla vartaloilla ei ole säärisuojaosaa (`greaves` vaikuttaa vain laskentaan). Kirves = `WEAPONS.axe`:
   reach −0,15, slowness 1,15, damage 1,2, overhead 1,1 / slash 1, ei pistoa, `shieldWear` 1,5 (uusi
   `WeaponDef`-kenttä, kertoo `shieldDamage`n). Kirves kiertyy varren ympäri −90° ylälyönnin asennoissa
-  (`AXE_CHOP_POSES`), muuten 0: mitattuna terä johtaa ylälyönnissä 0,84–0,93 ja sivalluksessa 0,45–0,75
+  (`AXE_ROLL`): mitattuna terä johtaa ylälyönnissä 0,84–0,93 ja sivalluksessa 0,45–0,75
   (ilman kiertoa ylälyönti meni lappeella). `ai.ts` arpoo vain aseen omista iskuista. Konsoli:
   `__game.showcase(true, undefined, "pohja")`, `__game.addWarrior(look, x, z)`.
 - **Sepän paja (v08.06, `smithyLayout.ts`, `smithyLife.ts`, `world.ts`, `world/content.ts`).** Käynti arpoo
@@ -44,13 +49,9 @@ Päivitetty: 2026-11-26 (Claude, Windows; pohja `origin/main` `c716869`)
 - **Uhri ennen laulua (v08.02, `content.ts`).** `ASK_SONG`: `ask-song` → `sage.offeringAsked` + `revealSite
   cairn-b`; `ask-song-taught` (`offering.made`) → `songIntro`; odotus `sage.offeringAwaited` → `askOffering`.
   Esineillä `tags` (`ItemTag` `"meat"`); ehto `hasTagged`, efekti `takeTagged` (`tryRemoveTagged`).
-- **Pitkäkestoiset efektit (v08.01, `map/longEffects.ts`).** `CampaignPlayer.effects` = `{ id, until }`
-  (maailma-aika, salliva luku). Kolme paikkaa; sama efekti alkaa alusta, neljäs eri epäonnistuu. Moottorin
-  efekti `addLongEffect`; 3D `transition.applyLongEffects` (muunnin `long-effect:<id>:<stat>`).
-- **Kuppikivi (v08.01–02, `cupstoneDialogue`).** Louhen kalmistolla puhuteltava `kuppikivi`, `cairn-b`:llä
-  `uhrikivi`; vain uhrikivellä "Ota uhrit…". "Ukon muistan…" → `ukko_blessing` + `markMoon`.
-- **Mökki ja kalmistot ovat instansseja (v08.00, `map/sites.ts`).** `lakeside`, `cairnfield` ja `cairn-b`
-  arvotaan rannoille (`placeShoreSites`) ennen pihoja; vanha tallennus `completeSiteInstances`.
+- **Pitkäkestoiset efektit (v08.01, `map/longEffects.ts`)**: kolme paikkaa, `addLongEffect`,
+  `transition.applyLongEffects`. **Kuppikivi** (`cupstoneDialogue`): `ukko_blessing` + `markMoon`.
+- **Mökki ja kalmistot ovat instansseja (v08.00, `map/sites.ts`)**, arvotaan rannoille (`placeShoreSites`).
 - **Piha (v07.02–v07.04, `content.ts`, `world.ts`, `yardLife.ts`).** Neito `vuode`lla (`archer.healed`,
   `archer.died-*`, `engine/leave.ts`). `housewifeDialogue(npc)` (`emanta`, `emanta_b`): huhu, kuukausittainen
   apaja, tervehdykset `meetingRules`; ruoka `householdFood`/`theftRule` (`world/instances.ts`).
@@ -107,10 +108,8 @@ Päivitetty: 2026-11-26 (Claude, Windows; pohja `origin/main` `c716869`)
   (**pelin oikea data**). Jokaisella säännöllä ja dialogilla pakollinen `intent`. Konsoli `__world`:
   `flags`, `counters`, `post`, `explain`, `describe()`, `items`. Dialogi 3D:ssä `engine/dialogue.ts`.
 - **Rauhallisten 3D-kohtausten esineet.** `sceneInteraction.ts` valitsee katseakselilta enintään 2,8 m:n
-  päässä olevan esineen (tai `Pickable`n); HUDin piste näyttää nimen, varkauden ja täyden inventaarion.
-  Käytä-ele lukitsee painallushetken kohteen ja ratkaisee oton eleen keskellä. Tallennus ennen 3D-juuren
-  poistoa; epäonnistunut tallennus jättää esineen paikalleen. Instanssit: `lakeside.sage-pack` (myös
-  `lakeruin`) sekä pihassa `<pihan tunniste>.table-flatbread` (3) ja `.table-dried-fish` (3).
+  päässä olevan esineen (tai `Pickable`n). Käytä-ele lukitsee kohteen; tallennus ennen 3D-juuren poistoa,
+  epäonnistunut tallennus jättää esineen paikalleen.
 - **Esinedomain ja pysyvyys.** `CampaignWorld.sceneItems` tallentaa otetut instanssit, `allowed|theft`-
   lupapoikkeamat, varkaustietueet sekä varauksen myöhemmille pudotetuille
   esineille (paikka, kierto, määrä ja seuraava tunniste). `setSceneItemTakeMode`
@@ -249,7 +248,7 @@ Päivitetty: 2026-11-26 (Claude, Windows; pohja `origin/main` `c716869`)
 
 ## Seuraava tehtävä
 
-Omistajan pelitesti (v08.08.00): väijytyksen tiheys (5 %), 1–3 soturin vaikeus, kirveen tuntuma ja metsäpolun
+Omistajan pelitesti (v08.08.01): leveämpi metsäpolku ja kirveen valmiusasento, väijytyksen tiheys (5 %), 1–3 soturin vaikeus ja polun
 ilme; samalla uudet soturit liikkeessä (helman läpimeno pitkässä askeleessa) ja v08.06.03:n seppä ja selkäkilpi.
 Palautteen jälkeen: rannan väijytys (tietäjän rannan mukaelma) tai kaatuneiden saalis.
 
